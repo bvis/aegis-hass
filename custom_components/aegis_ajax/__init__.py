@@ -151,6 +151,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
             device_id=entry.data.get("device_id"),
             app_label=entry.data.get("app_label", ""),
         )
+    # Restore session token from stored data to skip re-login (and 2FA) on restart
+    if entry.data.get("session_token") and entry.data.get("user_hex_id"):
+        client.session.set_session(entry.data["session_token"], entry.data["user_hex_id"])
     await client.connect()
     coordinator = AjaxCobrandedCoordinator(
         hass=hass,

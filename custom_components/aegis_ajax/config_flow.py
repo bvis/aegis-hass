@@ -144,16 +144,17 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             if self._client is None:
                 raise RuntimeError("Client not initialized")
-            return self.async_create_entry(
-                title=f"Ajax Security ({self._email})",
-                data={
-                    "email": self._email,
-                    "password_hash": self._password_hash,
-                    "app_label": self._app_label,
-                    "spaces": user_input["spaces"],
-                    "device_id": self._client.session.device_id,
-                },
-            )
+            data: dict[str, Any] = {
+                "email": self._email,
+                "password_hash": self._password_hash,
+                "app_label": self._app_label,
+                "spaces": user_input["spaces"],
+                "device_id": self._client.session.device_id,
+            }
+            if self._client.session.session_token:
+                data["session_token"] = self._client.session.session_token
+                data["user_hex_id"] = self._client.session.user_hex_id
+            return self.async_create_entry(title=f"Ajax Security ({self._email})", data=data)
         if self._client:
             spaces_api = SpacesApi(self._client)
             spaces = await spaces_api.list_spaces()
@@ -182,31 +183,22 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
 
         if user_input is not None:
-            email = user_input["email"]
-            password_hash = AjaxSession.hash_password(user_input["password"])
-            app_label = user_input.get("app_label", entry.data.get("app_label", APPLICATION_LABEL))
+            self._email = user_input["email"]
+            self._password_hash = AjaxSession.hash_password(user_input["password"])
+            self._app_label = user_input.get("app_label", entry.data.get("app_label", APPLICATION_LABEL))
             try:
-                client = AjaxGrpcClient(
-                    email=email,
-                    password_hash=password_hash,
-                    app_label=app_label,
+                self._client = AjaxGrpcClient(
+                    email=self._email,
+                    password_hash=self._password_hash,
+                    app_label=self._app_label,
                 )
-                await client.connect()
-                await asyncio.wait_for(client.login(), timeout=30)
-                await client.close()
-                # Update unique_id if email changed
-                if email != entry.unique_id:
-                    await self.async_set_unique_id(email)
-                    self._abort_if_unique_id_configured(updates={"email": email})
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data={
-                        **entry.data,
-                        "email": email,
-                        "password_hash": password_hash,
-                        "app_label": app_label,
-                    },
-                )
+                await self._client.connect()
+                await asyncio.wait_for(self._client.login(), timeout=30)
+                await self._client.close()
+                return await self._async_finish_reconfigure()
+            except TwoFactorRequiredError as e:
+                self._request_id = e.request_id
+                return await self.async_step_reconfigure_2fa()
             except AuthenticationError:
                 errors["base"] = "invalid_auth"
             except (ConnectionError, OSError, TimeoutError):
@@ -235,6 +227,50 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    async def async_step_reconfigure_2fa(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle 2FA during reconfiguration."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                assert self._client is not None
+                await asyncio.wait_for(
+                    self._client.login_totp(
+                        email=self._email,
+                        request_id=self._request_id,
+                        totp_code=user_input["totp_code"],
+                    ),
+                    timeout=30,
+                )
+                await self._client.close()
+                return await self._async_finish_reconfigure()
+            except AuthenticationError:
+                errors["base"] = "invalid_totp"
+            except TimeoutError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error during reconfigure 2FA")
+                errors["base"] = "unknown"
+        return self.async_show_form(step_id="reconfigure_2fa", data_schema=TOTP_SCHEMA, errors=errors)
+
+    async def _async_finish_reconfigure(self) -> ConfigFlowResult:
+        """Persist new credentials and reload the entry."""
+        entry = self._get_reconfigure_entry()
+        if self._email != entry.unique_id:
+            await self.async_set_unique_id(self._email)
+            self._abort_if_unique_id_configured(updates={"email": self._email})
+        data: dict[str, Any] = {
+            **entry.data,
+            "email": self._email,
+            "password_hash": self._password_hash,
+            "app_label": self._app_label,
+        }
+        if self._client is not None and self._client.session.session_token:
+            data["session_token"] = self._client.session.session_token
+            data["user_hex_id"] = self._client.session.user_hex_id
+        return self.async_update_reload_and_abort(entry, data=data)
 
     @staticmethod
     @callback

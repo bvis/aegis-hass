@@ -28,6 +28,11 @@
                     "password": "Password",
                     "app_label": "App label (co-branded app name)"
                 }
+            },
+            "reconfigure_2fa": {
+                "title": "Two-Factor Authentication",
+                "description": "Enter the 6-digit code from your authenticator app.",
+                "data": {"totp_code": "TOTP Code"}
             }
         },
         "error": {

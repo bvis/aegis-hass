@@ -10,6 +10,22 @@ from typing import TYPE_CHECKING, Any
 
 import grpc
 
+# Proto imports use C extensions (protobuf). Import at module level so HA's
+# async event loop never triggers a blocking-import violation at runtime.
+_PROTO_PATH = str(Path(__file__).parent.parent / "proto")
+if _PROTO_PATH not in sys.path:
+    sys.path.append(_PROTO_PATH)
+
+from v3.mobilegwsvc.commonmodels.type import user_role_pb2  # noqa: E402, PLC0415
+from v3.mobilegwsvc.service.login_by_password import (  # noqa: E402, PLC0415
+    endpoint_pb2_grpc as login_password_grpc,
+    request_pb2 as login_password_req,
+)
+from v3.mobilegwsvc.service.login_by_totp import (  # noqa: E402, PLC0415
+    endpoint_pb2_grpc as login_totp_grpc,
+    request_pb2 as login_totp_req,
+)
+
 from custom_components.aegis_ajax.api.session import (
     AjaxSession,
     AuthenticationError,
@@ -152,17 +168,11 @@ class AjaxGrpcClient:
 
     async def login(self) -> None:
         """Authenticate with Ajax servers via gRPC."""
-        from v3.mobilegwsvc.commonmodels.type import user_role_pb2  # noqa: PLC0415
-        from v3.mobilegwsvc.service.login_by_password import (  # noqa: PLC0415
-            endpoint_pb2_grpc,
-            request_pb2,
-        )
-
         channel = self._get_channel()
-        stub = endpoint_pb2_grpc.LoginByPasswordServiceStub(channel)
+        stub = login_password_grpc.LoginByPasswordServiceStub(channel)
         params = self._session.get_login_params()
 
-        request = request_pb2.LoginByPasswordRequest(
+        request = login_password_req.LoginByPasswordRequest(
             email=params["email"],
             password_sha256_hash=params["password_sha256_hash"],
             user_role=user_role_pb2.USER_ROLE_USER,
@@ -192,16 +202,10 @@ class AjaxGrpcClient:
 
     async def login_totp(self, email: str, request_id: str, totp_code: str) -> None:
         """Complete 2FA authentication by submitting the TOTP code."""
-        from v3.mobilegwsvc.commonmodels.type import user_role_pb2  # noqa: PLC0415
-        from v3.mobilegwsvc.service.login_by_totp import (  # noqa: PLC0415
-            endpoint_pb2_grpc,
-            request_pb2,
-        )
-
         channel = self._get_channel()
-        stub = endpoint_pb2_grpc.LoginByTotpServiceStub(channel)
+        stub = login_totp_grpc.LoginByTotpServiceStub(channel)
 
-        request = request_pb2.LoginByTotpRequest(
+        request = login_totp_req.LoginByTotpRequest(
             email=email,
             user_role=user_role_pb2.USER_ROLE_USER,
             totp=totp_code,
