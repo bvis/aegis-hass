@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.const import CONF_FORCE_ARM, DOMAIN, MANUFACTURER, SecurityState
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -237,12 +238,15 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCo
         space = coordinator.spaces.get(space_id)
         hub_id = space.hub_id if space else space_id
         hub_device = coordinator.devices.get(hub_id)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, hub_id)},
-            name=space.name if space else "Ajax Hub",
-            manufacturer=MANUFACTURER,
-            model=hub_device.device_type.replace("_", " ").title() if hub_device else "Hub",
-        )
+        if hub_device:
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
+        else:
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, hub_id)},
+                name=space.name if space else "Ajax Hub",
+                manufacturer=MANUFACTURER,
+                model="Hub",
+            )
 
     def _get_options(self) -> dict[str, Any]:
         """Return config entry options, or empty dict if entry is unavailable."""

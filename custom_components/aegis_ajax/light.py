@@ -10,12 +10,11 @@ from homeassistant.components.light import (  # type: ignore[attr-defined]
     ColorMode,
     LightEntity,
 )
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
-from custom_components.aegis_ajax.const import DOMAIN, MANUFACTURER
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -70,13 +69,7 @@ class AjaxLight(CoordinatorEntity[AjaxCobrandedCoordinator], LightEntity):
         self._attr_unique_id = f"aegis_ajax_{device_id}_light_{channel}"
         device = coordinator.devices.get(device_id)
         if device:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, device.id)},
-                name=device.name,
-                manufacturer=MANUFACTURER,
-                model=device.device_type.replace("_", " ").title(),
-                via_device=(DOMAIN, device.hub_id),
-            )
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     @property
     def _device(self) -> Device | None:

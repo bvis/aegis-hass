@@ -14,6 +14,7 @@ class TestAjaxSecurityEvent:
         coordinator.spaces = {
             "space-1": MagicMock(hub_id="hub-1", name="Home"),
         }
+        coordinator.devices = {}
         return AjaxSecurityEvent(coordinator=coordinator, space_id="space-1")
 
     def test_unique_id(self) -> None:

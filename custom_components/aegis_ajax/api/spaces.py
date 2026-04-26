@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from custom_components.aegis_ajax.api.models import Space
+from custom_components.aegis_ajax.api.models import Room, Space
 from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
 
 if TYPE_CHECKING:
@@ -54,6 +54,49 @@ class SpacesApi:
             return []
 
         return [self.parse_space(s) for s in response.success.spaces]
+
+    async def list_rooms(self, space_id: str) -> list[Room]:
+        """Return the rooms defined in the given space.
+
+        Reads the snapshot message from `SpaceService/stream` and closes
+        the stream — rooms rarely change so we don't keep it open.
+        """
+        from systems.ajax.api.mobile.v2.common.space import (  # noqa: PLC0415
+            space_locator_pb2,
+        )
+        from systems.ajax.api.mobile.v2.space import (  # noqa: PLC0415
+            space_endpoints_pb2_grpc,
+            stream_space_updates_request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = space_endpoints_pb2_grpc.SpaceServiceStub(channel)
+
+        request = stream_space_updates_request_pb2.StreamSpaceUpdatesRequest(
+            space_locator=space_locator_pb2.SpaceLocator(space_id=space_id),
+        )
+        stream = stub.stream(request, metadata=metadata, timeout=15)
+
+        rooms: list[Room] = []
+        try:
+            async for msg in stream:
+                if msg.HasField("failure"):
+                    _LOGGER.debug("Failed to stream space %s for rooms snapshot", space_id)
+                    break
+                if not msg.HasField("success"):
+                    continue
+                if msg.success.WhichOneof("success") != "snapshot":
+                    continue
+                for proto_room in msg.success.snapshot.rooms:
+                    rooms.append(Room(id=proto_room.id, name=proto_room.name, space_id=space_id))
+                break
+        finally:
+            cancel = getattr(stream, "cancel", None)
+            if callable(cancel):
+                cancel()
+
+        return rooms
 
     async def press_panic_button(
         self,

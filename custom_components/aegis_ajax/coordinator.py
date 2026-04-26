@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
     from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
-    from custom_components.aegis_ajax.api.models import Device, Space
+    from custom_components.aegis_ajax.api.models import Device, Room, Space
     from custom_components.aegis_ajax.notification import AjaxNotificationListener
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,6 +75,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._media_api = MediaApi(client)
         self.spaces: dict[str, Space] = {}
         self.devices: dict[str, Device] = {}
+        self.rooms: dict[str, Room] = {}
         self.sim_info: dict[str, SimCardInfo] = {}
         self._notification_listener: AjaxNotificationListener | None = None
         self._stream_tasks: list[asyncio.Task[None]] = []
@@ -85,6 +86,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._optimistic_space_states: dict[str, tuple[float, Any]] = {}
         # SIM info is mostly static — cache and refresh once per hour
         self._sim_info_last_fetch: float = 0.0
+        # Rooms rarely change — cache and refresh once per hour. None means
+        # never fetched yet so the first poll always populates rooms.
+        self._rooms_last_fetch: float | None = None
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
@@ -209,6 +213,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         if sim:
                             self.sim_info[space.hub_id] = sim
                 self._sim_info_last_fetch = now
+
+            # Fetch rooms for each space (cached, refresh once per hour). Used
+            # to set `suggested_area` on device entries so HA can auto-assign
+            # devices to areas matching their Ajax rooms.
+            rooms_refresh_interval = 3600.0
+            if (
+                self._rooms_last_fetch is None
+                or now - self._rooms_last_fetch > rooms_refresh_interval
+            ):
+                refreshed_rooms: dict[str, Room] = {}
+                for space_id in self.spaces:
+                    try:
+                        space_rooms = await self._spaces_api.list_rooms(space_id)
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.debug("Failed to fetch rooms for space %s", space_id, exc_info=True)
+                        continue
+                    for room in space_rooms:
+                        refreshed_rooms[room.id] = room
+                self.rooms = refreshed_rooms
+                self._rooms_last_fetch = now
 
             # Start persistent device streams on first update (once only)
             if not self._streams_started:

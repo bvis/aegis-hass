@@ -8,11 +8,10 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.aegis_ajax.const import DOMAIN, MANUFACTURER
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -159,14 +158,7 @@ class AjaxSensor(CoordinatorEntity[AjaxCobrandedCoordinator], SensorEntity):
         self._attr_entity_registry_enabled_default = self._type_info.entity_registry_enabled_default
         device = coordinator.devices.get(device_id)
         if device:
-            is_hub = device.device_type.startswith("hub")
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, device.id)},
-                name=device.name,
-                manufacturer=MANUFACTURER,
-                model=device.device_type.replace("_", " ").title(),
-                **({} if is_hub else {"via_device": (DOMAIN, device.hub_id)}),
-            )
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     @property
     def _device(self) -> Device | None:
@@ -204,12 +196,7 @@ class AjaxSimBaseSensor(CoordinatorEntity[AjaxCobrandedCoordinator], SensorEntit
         # Find hub device to populate device_info
         hub_device = coordinator.devices.get(hub_id)
         if hub_device:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, hub_id)},
-                name=hub_device.name,
-                manufacturer=MANUFACTURER,
-                model=hub_device.device_type.replace("_", " ").title(),
-            )
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
 
     @property
     def _sim_info(self) -> SimCardInfo | None:
@@ -253,12 +240,7 @@ class _HubNetworkSensor(CoordinatorEntity[AjaxCobrandedCoordinator], SensorEntit
         self._hub_id = hub_id
         hub_device = coordinator.devices.get(hub_id)
         if hub_device:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, hub_id)},
-                name=hub_device.name,
-                manufacturer=MANUFACTURER,
-                model=hub_device.device_type.replace("_", " ").title(),
-            )
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
 
     @property
     def available(self) -> bool:

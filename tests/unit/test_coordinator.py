@@ -94,6 +94,48 @@ class TestCoordinatorInit:
         coordinator = _make_coordinator()
         assert coordinator.hub_network == {}
 
+    def test_rooms_initially_empty(self) -> None:
+        coordinator = _make_coordinator()
+        assert coordinator.rooms == {}
+
+
+class TestRoomsRefresh:
+    @pytest.mark.asyncio
+    async def test_rooms_populated_from_spaces_api(self) -> None:
+        from custom_components.aegis_ajax.api.models import Room
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.list_rooms = AsyncMock(
+            return_value=[Room(id="r1", name="Kitchen", space_id="s1")]
+        )
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator.rooms == {"r1": Room(id="r1", name="Kitchen", space_id="s1")}
+
+    @pytest.mark.asyncio
+    async def test_rooms_failure_swallowed(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.list_rooms = AsyncMock(side_effect=RuntimeError("oops"))
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        # Should not raise — failure is downgraded to debug log
+        await coordinator._async_update_data()
+        assert coordinator.rooms == {}
+
 
 class TestAsyncUpdateData:
     @pytest.mark.asyncio

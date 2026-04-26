@@ -4,6 +4,7 @@ from custom_components.aegis_ajax.api.models import (
     BatteryInfo,
     Device,
     DeviceCommand,
+    Room,
     Space,
 )
 from custom_components.aegis_ajax.const import (
@@ -102,6 +103,14 @@ class TestDevice:
             battery=None,
         )
         assert device.is_online is False
+
+
+class TestRoom:
+    def test_creation(self) -> None:
+        room = Room(id="r1", name="Kitchen", space_id="s1")
+        assert room.id == "r1"
+        assert room.name == "Kitchen"
+        assert room.space_id == "s1"
 
 
 class TestDeviceCommand:

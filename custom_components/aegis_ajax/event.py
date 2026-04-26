@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.const import ALL_EVENT_TYPES, DOMAIN, MANUFACTURER
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -44,12 +45,16 @@ class AjaxSecurityEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         hub_id = space.hub_id if space else space_id
         self._attr_unique_id = f"aegis_ajax_{hub_id}_event"
         self._attr_event_types = ALL_EVENT_TYPES
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, hub_id)},
-            name=space.name if space else "Ajax Hub",
-            manufacturer=MANUFACTURER,
-            model="Hub",
-        )
+        hub_device = coordinator.devices.get(hub_id)
+        if hub_device:
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
+        else:
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, hub_id)},
+                name=space.name if space else "Ajax Hub",
+                manufacturer=MANUFACTURER,
+                model="Hub",
+            )
 
     @property
     def event_types(self) -> list[str]:

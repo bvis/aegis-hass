@@ -117,9 +117,35 @@ class TestAjaxSensor:
         device = self._make_device({})
         coordinator = MagicMock()
         coordinator.devices = {"dev-1": device}
+        coordinator.rooms = {}
         sensor = AjaxSensor(coordinator=coordinator, device_id="dev-1", sensor_key="battery_level")
         assert sensor._attr_device_info is not None
         assert ("aegis_ajax", "dev-1") in sensor._attr_device_info["identifiers"]
+        # Issue #55: expose Ajax device id as HA serial number
+        assert sensor._attr_device_info.get("serial_number") == "dev-1"
+
+    def test_device_info_includes_suggested_area_from_room(self) -> None:
+        from custom_components.aegis_ajax.api.models import Room
+
+        device = Device(
+            id="dev-r",
+            hub_id="hub-1",
+            name="Hallway Sensor",
+            device_type="motion_protect",
+            room_id="room-9",
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+        coordinator = MagicMock()
+        coordinator.devices = {"dev-r": device}
+        coordinator.rooms = {"room-9": Room(id="room-9", name="Hallway", space_id="s1")}
+        sensor = AjaxSensor(coordinator=coordinator, device_id="dev-r", sensor_key="battery_level")
+        assert sensor._attr_device_info is not None
+        assert sensor._attr_device_info.get("suggested_area") == "Hallway"
 
     def test_device_info_without_device(self) -> None:
         coordinator = MagicMock()

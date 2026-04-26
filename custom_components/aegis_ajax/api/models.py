@@ -37,6 +37,15 @@ class Space:
 
 
 @dataclass(frozen=True)
+class Room:
+    """Represents an Ajax room within a space."""
+
+    id: str
+    name: str
+    space_id: str
+
+
+@dataclass(frozen=True)
 class BatteryInfo:
     """Battery status for a device."""
 

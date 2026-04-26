@@ -6,12 +6,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.camera import PHOD_DEVICE_TYPES
-from custom_components.aegis_ajax.const import DOMAIN, MANUFACTURER
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -58,13 +57,7 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
         self._attr_unique_id = f"aegis_ajax_{device_id}_capture_photo"
         device = coordinator.devices.get(device_id)
         if device:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, device.id)},
-                name=device.name,
-                manufacturer=MANUFACTURER,
-                model=device.device_type.replace("_", " ").title(),
-                via_device=(DOMAIN, device.hub_id),
-            )
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     async def async_press(self) -> None:
         """Trigger photo capture and retrieve the photo URL."""

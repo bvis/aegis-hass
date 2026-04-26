@@ -6,12 +6,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
-from custom_components.aegis_ajax.const import DOMAIN, MANUFACTURER
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -88,13 +87,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
             self._attr_name = None
         device = coordinator.devices.get(device_id)
         if device:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, device.id)},
-                name=device.name,
-                manufacturer=MANUFACTURER,
-                model=device.device_type.replace("_", " ").title(),
-                via_device=(DOMAIN, device.hub_id),
-            )
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     @property
     def _device(self) -> Device | None:

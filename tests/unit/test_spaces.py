@@ -11,6 +11,9 @@ from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
 
 _FIND_SPACES_BASE = "v3.mobilegwsvc.service.find_user_spaces_with_pagination"
+_STREAM_SPACE_REQUEST = "systems.ajax.api.mobile.v2.space.stream_space_updates_request_pb2"
+_SPACE_GRPC = "systems.ajax.api.mobile.v2.space.space_endpoints_pb2_grpc"
+_SPACE_LOCATOR = "systems.ajax.api.mobile.v2.common.space.space_locator_pb2"
 
 
 class TestParseSpace:
@@ -136,6 +139,114 @@ class TestListSpaces:
             spaces = await api.list_spaces()
 
         assert spaces == []
+
+
+class _AsyncIter:
+    """Minimal async iterator that mirrors the grpc stream API used by SpacesApi."""
+
+    def __init__(self, src: list) -> None:
+        self._src = list(src)
+
+    def __aiter__(self) -> _AsyncIter:
+        return self
+
+    async def __anext__(self) -> object:
+        if not self._src:
+            raise StopAsyncIteration
+        return self._src.pop(0)
+
+    def cancel(self) -> None:
+        self._src.clear()
+
+
+def _async_iter(items: list) -> _AsyncIter:
+    return _AsyncIter(items)
+
+
+class TestListRooms:
+    @pytest.mark.asyncio
+    async def test_list_rooms_returns_snapshot_rooms(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        room1 = MagicMock()
+        room1.id = "r1"
+        room1.name = "Kitchen"
+        room2 = MagicMock()
+        room2.id = "r2"
+        room2.name = "Bedroom"
+
+        snapshot_msg = MagicMock()
+        snapshot_msg.HasField.side_effect = lambda f: f == "success"
+        snapshot_msg.success.WhichOneof.return_value = "snapshot"
+        snapshot_msg.success.snapshot.rooms = [room1, room2]
+
+        update_msg = MagicMock()
+        update_msg.HasField.side_effect = lambda f: f == "success"
+        update_msg.success.WhichOneof.return_value = "update"
+
+        stream = _async_iter([snapshot_msg, update_msg])
+        stub_instance = MagicMock()
+        stub_instance.stream = MagicMock(return_value=stream)
+        stub_class = MagicMock(return_value=stub_instance)
+
+        request_pb2 = MagicMock()
+        grpc_module = MagicMock(SpaceServiceStub=stub_class)
+        locator_pb2 = MagicMock()
+        locator_pb2.SpaceLocator = MagicMock(return_value="locator-marker")
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: request_pb2,
+                _SPACE_GRPC: grpc_module,
+                _SPACE_LOCATOR: locator_pb2,
+            },
+        ):
+            rooms = await api.list_rooms("space-1")
+
+        assert len(rooms) == 2
+        assert rooms[0].id == "r1"
+        assert rooms[0].name == "Kitchen"
+        assert rooms[0].space_id == "space-1"
+        assert rooms[1].name == "Bedroom"
+        # We close the stream after the first snapshot rather than draining it
+        assert stream._src == []
+        locator_pb2.SpaceLocator.assert_called_once_with(space_id="space-1")
+
+    @pytest.mark.asyncio
+    async def test_list_rooms_returns_empty_on_failure(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        failure_msg = MagicMock()
+        failure_msg.HasField.side_effect = lambda f: f == "failure"
+
+        stream = _async_iter([failure_msg])
+        stub_instance = MagicMock()
+        stub_instance.stream = MagicMock(return_value=stream)
+
+        request_pb2 = MagicMock()
+        grpc_module = MagicMock(SpaceServiceStub=MagicMock(return_value=stub_instance))
+        locator_pb2 = MagicMock()
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: request_pb2,
+                _SPACE_GRPC: grpc_module,
+                _SPACE_LOCATOR: locator_pb2,
+            },
+        ):
+            rooms = await api.list_rooms("space-1")
+
+        assert rooms == []
 
 
 _PANIC_REQUEST = "systems.ajax.api.mobile.v2.space.press_panic_button_request_pb2"

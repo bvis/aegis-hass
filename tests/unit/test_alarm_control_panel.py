@@ -149,6 +149,7 @@ class TestAlarmControlPanel:
     def test_device_info_with_space(self) -> None:
         coordinator = MagicMock()
         coordinator.spaces = {"s1": self._make_space()}
+        coordinator.devices = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel._attr_device_info is not None
         assert (
@@ -159,6 +160,7 @@ class TestAlarmControlPanel:
     def test_device_info_without_space(self) -> None:
         coordinator = MagicMock()
         coordinator.spaces = {}
+        coordinator.devices = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel._attr_device_info is not None
 
