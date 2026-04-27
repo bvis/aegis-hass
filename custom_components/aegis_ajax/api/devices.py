@@ -440,9 +440,7 @@ class DevicesApi:
                                                 else True
                                             )
                                         elif status_name == "wifi_signal_level_status":
-                                            payload["value"] = int(
-                                                status.wifi_signal_level_status
-                                            )
+                                            payload["value"] = int(status.wifi_signal_level_status)
 
                                         on_status_update(
                                             device_id,
