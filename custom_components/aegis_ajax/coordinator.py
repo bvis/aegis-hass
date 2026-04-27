@@ -50,6 +50,16 @@ _STATUS_KEY_MAP: dict[str, str] = {
     "wire_input_status": "wire_input_alert",
 }
 
+# Statuses whose snapshot parser writes more than the single mapped key.
+# Used by the REMOVE op so stale sub-keys don't linger after the hub drops
+# the parent status from the stream.
+_STATUS_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
+    "motion_detected": ("motion_detected_at",),
+    "life_quality": ("temperature", "humidity", "co2"),
+    "gsm_status": ("mobile_network_type", "gsm_connected"),
+    "wire_input_status": ("wire_input_alarm_type",),
+}
+
 
 class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(
@@ -371,8 +381,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if op == 3:  # REMOVE
             new_statuses.pop(key, None)
-            if status_name == "wire_input_status":
-                new_statuses.pop("wire_input_alarm_type", None)
+            for sub_key in _STATUS_EXTRA_KEYS.get(status_name, ()):
+                new_statuses.pop(sub_key, None)
         elif "values" in data:
             new_statuses.update(data["values"])
         elif "value" in data:

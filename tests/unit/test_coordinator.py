@@ -479,6 +479,76 @@ class TestStreamHandlers:
         assert "wire_input_alert" not in coordinator.devices["d1"].statuses
         assert "wire_input_alarm_type" not in coordinator.devices["d1"].statuses
 
+    def test_handle_status_update_life_quality_remove_drops_all_sub_keys(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        device = Device(
+            id="d1",
+            hub_id="hub-1",
+            name="Life Quality",
+            device_type="life_quality",
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={"temperature": 21, "humidity": 58, "co2": 742},
+            battery=None,
+        )
+        coordinator.devices["d1"] = device
+
+        coordinator._handle_status_update("d1", "life_quality", {"op": 3})
+
+        statuses = coordinator.devices["d1"].statuses
+        assert "temperature" not in statuses
+        assert "humidity" not in statuses
+        assert "co2" not in statuses
+
+    def test_handle_status_update_gsm_status_remove_drops_all_sub_keys(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        device = Device(
+            id="d1",
+            hub_id="hub-1",
+            name="Hub",
+            device_type="hub_two_4g",
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={"mobile_network_type": "4G", "gsm_connected": True},
+            battery=None,
+        )
+        coordinator.devices["d1"] = device
+
+        coordinator._handle_status_update("d1", "gsm_status", {"op": 3})
+
+        statuses = coordinator.devices["d1"].statuses
+        assert "mobile_network_type" not in statuses
+        assert "gsm_connected" not in statuses
+
+    def test_handle_status_update_motion_remove_drops_detected_at(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        device = Device(
+            id="d1",
+            hub_id="hub-1",
+            name="Motion",
+            device_type="motion_protect",
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={"motion_detected": True, "motion_detected_at": 1700000000},
+            battery=None,
+        )
+        coordinator.devices["d1"] = device
+
+        coordinator._handle_status_update("d1", "motion_detected", {"op": 3})
+
+        statuses = coordinator.devices["d1"].statuses
+        assert "motion_detected" not in statuses
+        assert "motion_detected_at" not in statuses
+
     def test_handle_status_update_unknown_device_is_ignored(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         # No devices in coordinator
