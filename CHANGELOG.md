@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1-beta.9] - 2026-04-27
+
+### Fixed
+- The Transmitter Jeweller exposed the new `wire_input_alert` entity from beta.8 but it never toggled, because the device emits the bridged sensor's alert through the `transmitter_status` proto oneof (field 75) rather than `wire_input_status` (field 74). Both oneofs are now handled identically by the snapshot parser, the stream forwarder, and the coordinator's status update / REMOVE paths, so the entity reflects the wired sensor's state in real time. (#65)
+
 ## [1.2.1-beta.8] - 2026-04-27
 
 ### Fixed
