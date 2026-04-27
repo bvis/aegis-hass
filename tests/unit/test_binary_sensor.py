@@ -487,6 +487,14 @@ class TestDeviceTypeSensors:
     def test_wire_input_keeps_tamper(self) -> None:
         assert "tamper" in _DEVICE_TYPE_SENSORS["wire_input"]
 
+    def test_transmitter_has_wire_input_alert_sensor(self) -> None:
+        # Issue #65: Transmitter Jeweller exposes only tamper, not the
+        # intrusion line carried by the wired sensor it bridges.
+        assert "wire_input_alert" in _DEVICE_TYPE_SENSORS["transmitter"]
+
+    def test_transmitter_keeps_tamper(self) -> None:
+        assert "tamper" in _DEVICE_TYPE_SENSORS["transmitter"]
+
 
 class TestWireInputAlertSensor:
     """Binary sensor behaviour for wired-input alerts (MultiTransmitter children)."""
@@ -571,6 +579,32 @@ class TestWireInputAlertSensor:
             coordinator=coordinator, device_id="wi-1", status_key="wire_input_alert"
         )
         assert sensor.is_on is False
+
+    def test_transmitter_wire_input_alert_or_reduces_external_contact(self) -> None:
+        # Issue #65: the Transmitter Jeweller may surface the intrusion line
+        # via any of wire_input_status / external_contact_broken /
+        # external_contact_alert depending on hub firmware. The unified
+        # entity must reflect any of them.
+        for source in ("wire_input_alert", "external_contact_broken", "external_contact_alert"):
+            device = Device(
+                id="tr-1",
+                hub_id="hub-1",
+                name="Transmitter",
+                device_type="transmitter",
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={source: True},
+                battery=None,
+            )
+            coordinator = MagicMock()
+            coordinator.devices = {"tr-1": device}
+            sensor = AjaxBinarySensor(
+                coordinator=coordinator, device_id="tr-1", status_key="wire_input_alert"
+            )
+            assert sensor.is_on is True, f"OR-reduce missed {source} on transmitter"
 
     def test_door_protect_external_contact_broken_not_routed_as_alert(self) -> None:
         # Sanity check: the composite OR must apply ONLY to wire_input devices,
