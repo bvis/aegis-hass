@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1-beta.7] - 2026-04-27
+
+### Fixed
+- REMOVE events on the device stream now clear every `device.statuses` key the snapshot parser writes for that status, not just the one matching the proto field name. Previously `life_quality`, `gsm_status`, and `motion_detected` left stale sub-keys behind (`temperature`/`humidity`/`co2`, `mobile_network_type`/`gsm_connected`, `motion_detected_at`) that lingered until the next full snapshot. Centralised the parent-to-extra-keys mapping so future additions stay in sync. (#61)
+
 ## [1.2.1-beta.6] - 2026-04-27
 
 ### Fixed
