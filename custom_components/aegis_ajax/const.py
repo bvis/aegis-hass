@@ -167,6 +167,24 @@ DEFAULT_AUTO_CREATE_LABELS = True
 
 EVENT_DOMAIN = f"{DOMAIN}_event"
 
+# Map HubEventTag oneof field names to the resulting space `security_state`
+# when the corresponding push event arrives. Used to refresh the alarm panel
+# instantly from the FCM payload instead of waiting for the next poll.
+# `group_*` tags are intentionally omitted — they only affect a subgroup, so
+# the resulting space-level state (PARTIALLY_ARMED, ARMED, …) depends on the
+# other groups; let the next poll resolve it.
+RAW_TAG_TO_SECURITY_STATE: dict[str, SecurityState] = {
+    "arm": SecurityState.ARMED,
+    "arm_attempt": SecurityState.ARMED,
+    "arm_with_malfunctions": SecurityState.ARMED,
+    "disarm": SecurityState.DISARMED,
+    "duress_disarm": SecurityState.DISARMED,
+    "night_mode_on": SecurityState.NIGHT_MODE,
+    "night_mode_off": SecurityState.DISARMED,
+    "duress_night_mode_off": SecurityState.DISARMED,
+}
+
+
 # Map HubEventTag oneof field names to simplified HA event types
 HUB_EVENT_TAG_MAP: dict[str, str] = {
     # Arming

@@ -353,6 +353,35 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception:
                 _LOGGER.exception("Failed to start device stream for space %s", space_id)
 
+    def apply_push_security_state(self, space_id: str, new_state: Any) -> None:  # noqa: ANN401
+        """Apply a security_state derived from an FCM arm/disarm push event.
+
+        Updates `coordinator.spaces[space_id]` in-memory and immediately notifies
+        listeners via `async_set_updated_data`, so the alarm panel reflects the
+        change without waiting for the next poll cycle. No-ops when:
+        - the space is unknown to the coordinator,
+        - the new state matches the current state,
+        - an HA-initiated optimistic state is still active for that space (the
+          push is treated as racing with our own command and ignored to avoid
+          flicker; the next poll reconciles).
+        """
+        import time  # noqa: PLC0415
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        space = self.spaces.get(space_id)
+        if space is None:
+            return
+        # `time.monotonic()` is the same source `asyncio.BaseEventLoop.time()`
+        # uses for the optimistic-state expiry stored from arm/disarm callsites.
+        now = time.monotonic()
+        opt = self._optimistic_space_states.get(space_id)
+        if opt and opt[0] > now:
+            return
+        if space.security_state == new_state:
+            return
+        self.spaces[space_id] = dc_replace(space, security_state=new_state)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
     def _handle_devices_snapshot(self, devices: list[Device]) -> None:
         """Handle initial snapshot or full device snapshot update from stream."""
         for device in devices:

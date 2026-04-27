@@ -695,3 +695,99 @@ class TestStreamHandlers:
 
         coordinator._devices_api.start_device_stream = MagicMock()
         coordinator._devices_api.start_device_stream.assert_not_called()
+
+
+class TestApplyPushSecurityState:
+    """Direct security_state updates from FCM arm/disarm pushes (#68)."""
+
+    def _make_coordinator_with_space(
+        self, security_state: SecurityState = SecurityState.DISARMED
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=client, space_ids=["s1"], poll_interval=300
+            )
+        coordinator.hass = hass
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="hub-1",
+                name="Home",
+                security_state=security_state,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+            )
+        }
+        return coordinator
+
+    def test_arm_push_updates_security_state(self) -> None:
+        coordinator = self._make_coordinator_with_space(SecurityState.DISARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.ARMED)
+
+        assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_night_mode_push_updates_security_state(self) -> None:
+        coordinator = self._make_coordinator_with_space(SecurityState.DISARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.NIGHT_MODE)
+
+        assert coordinator.spaces["s1"].security_state == SecurityState.NIGHT_MODE
+
+    def test_disarm_push_updates_security_state(self) -> None:
+        coordinator = self._make_coordinator_with_space(SecurityState.ARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.DISARMED)
+
+        assert coordinator.spaces["s1"].security_state == SecurityState.DISARMED
+
+    def test_no_change_skips_update(self) -> None:
+        coordinator = self._make_coordinator_with_space(SecurityState.ARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.ARMED)
+
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_unknown_space_no_op(self) -> None:
+        coordinator = self._make_coordinator_with_space(SecurityState.DISARMED)
+
+        coordinator.apply_push_security_state("unknown", SecurityState.ARMED)
+
+        # Original space untouched, no update fired
+        assert coordinator.spaces["s1"].security_state == SecurityState.DISARMED
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_active_optimistic_state_is_respected(self) -> None:
+        # Local arm-from-HA registers an optimistic state. A contradictory
+        # push arriving before its 10s expiry must not flip the panel back.
+        import time
+
+        coordinator = self._make_coordinator_with_space(SecurityState.ARMED)
+        future = time.monotonic() + 60
+        coordinator._optimistic_space_states["s1"] = (future, SecurityState.ARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.DISARMED)
+
+        assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_expired_optimistic_state_does_not_block(self) -> None:
+        import time
+
+        coordinator = self._make_coordinator_with_space(SecurityState.DISARMED)
+        past = time.monotonic() - 60
+        coordinator._optimistic_space_states["s1"] = (past, SecurityState.ARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.ARMED)
+
+        assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
+        coordinator.async_set_updated_data.assert_called_once()

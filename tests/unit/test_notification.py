@@ -233,3 +233,79 @@ class TestNotificationListener:
         result = await listener.wait_for_notification_id("dev-99", timeout=0.05)
         assert result is None
         assert "dev-99" not in listener._notification_id_callbacks
+
+
+class TestApplySecurityStateFromEvent:
+    """Issue #68: arm/disarm pushes update space security_state instantly."""
+
+    def _make_listener(self) -> tuple[AjaxNotificationListener, MagicMock, MagicMock]:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+        return listener, hass, coordinator
+
+    def test_arm_tag_dispatches_armed_state(self) -> None:
+        from custom_components.aegis_ajax.const import SecurityState
+
+        listener, hass, coordinator = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "arm"})
+
+        hass.loop.call_soon_threadsafe.assert_called_once_with(
+            coordinator.apply_push_security_state, "space-1", SecurityState.ARMED
+        )
+
+    def test_disarm_tag_dispatches_disarmed_state(self) -> None:
+        from custom_components.aegis_ajax.const import SecurityState
+
+        listener, hass, coordinator = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "disarm"})
+
+        hass.loop.call_soon_threadsafe.assert_called_once_with(
+            coordinator.apply_push_security_state, "space-1", SecurityState.DISARMED
+        )
+
+    def test_night_mode_on_dispatches_night_mode_state(self) -> None:
+        from custom_components.aegis_ajax.const import SecurityState
+
+        listener, hass, coordinator = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "night_mode_on"})
+
+        hass.loop.call_soon_threadsafe.assert_called_once_with(
+            coordinator.apply_push_security_state, "space-1", SecurityState.NIGHT_MODE
+        )
+
+    def test_group_arm_tag_does_not_dispatch(self) -> None:
+        # group_* tags only affect a subgroup; let the next poll resolve the
+        # space-level state instead of guessing it from the push.
+        listener, hass, _ = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "group_arm"})
+
+        hass.loop.call_soon_threadsafe.assert_not_called()
+
+    def test_unmapped_tag_does_not_dispatch(self) -> None:
+        listener, hass, _ = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "intrusion_alarm"})
+
+        hass.loop.call_soon_threadsafe.assert_not_called()
+
+    def test_missing_raw_tag_does_not_dispatch(self) -> None:
+        listener, hass, _ = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {})
+
+        hass.loop.call_soon_threadsafe.assert_not_called()
+
+    def test_no_dispatch_when_loop_not_running(self) -> None:
+        listener, hass, _ = self._make_listener()
+        hass.loop.is_running.return_value = False
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": "arm"})
+
+        hass.loop.call_soon_threadsafe.assert_not_called()

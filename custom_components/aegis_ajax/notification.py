@@ -14,6 +14,7 @@ from homeassistant.helpers.storage import Store
 from custom_components.aegis_ajax.const import (
     DOMAIN,
     HUB_EVENT_TAG_MAP,
+    RAW_TAG_TO_SECURITY_STATE,
 )
 
 if TYPE_CHECKING:
@@ -284,12 +285,33 @@ class AjaxNotificationListener:
                 target_space = self._find_space_for_event(raw)
                 if target_space:
                     self._coordinator.fire_push_event(target_space, event_type, event_data)
+                    self._apply_security_state_from_event(target_space, event_data)
                 else:
                     # Fallback: single-space installations or unknown hub
                     for space_id in self._coordinator._space_ids:
                         self._coordinator.fire_push_event(space_id, event_type, event_data)
+                        self._apply_security_state_from_event(space_id, event_data)
         except Exception:
             _LOGGER.debug("Failed to parse event from push notification", exc_info=True)
+
+    def _apply_security_state_from_event(self, space_id: str, event_data: dict[str, Any]) -> None:
+        """If the push event implies a new space security_state, push it now (#68).
+
+        The FCM callback runs on the firebase_messaging worker thread, so we
+        dispatch the update to the HA event loop via call_soon_threadsafe.
+        """
+        raw_tag = event_data.get("raw_tag")
+        if not isinstance(raw_tag, str):
+            return
+        new_state = RAW_TAG_TO_SECURITY_STATE.get(raw_tag)
+        if new_state is None:
+            return
+        if self._hass.loop and self._hass.loop.is_running():
+            self._hass.loop.call_soon_threadsafe(
+                self._coordinator.apply_push_security_state,
+                space_id,
+                new_state,
+            )
 
     def _find_space_for_event(self, raw: bytes) -> str | None:
         """Try to match the event to a space by finding a known hub_id in raw bytes."""
