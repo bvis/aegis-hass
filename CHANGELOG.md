@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1-beta.10] - 2026-04-27
+
+### Changed
+- The alarm control panel now reflects external arm/disarm/night-mode events in real time when FCM is configured: the integration applies the new `security_state` directly from the parsed push payload instead of waiting for the next poll cycle (up to 5 min). HA-initiated optimistic state still wins inside its 10s race window, and `group_*` tags keep falling through to the regular refresh path because their resulting space-level state depends on the other groups. (#68, #46)
+
 ## [1.2.1-beta.9] - 2026-04-27
 
 ### Fixed
