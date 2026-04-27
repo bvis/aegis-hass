@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1-beta.8] - 2026-04-27
+
+### Fixed
+- The Transmitter Jeweller (Ajax `transmitter`), which bridges a third-party wired sensor to the hub, now exposes a `wire_input_alert` binary sensor in addition to the case tamper, so the intrusion line of the bridged sensor is reflected in HA. The entity OR-reduces the three oneofs hub firmwares may use to signal the wired alert (`wire_input_status`, `external_contact_broken`, `external_contact_alert`), matching the existing handling for `wire_input` / `wire_input_mt`. (#65)
+
 ## [1.2.1-beta.7] - 2026-04-27
 
 ### Fixed
