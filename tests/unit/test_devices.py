@@ -321,6 +321,27 @@ class TestStatusParser:
         assert result.get("wire_input_alert") is True
         assert result.get("wire_input_alarm_type") == "unspecified"
 
+    def test_transmitter_status_alerting(self) -> None:
+        # Issue #65 follow-up: the Transmitter Jeweller emits its own oneof
+        # `transmitter_status` (proto field 75) with the same shape as
+        # `wire_input_status`. It must populate the same wire_input_alert key
+        # so the unified safety entity reflects the bridged sensor.
+        status = MagicMock()
+        status.WhichOneof.return_value = "transmitter_status"
+        status.transmitter_status.is_alert = True
+        status.transmitter_status.type = 1  # INTRUSION
+        result = DevicesApi._parse_statuses([status])
+        assert result.get("wire_input_alert") is True
+        assert result.get("wire_input_alarm_type") == "intrusion"
+
+    def test_transmitter_status_not_alerting(self) -> None:
+        status = MagicMock()
+        status.WhichOneof.return_value = "transmitter_status"
+        status.transmitter_status.is_alert = False
+        status.transmitter_status.type = 0
+        result = DevicesApi._parse_statuses([status])
+        assert result.get("wire_input_alert") is False
+
     def test_case_drilling_detected(self) -> None:
         status = MagicMock()
         status.WhichOneof.return_value = "case_drilling_detected"
@@ -762,6 +783,52 @@ class TestStartDeviceStream:
         _, status_name, data = status_received[0]
         assert status_name == "temperature"
         assert data == {"op": 2, "value": 19}
+
+    @pytest.mark.asyncio
+    async def test_status_update_transmitter_status_forwards_alert_and_type(self) -> None:
+        """transmitter_status updates must forward is_alert + alarm_type, not boolean True."""
+        api = self._make_api()
+
+        update_msg = MagicMock()
+        update_msg.HasField.side_effect = lambda field: field == "success"
+        update_msg.success.WhichOneof.return_value = "updates"
+
+        single_update = MagicMock()
+        single_update.WhichOneof.return_value = "status_update"
+        single_update.device_id.hub_light_device_id.device_id = "dev-tr"
+        single_update.status_update.status.WhichOneof.return_value = "transmitter_status"
+        single_update.status_update.status.transmitter_status.is_alert = True
+        single_update.status_update.status.transmitter_status.type = 1  # INTRUSION
+        single_update.status_update.update_type = 2  # UPDATE
+
+        update_msg.success.updates.updates = [single_update]
+
+        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+            yield update_msg
+
+        status_received: list[tuple[str, str, dict]] = []
+
+        def on_snap(devices: list) -> None:
+            pass
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            status_received.append((device_id, status_name, data))
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        assert len(status_received) == 1
+        _, status_name, data = status_received[0]
+        assert status_name == "transmitter_status"
+        assert data["op"] == 2
+        assert data["is_alert"] is True
+        assert data["alarm_type"] == "intrusion"
 
     @pytest.mark.asyncio
     async def test_snapshot_update_calls_on_devices_snapshot(self) -> None:

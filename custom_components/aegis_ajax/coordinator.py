@@ -48,6 +48,7 @@ _STATUS_KEY_MAP: dict[str, str] = {
     "glass_break_detected": "glass_break",
     "vibration_detected": "vibration",
     "wire_input_status": "wire_input_alert",
+    "transmitter_status": "wire_input_alert",
 }
 
 # Statuses whose snapshot parser writes more than the single mapped key.
@@ -58,6 +59,7 @@ _STATUS_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
     "life_quality": ("temperature", "humidity", "co2"),
     "gsm_status": ("mobile_network_type", "gsm_connected"),
     "wire_input_status": ("wire_input_alarm_type",),
+    "transmitter_status": ("wire_input_alarm_type",),
 }
 
 
@@ -387,9 +389,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             new_statuses.update(data["values"])
         elif "value" in data:
             new_statuses[key] = data["value"]
-        elif status_name == "wire_input_status" and "is_alert" in data:
+        elif status_name in ("wire_input_status", "transmitter_status") and "is_alert" in data:
             # Respect the actual alert boolean so the entity toggles back to
             # off when the wired contact closes (op=UPDATE with is_alert=False).
+            # Both oneofs map to the same `wire_input_alert` key via
+            # `_STATUS_KEY_MAP`.
             new_statuses[key] = bool(data["is_alert"])
             if "alarm_type" in data:
                 new_statuses["wire_input_alarm_type"] = data["alarm_type"]

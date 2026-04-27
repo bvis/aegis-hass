@@ -228,12 +228,19 @@ class DevicesApi:
                 result["external_contact_broken"] = True
             elif which == "external_contact_alert":
                 result["external_contact_alert"] = True
-            elif which == "wire_input_status":
-                ws = status.wire_input_status
-                result["wire_input_alert"] = bool(ws.is_alert) if hasattr(ws, "is_alert") else True
-                if hasattr(ws, "type"):
+            elif which in ("wire_input_status", "transmitter_status"):
+                # Both oneofs share the same shape (is_alert + CustomAlarmType)
+                # but different devices use different ones: WireInput / WireInputMt
+                # use `wire_input_status`, the wireless Transmitter Jeweller
+                # uses `transmitter_status`. Map both to the same internal keys
+                # so the unified safety entity reflects either source.
+                sub = getattr(status, which)
+                result["wire_input_alert"] = (
+                    bool(sub.is_alert) if hasattr(sub, "is_alert") else True
+                )
+                if hasattr(sub, "type"):
                     result["wire_input_alarm_type"] = _ALARM_TYPE_NAMES.get(
-                        int(ws.type), "unspecified"
+                        int(sub.type), "unspecified"
                     )
             elif which == "case_drilling_detected":
                 result["case_drilling"] = True
@@ -377,13 +384,16 @@ class DevicesApi:
 
                                         op = int(update.status_update.update_type)
                                         payload: dict[str, Any] = {"op": op}
-                                        if status_name == "wire_input_status":
-                                            ws = status.wire_input_status
-                                            if hasattr(ws, "is_alert"):
-                                                payload["is_alert"] = bool(ws.is_alert)
-                                            if hasattr(ws, "type"):
+                                        if status_name in (
+                                            "wire_input_status",
+                                            "transmitter_status",
+                                        ):
+                                            sub = getattr(status, status_name)
+                                            if hasattr(sub, "is_alert"):
+                                                payload["is_alert"] = bool(sub.is_alert)
+                                            if hasattr(sub, "type"):
                                                 payload["alarm_type"] = _ALARM_TYPE_NAMES.get(
-                                                    int(ws.type), "unspecified"
+                                                    int(sub.type), "unspecified"
                                                 )
                                         elif status_name == "temperature":
                                             payload["value"] = status.temperature.value
