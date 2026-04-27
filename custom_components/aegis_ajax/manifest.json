@@ -9,5 +9,5 @@
     "iot_class": "cloud_push",
     "issue_tracker": "https://github.com/bvis/aegis-hass/issues",
     "requirements": ["grpcio>=1.60.0", "protobuf>=4.25.0", "firebase-messaging>=0.4.5", "pycryptodome>=3.20"],
-    "version": "1.2.1-beta.5"
+    "version": "1.2.1-beta.6"
 }

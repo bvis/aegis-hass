@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1-beta.6] - 2026-04-27
+
+### Fixed
+- Numeric/structured sensor values streamed in real time (temperature, humidity, CO2, signal strength, GSM/SIM/NFC/Wi-Fi diagnostics) were being overwritten with `True` whenever an ADD/UPDATE event arrived between snapshots, causing temperature entities to drop to `1 °C` intermittently on `DoorProtect Plus` and `MotionCam` devices among others. The stream parser now extracts the actual values (mirroring the snapshot path) and the coordinator applies them as scalars or sub-keys instead of coercing every non-binary update to a boolean. (#59)
+
 ## [1.2.1-beta.5] - 2026-04-27
 
 ### Added
