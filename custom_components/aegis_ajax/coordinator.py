@@ -373,6 +373,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             new_statuses.pop(key, None)
             if status_name == "wire_input_status":
                 new_statuses.pop("wire_input_alarm_type", None)
+        elif "values" in data:
+            new_statuses.update(data["values"])
+        elif "value" in data:
+            new_statuses[key] = data["value"]
         elif status_name == "wire_input_status" and "is_alert" in data:
             # Respect the actual alert boolean so the entity toggles back to
             # off when the wired contact closes (op=UPDATE with is_alert=False).

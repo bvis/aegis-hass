@@ -369,10 +369,12 @@ class DevicesApi:
                                         except AttributeError:
                                             _LOGGER.debug("Could not extract device_id from update")
                                             continue
+
                                         status = update.status_update.status
                                         status_name = status.WhichOneof("status")
                                         if status_name is None:
                                             continue
+
                                         op = int(update.status_update.update_type)
                                         payload: dict[str, Any] = {"op": op}
                                         if status_name == "wire_input_status":
@@ -383,6 +385,65 @@ class DevicesApi:
                                                 payload["alarm_type"] = _ALARM_TYPE_NAMES.get(
                                                     int(ws.type), "unspecified"
                                                 )
+                                        elif status_name == "temperature":
+                                            payload["value"] = status.temperature.value
+                                        elif status_name == "life_quality":
+                                            lq = status.life_quality
+                                            values: dict[str, Any] = {}
+                                            if hasattr(lq, "actual_temperature"):
+                                                values["temperature"] = lq.actual_temperature
+                                            if hasattr(lq, "actual_humidity"):
+                                                values["humidity"] = lq.actual_humidity
+                                            if hasattr(lq, "actual_co2"):
+                                                values["co2"] = lq.actual_co2
+                                            if values:
+                                                payload["values"] = values
+                                        elif status_name == "signal_strength":
+                                            signal_int = int(
+                                                status.signal_strength.device_signal_level
+                                            )
+                                            payload["value"] = _SIGNAL_LEVEL_MAP.get(
+                                                signal_int, f"Unknown ({signal_int})"
+                                            )
+                                        elif status_name == "gsm_status":
+                                            gsm = status.gsm_status
+                                            gsm_int = int(gsm.type) if hasattr(gsm, "type") else 0
+                                            payload["values"] = {
+                                                "mobile_network_type": _GSM_TYPE_MAP.get(
+                                                    gsm_int, "Unknown"
+                                                ),
+                                                "gsm_connected": (
+                                                    int(gsm.status) == 2
+                                                    if hasattr(gsm, "status")
+                                                    else False
+                                                ),
+                                            }
+                                        elif status_name == "monitoring":
+                                            payload["value"] = (
+                                                bool(status.monitoring.cms_active)
+                                                if hasattr(status.monitoring, "cms_active")
+                                                else False
+                                            )
+                                        elif status_name == "sim_status":
+                                            sim_int = (
+                                                int(status.sim_status.sim_card_status)
+                                                if hasattr(status.sim_status, "sim_card_status")
+                                                else 0
+                                            )
+                                            payload["value"] = _SIM_STATUS_MAP.get(
+                                                sim_int, f"Unknown ({sim_int})"
+                                            )
+                                        elif status_name == "nfc":
+                                            payload["value"] = (
+                                                bool(status.nfc.enabled)
+                                                if hasattr(status.nfc, "enabled")
+                                                else True
+                                            )
+                                        elif status_name == "wifi_signal_level_status":
+                                            payload["value"] = int(
+                                                status.wifi_signal_level_status
+                                            )
+
                                         on_status_update(
                                             device_id,
                                             status_name,

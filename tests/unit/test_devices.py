@@ -721,6 +721,49 @@ class TestStartDeviceStream:
         assert data["op"] == 3
 
     @pytest.mark.asyncio
+    async def test_status_update_temperature_preserves_numeric_value(self) -> None:
+        """Temperature updates must forward the actual reading, not boolean True."""
+        api = self._make_api()
+
+        update_msg = MagicMock()
+        update_msg.HasField.side_effect = lambda field: field == "success"
+        update_msg.success.WhichOneof.return_value = "updates"
+
+        single_update = MagicMock()
+        single_update.WhichOneof.return_value = "status_update"
+        single_update.device_id.hub_light_device_id.device_id = "dev-temp"
+        single_update.status_update.status.WhichOneof.return_value = "temperature"
+        single_update.status_update.status.temperature.value = 19
+        single_update.status_update.update_type = 2  # UPDATE
+
+        update_msg.success.updates.updates = [single_update]
+
+        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+            yield update_msg
+
+        status_received: list[tuple[str, str, dict]] = []
+
+        def on_snap(devices: list) -> None:
+            pass
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            status_received.append((device_id, status_name, data))
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        assert len(status_received) == 1
+        _, status_name, data = status_received[0]
+        assert status_name == "temperature"
+        assert data == {"op": 2, "value": 19}
+
+    @pytest.mark.asyncio
     async def test_snapshot_update_calls_on_devices_snapshot(self) -> None:
         """snapshot_update in Updates triggers on_devices_snapshot."""
         api = self._make_api()

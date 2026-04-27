@@ -370,6 +370,29 @@ class TestStreamHandlers:
 
         assert coordinator.devices["d1"].statuses.get("high_temperature") is True
 
+    def test_handle_status_update_temperature_preserves_numeric_value(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.devices["d1"] = _make_device("d1")
+
+        coordinator._handle_status_update("d1", "temperature", {"op": 2, "value": 19})
+
+        assert coordinator.devices["d1"].statuses.get("temperature") == 19
+        assert coordinator.devices["d1"].statuses.get("temperature") is not True
+
+    def test_handle_status_update_life_quality_updates_temperature_humidity_and_co2(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.devices["d1"] = _make_device("d1")
+
+        coordinator._handle_status_update(
+            "d1",
+            "life_quality",
+            {"op": 2, "values": {"temperature": 21, "humidity": 58, "co2": 742}},
+        )
+
+        assert coordinator.devices["d1"].statuses.get("temperature") == 21
+        assert coordinator.devices["d1"].statuses.get("humidity") == 58
+        assert coordinator.devices["d1"].statuses.get("co2") == 742
+
     def test_handle_status_update_case_drilling_maps_correctly(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         coordinator.devices["d1"] = _make_device("d1")
