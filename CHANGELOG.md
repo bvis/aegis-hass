@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-04-28
+
+Stable release rolling up the `1.2.1-beta.1` … `1.2.1-beta.10` line. Highlights:
+
+### Added
+- New optional `auto_create_labels` toggle in the integration's Options. When disabled the integration no longer recreates and reassigns the `aegis_*` labels on every restart, so users who manage Home Assistant labels manually can clean them up without having them come back. Default stays enabled. (#47)
+- New `aegis_ajax.press_panic_button` service that triggers the Ajax SOS / panic button on a space (same endpoint the official mobile app's red SOS button uses). Requires an explicit `confirm: true` field as a safety lock; the call forwards a Panic / Hold-up alarm to the monitoring station (CRA) and on most contracts triggers immediate police dispatch with no verification window — see the README for caveats and the recommended Transmitter-based path for non-emergency automations. (#48)
+- Each Ajax device now exposes its hardware identifier as the device `serial_number`, so you can locate sensors physically without walking around triggering each one. (#55)
+- Devices are automatically associated with HA areas matching their Ajax room (via `suggested_area`) the first time they're added. (#55)
+- The `wire_input_alert` binary sensor is now exposed for Transmitter Jeweller devices, reflecting the bridged third-party sensor's intrusion line in addition to the case tamper. (#65)
+
+### Changed
+- The alarm control panel applies external arm/disarm/night-mode events from the parsed FCM push payload directly when the new in-memory shortcut succeeds, falling back to the existing `async_request_refresh()` path otherwise. The fallback keeps the panel in sync regardless of co-brand parser variants — see follow-ups in #68 for the FCM-driven instant path being investigated for some payload shapes.
+- Audited `_DEVICE_TYPE_SENSORS` and `SWITCH_DEVICE_TYPES` against the current Ajax v3 ObjectType catalog and added missing aliases that were silently falling back to a tamper-only entity set: hub variants (`hub_two`, `hub_two_plus`, `hub_three`, `hub_4g`, `hub_lite`, `hub_fibra`, `hub_hybrid_2`, `hub_hybrid_4g`, `hub_mega`, `hub_yavir`, `hub_fire`, `hub_superior`, …); range extenders (`range_extender`, `range_extender_2`, `range_extender_2_fire`); DoorProtect Plus G3 Fibra; MotionProtect / MotionCam G3, Plus, S, Curtain, Outdoor, Fibra and PhOD variants; sirens (`home_siren_g3`, `street_siren_plus_*`, `street_siren_s_*`, `street_siren_double_deck_fibra`); `wire_input_rs`; keypad family (`keypad_plus`, `keypad_plus_g3`, `keypad_s_plus`, `keypad_outdoor*`, `keypad_touchscreen*`); `life_quality_plus`, `water_stop_base`; switch wiring variants (`relay_fibra_base`, several socket types, multi-gang and multi-way light switches). (#51)
+
+### Fixed
+- Reloading the integration no longer accumulates new active sessions in the user's Ajax account: the latest session token is persisted back to the config entry after every login, the coordinator detects `UNAUTHENTICATED` errors from the gRPC API and forces a fresh login + retry instead of falling out as `UpdateFailed`, and removing the integration permanently calls `LogoutService.execute` server-side so the dangling session disappears from the Ajax account too. (#53)
+- FireProtect 2 detectors no longer fall back to a tamper-only entity set: all `fire_protect_two*` variants known to the v3 ObjectType (including UL-listed sub-models) now map to the appropriate smoke / heat / CO sensor set, with single-sensor sub-models exposing only the relevant entity. (#51)
+- Numeric/structured sensor values streamed in real time (temperature, humidity, CO2, signal strength, GSM/SIM/NFC/Wi-Fi diagnostics) were being overwritten with `True` whenever an ADD/UPDATE event arrived between snapshots, causing temperature entities to drop to `1 °C` intermittently on `DoorProtect Plus` and `MotionCam` devices among others. The stream parser now extracts the actual values and the coordinator applies them as scalars or sub-keys instead of coercing every non-binary update to a boolean. (#59)
+- REMOVE events on the device stream now clear every `device.statuses` key the snapshot parser writes for that status, not just the one matching the proto field name. Previously `life_quality`, `gsm_status`, and `motion_detected` left stale sub-keys behind that lingered until the next full snapshot. (#61)
+- The Transmitter Jeweller's `wire_input_alert` entity now toggles correctly because the device's `transmitter_status` proto oneof (field 75) is handled identically to `wire_input_status` (field 74) across the snapshot parser, the real-time stream and the coordinator's REMOVE path. (#65)
+
+### Known issues
+
+Two items remain open and will be addressed in a follow-up release:
+- #68 — the FCM-driven instant security_state path is implemented and unit-tested but in some co-brand payload shapes the parser doesn't surface the right qualifier, so the panel still updates via the legacy poll-refresh path on those installs.
+- #74 — `_async_update_data()` can stall indefinitely under specific HTS reconnect scenarios; reload the integration as a workaround until the fix lands.
+
 ## [1.2.1-beta.10] - 2026-04-27
 
 ### Changed
