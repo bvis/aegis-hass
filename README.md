@@ -350,7 +350,7 @@ The required fields (configured in the integration's Options flow, stored secure
 
 ### How to obtain FCM credentials
 
-The FCM credentials can be found in the app's resources (`res/values/strings.xml`) or native libraries. Look for `google_app_id`, `gcm_defaultSenderId`, `project_id`, and `google_api_key`.
+Three of the four values are plain strings in the app's `res/values/strings.xml`: `project_id`, `gcm_defaultSenderId` and `google_app_id`. The fourth, `google_api_key`, is **not** in `strings.xml` (the value there is a placeholder); it ships inside `lib/<arch>/libnative-lib.so` bundled with the APK.
 
 If FCM credentials are not configured, the integration will still work using the persistent gRPC stream for real-time updates. FCM adds an additional push notification channel for faster event delivery and enables Photo on Demand URL retrieval.
 
