@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4-beta.1] - 2026-05-01
+
+First beta of the `1.2.4` line. Adds initial support for Ajax Group / Zone Mode and clarifies the FCM credential extraction docs. Needs real-hardware validation from Group/Zone-Mode users before promotion to stable.
+
+### Added
+- New `alarm_control_panel` entity per Ajax security group when the space is in **Group Mode** (also exposed as **Zone Mode** on newer hub firmwares — same `GroupSecurity` proto under the hood). Each entity arms/disarms its group independently via the existing `armGroup` / `disarmGroup` gRPC calls. State attributes include `group_id`, `group_name`, `space_id`, `hub_id`, `connection_status` so automations can target a single group ("turn off outlets only when *Villa* arms"). Spaces in regular (non-group) mode keep the existing single space-wide panel — no entity churn for those installs. Per-group state refreshes via the hourly snapshot path plus optimistic local updates on HA-initiated arm/disarm; remote arms from the Ajax mobile app may take up to one hour to reflect in HA in this initial slice. A long-lived `SpaceService/stream` subscription for real-time per-group updates is intentionally deferred to a follow-up. Night mode is not exposed on per-group panels because the underlying flag is space-wide on Ajax. (#84, #86)
+
+### Fixed
+- Documentation: the README's "How to obtain FCM credentials" section previously read "found in `res/values/strings.xml` *or* native libraries", which sent users hunting for `google_api_key` in `strings.xml` and bailing out on the placeholder value stored there. The section now states explicitly that three of the four values (`project_id`, `gcm_defaultSenderId`, `google_app_id`) are in `strings.xml` while the api_key lives in `lib/<arch>/libnative-lib.so` bundled with the APK. (#83)
+
 ## [1.2.3] - 2026-04-29
 
 Stable release rolling up the `1.2.3-beta.1` and `1.2.3-beta.2` line. Closes #78 and ships another community contribution from @bogar.
