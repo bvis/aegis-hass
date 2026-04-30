@@ -262,6 +262,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             current_space,
                             monitoring_companies=snapshot.monitoring_companies,
                             monitoring_companies_loaded=snapshot.monitoring_companies_loaded,
+                            groups=snapshot.groups,
+                            group_mode_enabled=snapshot.group_mode_enabled,
                         )
                 self.rooms = refreshed_rooms
                 self._rooms_last_fetch = now

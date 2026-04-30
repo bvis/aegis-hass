@@ -9,9 +9,10 @@ import pytest
 
 from custom_components.aegis_ajax.alarm_control_panel import (
     AjaxAlarmControlPanel,
+    AjaxGroupAlarmControlPanel,
     map_security_state,
 )
-from custom_components.aegis_ajax.api.models import Space
+from custom_components.aegis_ajax.api.models import Group, Space
 from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
 
 
@@ -307,3 +308,113 @@ class TestAlarmControlPanel:
         with pytest.raises(HomeAssistantError):
             await panel.async_alarm_arm_away(code="0000")
         coordinator.security_api.arm.assert_not_called()
+
+
+class TestGroupAlarmControlPanel:
+    def _make_space_with_groups(
+        self,
+        group_states: list[tuple[str, str, SecurityState]] | None = None,
+        online: bool = True,
+    ) -> Space:
+        groups = tuple(
+            Group(id=gid, space_id="s1", name=name, security_state=state, sorting_key=gid)
+            for gid, name, state in (group_states or [("g1", "Villa", SecurityState.DISARMED)])
+        )
+        return Space(
+            id="s1",
+            hub_id="h1",
+            name="Home",
+            security_state=SecurityState.PARTIALLY_ARMED,
+            connection_status=ConnectionStatus.ONLINE if online else ConnectionStatus.OFFLINE,
+            malfunctions_count=0,
+            groups=groups,
+            group_mode_enabled=True,
+        )
+
+    def _make_coordinator(self) -> MagicMock:
+        coordinator = MagicMock()
+        coordinator.config_entry.options = {}
+        return coordinator
+
+    def test_unique_id_per_group(self) -> None:
+        coordinator = self._make_coordinator()
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        assert panel.unique_id == "aegis_ajax_alarm_s1_group_g1"
+
+    def test_name_is_group_name(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.DISARMED)])
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        assert panel.name == "Villa"
+
+    def test_alarm_state_reflects_group_state(self) -> None:
+        from homeassistant.components.alarm_control_panel import (
+            AlarmControlPanelState,
+        )
+
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups(
+                [("g1", "Villa", SecurityState.ARMED), ("g2", "Apartment", SecurityState.DISARMED)]
+            )
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        p1 = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        p2 = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g2")
+        assert p1.alarm_state == AlarmControlPanelState.ARMED_AWAY
+        assert p2.alarm_state == AlarmControlPanelState.DISARMED
+
+    def test_unavailable_when_group_missing(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {"s1": self._make_space_with_groups()}
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="ghost")
+        assert panel.available is False
+
+    def test_extra_attributes(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.ARMED)])
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        attrs = panel.extra_state_attributes
+        assert attrs["group_id"] == "g1"
+        assert attrs["group_name"] == "Villa"
+        assert attrs["space_id"] == "s1"
+        assert attrs["hub_id"] == "h1"
+
+    @pytest.mark.asyncio
+    async def test_arm_calls_arm_group(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.DISARMED)])
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        coordinator.security_api.arm_group = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        await panel.async_alarm_arm_away()
+        coordinator.security_api.arm_group.assert_called_once_with("s1", "g1", ignore_alarms=False)
+
+    @pytest.mark.asyncio
+    async def test_disarm_calls_disarm_group(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.ARMED)])
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        coordinator.security_api.disarm_group = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        await panel.async_alarm_disarm()
+        coordinator.security_api.disarm_group.assert_called_once_with("s1", "g1")

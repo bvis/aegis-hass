@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from custom_components.aegis_ajax.api.models import (
+    Group,
     MonitoringCompany,
     MonitoringCompanyStatus,
     Room,
@@ -13,6 +14,16 @@ from custom_components.aegis_ajax.api.models import (
     SpaceSnapshot,
 )
 from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
+
+# GroupSecurity.State proto enum:
+#   GROUP_SECURITY_STATE_NONE = 0
+#   GROUP_SECURITY_STATE_ARMED = 1
+#   GROUP_SECURITY_STATE_DISARMED = 2
+_GROUP_STATE_MAP: dict[int, SecurityState] = {
+    0: SecurityState.NONE,
+    1: SecurityState.ARMED,
+    2: SecurityState.DISARMED,
+}
 
 if TYPE_CHECKING:
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
@@ -41,6 +52,51 @@ class SpacesApi:
             connection_status=ConnectionStatus(proto_space.hub_connection_status),
             malfunctions_count=proto_space.malfunctions_count,
         )
+
+    @staticmethod
+    def parse_groups(proto_security: Any, space_id: str) -> tuple[tuple[Group, ...], bool]:  # noqa: ANN401
+        """Extract groups + group-mode flag from a `SpaceSecurity` proto.
+
+        Combines the group definitions in `security.groups[]` (id, name,
+        sorting_key) with the per-group security states in
+        `security.mode.group_mode.groups[]` keyed by `group_id`. When the
+        space is in regular mode (no group_mode oneof), returns an empty
+        tuple regardless of whether group definitions exist — the official
+        Ajax UI does the same.
+        """
+        if not hasattr(proto_security, "groups") or not hasattr(proto_security, "mode"):
+            return (), False
+        mode = proto_security.mode
+        group_mode_active = hasattr(mode, "WhichOneof") and mode.WhichOneof("mode") == "group_mode"
+        if not group_mode_active:
+            return (), False
+
+        # Per-group state map keyed by group_id.
+        states: dict[str, SecurityState] = {}
+        if hasattr(mode, "group_mode") and hasattr(mode.group_mode, "groups"):
+            for group_security in mode.group_mode.groups:
+                gid = getattr(group_security, "group_id", "")
+                if not gid:
+                    continue
+                proto_state = getattr(group_security, "state", 0)
+                states[gid] = _GROUP_STATE_MAP.get(int(proto_state), SecurityState.NONE)
+
+        groups: list[Group] = []
+        for proto_group in proto_security.groups:
+            gid = getattr(proto_group, "id", "")
+            if not gid:
+                continue
+            groups.append(
+                Group(
+                    id=gid,
+                    space_id=space_id,
+                    name=getattr(proto_group, "name", "") or "",
+                    security_state=states.get(gid, SecurityState.NONE),
+                    sorting_key=getattr(proto_group, "sorting_key", "") or "",
+                )
+            )
+        groups.sort(key=lambda g: (g.sorting_key, g.name))
+        return tuple(groups), True
 
     @staticmethod
     def parse_monitoring_company(proto_company: Any) -> MonitoringCompany:  # noqa: ANN401
@@ -102,6 +158,8 @@ class SpacesApi:
 
         rooms: list[Room] = []
         monitoring_companies: list[MonitoringCompany] = []
+        groups: tuple[Group, ...] = ()
+        group_mode_enabled: bool = False
         try:
             async for msg in stream:
                 if msg.HasField("failure"):
@@ -111,10 +169,13 @@ class SpacesApi:
                     continue
                 if msg.success.WhichOneof("success") != "snapshot":
                     continue
-                for proto_room in msg.success.snapshot.rooms:
+                snapshot = msg.success.snapshot
+                for proto_room in snapshot.rooms:
                     rooms.append(Room(id=proto_room.id, name=proto_room.name, space_id=space_id))
-                for proto_company in msg.success.snapshot.monitoring_companies:
+                for proto_company in snapshot.monitoring_companies:
                     monitoring_companies.append(self.parse_monitoring_company(proto_company))
+                if hasattr(snapshot, "security"):
+                    groups, group_mode_enabled = self.parse_groups(snapshot.security, space_id)
                 break
         finally:
             cancel = getattr(stream, "cancel", None)
@@ -125,6 +186,8 @@ class SpacesApi:
             rooms=tuple(rooms),
             monitoring_companies=tuple(monitoring_companies),
             monitoring_companies_loaded=True,
+            groups=groups,
+            group_mode_enabled=group_mode_enabled,
         )
 
     async def list_rooms(self, space_id: str) -> list[Room]:

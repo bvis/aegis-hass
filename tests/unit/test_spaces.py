@@ -6,6 +6,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from google.protobuf.wrappers_pb2 import StringValue
+from systems.ajax.api.mobile.v2.common.space.security import (
+    space_security_mode_pb2,
+    space_security_pb2,
+)
+from systems.ajax.api.mobile.v2.common.space.security.group import (
+    group_mode_space_security_pb2,
+    group_pb2,
+    group_security_pb2,
+)
+from systems.ajax.api.mobile.v2.common.space.security.regular import (
+    regular_mode_space_security_pb2,
+)
 
 from custom_components.aegis_ajax.api.models import (
     MonitoringCompanyStatus,
@@ -85,6 +97,87 @@ class TestParseSpace:
         assert isinstance(result.name, str)
         assert result.name == "Secure Co"
         assert result.status == MonitoringCompanyStatus.APPROVED
+
+
+class TestParseGroups:
+    """Parse group definitions + per-group security state from a SpaceSecurity proto."""
+
+    def _build_security(
+        self,
+        groups: list[tuple[str, str, str]] | None = None,
+        states: dict[str, int] | None = None,
+        mode: str = "group_mode",
+    ) -> space_security_pb2.SpaceSecurity:
+        proto_groups = [
+            group_pb2.Group(id=gid, name=name, sorting_key=sort_key)
+            for gid, name, sort_key in (groups or [])
+        ]
+        if mode == "group_mode":
+            group_securities = [
+                group_security_pb2.GroupSecurity(group_id=gid, state=state)
+                for gid, state in (states or {}).items()
+            ]
+            mode_msg = space_security_mode_pb2.SpaceSecurityMode(
+                group_mode=group_mode_space_security_pb2.GroupModeSpaceSecurity(
+                    groups=group_securities,
+                )
+            )
+        else:
+            mode_msg = space_security_mode_pb2.SpaceSecurityMode(
+                regular_mode=regular_mode_space_security_pb2.RegularModeSpaceSecurity()
+            )
+        return space_security_pb2.SpaceSecurity(groups=proto_groups, mode=mode_msg)
+
+    def test_two_groups_with_distinct_states(self) -> None:
+        security = self._build_security(
+            groups=[("g1", "Villa", "01"), ("g2", "Apartment", "02")],
+            states={"g1": 1, "g2": 2},  # ARMED, DISARMED
+        )
+        groups, enabled = SpacesApi.parse_groups(security, space_id="space-1")
+
+        assert enabled is True
+        assert [g.id for g in groups] == ["g1", "g2"]
+        assert [g.name for g in groups] == ["Villa", "Apartment"]
+        assert [g.security_state for g in groups] == [SecurityState.ARMED, SecurityState.DISARMED]
+        assert all(g.space_id == "space-1" for g in groups)
+
+    def test_groups_sorted_by_sorting_key(self) -> None:
+        security = self._build_security(
+            groups=[
+                ("g1", "Z-First-Insertion", "02"),
+                ("g2", "A-Second-Insertion", "01"),
+            ],
+            states={"g1": 2, "g2": 2},
+        )
+        groups, _ = SpacesApi.parse_groups(security, space_id="space-1")
+        assert [g.sorting_key for g in groups] == ["01", "02"]
+        assert groups[0].name == "A-Second-Insertion"
+
+    def test_state_unknown_when_security_missing_for_group(self) -> None:
+        security = self._build_security(
+            groups=[("g1", "Villa", "01")],
+            states={},  # no per-group state in mode.group_mode.groups
+        )
+        groups, enabled = SpacesApi.parse_groups(security, space_id="s")
+        assert enabled is True
+        assert groups[0].security_state == SecurityState.NONE
+
+    def test_returns_empty_when_regular_mode(self) -> None:
+        security = self._build_security(
+            groups=[("g1", "Villa", "01")],  # definitions exist but mode is regular
+            mode="regular_mode",
+        )
+        groups, enabled = SpacesApi.parse_groups(security, space_id="s")
+        assert groups == ()
+        assert enabled is False
+
+    def test_skips_groups_without_id(self) -> None:
+        security = self._build_security(
+            groups=[("", "Bad", "00"), ("g1", "Good", "01")],
+            states={"g1": 1},
+        )
+        groups, _ = SpacesApi.parse_groups(security, space_id="s")
+        assert [g.id for g in groups] == ["g1"]
 
 
 class TestListSpaces:

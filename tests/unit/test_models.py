@@ -4,6 +4,7 @@ from custom_components.aegis_ajax.api.models import (
     BatteryInfo,
     Device,
     DeviceCommand,
+    Group,
     Room,
     Space,
 )
@@ -103,6 +104,62 @@ class TestDevice:
             battery=None,
         )
         assert device.is_online is False
+
+
+class TestGroup:
+    def test_creation(self) -> None:
+        group = Group(
+            id="grp-1",
+            space_id="space-1",
+            name="Villa",
+            security_state=SecurityState.DISARMED,
+            sorting_key="01",
+        )
+        assert group.id == "grp-1"
+        assert group.name == "Villa"
+        assert group.is_armed is False
+
+    def test_is_armed(self) -> None:
+        for state in (SecurityState.ARMED, SecurityState.NIGHT_MODE, SecurityState.PARTIALLY_ARMED):
+            group = Group(
+                id="g",
+                space_id="s",
+                name="X",
+                security_state=state,
+            )
+            assert group.is_armed is True
+
+
+class TestSpaceGroups:
+    def test_get_group_by_id(self) -> None:
+        g1 = Group(id="g1", space_id="s1", name="Villa", security_state=SecurityState.ARMED)
+        g2 = Group(id="g2", space_id="s1", name="Apartment", security_state=SecurityState.DISARMED)
+        space = Space(
+            id="s1",
+            hub_id="h1",
+            name="Home",
+            security_state=SecurityState.PARTIALLY_ARMED,
+            connection_status=ConnectionStatus.ONLINE,
+            malfunctions_count=0,
+            groups=(g1, g2),
+            group_mode_enabled=True,
+        )
+        assert space.get_group("g1") is g1
+        assert space.get_group("g2") is g2
+        assert space.get_group("unknown") is None
+        assert space.group_mode_enabled is True
+
+    def test_default_no_groups(self) -> None:
+        space = Space(
+            id="s1",
+            hub_id="h1",
+            name="Home",
+            security_state=SecurityState.DISARMED,
+            connection_status=ConnectionStatus.ONLINE,
+            malfunctions_count=0,
+        )
+        assert space.groups == ()
+        assert space.group_mode_enabled is False
 
 
 class TestRoom:

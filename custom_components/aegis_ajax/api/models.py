@@ -31,6 +31,31 @@ class MonitoringCompany:
 
 
 @dataclass(frozen=True)
+class Group:
+    """Represents an Ajax security group inside a space.
+
+    A group is a subset of devices that can be armed/disarmed independently.
+    The Ajax mobile app exposes this feature as "Group Mode" on older
+    firmwares and "Zone Mode" on newer ones; the underlying gRPC payload is
+    the same `GroupSecurity` message in both cases.
+    """
+
+    id: str
+    space_id: str
+    name: str
+    security_state: SecurityState
+    sorting_key: str = ""
+
+    @property
+    def is_armed(self) -> bool:
+        return self.security_state in (
+            SecurityState.ARMED,
+            SecurityState.NIGHT_MODE,
+            SecurityState.PARTIALLY_ARMED,
+        )
+
+
+@dataclass(frozen=True)
 class Space:
     """Represents an Ajax space (hub)."""
 
@@ -42,6 +67,8 @@ class Space:
     malfunctions_count: int
     monitoring_companies: tuple[MonitoringCompany, ...] = field(default_factory=tuple)
     monitoring_companies_loaded: bool = False
+    groups: tuple[Group, ...] = field(default_factory=tuple)
+    group_mode_enabled: bool = False
 
     @property
     def is_online(self) -> bool:
@@ -67,6 +94,9 @@ class Space:
     def has_monitoring(self) -> bool:
         return bool(self.approved_monitoring_companies)
 
+    def get_group(self, group_id: str) -> Group | None:
+        return next((g for g in self.groups if g.id == group_id), None)
+
 
 @dataclass(frozen=True)
 class Room:
@@ -84,6 +114,8 @@ class SpaceSnapshot:
     rooms: tuple[Room, ...] = field(default_factory=tuple)
     monitoring_companies: tuple[MonitoringCompany, ...] = field(default_factory=tuple)
     monitoring_companies_loaded: bool = False
+    groups: tuple[Group, ...] = field(default_factory=tuple)
+    group_mode_enabled: bool = False
 
 
 @dataclass(frozen=True)
