@@ -214,16 +214,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 elif opt and opt[0] <= now:
                     self._optimistic_space_states.pop(s.id, None)
                 previous = self.spaces.get(s.id)
-                if previous and (
-                    previous.monitoring_companies or previous.monitoring_companies_loaded
-                ):
+                if previous:
                     from dataclasses import replace as dc_replace  # noqa: PLC0415
 
-                    s = dc_replace(
-                        s,
-                        monitoring_companies=previous.monitoring_companies,
-                        monitoring_companies_loaded=previous.monitoring_companies_loaded,
-                    )
+                    if previous.monitoring_companies or previous.monitoring_companies_loaded:
+                        s = dc_replace(
+                            s,
+                            monitoring_companies=previous.monitoring_companies,
+                            monitoring_companies_loaded=previous.monitoring_companies_loaded,
+                        )
+                    # Preserve group definitions + group_mode flag across polls.
+                    # `list_spaces()` does not return them — only the hourly
+                    # snapshot path does. Without this, every poll between
+                    # snapshot refreshes wipes the cached groups and per-group
+                    # alarm panels go unavailable.
+                    if previous.groups or previous.group_mode_enabled:
+                        s = dc_replace(
+                            s,
+                            groups=previous.groups,
+                            group_mode_enabled=previous.group_mode_enabled,
+                        )
                 new_spaces[s.id] = s
             self.spaces = new_spaces
 

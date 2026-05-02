@@ -418,3 +418,61 @@ class TestGroupAlarmControlPanel:
         panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
         await panel.async_alarm_disarm()
         coordinator.security_api.disarm_group.assert_called_once_with("s1", "g1")
+
+
+class TestAsyncSetupEntry:
+    """`async_setup_entry` always creates the space-level panel.
+    In group mode it ALSO creates one per-group panel.
+    """
+
+    def _coordinator_with_space(self, *, group_mode: bool, groups: tuple) -> MagicMock:  # type: ignore[type-arg]
+        coordinator = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="h1",
+                name="Home",
+                security_state=SecurityState.DISARMED,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+                groups=groups,
+                group_mode_enabled=group_mode,
+            )
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_creates_only_space_panel_when_no_group_mode(self) -> None:
+        from custom_components.aegis_ajax.alarm_control_panel import async_setup_entry
+
+        coordinator = self._coordinator_with_space(group_mode=False, groups=())
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+        await async_setup_entry(MagicMock(), entry, added.append)
+        assert len(added[0]) == 1
+        assert isinstance(added[0][0], AjaxAlarmControlPanel)
+
+    @pytest.mark.asyncio
+    async def test_creates_space_panel_plus_per_group_panels_in_group_mode(self) -> None:
+        from custom_components.aegis_ajax.alarm_control_panel import async_setup_entry
+
+        groups = (
+            Group(id="g1", space_id="s1", name="Villa", security_state=SecurityState.ARMED),
+            Group(id="g2", space_id="s1", name="Apartment", security_state=SecurityState.DISARMED),
+        )
+        coordinator = self._coordinator_with_space(group_mode=True, groups=groups)
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+        await async_setup_entry(MagicMock(), entry, added.append)
+        entities = added[0]
+        # Expect: 1 whole-house + 2 group panels (Villa, Apartment)
+        assert len(entities) == 3
+        space_panels = [e for e in entities if isinstance(e, AjaxAlarmControlPanel)]
+        group_panels = [e for e in entities if isinstance(e, AjaxGroupAlarmControlPanel)]
+        assert len(space_panels) == 1
+        assert len(group_panels) == 2
+        assert {p._group_id for p in group_panels} == {"g1", "g2"}

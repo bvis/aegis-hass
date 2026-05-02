@@ -146,7 +146,7 @@ class SecurityApi:
         metadata = self._client._session.get_call_metadata()
         stub = space_security_endpoints_pb2_grpc.SpaceSecurityServiceStub(channel)
 
-        request = arm_group_request_pb2.ArmGroupRequest(
+        request = arm_group_request_pb2.ArmSpaceGroupRequest(
             space_locator=space_locator_pb2.SpaceLocator(space_id=space_id),
             group_id=group_id,
             ignore_alarms=ignore_alarms,
@@ -170,7 +170,7 @@ class SecurityApi:
         metadata = self._client._session.get_call_metadata()
         stub = space_security_endpoints_pb2_grpc.SpaceSecurityServiceStub(channel)
 
-        request = disarm_group_request_pb2.DisarmGroupRequest(
+        request = disarm_group_request_pb2.DisarmSpaceGroupRequest(
             space_locator=space_locator_pb2.SpaceLocator(space_id=space_id),
             group_id=group_id,
         )

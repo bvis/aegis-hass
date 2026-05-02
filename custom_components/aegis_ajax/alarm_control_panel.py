@@ -219,6 +219,14 @@ async def async_setup_entry(
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
     entities: list[AlarmControlPanelEntity] = []
     for space_id, space in coordinator.spaces.items():
+        # Always create the space-level panel. It carries night-mode support
+        # (Ajax exposes night mode only at the space level) and acts as the
+        # "arm everything" / "disarm everything" control. In group mode the
+        # space-level arm/disarm cascades down to all groups server-side.
+        entities.append(AjaxAlarmControlPanel(coordinator=coordinator, space_id=space_id))
+        # In group mode, additionally expose one panel per group for
+        # independent arm/disarm. Group panels deliberately do NOT expose
+        # night mode — the protocol has no per-group night-mode endpoint.
         if space.group_mode_enabled and space.groups:
             entities.extend(
                 AjaxGroupAlarmControlPanel(
@@ -226,8 +234,6 @@ async def async_setup_entry(
                 )
                 for group in space.groups
             )
-        else:
-            entities.append(AjaxAlarmControlPanel(coordinator=coordinator, space_id=space_id))
     async_add_entities(entities)
 
 

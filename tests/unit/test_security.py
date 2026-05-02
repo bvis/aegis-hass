@@ -507,3 +507,88 @@ class TestArmingCommands:
         api = SecurityApi.__new__(SecurityApi)
         api._client = MagicMock()
         assert callable(api.disarm_group)
+
+
+class TestGroupProtoIntegration:
+    """Real-proto regression tests for arm_group / disarm_group.
+
+    The class-level tests above mock the entire `*_request_pb2` module with
+    MagicMock, so a typo in the proto class name (e.g. ArmGroupRequest vs
+    ArmSpaceGroupRequest) silently passes. These tests use the real proto
+    module so any drift between security.py and the generated descriptors
+    surfaces immediately.
+    """
+
+    def test_arm_group_request_class_name(self) -> None:
+        from systems.ajax.api.mobile.v2.space.security.group import (
+            arm_group_request_pb2,
+        )
+
+        assert hasattr(arm_group_request_pb2, "ArmSpaceGroupRequest")
+        assert not hasattr(arm_group_request_pb2, "ArmGroupRequest")
+
+    def test_disarm_group_request_class_name(self) -> None:
+        from systems.ajax.api.mobile.v2.space.security.group import (
+            disarm_group_request_pb2,
+        )
+
+        assert hasattr(disarm_group_request_pb2, "DisarmSpaceGroupRequest")
+        assert not hasattr(disarm_group_request_pb2, "DisarmGroupRequest")
+
+    @pytest.mark.asyncio
+    async def test_arm_group_builds_real_proto(self) -> None:
+        """Exercise security.arm_group with the real proto, mocking only the stub."""
+        from systems.ajax.api.mobile.v2.space.security.group import (
+            arm_group_request_pb2,
+        )
+
+        api, _, _ = _make_security_api()
+
+        captured: dict[str, object] = {}
+        mock_response = MagicMock()
+        mock_response.HasField.return_value = False
+
+        async def fake_arm_group(request, metadata=None, timeout=None):  # noqa: ANN001, ANN202, ARG001
+            captured["request"] = request
+            return mock_response
+
+        mock_stub_instance = MagicMock()
+        mock_stub_instance.armGroup = fake_arm_group
+        mock_grpc_module = MagicMock(SpaceSecurityServiceStub=lambda _ch: mock_stub_instance)
+
+        with patch.dict("sys.modules", {_GRPC_MOD: mock_grpc_module}):
+            await api.arm_group("space-1", "group-2", ignore_alarms=True)
+
+        request = captured["request"]
+        assert isinstance(request, arm_group_request_pb2.ArmSpaceGroupRequest)
+        assert request.group_id == "group-2"
+        assert request.ignore_alarms is True
+        assert request.space_locator.space_id == "space-1"
+
+    @pytest.mark.asyncio
+    async def test_disarm_group_builds_real_proto(self) -> None:
+        from systems.ajax.api.mobile.v2.space.security.group import (
+            disarm_group_request_pb2,
+        )
+
+        api, _, _ = _make_security_api()
+
+        captured: dict[str, object] = {}
+        mock_response = MagicMock()
+        mock_response.HasField.return_value = False
+
+        async def fake_disarm_group(request, metadata=None, timeout=None):  # noqa: ANN001, ANN202, ARG001
+            captured["request"] = request
+            return mock_response
+
+        mock_stub_instance = MagicMock()
+        mock_stub_instance.disarmGroup = fake_disarm_group
+        mock_grpc_module = MagicMock(SpaceSecurityServiceStub=lambda _ch: mock_stub_instance)
+
+        with patch.dict("sys.modules", {_GRPC_MOD: mock_grpc_module}):
+            await api.disarm_group("space-1", "group-2")
+
+        request = captured["request"]
+        assert isinstance(request, disarm_group_request_pb2.DisarmSpaceGroupRequest)
+        assert request.group_id == "group-2"
+        assert request.space_locator.space_id == "space-1"

@@ -266,6 +266,52 @@ class TestAsyncUpdateData:
         assert coordinator.spaces["s1"].monitoring_companies_loaded is True
 
     @pytest.mark.asyncio
+    async def test_update_data_preserves_cached_groups_between_snapshot_refreshes(
+        self,
+    ) -> None:
+        """list_spaces() doesn't return groups; the coordinator must keep the
+        previously cached groups + group_mode_enabled, otherwise per-group
+        alarm panels go unavailable on every poll between hourly snapshots.
+        """
+        from custom_components.aegis_ajax.api.models import Group
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        cached_groups = (
+            Group(
+                id="g1",
+                space_id="s1",
+                name="Villa",
+                security_state=SecurityState.ARMED,
+                sorting_key="01",
+            ),
+            Group(
+                id="g2",
+                space_id="s1",
+                name="Apartment",
+                security_state=SecurityState.DISARMED,
+                sorting_key="02",
+            ),
+        )
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            groups=cached_groups,
+            group_mode_enabled=True,
+        )
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator.spaces["s1"].groups == cached_groups
+        assert coordinator.spaces["s1"].group_mode_enabled is True
+
+    @pytest.mark.asyncio
     async def test_update_data_raises_update_failed_on_error(self) -> None:
         from homeassistant.helpers.update_coordinator import UpdateFailed
 

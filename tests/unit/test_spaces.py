@@ -6,18 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from google.protobuf.wrappers_pb2 import StringValue
-from systems.ajax.api.mobile.v2.common.space.security import (
-    space_security_mode_pb2,
-    space_security_pb2,
-)
-from systems.ajax.api.mobile.v2.common.space.security.group import (
-    group_mode_space_security_pb2,
-    group_pb2,
-    group_security_pb2,
-)
-from systems.ajax.api.mobile.v2.common.space.security.regular import (
-    regular_mode_space_security_pb2,
-)
 
 from custom_components.aegis_ajax.api.models import (
     MonitoringCompanyStatus,
@@ -102,12 +90,28 @@ class TestParseSpace:
 class TestParseGroups:
     """Parse group definitions + per-group security state from a SpaceSecurity proto."""
 
-    def _build_security(
+    def _build_security(  # noqa: ANN202
         self,
         groups: list[tuple[str, str, str]] | None = None,
         states: dict[str, int] | None = None,
         mode: str = "group_mode",
-    ) -> space_security_pb2.SpaceSecurity:
+    ):
+        # Imports inside the method so they don't pollute sys.modules with
+        # real proto packages at collection time — that breaks unrelated tests
+        # that patch.dict child modules of the same package.
+        from systems.ajax.api.mobile.v2.common.space.security import (  # noqa: PLC0415
+            space_security_mode_pb2,
+            space_security_pb2,
+        )
+        from systems.ajax.api.mobile.v2.common.space.security.group import (  # noqa: PLC0415
+            group_mode_space_security_pb2,
+            group_pb2,
+            group_security_pb2,
+        )
+        from systems.ajax.api.mobile.v2.common.space.security.regular import (  # noqa: PLC0415
+            regular_mode_space_security_pb2,
+        )
+
         proto_groups = [
             group_pb2.Group(id=gid, name=name, sorting_key=sort_key)
             for gid, name, sort_key in (groups or [])
@@ -319,13 +323,24 @@ class TestListRooms:
         locator_pb2 = MagicMock()
         locator_pb2.SpaceLocator = MagicMock(return_value="locator-marker")
 
-        with patch.dict(
-            "sys.modules",
-            {
-                _STREAM_SPACE_REQUEST: request_pb2,
-                _SPACE_GRPC: grpc_module,
-                _SPACE_LOCATOR: locator_pb2,
-            },
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    _STREAM_SPACE_REQUEST: request_pb2,
+                    _SPACE_GRPC: grpc_module,
+                    _SPACE_LOCATOR: locator_pb2,
+                },
+            ),
+            # The production code does `from systems.ajax...space import
+            # space_locator_pb2` which resolves via the parent's attribute
+            # if previously loaded. Patch that attribute too so the test is
+            # robust against earlier tests that triggered the real import.
+            patch(
+                "systems.ajax.api.mobile.v2.common.space.space_locator_pb2",
+                locator_pb2,
+                create=True,
+            ),
         ):
             rooms = await api.list_rooms("space-1")
 
@@ -469,13 +484,20 @@ class TestPressPanicButton:
         locator_pb2 = MagicMock()
         locator_pb2.SpaceLocator = MagicMock(return_value="locator-marker")
 
-        with patch.dict(
-            "sys.modules",
-            {
-                _PANIC_REQUEST: request_pb2,
-                _PANIC_GRPC: grpc_module,
-                _LOCATOR: locator_pb2,
-            },
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    _PANIC_REQUEST: request_pb2,
+                    _PANIC_GRPC: grpc_module,
+                    _LOCATOR: locator_pb2,
+                },
+            ),
+            patch(
+                "systems.ajax.api.mobile.v2.common.space.space_locator_pb2",
+                locator_pb2,
+                create=True,
+            ),
         ):
             await api.press_panic_button("space-1")
 
