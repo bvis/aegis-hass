@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4-beta.2] - 2026-05-02
+
+Second beta of the `1.2.4` line. Three end-to-end fixes on top of `beta.1`'s per-group alarm panels, all surfaced by @Cingar01 testing the real Hub Hybrid 4G in Zone Mode (#86).
+
+### Fixed
+- `arm_group` / `disarm_group` no longer fail with `module ... has no attribute 'ArmGroupRequest'`. The gRPC client referenced `ArmGroupRequest` / `DisarmGroupRequest` but the actual proto classes are `ArmSpaceGroupRequest` / `DisarmSpaceGroupRequest`. Arming any group from Home Assistant under `beta.1` was broken; with this release it works against the real `SpaceSecurityService/armGroup` and `disarmGroup` endpoints. The new `TestGroupProtoIntegration` regression suite exercises the real proto module so this class of drift between `security.py` and the generated descriptors fails loudly instead of silently passing through `MagicMock` — addressing the gap that let `beta.1` ship the bug.
+- Per-group alarm panels no longer flap to `unavailable` between hourly snapshot refreshes. The coordinator's poll path uses `list_spaces()` which doesn't return groups, and was overwriting the cached `Space` with one whose `groups=()` and `group_mode_enabled=False`. Only the hourly snapshot populates groups, so per-group panels were unavailable for almost every poll cycle, with empty `extra_state_attributes`. The coordinator now preserves `groups` and `group_mode_enabled` from the previous `Space` across polls in the same merge step that already preserves `monitoring_companies`.
+- The whole-space alarm panel no longer disappears when Group/Zone Mode is enabled. `beta.1` replaced the space-level panel with per-group panels; users lost access to night mode (Ajax exposes night mode only space-wide — there is no `armGroupToNightMode` endpoint) and the pre-upgrade `aegis_ajax_alarm_<space>` entity from `1.2.3` was orphaned in the registry as `restored: true`. The integration now always creates the whole-house panel and additionally adds per-group panels when Group Mode is on, giving users `1 + N` panels per space: night-mode through the whole-house one, independent arm/disarm per group through the rest.
+
 ## [1.2.4-beta.1] - 2026-05-01
 
 First beta of the `1.2.4` line. Adds initial support for Ajax Group / Zone Mode and clarifies the FCM credential extraction docs. Needs real-hardware validation from Group/Zone-Mode users before promotion to stable.
