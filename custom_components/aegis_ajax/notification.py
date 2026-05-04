@@ -64,6 +64,27 @@ class AjaxNotificationListener:
         # notification_id → time.monotonic() of first sighting; used to suppress
         # the second of the two FCM messages Ajax sends per event (#80).
         self._recent_notification_ids: dict[str, float] = {}
+        # Counters surfaced by system_health.py for in-UI diagnostics.
+        # Incremented inside `_on_notification` after the dedupe gate so
+        # only "real" pushes are counted; the dedupe-suppressed twin
+        # doesn't double-count.
+        self._pushes_received: int = 0
+        self._last_push_at: float | None = None
+
+    @property
+    def pushes_received(self) -> int:
+        """Total non-deduped push notifications received since startup."""
+        return self._pushes_received
+
+    @property
+    def last_push_at(self) -> float | None:
+        """`time.monotonic()` of the most recent non-deduped push, or None."""
+        return self._last_push_at
+
+    @property
+    def is_fcm_connected(self) -> bool:
+        """True if the FCM push client is alive."""
+        return self._push_client is not None
 
     async def async_start(self) -> None:
         """Register with FCM and start listening for push notifications."""
@@ -239,6 +260,11 @@ class AjaxNotificationListener:
                 NOTIFICATION_DEDUPE_WINDOW_SECONDS,
             )
             return
+
+        # Count only real (non-dedupe-suppressed) pushes. Surfaced in the
+        # System Health card so users can confirm push delivery is alive.
+        self._pushes_received += 1
+        self._last_push_at = time.monotonic()
 
         # Parse event from ENCODED_DATA using compiled protos
         if encoded_data:

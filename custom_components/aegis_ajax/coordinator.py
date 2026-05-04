@@ -130,6 +130,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def notification_listener(self) -> AjaxNotificationListener | None:
         return self._notification_listener
 
+    @property
+    def is_hts_connected(self) -> bool:
+        """True if HTS has an active connection feeding hub-network sensors."""
+        return self._hts_client is not None and self._hts_task is not None
+
     async def _login_and_persist(self) -> None:
         """Login fresh and notify the on_session_persist callback.
 

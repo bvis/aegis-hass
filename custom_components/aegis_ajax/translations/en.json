@@ -69,6 +69,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Reach Ajax cloud (gRPC host)",
+            "configured_accounts": "Configured accounts",
+            "spaces": "Spaces (hubs)",
+            "hts_connected": "HTS streams connected",
+            "fcm_connected": "FCM push clients connected",
+            "pushes_received": "Pushes received",
+            "last_push": "Last push received",
+            "last_poll": "Last successful poll"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Force arm",
