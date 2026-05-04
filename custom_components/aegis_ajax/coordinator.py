@@ -9,6 +9,7 @@ import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from custom_components.aegis_ajax.api.devices import DevicesApi
@@ -205,11 +206,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     # Slow down retries to prevent account lockout
                     self.update_interval = timedelta(minutes=30)
                     _LOGGER.error(
-                        "Authentication failed: %s — next retry in 30 min. "
-                        "Fix credentials via Settings → Integrations → Ajax → Reconfigure.",
+                        "Authentication failed: %s — triggering reauth.",
                         err,
                     )
-                    raise UpdateFailed(f"Authentication failed: {err}") from err
+                    # Raise ConfigEntryAuthFailed so HA surfaces the reauth
+                    # banner ("Reconfigure"); UpdateFailed only logs.
+                    raise ConfigEntryAuthFailed(str(err)) from err
 
             # Refresh spaces — if the saved token is stale Ajax replies with
             # UNAUTHENTICATED; force a fresh login (and persist the new token)
@@ -226,7 +228,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "Forcing a fresh login and retrying."
                 )
                 self._client.session.clear_session()
-                await self._login_and_persist()
+                try:
+                    await self._login_and_persist()
+                except AuthenticationError as auth_err:
+                    raise ConfigEntryAuthFailed(str(auth_err)) from auth_err
                 all_spaces = await self._spaces_api.list_spaces()
             now = asyncio.get_running_loop().time()
             new_spaces: dict[str, Space] = {}
@@ -341,6 +346,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._start_hts()
 
             return {"spaces": self.spaces, "devices": self.devices}
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             raise UpdateFailed("Error fetching Ajax data") from err
 

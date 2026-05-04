@@ -256,6 +256,167 @@ class TestAsyncStepSelectSpaces:
         flow.async_show_form.assert_called_once()
 
 
+class TestAsyncStepReauth:
+    @staticmethod
+    def _make_flow(entry_data: dict | None = None) -> AjaxCobrandedConfigFlow:
+        """Build a flow with `_get_reauth_entry` stubbed to return a fake entry."""
+        flow = AjaxCobrandedConfigFlow()
+        entry = MagicMock()
+        entry.data = entry_data or {"email": "user@example.com", "app_label": "Ajax"}
+        flow._get_reauth_entry = MagicMock(return_value=entry)
+        return flow
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_seeds_email_and_calls_confirm(self) -> None:
+        flow = self._make_flow()
+        flow.async_step_reauth_confirm = AsyncMock(return_value={"type": "form"})
+
+        await flow.async_step_reauth({"email": "user@example.com", "app_label": "Verux"})
+
+        assert flow._email == "user@example.com"
+        assert flow._app_label == "Verux"
+        flow.async_step_reauth_confirm.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_confirm_no_input_shows_form(self) -> None:
+        flow = self._make_flow()
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+
+        await flow.async_step_reauth_confirm(None)
+
+        flow.async_show_form.assert_called_once()
+        assert flow.async_show_form.call_args[1]["step_id"] == "reauth_confirm"
+        # Email surfaced in the prompt so the user knows which account they're re-auth'ing
+        assert (
+            flow.async_show_form.call_args[1]["description_placeholders"]["email"]
+            == "user@example.com"
+        )
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_confirm_invalid_auth_shows_error(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._app_label = "Ajax"
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(side_effect=AuthenticationError("nope"))
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_reauth_confirm({"password": "wrong"})
+
+        assert flow.async_show_form.call_args[1]["errors"]["base"] == "invalid_auth"
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_confirm_cannot_connect(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._app_label = "Ajax"
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock(side_effect=ConnectionError("refused"))
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_reauth_confirm({"password": "x"})
+
+        assert flow.async_show_form.call_args[1]["errors"]["base"] == "cannot_connect"
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_confirm_2fa_required_forwards(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._app_label = "Ajax"
+        flow.async_step_reauth_2fa = AsyncMock(return_value={"type": "form"})
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.login = AsyncMock(side_effect=TwoFactorRequiredError("req-XYZ"))
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_reauth_confirm({"password": "x"})
+
+        assert flow._request_id == "req-XYZ"
+        flow.async_step_reauth_2fa.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_confirm_success_updates_entry(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._app_label = "Ajax"
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.login = AsyncMock()
+        mock_client.close = AsyncMock()
+        mock_client.session.session_token = "tok-fresh"
+        mock_client.session.user_hex_id = "hex-99"
+
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_reauth_confirm({"password": "newpass"})
+
+        flow.async_update_reload_and_abort.assert_called_once()
+        kwargs = flow.async_update_reload_and_abort.call_args.kwargs
+        assert kwargs["reason"] == "reauth_successful"
+        new_data = kwargs["data"]
+        # Same email + app_label preserved; password rotated; fresh session persisted
+        assert new_data["email"] == "user@example.com"
+        assert new_data["password_hash"] == hashlib.sha256(b"newpass").hexdigest()
+        assert new_data["session_token"] == "tok-fresh"
+        assert new_data["user_hex_id"] == "hex-99"
+        # Plaintext password never lands on the entry
+        assert "password" not in new_data
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_2fa_invalid_totp(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._request_id = "req-9"
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        mock_client = MagicMock()
+        mock_client.login_totp = AsyncMock(side_effect=AuthenticationError("bad"))
+        flow._client = mock_client
+
+        await flow.async_step_reauth_2fa({"totp_code": "000000"})
+
+        assert flow.async_show_form.call_args[1]["errors"]["base"] == "invalid_totp"
+        assert flow.async_show_form.call_args[1]["step_id"] == "reauth_2fa"
+
+    @pytest.mark.asyncio
+    async def test_step_reauth_2fa_success_finishes_reauth(self) -> None:
+        flow = self._make_flow()
+        flow._email = "user@example.com"
+        flow._app_label = "Ajax"
+        flow._password_hash = hashlib.sha256(b"newpass").hexdigest()
+        flow._request_id = "req-9"
+
+        mock_client = MagicMock()
+        mock_client.login_totp = AsyncMock()
+        mock_client.close = AsyncMock()
+        mock_client.session.session_token = "tok-2fa"
+        mock_client.session.user_hex_id = "hex-2fa"
+        flow._client = mock_client
+
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+
+        await flow.async_step_reauth_2fa({"totp_code": "123456"})
+
+        flow.async_update_reload_and_abort.assert_called_once()
+        kwargs = flow.async_update_reload_and_abort.call_args.kwargs
+        assert kwargs["reason"] == "reauth_successful"
+        assert kwargs["data"]["session_token"] == "tok-2fa"
+
+
 class TestOptionsFlow:
     @staticmethod
     def _make_flow(

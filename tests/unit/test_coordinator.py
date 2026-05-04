@@ -417,6 +417,46 @@ class TestAsyncUpdateData:
         clr.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_update_data_raises_auth_failed_when_login_invalid(self) -> None:
+        """Bad credentials must raise ConfigEntryAuthFailed so HA shows reauth banner."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        from custom_components.aegis_ajax.api.session import AuthenticationError
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = False
+        coordinator._client.login = AsyncMock(side_effect=AuthenticationError("invalid"))
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
+    async def test_update_data_raises_auth_failed_when_token_rejected_and_relogin_invalid(
+        self,
+    ) -> None:
+        """Stale token + invalid creds on retry must surface as ConfigEntryAuthFailed."""
+        import grpc
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        from custom_components.aegis_ajax.api.session import AuthenticationError
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+
+        unauth = grpc.aio.AioRpcError(  # type: ignore[call-arg]
+            code=grpc.StatusCode.UNAUTHENTICATED,
+            initial_metadata=grpc.aio.Metadata(),
+            trailing_metadata=grpc.aio.Metadata(),
+            details="token expired",
+        )
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(side_effect=unauth)
+        coordinator._client.login = AsyncMock(side_effect=AuthenticationError("revoked"))
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
     async def test_login_persists_session_via_callback(self) -> None:
         """A successful login pushes the new token through on_session_persist."""
         coordinator = _make_coordinator()

@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
@@ -263,6 +266,100 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure_2fa", data_schema=TOTP_SCHEMA, errors=errors
         )
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """Entry point when HA detects auth has gone stale.
+
+        Triggered by the coordinator raising ``ConfigEntryAuthFailed``;
+        HA shows the orange "Reconfigure" banner that runs this flow.
+        """
+        self._email = str(entry_data.get("email", ""))
+        self._app_label = str(entry_data.get("app_label", APPLICATION_LABEL))
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-prompt for the password (and 2FA if required) keeping the same entry."""
+        errors: dict[str, str] = {}
+        entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            self._password_hash = AjaxSession.hash_password(user_input["password"])
+            try:
+                self._client = AjaxGrpcClient(
+                    email=self._email,
+                    password_hash=self._password_hash,
+                    app_label=self._app_label,
+                )
+                await self._client.connect()
+                await asyncio.wait_for(self._client.login(), timeout=30)
+                await self._client.close()
+                return await self._async_finish_reauth()
+            except TwoFactorRequiredError as e:
+                self._request_id = e.request_id
+                return await self.async_step_reauth_2fa()
+            except AuthenticationError:
+                errors["base"] = "invalid_auth"
+            except (ConnectionError, OSError, TimeoutError):
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error during reauth")
+                errors["base"] = "unknown"
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("password"): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
+                }
+            ),
+            description_placeholders={"email": entry.data.get("email", self._email)},
+            errors=errors,
+        )
+
+    async def async_step_reauth_2fa(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle 2FA during reauth."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                if self._client is None:
+                    raise RuntimeError("Client not initialized")
+                await asyncio.wait_for(
+                    self._client.login_totp(
+                        email=self._email,
+                        request_id=self._request_id,
+                        totp_code=user_input["totp_code"],
+                    ),
+                    timeout=30,
+                )
+                await self._client.close()
+                return await self._async_finish_reauth()
+            except AuthenticationError:
+                errors["base"] = "invalid_totp"
+            except TimeoutError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error during reauth 2FA")
+                errors["base"] = "unknown"
+        return self.async_show_form(step_id="reauth_2fa", data_schema=TOTP_SCHEMA, errors=errors)
+
+    async def _async_finish_reauth(self) -> ConfigFlowResult:
+        """Persist the refreshed credentials onto the existing entry and reload."""
+        entry = self._get_reauth_entry()
+        new_data: dict[str, Any] = {
+            **entry.data,
+            "password_hash": self._password_hash,
+            "app_label": self._app_label,
+        }
+        if self._client and self._client.session.session_token:
+            new_data["session_token"] = self._client.session.session_token
+            new_data["user_hex_id"] = self._client.session.user_hex_id
+        return self.async_update_reload_and_abort(entry, data=new_data, reason="reauth_successful")
 
     async def _async_finish_reconfigure(self) -> ConfigFlowResult:
         """Persist new credentials and session token, then reload."""
