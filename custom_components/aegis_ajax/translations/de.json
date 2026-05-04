@@ -109,6 +109,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} seit ueber {hours_offline} h offline",
+            "description": "Aegis empfaengt seit {hours_offline} Stunden durchgehend den Status OFFLINE fuer den Hub {hub_name}. Die Entitaeten bleiben veraltet, bis der Hub wieder verbunden ist. Haeufige Ursachen: Hub vom Strom getrennt, Netzwerkausfall, oder die ausgehende Verbindung des Hubs zur Ajax-Cloud wird von einer Firewall blockiert. Die Reparatur wird automatisch geschlossen, sobald Aegis den Hub wieder online sieht."
+        },
+        "hts_chronic_failure": {
+            "title": "Hub-Netzwerksensoren beeintraechtigt",
+            "description": "Die HTS-Verbindung (die die Sensoren fuer Ethernet / Wi-Fi / GSM / Stromversorgung speist) fuer den Bereich {space_id} bleibt seit {minutes_failing} Minuten nicht stabil. Die Hub-Netzwerksensoren sind nicht verfuegbar, bis sie sich erholt. Haeufigste Ursache: eine Firewall blockiert den ausgehenden Verkehr zu den Ajax-HTS-Endpunkten, oder anhaltende Netzwerkinstabilitaet zwischen Home Assistant und der Ajax-Cloud. Die Reparatur wird automatisch geschlossen, sobald HTS wieder verbunden ist."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",
+            "description": "Die Firebase-Cloud-Messaging-Registrierung ist fuer dieses Konto fehlgeschlagen. Die konfigurierten Werte FCM Project ID / App ID / API Key / Sender ID passen vermutlich nicht zu Ihrer Co-Branding-Ajax-App oder der API-Schluessel wurde widerrufen. Push-basierte Funktionen (sofortiger Arm/Disarm-Status, security_event-Entitaet, Foto-URLs von MotionCam) fallen auf langsameres Polling zurueck, bis dies behoben ist. Oeffnen Sie das Konfigurationsmenue der Integration und geben Sie die FCM-Anmeldedaten erneut ein - siehe Abschnitt 'How to obtain FCM credentials' in der README."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Foto aufnehmen"}},
         "event": {

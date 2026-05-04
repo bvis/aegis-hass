@@ -113,6 +113,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} offline ha mais de {hours_offline} h",
+            "description": "O Aegis esta a receber o estado OFFLINE para o hub {hub_name} ha {hours_offline} horas seguidas. As entidades ficarao desatualizadas ate que o hub volte a ligar-se. Causas comuns: hub desligado, falha de rede, ou ligacao de saida do hub para a cloud Ajax bloqueada por uma firewall. A reparacao fecha automaticamente assim que o Aegis vir o hub novamente online."
+        },
+        "hts_chronic_failure": {
+            "title": "Sensores de rede do hub degradados",
+            "description": "A ligacao HTS (que alimenta os sensores de Ethernet / Wi-Fi / GSM / alimentacao) do espaco {space_id} ha {minutes_failing} minutos que nao consegue manter-se ativa. Os sensores de rede do hub ficarao indisponiveis ate recuperar. Causa mais frequente: firewall a bloquear trafego de saida para os endpoints HTS da Ajax, ou instabilidade de rede prolongada entre o Home Assistant e a cloud Ajax. A reparacao fecha automaticamente quando o HTS reconectar."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Notificacoes push desativadas - credenciais FCM rejeitadas",
+            "description": "O registo no Firebase Cloud Messaging falhou para esta conta. Os valores configurados de FCM Project ID / App ID / API Key / Sender ID provavelmente nao correspondem a sua aplicacao Ajax co-branded, ou a chave da API foi revogada. As funcionalidades baseadas em push (estado instantaneo de armar/desarmar, entidade security_event, URLs de fotos do MotionCam) caem para polling mais lento ate a correcao. Abra o menu Configurar da integracao para introduzir novamente as credenciais FCM - consulte a seccao 'How to obtain FCM credentials' do README."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Tirar foto"}},
         "event": {

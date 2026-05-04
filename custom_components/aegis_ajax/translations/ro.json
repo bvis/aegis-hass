@@ -113,6 +113,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} offline de peste {hours_offline} h",
+            "description": "Aegis primeste un status OFFLINE pentru hub-ul {hub_name} de {hours_offline} ore la rand. Entitatile vor ramane invechite pana cand hub-ul se reconecteaza. Cauze comune: hub deconectat, intrerupere de retea, sau conexiunea de iesire a hub-ului catre cloud-ul Ajax blocata de un firewall. Reparatia se inchide automat de indata ce Aegis vede hub-ul din nou online."
+        },
+        "hts_chronic_failure": {
+            "title": "Senzorii de retea ai hub-ului degradati",
+            "description": "Conexiunea HTS (care alimenteaza senzorii Ethernet / Wi-Fi / GSM / alimentare) pentru spatiul {space_id} nu reuseste sa ramana activa de {minutes_failing} minute. Senzorii de retea ai hub-ului vor fi indisponibili pana la recuperare. Cauza frecventa: un firewall blocheaza traficul de iesire catre endpoint-urile HTS Ajax, sau instabilitate prelungita a retelei intre Home Assistant si cloud-ul Ajax. Reparatia se inchide automat cand HTS se reconecteaza."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Notificarile push dezactivate - credentiale FCM respinse",
+            "description": "Inregistrarea Firebase Cloud Messaging a esuat pentru acest cont. Valorile configurate FCM Project ID / App ID / API Key / Sender ID probabil nu corespund aplicatiei tale Ajax co-branded, sau cheia API a fost revocata. Functionalitatile bazate pe push (stare instantanee armat/dezarmat, entitatea security_event, URL-uri de fotografii de la MotionCam) vor cadea pe polling mai lent pana la corectare. Deschide meniul Configureaza al integrarii pentru a reintroduce credentialele FCM - consulta sectiunea 'How to obtain FCM credentials' din README."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Capturați fotografie"}},
         "event": {

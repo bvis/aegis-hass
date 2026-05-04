@@ -109,6 +109,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} offline dele nez {hours_offline} h",
+            "description": "Aegis prijima stav OFFLINE pro hub {hub_name} jiz {hours_offline} hodin v kuse. Entity zustanou zastarale, dokud se hub znovu nepripoji. Caste priciny: odpojeny hub, vypadek site, nebo blokovane odchozi spojeni hubu k cloudu Ajax firewallem. Oprava se vyresi automaticky, jakmile Aegis uvidi hub znovu online."
+        },
+        "hts_chronic_failure": {
+            "title": "Sitove senzory hubu zhorseny",
+            "description": "Spojeni HTS (ktere dodava data senzorum Ethernet / Wi-Fi / GSM / napajeni) pro prostor {space_id} se {minutes_failing} minut nedari udrzet aktivni. Sitove senzory hubu budou nedostupne, dokud se nezotavi. Nejcasteji je to zpusobeno firewallem, ktery blokuje odchozi provoz na HTS endpointy Ajax, nebo trvalou nestabilitou site mezi Home Assistant a cloudem Ajax. Oprava se vyresi automaticky, jakmile se HTS znovu pripoji."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",
+            "description": "Registrace Firebase Cloud Messaging selhala pro tento ucet. Konfigurovane hodnoty FCM Project ID / App ID / API Key / Sender ID pravdepodobne neodpovidaji vasi co-brandove aplikaci Ajax, nebo byl API klic zneplatnen. Funkce zavisle na pushi (okamzity stav armed/disarmed, entita security_event, URL fotek z MotionCam) prejdou na pomalejsi polling, dokud to nenapravite. Otevrete nabidku Konfigurovat integrace a zadejte znovu prihlasovaci udaje FCM - viz sekce 'How to obtain FCM credentials' v README."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Pořídit fotografii"}},
         "event": {

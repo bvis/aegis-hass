@@ -109,6 +109,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} {hours_offline} saatten fazla cevrimdisi",
+            "description": "Aegis, {hub_name} hub'i icin {hours_offline} saat boyunca kesintisiz OFFLINE durumu aliyor. Hub yeniden baglanana kadar varliklar guncel olmayacak. Yaygin nedenler: hub'in fisten cekilmesi, ag kesintisi veya hub'in Ajax bulutuna giden baglantisinin bir guvenlik duvari tarafindan engellenmesi. Aegis hub'i tekrar cevrimici gordugunde sorun otomatik olarak kapanir."
+        },
+        "hts_chronic_failure": {
+            "title": "Hub ag sensorleri zayiflamis",
+            "description": "{space_id} alani icin HTS baglantisi (Ethernet / Wi-Fi / GSM / sebeke gucu sensorlerini besleyen), {minutes_failing} dakikadir ayakta kalamiyor. Hub ag sensorleri toparlanana kadar kullanilamaz olacak. En yaygin neden: Ajax HTS uc noktalarina giden trafigi engelleyen bir guvenlik duvari veya Home Assistant ile Ajax bulutu arasindaki surekli ag kararsizligi. HTS yeniden baglandiginda sorun otomatik olarak kapanir."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Push bildirimleri devre disi - FCM kimlik bilgileri reddedildi",
+            "description": "Bu hesap icin Firebase Cloud Messaging kaydi basarisiz oldu. Yapilandirilmis FCM Project ID / App ID / API Key / Sender ID degerleri buyuk olasilikla co-branded Ajax uygulamaniza karsilik gelmiyor veya API anahtari iptal edilmis. Push'a bagimli ozellikler (anlik armed/disarmed durumu, security_event varligi, MotionCam'den foto URL'leri) bu duzeltilene kadar daha yavas polling'e dusecektir. FCM kimlik bilgilerini yeniden girmek icin entegrasyonun Yapilandir menusunu acin - README'deki 'How to obtain FCM credentials' bolumune bakin."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Fotoğraf çek"}},
         "event": {

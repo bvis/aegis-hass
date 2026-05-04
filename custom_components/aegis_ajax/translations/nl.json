@@ -109,6 +109,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} al meer dan {hours_offline} u offline",
+            "description": "Aegis ontvangt al {hours_offline} uur achter elkaar de status OFFLINE voor hub {hub_name}. De entiteiten blijven verouderd totdat de hub opnieuw verbinding maakt. Veelvoorkomende oorzaken: hub niet aangesloten, netwerkstoring, of de uitgaande verbinding van de hub naar de Ajax-cloud wordt door een firewall geblokkeerd. De melding sluit automatisch zodra Aegis de hub weer online ziet."
+        },
+        "hts_chronic_failure": {
+            "title": "Hub-netwerksensoren gedegradeerd",
+            "description": "De HTS-verbinding (die de sensoren voor Ethernet / Wi-Fi / GSM / netvoeding aanlevert) voor ruimte {space_id} lukt al {minutes_failing} minuten niet te blijven staan. De hub-netwerksensoren zijn niet beschikbaar totdat het herstelt. Meest voorkomende oorzaak: een firewall blokkeert uitgaand verkeer naar de HTS-endpoints van Ajax, of aanhoudende netwerkinstabiliteit tussen Home Assistant en de Ajax-cloud. De melding sluit automatisch wanneer HTS opnieuw verbindt."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",
+            "description": "Firebase Cloud Messaging-registratie is voor dit account mislukt. De ingestelde FCM Project ID / App ID / API Key / Sender ID komen waarschijnlijk niet overeen met je co-branded Ajax-app, of de API-sleutel is ingetrokken. Push-afhankelijke functies (directe arm/disarm-status, security_event-entiteit, foto-URL's van MotionCam) vallen terug op langzamere polling totdat dit is opgelost. Open het menu Configureren van de integratie om de FCM-inloggegevens opnieuw in te voeren - zie de sectie 'How to obtain FCM credentials' in de README."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Foto maken"}},
         "event": {
