@@ -4,6 +4,9 @@
     "codeowners": ["@bvis"],
     "config_flow": true,
     "dependencies": ["media_source"],
+    "dhcp": [
+        {"macaddress": "9C756E*"}
+    ],
     "documentation": "https://github.com/bvis/aegis-hass",
     "integration_type": "hub",
     "iot_class": "cloud_push",

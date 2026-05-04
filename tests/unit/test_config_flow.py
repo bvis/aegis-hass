@@ -37,6 +37,69 @@ class TestConfigFlowInit:
         assert flow.VERSION == 2
 
 
+class TestAsyncStepDhcp:
+    @staticmethod
+    def _discovery(
+        ip: str = "192.168.1.42",
+        mac: str = "9c:75:6e:1b:60:c4",
+        hostname: str | None = None,
+    ) -> MagicMock:
+        info = MagicMock()
+        info.ip = ip
+        info.macaddress = mac
+        info.hostname = hostname
+        return info
+
+    @pytest.mark.asyncio
+    async def test_first_discovery_forwards_into_user_step(self) -> None:
+        flow = AjaxCobrandedConfigFlow()
+        flow.hass = MagicMock()
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+        flow._async_current_entries = MagicMock(return_value=[])
+        flow.async_step_user = AsyncMock(return_value={"type": "form"})
+        flow.context = {}
+
+        await flow.async_step_dhcp(self._discovery(hostname="ajax-hub-01"))
+
+        # Per-MAC unique_id deduplicates repeat DHCP packets
+        flow.async_set_unique_id.assert_awaited_once()
+        flow._abort_if_unique_id_configured.assert_called_once()
+        flow.async_step_user.assert_awaited_once()
+        assert flow.context["title_placeholders"] == {"name": "ajax-hub-01"}
+
+    @pytest.mark.asyncio
+    async def test_no_hostname_falls_back_to_ip_in_title(self) -> None:
+        flow = AjaxCobrandedConfigFlow()
+        flow.hass = MagicMock()
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+        flow._async_current_entries = MagicMock(return_value=[])
+        flow.async_step_user = AsyncMock(return_value={"type": "form"})
+        flow.context = {}
+
+        await flow.async_step_dhcp(self._discovery(hostname=None))
+
+        assert flow.context["title_placeholders"] == {"name": "Ajax hub (192.168.1.42)"}
+
+    @pytest.mark.asyncio
+    async def test_existing_entry_aborts_already_configured(self) -> None:
+        """A user with at least one Aegis account configured doesn't get nagged."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.hass = MagicMock()
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+        flow._async_current_entries = MagicMock(return_value=[MagicMock()])
+        flow.async_abort = MagicMock(return_value={"type": "abort"})
+        flow.async_step_user = AsyncMock()
+        flow.context = {}
+
+        await flow.async_step_dhcp(self._discovery())
+
+        flow.async_abort.assert_called_once_with(reason="already_configured")
+        flow.async_step_user.assert_not_awaited()
+
+
 class TestAsyncStepUser:
     @pytest.mark.asyncio
     async def test_step_user_no_input_shows_form(self) -> None:

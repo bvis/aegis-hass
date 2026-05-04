@@ -10,9 +10,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
@@ -76,6 +79,32 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         self._password_hash: str = ""
         self._app_label: str = APPLICATION_LABEL
         self._request_id: str = ""
+
+    async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
+        """Entry point when an Ajax hub is seen on the local network.
+
+        HA invokes this when a DHCP packet matches the manifest's `dhcp`
+        spec (Ajax Systems OUI 9C:75:6E). The flow doesn't have
+        credentials at discovery time — its only job is to surface
+        Aegis as a "Discovered" card with a hint so the user clicks
+        through into the credential prompt instead of having to search
+        for the integration by name.
+        """
+        # Per-MAC unique_id on the *flow* (not the eventual entry, which
+        # uses the email) so HA dedupes repeat DHCP packets and avoids
+        # showing two discovery cards for the same hub.
+        await self.async_set_unique_id(format_mac(discovery_info.macaddress))
+        self._abort_if_unique_id_configured()
+        # Once the user has at least one Aegis account configured we
+        # don't keep nagging on every hub renewal — additional spaces
+        # under the same account already appear automatically.
+        if self._async_current_entries(include_ignore=False):
+            return self.async_abort(reason="already_configured")
+        # Title placeholder is what HA renders on the "Discovered" card.
+        self.context["title_placeholders"] = {
+            "name": discovery_info.hostname or f"Ajax hub ({discovery_info.ip})"
+        }
+        return await self.async_step_user()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
