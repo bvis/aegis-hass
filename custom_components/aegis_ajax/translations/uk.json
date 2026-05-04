@@ -65,6 +65,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Доступ до хмари Ajax (gRPC-хост)",
+            "configured_accounts": "Налаштовані акаунти",
+            "spaces": "Простори (хаби)",
+            "hts_connected": "Підключені HTS-потоки",
+            "fcm_connected": "Підключені FCM-клієнти",
+            "pushes_received": "Отримані push-повідомлення",
+            "last_push": "Останнє push-повідомлення",
+            "last_poll": "Останнє успішне опитування"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Примусова постановка на охорону",

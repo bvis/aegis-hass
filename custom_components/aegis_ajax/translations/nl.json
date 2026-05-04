@@ -65,6 +65,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Bereik Ajax-cloud (gRPC-host)",
+            "configured_accounts": "Geconfigureerde accounts",
+            "spaces": "Ruimtes (hubs)",
+            "hts_connected": "HTS-streams verbonden",
+            "fcm_connected": "FCM-pushclients verbonden",
+            "pushes_received": "Ontvangen pushes",
+            "last_push": "Laatste push ontvangen",
+            "last_poll": "Laatste succesvolle poll"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Geforceerd inschakelen",

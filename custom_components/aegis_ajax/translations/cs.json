@@ -65,6 +65,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Dostupnost Ajax cloudu (gRPC host)",
+            "configured_accounts": "Nakonfigurovane ucty",
+            "spaces": "Prostory (huby)",
+            "hts_connected": "Pripojene HTS streamy",
+            "fcm_connected": "Pripojene FCM klienty",
+            "pushes_received": "Prijate push zpravy",
+            "last_push": "Posledni push prijat",
+            "last_poll": "Posledni uspesny dotaz"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Nucene zastrezeni",

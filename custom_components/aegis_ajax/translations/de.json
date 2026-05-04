@@ -65,6 +65,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Erreichbarkeit der Ajax-Cloud (gRPC-Host)",
+            "configured_accounts": "Konfigurierte Konten",
+            "spaces": "Bereiche (Hubs)",
+            "hts_connected": "HTS-Streams verbunden",
+            "fcm_connected": "FCM-Push-Clients verbunden",
+            "pushes_received": "Empfangene Pushes",
+            "last_push": "Letzter Push empfangen",
+            "last_poll": "Letzte erfolgreiche Abfrage"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Erzwungenes Scharfschalten",

@@ -69,6 +69,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Acces la cloud-ul Ajax (host gRPC)",
+            "configured_accounts": "Conturi configurate",
+            "spaces": "Spatii (hub-uri)",
+            "hts_connected": "Stream-uri HTS conectate",
+            "fcm_connected": "Clienti FCM conectati",
+            "pushes_received": "Push-uri primite",
+            "last_push": "Ultimul push primit",
+            "last_poll": "Ultimul poll reusit"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Armare fortata",

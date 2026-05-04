@@ -69,6 +69,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Acces al nuvol Ajax (host gRPC)",
+            "configured_accounts": "Comptes configurats",
+            "spaces": "Espais (hubs)",
+            "hts_connected": "Streams HTS connectats",
+            "fcm_connected": "Clients FCM connectats",
+            "pushes_received": "Pushes rebuts",
+            "last_push": "Ultim push rebut",
+            "last_poll": "Ultim sondeig correcte"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Forcar armat",

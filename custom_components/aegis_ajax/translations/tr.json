@@ -65,6 +65,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Ajax bulutuna erisim (gRPC ana makinesi)",
+            "configured_accounts": "Yapilandirilmis hesaplar",
+            "spaces": "Alanlar (hub'lar)",
+            "hts_connected": "Bagli HTS akislari",
+            "fcm_connected": "Bagli FCM push istemcileri",
+            "pushes_received": "Alinan push'lar",
+            "last_push": "Son alinan push",
+            "last_poll": "Son basarili sorgu"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Zorla kurma",

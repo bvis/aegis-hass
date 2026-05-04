@@ -69,6 +69,18 @@
             }
         }
     },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Acces au cloud Ajax (hote gRPC)",
+            "configured_accounts": "Comptes configures",
+            "spaces": "Espaces (hubs)",
+            "hts_connected": "Streams HTS connectes",
+            "fcm_connected": "Clients FCM connectes",
+            "pushes_received": "Pushes recus",
+            "last_push": "Dernier push recu",
+            "last_poll": "Dernier sondage reussi"
+        }
+    },
     "services": {
         "force_arm": {
             "name": "Armement force",
