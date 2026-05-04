@@ -29,6 +29,16 @@
                 "title": "Zwei-Faktor-Authentifizierung",
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein.",
                 "data": {"totp_code": "TOTP-Code"}
+            },
+            "reauth_confirm": {
+                "title": "Aegis for Ajax neu authentifizieren",
+                "description": "Ihre Ajax-Sitzung für {email} ist nicht mehr gültig. Geben Sie das aktuelle Konto-Passwort ein, um den Zugriff wiederherzustellen.",
+                "data": {"password": "Passwort"}
+            },
+            "reauth_2fa": {
+                "title": "Zwei-Faktor-Authentifizierung",
+                "description": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
+                "data": {"totp_code": "TOTP-Code"}
             }
         },
         "error": {

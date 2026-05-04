@@ -29,6 +29,16 @@
                 "title": "Autenticazione a due fattori",
                 "description": "Inserisci il codice a 6 cifre dalla tua app di autenticazione.",
                 "data": {"totp_code": "Codice TOTP"}
+            },
+            "reauth_confirm": {
+                "title": "Riautentica Aegis for Ajax",
+                "description": "La sessione Ajax per {email} non è più valida. Inserisci la password attuale dell'account per ripristinare l'accesso.",
+                "data": {"password": "Password"}
+            },
+            "reauth_2fa": {
+                "title": "Autenticazione a due fattori",
+                "description": "Inserisci il codice a 6 cifre dell'app di autenticazione.",
+                "data": {"totp_code": "Codice TOTP"}
             }
         },
         "error": {

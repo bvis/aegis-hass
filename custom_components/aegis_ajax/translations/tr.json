@@ -29,6 +29,16 @@
                 "title": "İki Faktörlü Doğrulama",
                 "description": "Doğrulama uygulamanızdaki 6 haneli kodu girin.",
                 "data": {"totp_code": "TOTP Kodu"}
+            },
+            "reauth_confirm": {
+                "title": "Aegis for Ajax yeniden kimlik doğrulaması",
+                "description": "{email} için Ajax oturumunuz artık geçerli değil. Erişimi geri yüklemek için hesabın mevcut parolasını girin.",
+                "data": {"password": "Parola"}
+            },
+            "reauth_2fa": {
+                "title": "İki faktörlü kimlik doğrulama",
+                "description": "Kimlik doğrulama uygulamanızdan 6 haneli kodu girin.",
+                "data": {"totp_code": "TOTP Kodu"}
             }
         },
         "error": {

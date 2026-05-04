@@ -33,6 +33,16 @@
                 "title": "Autentificare în doi pași",
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
                 "data": {"totp_code": "Cod TOTP"}
+            },
+            "reauth_confirm": {
+                "title": "Reautentificare Aegis for Ajax",
+                "description": "Sesiunea Ajax pentru {email} nu mai este validă. Introduceți parola curentă a contului pentru a restabili accesul.",
+                "data": {"password": "Parolă"}
+            },
+            "reauth_2fa": {
+                "title": "Autentificare cu doi factori",
+                "description": "Introduceți codul din 6 cifre din aplicația de autentificare.",
+                "data": {"totp_code": "Cod TOTP"}
             }
         },
         "error": {

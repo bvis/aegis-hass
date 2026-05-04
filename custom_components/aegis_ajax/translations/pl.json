@@ -29,6 +29,16 @@
                 "title": "Uwierzytelnianie dwuskładnikowe",
                 "description": "Wprowadź 6-cyfrowy kod z aplikacji uwierzytelniającej.",
                 "data": {"totp_code": "Kod TOTP"}
+            },
+            "reauth_confirm": {
+                "title": "Ponowne uwierzytelnienie Aegis for Ajax",
+                "description": "Twoja sesja Ajax dla {email} nie jest już ważna. Wprowadź aktualne hasło konta, aby przywrócić dostęp.",
+                "data": {"password": "Hasło"}
+            },
+            "reauth_2fa": {
+                "title": "Uwierzytelnianie dwuskładnikowe",
+                "description": "Wprowadź 6-cyfrowy kod z aplikacji uwierzytelniającej.",
+                "data": {"totp_code": "Kod TOTP"}
             }
         },
         "error": {

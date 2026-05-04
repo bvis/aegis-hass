@@ -29,6 +29,16 @@
                 "title": "Dvoufaktorové ověření",
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
                 "data": {"totp_code": "Kód TOTP"}
+            },
+            "reauth_confirm": {
+                "title": "Opětovné ověření Aegis for Ajax",
+                "description": "Vaše Ajax relace pro {email} již není platná. Zadejte aktuální heslo k účtu pro obnovení přístupu.",
+                "data": {"password": "Heslo"}
+            },
+            "reauth_2fa": {
+                "title": "Dvoufaktorové ověření",
+                "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
+                "data": {"totp_code": "Kód TOTP"}
             }
         },
         "error": {

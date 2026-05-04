@@ -29,6 +29,16 @@
                 "title": "Twee-factor-authenticatie",
                 "description": "Voer de 6-cijferige code in van uw authenticator-app.",
                 "data": {"totp_code": "TOTP-code"}
+            },
+            "reauth_confirm": {
+                "title": "Aegis for Ajax opnieuw authenticeren",
+                "description": "Je Ajax-sessie voor {email} is niet langer geldig. Voer het huidige accountwachtwoord in om de toegang te herstellen.",
+                "data": {"password": "Wachtwoord"}
+            },
+            "reauth_2fa": {
+                "title": "Tweefactorauthenticatie",
+                "description": "Voer de 6-cijferige code uit je authenticator-app in.",
+                "data": {"totp_code": "TOTP-code"}
             }
         },
         "error": {
