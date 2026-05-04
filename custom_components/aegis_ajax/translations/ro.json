@@ -144,6 +144,10 @@
             "title": "Senzorii de retea ai hub-ului degradati",
             "description": "Conexiunea HTS (care alimenteaza senzorii Ethernet / Wi-Fi / GSM / alimentare) pentru spatiul {space_id} nu reuseste sa ramana activa de {minutes_failing} minute. Senzorii de retea ai hub-ului vor fi indisponibili pana la recuperare. Cauza frecventa: un firewall blocheaza traficul de iesire catre endpoint-urile HTS Ajax, sau instabilitate prelungita a retelei intre Home Assistant si cloud-ul Ajax. Reparatia se inchide automat cand HTS se reconecteaza."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis are nevoie de grpcio {required} sau mai nou (gasit {current})",
+            "description": "Aegis depinde de `grpcio` pentru canalul gRPC care comunica cu cloud-ul Ajax, iar instalarea ta Home Assistant aduce `grpcio` {current}. Sub {required} autentificarea poate esua cu erori HTTP/2 criptice. Pe Home Assistant Core sau Container manifest-ul integrarii fixeaza versiunea la instalare, dar pe Home Assistant OS runtime-ul foloseste un grpcio la nivel de sistem pe care manifest-ul nu il poate influenta — de obicei trebuie sa actualizezi Home Assistant OS la o build care include un grpcio mai nou. Reparatia se inchide automat la urmatoarea reincarcare cand versiunea depaseste {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notificarile push dezactivate - credentiale FCM respinse",
             "description": "Inregistrarea Firebase Cloud Messaging a esuat pentru acest cont. Valorile configurate FCM Project ID / App ID / API Key / Sender ID probabil nu corespund aplicatiei tale Ajax co-branded, sau cheia API a fost revocata. Functionalitatile bazate pe push (stare instantanee armat/dezarmat, entitatea security_event, URL-uri de fotografii de la MotionCam) vor cadea pe polling mai lent pana la corectare. Deschide meniul Configureaza al integrarii pentru a reintroduce credentialele FCM - consulta sectiunea 'How to obtain FCM credentials' din README."

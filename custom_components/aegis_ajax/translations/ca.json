@@ -144,6 +144,10 @@
             "title": "Sensors de xarxa del hub degradats",
             "description": "La connexio HTS (que alimenta els sensors d'Ethernet / Wi-Fi / GSM / alimentacio) de l'espai {space_id} fa {minutes_failing} minuts que no aconsegueix mantenir-se activa. Els sensors de xarxa del hub estaran no disponibles fins que es recuperi. Causa habitual: tallafocs que bloqueja el transit sortint cap als endpoints HTS d'Ajax, o inestabilitat de xarxa sostinguda entre Home Assistant i el nuvol d'Ajax. La incidencia es tanca automaticament quan HTS reconnecti."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis necessita grpcio {required} o superior (trobat {current})",
+            "description": "Aegis depen de `grpcio` per al canal gRPC que parla amb el nuvol d'Ajax, i la teva instal·lacio de Home Assistant porta `grpcio` {current}. Per sota de {required} l'inici de sessio pot fallar amb errors HTTP/2 poc descriptius. A Home Assistant Core o Container el manifest de la integracio fixa la versio en instal·lar, pero a Home Assistant OS el runtime porta un grpcio del sistema que aquest manifest no pot tocar — normalment cal actualitzar Home Assistant OS a una build que inclogui un grpcio mes recent. La incidencia es tanca automaticament en la seguent recarrega quan la versio creui {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notificacions push desactivades: credencials FCM rebutjades",
             "description": "El registre a Firebase Cloud Messaging ha fallat per a aquest compte. Probablement, el FCM Project ID / App ID / API Key / Sender ID configurats no es corresponen amb la teva app Ajax co-branded, o la API key s'ha revocat. Les funcions que depenen del push (estat instantani d'armat/desarmat, entitat security_event, URL de fotos de MotionCam) cauran a polling mes lent fins que es corregeixi. Obre el menu Configurar de la integracio per reintroduir les credencials FCM - consulta la seccio 'How to obtain FCM credentials' del README."

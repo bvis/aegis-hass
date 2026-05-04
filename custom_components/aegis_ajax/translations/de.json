@@ -140,6 +140,10 @@
             "title": "Hub-Netzwerksensoren beeintraechtigt",
             "description": "Die HTS-Verbindung (die die Sensoren fuer Ethernet / Wi-Fi / GSM / Stromversorgung speist) fuer den Bereich {space_id} bleibt seit {minutes_failing} Minuten nicht stabil. Die Hub-Netzwerksensoren sind nicht verfuegbar, bis sie sich erholt. Haeufigste Ursache: eine Firewall blockiert den ausgehenden Verkehr zu den Ajax-HTS-Endpunkten, oder anhaltende Netzwerkinstabilitaet zwischen Home Assistant und der Ajax-Cloud. Die Reparatur wird automatisch geschlossen, sobald HTS wieder verbunden ist."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis benoetigt grpcio {required} oder neuer (gefunden {current})",
+            "description": "Aegis benoetigt `grpcio` fuer den gRPC-Kanal, der mit der Ajax-Cloud spricht; Ihre Home-Assistant-Installation liefert `grpcio` {current}. Unterhalb von {required} kann der Login mit kryptischen HTTP/2-Fehlern fehlschlagen. Auf Home Assistant Core oder Container fixiert das Manifest der Integration die Version bei der Installation, aber auf Home Assistant OS wird das system-weite grpcio verwendet und das Manifest hat keinen Einfluss darauf — typischerweise muessen Sie Home Assistant OS auf einen Build aktualisieren, der ein neueres grpcio enthaelt. Die Reparatur wird beim naechsten Reload automatisch geschlossen, sobald die Version {required} ueberschreitet."
+        },
         "fcm_credentials_invalid": {
             "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",
             "description": "Die Firebase-Cloud-Messaging-Registrierung ist fuer dieses Konto fehlgeschlagen. Die konfigurierten Werte FCM Project ID / App ID / API Key / Sender ID passen vermutlich nicht zu Ihrer Co-Branding-Ajax-App oder der API-Schluessel wurde widerrufen. Push-basierte Funktionen (sofortiger Arm/Disarm-Status, security_event-Entitaet, Foto-URLs von MotionCam) fallen auf langsameres Polling zurueck, bis dies behoben ist. Oeffnen Sie das Konfigurationsmenue der Integration und geben Sie die FCM-Anmeldedaten erneut ein - siehe Abschnitt 'How to obtain FCM credentials' in der README."

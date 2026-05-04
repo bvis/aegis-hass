@@ -140,6 +140,10 @@
             "title": "Sitove senzory hubu zhorseny",
             "description": "Spojeni HTS (ktere dodava data senzorum Ethernet / Wi-Fi / GSM / napajeni) pro prostor {space_id} se {minutes_failing} minut nedari udrzet aktivni. Sitove senzory hubu budou nedostupne, dokud se nezotavi. Nejcasteji je to zpusobeno firewallem, ktery blokuje odchozi provoz na HTS endpointy Ajax, nebo trvalou nestabilitou site mezi Home Assistant a cloudem Ajax. Oprava se vyresi automaticky, jakmile se HTS znovu pripoji."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis potrebuje grpcio {required} nebo novejsi (nalezeno {current})",
+            "description": "Aegis je zavisly na `grpcio` pro gRPC kanal, ktery komunikuje s cloudem Ajax, a vase instalace Home Assistant ma `grpcio` {current}. Pod {required} muze prihlaseni selhat s krytickymi HTTP/2 chybami. Na Home Assistant Core nebo Container manifest integrace zafixuje verzi pri instalaci, ale na Home Assistant OS bezi system-wide grpcio, ktere tento manifest nemuze ovlivnit — obvykle je potreba aktualizovat Home Assistant OS na build s novejsim grpcio. Oprava se vyresi automaticky pri pristim nacteni, jakmile verze prekroci {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",
             "description": "Registrace Firebase Cloud Messaging selhala pro tento ucet. Konfigurovane hodnoty FCM Project ID / App ID / API Key / Sender ID pravdepodobne neodpovidaji vasi co-brandove aplikaci Ajax, nebo byl API klic zneplatnen. Funkce zavisle na pushi (okamzity stav armed/disarmed, entita security_event, URL fotek z MotionCam) prejdou na pomalejsi polling, dokud to nenapravite. Otevrete nabidku Konfigurovat integrace a zadejte znovu prihlasovaci udaje FCM - viz sekce 'How to obtain FCM credentials' v README."

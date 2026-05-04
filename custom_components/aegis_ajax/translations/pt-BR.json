@@ -144,6 +144,10 @@
             "title": "Sensores de rede do hub degradados",
             "description": "A conexao HTS (que alimenta os sensores de Ethernet / Wi-Fi / GSM / energia) do espaco {space_id} esta ha {minutes_failing} minutos sem conseguir se manter ativa. Os sensores de rede do hub ficarao indisponiveis ate que se recupere. Causa mais comum: firewall bloqueando trafego de saida para os endpoints HTS da Ajax, ou instabilidade de rede prolongada entre o Home Assistant e a nuvem Ajax. O reparo e encerrado automaticamente quando o HTS reconectar."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis precisa de grpcio {required} ou superior (encontrado {current})",
+            "description": "O Aegis depende de `grpcio` para o canal gRPC que conversa com a nuvem Ajax, e sua instalacao do Home Assistant traz `grpcio` {current}. Abaixo de {required} o login pode falhar com erros HTTP/2 pouco descritivos. No Home Assistant Core ou Container o manifest da integracao fixa a versao na instalacao, mas no Home Assistant OS o runtime usa um grpcio do sistema que este manifest nao pode influenciar — normalmente e necessario atualizar o Home Assistant OS para uma build que inclua um grpcio mais recente. O reparo se encerra automaticamente no proximo carregamento quando a versao ultrapassar {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notificacoes push desativadas - credenciais FCM rejeitadas",
             "description": "O registro no Firebase Cloud Messaging falhou para esta conta. Os valores configurados de FCM Project ID / App ID / API Key / Sender ID provavelmente nao correspondem ao seu aplicativo Ajax co-branded, ou a chave da API foi revogada. Os recursos baseados em push (estado instantaneo de armar/desarmar, entidade security_event, URLs de fotos do MotionCam) farao fallback para polling mais lento ate a correcao. Abra o menu Configurar da integracao para inserir novamente as credenciais FCM - consulte a secao 'How to obtain FCM credentials' do README."

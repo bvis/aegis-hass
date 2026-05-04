@@ -144,6 +144,10 @@
             "title": "Capteurs reseau du hub degrades",
             "description": "La connexion HTS (qui alimente les capteurs Ethernet / Wi-Fi / GSM / alimentation) de l'espace {space_id} ne parvient plus a se maintenir depuis {minutes_failing} minutes. Les capteurs reseau du hub seront indisponibles jusqu'a la recuperation. Cause la plus frequente : un pare-feu bloque le trafic sortant vers les endpoints HTS d'Ajax, ou une instabilite reseau prolongee entre Home Assistant et le cloud Ajax. L'incident se resout automatiquement a la reconnexion HTS."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis a besoin de grpcio {required} ou plus recent (trouve {current})",
+            "description": "Aegis depend de `grpcio` pour le canal gRPC qui parle au cloud Ajax, et votre installation Home Assistant fournit `grpcio` {current}. En dessous de {required} la connexion peut echouer avec des erreurs HTTP/2 cryptiques. Sur Home Assistant Core ou Container le manifest de l'integration epingle la version a l'installation, mais sur Home Assistant OS le runtime fournit un grpcio system-wide que ce manifest ne peut pas influencer — il faut generalement mettre a jour Home Assistant OS vers une build qui inclut un grpcio plus recent. L'incident se resout automatiquement au prochain rechargement une fois la version superieure a {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notifications push desactivees - identifiants FCM rejetes",
             "description": "L'enregistrement Firebase Cloud Messaging a echoue pour ce compte. Les valeurs FCM Project ID / App ID / API Key / Sender ID configurees ne correspondent probablement pas a votre application Ajax co-brandee, ou la cle API a ete revoquee. Les fonctions dependantes du push (etat instantane d'armement/desarmement, entite security_event, URLs de photos de MotionCam) basculent vers un polling plus lent jusqu'a correction. Ouvrez le menu Configurer de l'integration pour ressaisir les identifiants FCM - voir la section 'How to obtain FCM credentials' du README."

@@ -140,6 +140,10 @@
             "title": "Hub-netwerksensoren gedegradeerd",
             "description": "De HTS-verbinding (die de sensoren voor Ethernet / Wi-Fi / GSM / netvoeding aanlevert) voor ruimte {space_id} lukt al {minutes_failing} minuten niet te blijven staan. De hub-netwerksensoren zijn niet beschikbaar totdat het herstelt. Meest voorkomende oorzaak: een firewall blokkeert uitgaand verkeer naar de HTS-endpoints van Ajax, of aanhoudende netwerkinstabiliteit tussen Home Assistant en de Ajax-cloud. De melding sluit automatisch wanneer HTS opnieuw verbindt."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis vereist grpcio {required} of nieuwer (gevonden {current})",
+            "description": "Aegis is afhankelijk van `grpcio` voor het gRPC-kanaal naar de Ajax-cloud, en jouw Home Assistant-installatie bevat `grpcio` {current}. Onder {required} kan de aanmelding mislukken met cryptische HTTP/2-fouten. Op Home Assistant Core of Container fixeert het integratiemanifest de versie bij installatie, maar op Home Assistant OS gebruikt de runtime een systeembrede grpcio die dit manifest niet kan beinvloeden — meestal moet je Home Assistant OS bijwerken naar een build met een nieuwere grpcio. De melding sluit automatisch bij de volgende herlaadronde zodra de versie boven {required} komt."
+        },
         "fcm_credentials_invalid": {
             "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",
             "description": "Firebase Cloud Messaging-registratie is voor dit account mislukt. De ingestelde FCM Project ID / App ID / API Key / Sender ID komen waarschijnlijk niet overeen met je co-branded Ajax-app, of de API-sleutel is ingetrokken. Push-afhankelijke functies (directe arm/disarm-status, security_event-entiteit, foto-URL's van MotionCam) vallen terug op langzamere polling totdat dit is opgelost. Open het menu Configureren van de integratie om de FCM-inloggegevens opnieuw in te voeren - zie de sectie 'How to obtain FCM credentials' in de README."

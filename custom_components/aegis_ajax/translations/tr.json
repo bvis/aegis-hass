@@ -140,6 +140,10 @@
             "title": "Hub ag sensorleri zayiflamis",
             "description": "{space_id} alani icin HTS baglantisi (Ethernet / Wi-Fi / GSM / sebeke gucu sensorlerini besleyen), {minutes_failing} dakikadir ayakta kalamiyor. Hub ag sensorleri toparlanana kadar kullanilamaz olacak. En yaygin neden: Ajax HTS uc noktalarina giden trafigi engelleyen bir guvenlik duvari veya Home Assistant ile Ajax bulutu arasindaki surekli ag kararsizligi. HTS yeniden baglandiginda sorun otomatik olarak kapanir."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis grpcio {required} veya daha yeni gerektirir (bulunan {current})",
+            "description": "Aegis, Ajax bulutuyla konusan gRPC kanali icin `grpcio` modulune bagimlidir ve Home Assistant kurulumunuzda `grpcio` {current} bulunuyor. {required} altinda oturum acma, anlamsiz HTTP/2 hatalariyla basarisiz olabilir. Home Assistant Core veya Container'da entegrasyon manifest dosyasi kurulumda surumu sabitler, ancak Home Assistant OS'ta calisma zamani sistem genelinde bir grpcio kullanir ve bu manifest onu etkileyemez — genellikle daha yeni bir grpcio iceren bir Home Assistant OS surumune yukseltmeniz gerekir. Surum {required} esiglini astiginda sorun bir sonraki yeniden yuklemede otomatik olarak kapanir."
+        },
         "fcm_credentials_invalid": {
             "title": "Push bildirimleri devre disi - FCM kimlik bilgileri reddedildi",
             "description": "Bu hesap icin Firebase Cloud Messaging kaydi basarisiz oldu. Yapilandirilmis FCM Project ID / App ID / API Key / Sender ID degerleri buyuk olasilikla co-branded Ajax uygulamaniza karsilik gelmiyor veya API anahtari iptal edilmis. Push'a bagimli ozellikler (anlik armed/disarmed durumu, security_event varligi, MotionCam'den foto URL'leri) bu duzeltilene kadar daha yavas polling'e dusecektir. FCM kimlik bilgilerini yeniden girmek icin entegrasyonun Yapilandir menusunu acin - README'deki 'How to obtain FCM credentials' bolumune bakin."

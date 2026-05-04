@@ -144,6 +144,10 @@
             "title": "Sensores de rede do hub degradados",
             "description": "A ligacao HTS (que alimenta os sensores de Ethernet / Wi-Fi / GSM / alimentacao) do espaco {space_id} ha {minutes_failing} minutos que nao consegue manter-se ativa. Os sensores de rede do hub ficarao indisponiveis ate recuperar. Causa mais frequente: firewall a bloquear trafego de saida para os endpoints HTS da Ajax, ou instabilidade de rede prolongada entre o Home Assistant e a cloud Ajax. A reparacao fecha automaticamente quando o HTS reconectar."
         },
+        "grpcio_version_mismatch": {
+            "title": "O Aegis precisa de grpcio {required} ou superior (encontrado {current})",
+            "description": "O Aegis depende de `grpcio` para o canal gRPC que comunica com a cloud Ajax, e a sua instalacao Home Assistant traz `grpcio` {current}. Abaixo de {required} o inicio de sessao pode falhar com erros HTTP/2 pouco descritivos. No Home Assistant Core ou Container o manifest da integracao fixa a versao na instalacao, mas no Home Assistant OS o runtime usa um grpcio do sistema que este manifest nao pode influenciar — normalmente e preciso atualizar o Home Assistant OS para uma build que inclua um grpcio mais recente. A reparacao fecha automaticamente no proximo recarregamento quando a versao ultrapassar {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notificacoes push desativadas - credenciais FCM rejeitadas",
             "description": "O registo no Firebase Cloud Messaging falhou para esta conta. Os valores configurados de FCM Project ID / App ID / API Key / Sender ID provavelmente nao correspondem a sua aplicacao Ajax co-branded, ou a chave da API foi revogada. As funcionalidades baseadas em push (estado instantaneo de armar/desarmar, entidade security_event, URLs de fotos do MotionCam) caem para polling mais lento ate a correcao. Abra o menu Configurar da integracao para introduzir novamente as credenciais FCM - consulte a seccao 'How to obtain FCM credentials' do README."

@@ -140,6 +140,10 @@
             "title": "Sensori di rete dell'hub degradati",
             "description": "La connessione HTS (che alimenta i sensori Ethernet / Wi-Fi / GSM / alimentazione) per lo spazio {space_id} non riesce a rimanere attiva da {minutes_failing} minuti. I sensori di rete dell'hub saranno non disponibili fino al ripristino. Causa piu frequente: un firewall blocca il traffico in uscita verso gli endpoint HTS di Ajax, o un'instabilita di rete prolungata tra Home Assistant e il cloud Ajax. La segnalazione si risolve automaticamente al ripristino di HTS."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis richiede grpcio {required} o successivo (trovato {current})",
+            "description": "Aegis dipende da `grpcio` per il canale gRPC che parla con il cloud Ajax, e la tua installazione di Home Assistant include `grpcio` {current}. Sotto {required} il login puo fallire con errori HTTP/2 poco chiari. Su Home Assistant Core o Container il manifest dell'integrazione fissa la versione all'installazione, ma su Home Assistant OS il runtime usa un grpcio di sistema che il manifest non puo influenzare — di solito occorre aggiornare Home Assistant OS a una build che includa un grpcio piu recente. La segnalazione si risolve automaticamente al prossimo ricaricamento quando la versione supera {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Notifiche push disabilitate - credenziali FCM rifiutate",
             "description": "La registrazione Firebase Cloud Messaging non e riuscita per questo account. I valori FCM Project ID / App ID / API Key / Sender ID configurati probabilmente non corrispondono alla tua app Ajax co-branded, oppure la API key e stata revocata. Le funzionalita basate sul push (stato istantaneo di armato/disarmato, entita security_event, URL delle foto da MotionCam) ripiegheranno su polling piu lento finche non viene corretto. Apri il menu Configura dell'integrazione per reinserire le credenziali FCM - consulta la sezione 'How to obtain FCM credentials' del README."

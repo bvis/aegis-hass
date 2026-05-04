@@ -140,6 +140,10 @@
             "title": "Czujniki sieci hubu w stanie zdegradowanym",
             "description": "Polaczenie HTS (zasilajace czujniki Ethernet / Wi-Fi / GSM / zasilania) dla obszaru {space_id} nie potrafi utrzymac sie od {minutes_failing} minut. Czujniki sieci hubu beda niedostepne az do odzyskania. Najczestsza przyczyna: firewall blokujacy ruch wychodzacy do endpointow HTS Ajax, lub trwala niestabilnosc sieci miedzy Home Assistant a chmura Ajax. Naprawa zamknie sie automatycznie po ponownym polaczeniu HTS."
         },
+        "grpcio_version_mismatch": {
+            "title": "Aegis wymaga grpcio {required} lub nowszego (znaleziono {current})",
+            "description": "Aegis polega na `grpcio` dla kanalu gRPC, ktory komunikuje sie z chmura Ajax, a Twoja instalacja Home Assistant ma `grpcio` {current}. Ponizej {required} logowanie moze sie nie powiesc z kryptycznymi bledami HTTP/2. W Home Assistant Core lub Container manifest integracji blokuje wersje przy instalacji, ale w Home Assistant OS runtime uzywa systemowego grpcio, na ktorego manifest nie ma wplywu — zwykle trzeba zaktualizowac Home Assistant OS do wydania z nowszym grpcio. Naprawa zamknie sie automatycznie przy nastepnym przeladowaniu, gdy wersja przekroczy {required}."
+        },
         "fcm_credentials_invalid": {
             "title": "Powiadomienia push wylaczone - dane FCM odrzucone",
             "description": "Rejestracja Firebase Cloud Messaging nie powiodla sie dla tego konta. Skonfigurowane wartosci FCM Project ID / App ID / API Key / Sender ID najprawdopodobniej nie odpowiadaja Twojej co-brandowej aplikacji Ajax lub klucz API zostal uniewazniony. Funkcje zalezne od push (natychmiastowy stan uzbrojenia/rozbrojenia, encja security_event, URL zdjec z MotionCam) przejda na wolniejszy polling do czasu naprawy. Otworz menu Konfiguruj integracji, aby ponownie wpisac dane FCM - zobacz sekcje 'How to obtain FCM credentials' w README."
