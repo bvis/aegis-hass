@@ -245,6 +245,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         fcm_app_id=_get_fcm("fcm_app_id"),
         fcm_api_key=_get_fcm("fcm_api_key"),
         fcm_sender_id=_get_fcm("fcm_sender_id"),
+        entry_id=entry.entry_id,
     )
 
     # Schedule photo cleanup

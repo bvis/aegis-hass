@@ -325,6 +325,98 @@ class TestAsyncUpdateData:
             await coordinator._async_update_data()
 
     @pytest.mark.asyncio
+    async def test_hub_offline_24h_triggers_repair_and_clears_when_back_online(
+        self,
+    ) -> None:
+        """A space sustained OFFLINE for >24h must raise the Repair, online clears it."""
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        offline_space = replace(_make_space("s1"), connection_status=ConnectionStatus.OFFLINE)
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[offline_space])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        # Simulate a hub that's been offline for >24h by pre-seeding the
+        # tracking dict 25h in the past.
+        loop = asyncio.get_running_loop()
+        coordinator._first_offline_at["s1"] = loop.time() - 25 * 3600
+
+        with patch("custom_components.aegis_ajax.coordinator.async_register_hub_offline") as reg:
+            await coordinator._async_update_data()
+
+        reg.assert_called_once()
+        kwargs = reg.call_args.kwargs
+        assert kwargs["space_id"] == "s1"
+        assert kwargs["hours_offline"] >= 24
+
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        with patch("custom_components.aegis_ajax.coordinator.async_clear_hub_offline") as clr:
+            await coordinator._async_update_data()
+
+        clr.assert_called_once()
+        assert clr.call_args.kwargs["space_id"] == "s1"
+        assert "s1" not in coordinator._first_offline_at
+
+    @pytest.mark.asyncio
+    async def test_hub_offline_below_threshold_does_not_raise(self) -> None:
+        """An offline hub under the 24h window must not surface a Repair."""
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        offline_space = replace(_make_space("s1"), connection_status=ConnectionStatus.OFFLINE)
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[offline_space])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        with patch("custom_components.aegis_ajax.coordinator.async_register_hub_offline") as reg:
+            await coordinator._async_update_data()
+
+        reg.assert_not_called()
+        assert "s1" in coordinator._first_offline_at
+
+    def test_hts_chronic_failure_raised_after_30_min_window(self) -> None:
+        """Sustained HTS reconnect failures must surface a Repair after 30 min."""
+        import time as _time
+
+        coordinator = _make_coordinator()
+        coordinator._hts_first_failure_at = _time.monotonic() - 31 * 60
+
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_register_hts_chronic_failure"
+        ) as reg:
+            coordinator._handle_hts_disconnect(reconnect=False)
+
+        reg.assert_called_once()
+        assert reg.call_args.kwargs["space_id"] == "s1"
+        assert reg.call_args.kwargs["minutes_failing"] >= 30
+
+    def test_hts_first_disconnect_seeds_timestamp_without_repair(self) -> None:
+        """The first HTS disconnect after a healthy run records the time but stays quiet."""
+        coordinator = _make_coordinator()
+        assert coordinator._hts_first_failure_at is None
+
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_register_hts_chronic_failure"
+        ) as reg:
+            coordinator._handle_hts_disconnect(reconnect=False)
+
+        reg.assert_not_called()
+        assert coordinator._hts_first_failure_at is not None
+
+    def test_clear_hts_chronic_failure_resets_state_and_clears_repair(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._hts_first_failure_at = 12345.0
+
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_clear_hts_chronic_failure"
+        ) as clr:
+            coordinator._clear_hts_chronic_failure()
+
+        assert coordinator._hts_first_failure_at is None
+        clr.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_login_persists_session_via_callback(self) -> None:
         """A successful login pushes the new token through on_session_persist."""
         coordinator = _make_coordinator()

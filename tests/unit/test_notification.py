@@ -235,6 +235,65 @@ class TestNotificationListener:
         assert "dev-99" not in listener._notification_id_callbacks
 
 
+class TestAsyncStartFcmRepairs:
+    """The FCM listener raises a Repair when registration / push start fails."""
+
+    @pytest.mark.asyncio
+    async def test_no_repair_when_fcm_unconfigured(self) -> None:
+        """No api_key → no Repair (push is just opt-out, not broken)."""
+        hass = MagicMock()
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass,
+            coordinator=coordinator,
+            fcm_project_id="",
+            fcm_app_id="",
+            fcm_api_key="",
+            fcm_sender_id="",
+            entry_id="entry-x",
+        )
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ) as reg,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"
+            ) as clr,
+        ):
+            await listener.async_start()
+
+        reg.assert_not_called()
+        clr.assert_called_once_with(hass, entry_id="entry-x")
+
+    @pytest.mark.asyncio
+    async def test_register_failure_raises_repair(self) -> None:
+        """firebase_messaging.register() throwing → repair raised, listener returns gracefully."""
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(side_effect=RuntimeError("boom"))
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass, coordinator=coordinator, **_FCM_KWARGS, entry_id="entry-x"
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+
+        register_cls = MagicMock()
+        instance = MagicMock()
+        instance.register = MagicMock(side_effect=RuntimeError("boom"))
+        register_cls.return_value = instance
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ) as reg,
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        reg.assert_called_once_with(hass, entry_id="entry-x")
+
+
 class TestApplySecurityStateFromEvent:
     """Issue #68: arm/disarm pushes update space security_state instantly."""
 

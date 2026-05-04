@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,13 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
+    ConnectionStatus,
+)
+from custom_components.aegis_ajax.repairs import (
+    async_clear_hts_chronic_failure,
+    async_clear_hub_offline,
+    async_register_hts_chronic_failure,
+    async_register_hub_offline,
 )
 
 if TYPE_CHECKING:
@@ -36,6 +44,12 @@ if TYPE_CHECKING:
     from custom_components.aegis_ajax.notification import AjaxNotificationListener
 
 _LOGGER = logging.getLogger(__name__)
+
+# Sustained-failure thresholds before raising HA Repairs. Below these the
+# integration just logs and recovers silently; above them the user is
+# expected to take action (check hub power, firewall, etc).
+_HUB_OFFLINE_THRESHOLD_HOURS = 24
+_HTS_CHRONIC_FAILURE_SECONDS = 30 * 60
 
 # Map proto status field name to internal key used by binary_sensor/sensor.
 # Module-level constant to avoid recreating on every status update.
@@ -105,6 +119,15 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
         self.hub_network: dict[str, HubNetworkState] = {}
+        # Per-space monotonic timestamp of when the hub first reported
+        # offline (cleared on the first ONLINE poll). Drives the
+        # `hub_offline_24h` Repair surfaced after sustained downtime.
+        self._first_offline_at: dict[str, float] = {}
+        # Monotonic timestamp of the first HTS disconnect after a
+        # healthy run; cleared whenever HTS reconnects. Drives the
+        # `hts_chronic_failure` Repair surfaced after 30 min of
+        # sustained reconnect failures.
+        self._hts_first_failure_at: float | None = None
 
     @property
     def security_api(self) -> SecurityApi:
@@ -236,6 +259,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         )
                 new_spaces[s.id] = s
             self.spaces = new_spaces
+            self._update_hub_offline_repairs(now)
 
             # Fetch SIM info for each hub (cached, refresh once per hour)
             sim_refresh_interval = 3600.0
@@ -338,6 +362,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             result = await self._hts_client.connect()
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
+            self._clear_hts_chronic_failure()
             self._hts_task = asyncio.create_task(
                 self._hts_client.listen(on_state_update=self._on_hts_update)
             )
@@ -367,9 +392,50 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.hub_network:
             self.hub_network.clear()
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+        # Track the first failure of an otherwise-healthy run so we can
+        # raise a Repair after a sustained outage. Successful reconnect
+        # clears it via `_clear_hts_chronic_failure`. Uses time.monotonic
+        # so the call works from sync task-done callbacks too.
+        if self._hts_first_failure_at is None:
+            self._hts_first_failure_at = time.monotonic()
+        else:
+            elapsed = time.monotonic() - self._hts_first_failure_at
+            if elapsed >= _HTS_CHRONIC_FAILURE_SECONDS:
+                for space_id in self._space_ids:
+                    async_register_hts_chronic_failure(
+                        self.hass,
+                        space_id=space_id,
+                        minutes_failing=int(elapsed // 60),
+                    )
         if reconnect:
             # Schedule reconnect on next poll cycle rather than immediate retry
             _LOGGER.debug("HTS disconnected; will reconnect on next poll cycle")
+
+    def _clear_hts_chronic_failure(self) -> None:
+        """Called when HTS reconnects successfully — drop any active Repair."""
+        if self._hts_first_failure_at is None:
+            return
+        self._hts_first_failure_at = None
+        for space_id in self._space_ids:
+            async_clear_hts_chronic_failure(self.hass, space_id=space_id)
+
+    def _update_hub_offline_repairs(self, now: float) -> None:
+        """Raise / clear `hub_offline_24h` Repairs based on current snapshot."""
+        for space_id, space in self.spaces.items():
+            if space.connection_status == ConnectionStatus.OFFLINE:
+                first_seen = self._first_offline_at.setdefault(space_id, now)
+                hours = (now - first_seen) / 3600
+                if hours >= _HUB_OFFLINE_THRESHOLD_HOURS:
+                    async_register_hub_offline(
+                        self.hass,
+                        space_id=space_id,
+                        hub_name=space.name,
+                        hours_offline=int(hours),
+                    )
+            else:
+                if space_id in self._first_offline_at:
+                    self._first_offline_at.pop(space_id, None)
+                    async_clear_hub_offline(self.hass, space_id=space_id)
 
     async def _start_device_streams(self) -> None:
         """Start persistent device streams for all spaces."""
@@ -496,6 +562,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fcm_app_id: str = "",
         fcm_api_key: str = "",
         fcm_sender_id: str = "",
+        entry_id: str = "",
     ) -> None:
         """Start FCM push notification listener."""
         from custom_components.aegis_ajax.notification import (
@@ -509,6 +576,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             fcm_app_id=fcm_app_id,
             fcm_api_key=fcm_api_key,
             fcm_sender_id=fcm_sender_id,
+            entry_id=entry_id,
         )
         await self._notification_listener.async_start()
 

@@ -18,6 +18,10 @@ from custom_components.aegis_ajax.const import (
     RAW_TAG_TO_SECURITY_STATE,
     SPACE_EVENT_TAG_MAP,
 )
+from custom_components.aegis_ajax.repairs import (
+    async_clear_fcm_credentials_invalid,
+    async_register_fcm_credentials_invalid,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -48,6 +52,7 @@ class AjaxNotificationListener:
         fcm_app_id: str,
         fcm_api_key: str,
         fcm_sender_id: str,
+        entry_id: str = "",
     ) -> None:
         self._hass = hass
         self._coordinator = coordinator
@@ -55,6 +60,7 @@ class AjaxNotificationListener:
         self._fcm_app_id = fcm_app_id
         self._fcm_api_key = fcm_api_key
         self._fcm_sender_id = fcm_sender_id
+        self._entry_id = entry_id
         self._push_client: Any = None
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._credentials: dict[str, Any] | None = None
@@ -67,6 +73,10 @@ class AjaxNotificationListener:
 
     async def async_start(self) -> None:
         """Register with FCM and start listening for push notifications."""
+        # Repair is per-entry; clear at every start so that a fresh
+        # credentials roundtrip can re-raise it from a clean slate.
+        if self._entry_id:
+            async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
             _LOGGER.debug("FCM credentials not configured, push notifications disabled")
             return
@@ -106,6 +116,8 @@ class AjaxNotificationListener:
                 _LOGGER.debug("FCM registration successful")
             except Exception:
                 _LOGGER.exception("FCM registration failed")
+                if self._entry_id:
+                    async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
                 return
 
         # Extract FCM token and register with Ajax servers
@@ -132,6 +144,9 @@ class AjaxNotificationListener:
             _LOGGER.debug("FCM push client started for Ajax")
         except Exception:
             _LOGGER.exception("Failed to start FCM push client")
+            self._push_client = None
+            if self._entry_id:
+                async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
 
     async def _register_push_token(self, fcm_token: str) -> None:
         """Register the FCM token with Ajax servers via gRPC."""

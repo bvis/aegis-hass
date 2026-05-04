@@ -113,6 +113,20 @@
             }
         }
     },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} offline for over {hours_offline}h",
+            "description": "Aegis has been receiving an OFFLINE connection status for hub {hub_name} for {hours_offline} hours straight. Entities are stale until the hub reconnects. Common causes: hub unplugged, network outage, or the hub's outbound connection to the Ajax cloud is blocked by a firewall. The Repair clears automatically as soon as Aegis sees the hub back online."
+        },
+        "hts_chronic_failure": {
+            "title": "Hub network sensors degraded",
+            "description": "The HTS connection (which feeds the Ethernet / Wi-Fi / GSM / mains-power sensors) for space {space_id} has failed to stay up for {minutes_failing} minutes. Hub network sensors will be unavailable until it recovers. Most often caused by a firewall blocking outbound traffic to Ajax HTS endpoints, or by sustained network instability between Home Assistant and the Ajax cloud. The Repair clears automatically when HTS reconnects."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Push notifications disabled — FCM credentials rejected",
+            "description": "Firebase Cloud Messaging registration failed for this account. The configured FCM Project ID / App ID / API Key / Sender ID are most likely wrong for your co-branded Ajax app, or the API key has been revoked. Push-driven features (instant arm/disarm state, security_event entity, photo URLs from MotionCam) fall back to slower polling until this is fixed. Open the integration's Configure menu to re-enter the FCM credentials — see the README's 'How to obtain FCM credentials' section."
+        }
+    },
     "entity": {
         "button": {"capture_photo": {"name": "Capture photo"}},
         "event": {
