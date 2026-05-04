@@ -35,6 +35,10 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Real-time updates**: Persistent gRPC stream for instant sensor state changes (< 1 second latency)
 - **Push notifications**: FCM integration for immediate event delivery
 - **2FA support** (TOTP)
+- **Reauth flow**: when the Ajax session is rejected (password rotated, 2FA newly enabled, server-side logout), HA shows the orange "Reconfigure" banner with a guided password prompt — entity ids, areas, automations and history survive untouched
+- **HA Repairs**: diagnosable conditions surface as cards under **Settings → Repairs** instead of being buried in `home-assistant.log` — hub offline > 24h, sustained HTS reconnect failure, FCM credentials rejected (with one-click fix flow), or grpcio version below the floor on Home Assistant OS
+- **System Health card**: one-line snapshot under **Settings → System → Repairs → System Information** with gRPC reachability, HTS / FCM connection ratios, last push / last poll ages — replaces log archaeology as the first triage step
+- **DHCP discovery**: Ajax hubs on the same LAN appear as a "Discovered" card in **Settings → Devices & Services**, no need to search by name
 - **MDI icons** for all entity types
 - **Automation Blueprints**: Ready-to-use automation templates (see below)
 
@@ -334,9 +338,9 @@ If a specific group of sensors stops working:
 - [ ] Smart lock support (LockBridge)
 - [ ] Valve platform (WaterStop)
 - [ ] Firmware update platform
-- [ ] DHCP discovery for hub auto-detection
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
 - [ ] SpaceControl (keyfob) event support
+- [ ] "Unknown app label" Repair card (#99)
 
 ## Push Notifications (Optional)
 

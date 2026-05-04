@@ -15,6 +15,11 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~Automation blueprints~~ (v1.0.0) — 8 blueprints (security events, intrusion, tamper, remind arm, battery, connectivity, door-while-armed, TTS)
 - ~~Rebrand~~ (v1.0.0) — Aegis for Ajax identity
 - ~~Binary sensors~~ (partial) — glass_break, vibration, external_contact
+- ~~Per-group `alarm_control_panel` for Group/Zone Mode~~ (v1.2.4) — one panel per Ajax security group + whole-house panel for night mode (#84, #86)
+- ~~Reauth flow~~ (v1.2.4) — `ConfigEntryAuthFailed` + `async_step_reauth` so HA shows the Reconfigure banner instead of failing silently (#90)
+- ~~HA Repairs~~ (v1.2.4) — `hub_offline_24h`, `hts_chronic_failure`, `fcm_credentials_invalid` (with guided fix flow), `grpcio_version_mismatch` Repair cards (#89)
+- ~~System Health card~~ (v1.2.4) — gRPC reachability, HTS/FCM ratios, pushes received, last push / last poll ages under Settings → System (#91)
+- ~~DHCP discovery~~ (v1.2.4) — Ajax hubs on the LAN appear as Discovered cards via OUI `9C:75:6E` (#92)
 
 ---
 
@@ -59,19 +64,17 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 
 **Effort:** Medium (3 hours). Need to parse firmware proto fields.
 
-### 2.2 DHCP Discovery
-**Why:** Automatic hub detection on the local network without manual setup.
-
-**Implementation:** Add `dhcp` entries to `manifest.json` with Ajax hub MAC prefixes, implement `async_step_dhcp` in config_flow.
-
-**Note:** Only helps if the hub is on the same network as HA.
-
-**Effort:** Low (1 hour).
-
-### 2.3 Persistent Notification Service
+### 2.2 Persistent Notification Service
 **Why:** Show alarm events as HA persistent notifications with configurable filters.
 
 **Effort:** Medium (2 hours).
+
+### 2.3 Unknown App Label Repair (#99)
+**Why:** When the user configures a label the Ajax backend rejects, the integration today surfaces UNAUTHENTICATED / PERMISSION_DENIED gRPC errors with no clear remediation. A Repair card with a fix flow (the same `KNOWN_APP_LABELS` dropdown the config flow uses) would replace stack traces with a one-click fix.
+
+**Implementation:** Capture the gRPC error shape backend returns for unknown labels (vs. wrong credentials), introduce `UnknownAppLabelError(AuthenticationError)` subclass, branch in coordinator's auth-failure path, add `UnknownAppLabelRepairFlow`. Same pattern as the FCM fix flow shipped in #96.
+
+**Effort:** Medium (3-4 hours, gated on capturing the discriminating error shape).
 
 ---
 
