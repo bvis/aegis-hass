@@ -146,7 +146,6 @@
         },
         "fcm_credentials_invalid": {
             "title": "Push notifications disabled — FCM credentials rejected",
-            "description": "Firebase Cloud Messaging registration failed for this account. The configured FCM Project ID / App ID / API Key / Sender ID are most likely wrong for your co-branded Ajax app, or the API key has been revoked. Push-driven features (instant arm/disarm state, security_event entity, photo URLs from MotionCam) fall back to slower polling until this is fixed. Click Submit to re-enter the FCM credentials.",
             "fix_flow": {
                 "step": {
                     "init": {

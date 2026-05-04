@@ -146,7 +146,6 @@
         },
         "fcm_credentials_invalid": {
             "title": "Notificaciones push desactivadas: credenciales FCM rechazadas",
-            "description": "El registro en Firebase Cloud Messaging ha fallado para esta cuenta. Lo mas probable es que el FCM Project ID / App ID / API Key / Sender ID configurados no correspondan a tu app Ajax co-branded, o que la API key haya sido revocada. Las funciones que dependen de push (estado instantaneo de armado/desarmado, entidad security_event, URLs de fotos de MotionCam) caeran a polling mas lento hasta que se corrija. Pulsa Enviar para reintroducir las credenciales FCM.",
             "fix_flow": {
                 "step": {
                     "init": {
