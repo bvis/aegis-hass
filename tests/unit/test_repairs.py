@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from custom_components.aegis_ajax.const import DOMAIN
 from custom_components.aegis_ajax.repairs import (
@@ -11,11 +13,13 @@ from custom_components.aegis_ajax.repairs import (
     ISSUE_HTS_CHRONIC_FAILURE,
     ISSUE_HUB_OFFLINE_24H,
     MIN_GRPCIO_VERSION,
+    FcmCredentialsRepairFlow,
     _parse_version,
     async_check_grpcio_version,
     async_clear_fcm_credentials_invalid,
     async_clear_hts_chronic_failure,
     async_clear_hub_offline,
+    async_create_fix_flow,
     async_register_fcm_credentials_invalid,
     async_register_hts_chronic_failure,
     async_register_hub_offline,
@@ -82,6 +86,16 @@ class TestFcmCredentialsRepair:
             async_clear_fcm_credentials_invalid(hass, entry_id="entry-abc")
 
         delete.assert_called_once_with(hass, DOMAIN, f"{ISSUE_FCM_CREDENTIALS_INVALID}:entry-abc")
+
+    def test_register_marks_fixable_and_carries_entry_id_in_data(self) -> None:
+        """is_fixable=True and the entry_id is in `data` so the fix flow can find it."""
+        hass = MagicMock()
+        with patch("custom_components.aegis_ajax.repairs.ir.async_create_issue") as create:
+            async_register_fcm_credentials_invalid(hass, entry_id="entry-abc")
+
+        kwargs = create.call_args.kwargs
+        assert kwargs["is_fixable"] is True
+        assert kwargs["data"] == {"entry_id": "entry-abc"}
 
 
 class TestParseVersion:
@@ -175,3 +189,99 @@ class TestAsyncCheckGrpcioVersion:
 
         create.assert_not_called()
         delete.assert_not_called()
+
+
+class TestFcmCredentialsRepairFlow:
+    @staticmethod
+    def _make_hass(entry: MagicMock | None) -> MagicMock:
+        hass = MagicMock()
+        hass.config_entries.async_get_entry.return_value = entry
+        hass.config_entries.async_reload = AsyncMock()
+        return hass
+
+    @pytest.mark.asyncio
+    async def test_init_no_input_shows_form_with_existing_creds_prefilled(self) -> None:
+        entry = MagicMock()
+        entry.data = {
+            "fcm_project_id": "old-proj",
+            "fcm_app_id": "old-app",
+            "fcm_api_key": "old-key",
+            "fcm_sender_id": "old-sender",
+        }
+        entry.options = {}
+        flow = FcmCredentialsRepairFlow("entry-abc")
+        flow.hass = self._make_hass(entry)
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.add_suggested_values_to_schema = MagicMock(return_value="schema")
+
+        await flow.async_step_init(None)
+
+        flow.async_show_form.assert_called_once()
+        assert flow.async_show_form.call_args.kwargs["step_id"] == "init"
+        # Pre-filled with the currently-stored (broken) creds so the user
+        # can edit only what's wrong rather than re-typing everything.
+        suggested = flow.add_suggested_values_to_schema.call_args[0][1]
+        assert suggested["fcm_project_id"] == "old-proj"
+        assert suggested["fcm_api_key"] == "old-key"
+
+    @pytest.mark.asyncio
+    async def test_init_with_input_writes_entry_and_reloads(self) -> None:
+        entry = MagicMock()
+        entry.data = {"email": "u@x", "fcm_project_id": "old"}
+        flow = FcmCredentialsRepairFlow("entry-abc")
+        flow.hass = self._make_hass(entry)
+        flow.hass.config_entries.async_update_entry = MagicMock()
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+
+        new_creds = {
+            "fcm_project_id": "new-proj",
+            "fcm_app_id": "new-app",
+            "fcm_api_key": "new-key",
+            "fcm_sender_id": "new-sender",
+        }
+        await flow.async_step_init(new_creds)
+
+        # Existing entry data is preserved; only the four FCM fields rotate
+        flow.hass.config_entries.async_update_entry.assert_called_once_with(
+            entry, data={"email": "u@x", **new_creds}
+        )
+        flow.hass.config_entries.async_reload.assert_awaited_once_with("entry-abc")
+        flow.async_create_entry.assert_called_once_with(data={})
+
+    @pytest.mark.asyncio
+    async def test_init_aborts_if_entry_vanished(self) -> None:
+        flow = FcmCredentialsRepairFlow("entry-gone")
+        flow.hass = self._make_hass(None)
+        flow.async_abort = MagicMock(return_value={"type": "abort"})
+
+        await flow.async_step_init({"fcm_project_id": "x"})
+
+        flow.async_abort.assert_called_once_with(reason="entry_missing")
+        flow.hass.config_entries.async_reload.assert_not_awaited()
+
+
+class TestAsyncCreateFixFlow:
+    @pytest.mark.asyncio
+    async def test_returns_fcm_flow_for_fcm_issue(self) -> None:
+        hass = MagicMock()
+        flow = await async_create_fix_flow(
+            hass, f"{ISSUE_FCM_CREDENTIALS_INVALID}:entry-abc", {"entry_id": "entry-abc"}
+        )
+        assert isinstance(flow, FcmCredentialsRepairFlow)
+        assert flow._entry_id == "entry-abc"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_data_entry_id_when_data_missing(self) -> None:
+        """If `data` was lost, recover the entry id from the namespaced issue id."""
+        hass = MagicMock()
+        flow = await async_create_fix_flow(hass, f"{ISSUE_FCM_CREDENTIALS_INVALID}:entry-xyz", None)
+        assert isinstance(flow, FcmCredentialsRepairFlow)
+        assert flow._entry_id == "entry-xyz"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_confirm_flow_for_unknown_issue(self) -> None:
+        from homeassistant.components.repairs import ConfirmRepairFlow
+
+        hass = MagicMock()
+        flow = await async_create_fix_flow(hass, "some_other_issue", None)
+        assert isinstance(flow, ConfirmRepairFlow)

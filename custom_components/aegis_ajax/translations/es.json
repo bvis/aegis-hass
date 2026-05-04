@@ -146,7 +146,23 @@
         },
         "fcm_credentials_invalid": {
             "title": "Notificaciones push desactivadas: credenciales FCM rechazadas",
-            "description": "El registro en Firebase Cloud Messaging ha fallado para esta cuenta. Lo mas probable es que el FCM Project ID / App ID / API Key / Sender ID configurados no correspondan a tu app Ajax co-branded, o que la API key haya sido revocada. Las funciones que dependen de push (estado instantaneo de armado/desarmado, entidad security_event, URLs de fotos de MotionCam) caeran a polling mas lento hasta que se corrija. Abre el menu Configurar de la integracion para reintroducir las credenciales FCM — consulta la seccion 'How to obtain FCM credentials' del README."
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Reparar credenciales FCM de Aegis",
+                        "description": "El registro en Firebase Cloud Messaging ha fallado para esta cuenta. Lo mas probable es que el FCM Project ID / App ID / API Key / Sender ID configurados no correspondan a tu app Ajax co-branded, o que la API key haya sido revocada. Reintroduce los cuatro valores y la integracion se recargara — si las nuevas credenciales funcionan el Repair se cierra solo; si no, este formulario reaparece. Consulta la seccion 'How to obtain FCM credentials' del README.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "La cuenta de Aegis para la que se levanto este Repair ya no esta configurada. No hay nada que reparar."
+                }
+            }
         },
         "grpcio_version_mismatch": {
             "title": "Aegis necesita grpcio {required} o superior (encontrado {current})",

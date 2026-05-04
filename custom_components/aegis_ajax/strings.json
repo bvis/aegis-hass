@@ -146,7 +146,23 @@
         },
         "fcm_credentials_invalid": {
             "title": "Push notifications disabled — FCM credentials rejected",
-            "description": "Firebase Cloud Messaging registration failed for this account. The configured FCM Project ID / App ID / API Key / Sender ID are most likely wrong for your co-branded Ajax app, or the API key has been revoked. Push-driven features (instant arm/disarm state, security_event entity, photo URLs from MotionCam) fall back to slower polling until this is fixed. Open the integration's Configure menu to re-enter the FCM credentials — see the README's 'How to obtain FCM credentials' section."
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Fix Aegis FCM credentials",
+                        "description": "Firebase Cloud Messaging registration failed for this account. The configured FCM Project ID / App ID / API Key / Sender ID are most likely wrong for your co-branded Ajax app, or the API key has been revoked. Re-enter the four values below and the integration will reload — if the new credentials work the Repair clears automatically; if not, the form re-appears. See the README's 'How to obtain FCM credentials' section.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "The Aegis account this Repair was raised for is no longer configured. Nothing to fix."
+                }
+            }
         },
         "grpcio_version_mismatch": {
             "title": "Aegis needs grpcio {required} or newer (found {current})",
