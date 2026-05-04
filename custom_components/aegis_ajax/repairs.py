@@ -2,23 +2,33 @@
 
 Each helper wraps `homeassistant.helpers.issue_registry` with the
 domain pre-bound and a stable issue id per category, so callers don't
-have to repeat boilerplate. All issues are non-fixable in this initial
-slice — the description tells the user what to do (re-enter FCM
-credentials via Options, check hub power, etc). A future pass can
-turn the FCM and app-label cases into guided RepairsFlow with
-`is_fixable=True`.
+have to repeat boilerplate.
+
+The FCM-credentials repair is fixable: the user clicks "Submit" on
+the Repair card, fills the four FCM fields in a dedicated form, and
+the integration reloads with the new credentials — no Options-menu
+detour. Hub-offline / HTS-chronic stay informational because their
+fix is physical (check hub power, firewall, etc.).
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import voluptuous as vol
+from homeassistant.components.repairs import RepairsFlow
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from custom_components.aegis_ajax.const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+    from homeassistant.data_entry_flow import FlowResult
 
 DOCS_BASE_URL = "https://github.com/bvis/aegis-hass#"
 
@@ -96,15 +106,19 @@ def async_register_fcm_credentials_invalid(hass: HomeAssistant, *, entry_id: str
     """FCM credentials were configured but registration / push start failed.
 
     Scoped per entry_id so multi-account installs see one repair per
-    affected account.
+    affected account. Fixable in-place via `FcmCredentialsRepairFlow`
+    so users don't have to detour through the Options menu.
     """
     ir.async_create_issue(
         hass,
         DOMAIN,
         _issue_id(ISSUE_FCM_CREDENTIALS_INVALID, entry_id),
-        is_fixable=False,
+        is_fixable=True,
         severity=ir.IssueSeverity.ERROR,
         translation_key=ISSUE_FCM_CREDENTIALS_INVALID,
+        # Fix-flow needs the entry id to write the new creds back; the
+        # issue_id already encodes it but `data` is the canonical channel.
+        data={"entry_id": entry_id},
         learn_more_url=f"{DOCS_BASE_URL}push-notifications-fcm",
     )
 
@@ -172,3 +186,67 @@ def async_check_grpcio_version(hass: HomeAssistant) -> None:
         },
         learn_more_url=f"{DOCS_BASE_URL}troubleshooting",
     )
+
+
+_FCM_FIX_SCHEMA = vol.Schema(
+    {
+        vol.Required("fcm_project_id"): str,
+        vol.Required("fcm_app_id"): str,
+        vol.Required("fcm_api_key"): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
+        vol.Required("fcm_sender_id"): str,
+    }
+)
+
+
+class FcmCredentialsRepairFlow(RepairsFlow):
+    """Guided repair flow for `fcm_credentials_invalid`.
+
+    Re-prompts the four FCM fields, writes them to the entry data, and
+    reloads — which kicks `notification.async_start()` and either
+    re-raises the repair (creds still wrong) or clears it (creds work
+    now).
+    """
+
+    def __init__(self, entry_id: str) -> None:
+        self._entry_id = entry_id
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        if user_input is not None:
+            entry = self.hass.config_entries.async_get_entry(self._entry_id)
+            if entry is None:
+                # The entry vanished between the repair being raised and
+                # the user clicking Submit. Nothing to fix.
+                return self.async_abort(reason="entry_missing")
+            self.hass.config_entries.async_update_entry(entry, data={**entry.data, **user_input})
+            await self.hass.config_entries.async_reload(self._entry_id)
+            return self.async_create_entry(data={})
+
+        # Pre-fill with the currently-stored values so the user only
+        # changes what's wrong, instead of re-typing everything.
+        suggested: dict[str, Any] = {}
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if entry is not None:
+            for key in ("fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"):
+                value = entry.data.get(key, entry.options.get(key, ""))
+                if value:
+                    suggested[key] = value
+        schema = self.add_suggested_values_to_schema(_FCM_FIX_SCHEMA, suggested)
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+
+async def async_create_fix_flow(
+    hass: HomeAssistant,
+    issue_id: str,
+    data: dict[str, str | int | float | None] | None,
+) -> RepairsFlow:
+    """HA discovery hook — returns the right flow for each fixable issue."""
+    if issue_id.startswith(f"{ISSUE_FCM_CREDENTIALS_INVALID}:"):
+        entry_id = (data or {}).get("entry_id") or issue_id.split(":", 1)[1]
+        return FcmCredentialsRepairFlow(str(entry_id))
+    # Fall back: HA's built-in confirm-only flow. Should not be hit since
+    # we only mark FCM as fixable today.
+    from homeassistant.components.repairs import ConfirmRepairFlow  # noqa: PLC0415
+
+    return ConfirmRepairFlow()
