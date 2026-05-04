@@ -17,6 +17,7 @@ from custom_components.aegis_ajax.const import (
     LABELS,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.repairs import async_check_grpcio_version
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
@@ -164,6 +165,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:
+    # Surface a Repair when HA's runtime grpcio is below the version we
+    # need; mostly hits HA OS where the manifest's pip-level requirement
+    # doesn't apply. Self-clears on the next setup if HA gets upgraded.
+    async_check_grpcio_version(hass)
+
     # Migrate plaintext password to hash (one-time migration)
     if "password" in entry.data and "password_hash" not in entry.data:
         from custom_components.aegis_ajax.api.session import AjaxSession  # noqa: PLC0415

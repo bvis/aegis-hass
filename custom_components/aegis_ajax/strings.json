@@ -147,6 +147,10 @@
         "fcm_credentials_invalid": {
             "title": "Push notifications disabled — FCM credentials rejected",
             "description": "Firebase Cloud Messaging registration failed for this account. The configured FCM Project ID / App ID / API Key / Sender ID are most likely wrong for your co-branded Ajax app, or the API key has been revoked. Push-driven features (instant arm/disarm state, security_event entity, photo URLs from MotionCam) fall back to slower polling until this is fixed. Open the integration's Configure menu to re-enter the FCM credentials — see the README's 'How to obtain FCM credentials' section."
+        },
+        "grpcio_version_mismatch": {
+            "title": "Aegis needs grpcio {required} or newer (found {current})",
+            "description": "Aegis depends on `grpcio` for the gRPC channel that talks to the Ajax cloud, and your Home Assistant install ships `grpcio` {current}. Login can fail with cryptic HTTP/2 errors below {required}. On Home Assistant Core or Container the integration manifest pins the version on install, but on Home Assistant OS the runtime ships system-wide grpcio that this manifest cannot influence — you'll typically need to upgrade Home Assistant OS to a build that includes a newer grpcio. The Repair clears automatically on the next reload once the version crosses {required}."
         }
     },
     "entity": {
