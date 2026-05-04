@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4-beta.4] - 2026-05-05
+
+Fourth beta of the `1.2.4` line. Two HA-platform additions on top of `beta.3`. No Ajax wire-protocol changes; both replace silent log lines with first-class HA UX.
+
+### Added
+- **DHCP discovery for Ajax hubs on the local LAN.** When a hub broadcasts a DHCP packet from the registered Ajax Systems OUI `9C:75:6E`, the integration now appears as a **Discovered** card under Settings → Devices & Services with the hub's hostname / IP in the title — no more searching for "Aegis" by name. Clicking through forwards into the existing credential prompt; subsequent DHCP renewals don't spam the discovery list (per-MAC dedupe on the flow + `already_configured` abort once an entry exists). Single OUI in this slice, captured from a real Hub Plus and verified via the IEEE registry as Ajax Systems DMCC; OUIs from other hub families can be added in one-line follow-up commits as users contribute their MACs. (#92)
+- **`fcm_credentials_invalid` Repair is now fixable in-place.** The Repair card promoted from `is_fixable=False` (informational, told the user to detour through the Options menu) to `is_fixable=True` with a dedicated `RepairsFlow`. Click Submit on the Repair card → guided form with the four FCM fields pre-filled with the currently-stored (broken) values → Submit → the integration reloads with the new credentials. If they work the Repair clears in `notification.async_start()`; if they're still wrong the same Repair re-raises and the user can try again. Defensive abort path covers the entry-removed-while-Repair-open race. The other two Repairs (`hub_offline_24h`, `hts_chronic_failure`) stay informational because their fix is physical (hub power, firewall). (#89 follow-up)
+
+### Internal
+- New `FcmCredentialsRepairFlow(RepairsFlow)` + module-level `async_create_fix_flow(hass, issue_id, data)` discovery hook on `repairs.py`. The fix flow recovers the entry id either from the issue's `data` field or by parsing the namespaced `issue_id` as a defensive fallback.
+- New `async_step_dhcp(discovery_info)` on `config_flow.py`. Sets `format_mac(macaddress)` as the *flow's* `unique_id` (the eventual entry's stays as email) so HA dedupes repeat DHCP packets.
+- All 14 translation locales carry the new strings (`fix_flow.step.init` + `fix_flow.abort.entry_missing` for the FCM repair). Other locales fall back to English form labels for FCM tokens (Project ID / App ID / API Key / Sender ID), which match the README verbatim in every language.
+
 ## [1.2.4-beta.3] - 2026-05-05
 
 Third beta of the `1.2.4` line. Three quality-of-life additions in the
