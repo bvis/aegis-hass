@@ -192,6 +192,8 @@
             "always_active": {"name": "Sempre attivo"},
             "glass_break": {"name": "Rottura vetro"},
             "vibration": {"name": "Vibrazione"},
+            "tilt": {"name": "Inclinazione"},
+            "steam": {"name": "Vapore"},
             "wire_input_alert": {"name": "Allarme ingresso cablato"},
             "tamper": {"name": "Manomissione involucro"},
             "connectivity": {"name": "Connettività"},

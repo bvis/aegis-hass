@@ -192,6 +192,8 @@
             "always_active": {"name": "Her zaman aktif"},
             "glass_break": {"name": "Cam kırılması"},
             "vibration": {"name": "Titreşim"},
+            "tilt": {"name": "Eğilme"},
+            "steam": {"name": "Buhar"},
             "wire_input_alert": {"name": "Kablolu giriş uyarısı"},
             "tamper": {"name": "Kasa kurcalama"},
             "connectivity": {"name": "Bağlantı"},

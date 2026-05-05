@@ -22,7 +22,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 
 - **Alarm Control Panel**: Arm away, disarm, night mode, group arming with PIN code support
 - **Force Arm Services**: `aegis_ajax.force_arm` and `aegis_ajax.force_arm_night` to arm ignoring open sensors
-- **Binary Sensors**: Door open/close, motion detection, smoke, leak, tamper, CO, heat, glass break, vibration, CRA monitoring status, cellular connection, lid tamper, external contact alert (wired reed switches on DoorProtect/Hub Hybrid inputs), external contact fault, MultiTransmitter wired-input alert with alarm category, anti-masking, interference detection, ethernet link, Wi-Fi link, mains power
+- **Binary Sensors**: Door open/close, motion detection, smoke, steam (FireProtect 2 chamber discriminator), leak, tamper, CO, heat, glass break, vibration, tilt (DoorProtect Plus accelerometer), CRA monitoring status, cellular connection, lid tamper, external contact alert (wired reed switches on DoorProtect/Hub Hybrid inputs), external contact fault, MultiTransmitter wired-input alert with alarm category, anti-masking, interference detection, ethernet link, Wi-Fi link, mains power
 - **Hub Network**: Real-time hub network data — ethernet/wifi/gsm connection status, Wi-Fi SSID and signal strength, IP addressing, cellular signal strength and network type, power supply status
 - **Sensors**: Battery level, temperature, humidity, CO2, signal strength, GSM type (2G/3G/4G), Wi-Fi signal level, Wi-Fi SSID, Wi-Fi IP, IMEI, Ethernet IP/gateway/DNS, cellular signal/network, connection type
 - **Switches**: Relays, wall switches, sockets (multi-channel support)
@@ -144,12 +144,12 @@ You can type any custom label during setup if yours is not listed.
 | Type | Devices | Entities |
 |---|---|---|
 | Hub | Hub, Hub Plus, Hub 4G, Hub Lite, Hub 2, Hub 2 Plus, Hub 2 4G, Hub 3, Hub Hybrid (2 / 4G), Hub Mega, Hub Fibra, Hub Yavir / Yavir Plus, Hub Fire, Hub Superior | Alarm panel, battery, GSM type/connected, CRA monitoring status, CRA company (diagnostic), lid tamper, IMEI, hub network sensors (Ethernet/Wi-Fi/GSM, IP data, cellular signal/network, mains power) |
-| Door Sensors | DoorProtect, DoorProtect Plus, DoorProtect Fibra, DoorProtect S, DoorProtect S Plus, DoorProtect Plus Fibra, DoorProtect Plus G3 Fibra, DoorProtect G3 | Door open/close, tamper, vibration (Plus), battery, temperature, signal, external contact alert (wired contact triggered), external contact fault (wiring broken) |
+| Door Sensors | DoorProtect, DoorProtect Plus, DoorProtect Fibra, DoorProtect S, DoorProtect S Plus, DoorProtect Plus Fibra, DoorProtect Plus G3 Fibra, DoorProtect G3 | Door open/close, tamper, vibration (Plus), tilt (Plus, accelerometer), battery, temperature, signal, external contact alert (wired contact triggered), external contact fault (wiring broken) |
 | Motion Sensors | MotionProtect, MotionProtect Plus, MotionProtect Outdoor, MotionProtect Curtain (and outdoor / mini / plus base variants), MotionProtect S / S Plus, MotionProtect G3 family (incl. Fibra), MotionProtect Plus Fibra / G3 | Motion detected (real-time), tamper, battery, temperature, signal |
 | Cameras | MotionCam, MotionCam Outdoor, MotionCam Fibra (& base), MotionCam G3, MotionCam HD, MotionCam PhOD, MotionCam PhOD Fibra, MotionCam Outdoor PhOD, MotionCam Outdoor 2/4 PhOD, MotionCam S PhOD (& AM), MotionCam Superior PhOD | Photo on-demand capture + storage (PhOD models), motion detected, tamper, battery |
 | Glass Break | GlassProtect, GlassProtect S, GlassProtect Fibra | Glass break detection, tamper, battery |
 | Combi | CombiProtect, CombiProtect S, CombiProtect Fibra | Motion, glass break, tamper, battery |
-| Fire/Smoke | FireProtect, FireProtect Plus, FireProtect 2 (all sub-models — heat-only `*hrb`/`*hsb`, CO-only `*crb`/`*csb`, multi-sensor `*hcrb`/`*hcsb`, AC-powered `*_ac`, UL-listed `*_ul`) | Smoke, CO, high temperature, tamper, battery — sub-models without a given sensor expose only the relevant entity |
+| Fire/Smoke | FireProtect, FireProtect Plus, FireProtect 2 (all sub-models — heat-only `*hrb`/`*hsb`, CO-only `*crb`/`*csb`, multi-sensor `*hcrb`/`*hcsb`, AC-powered `*_ac`, UL-listed `*_ul`) | Smoke, steam (FireProtect 2 only — chamber discriminator), CO, high temperature, tamper, battery — sub-models without a given sensor expose only the relevant entity |
 | Water Leak | LeaksProtect | Leak detected, tamper, battery |
 | Relays/Switches | Relay, WallSwitch, Socket, LightSwitch | On/off per channel |
 | Lights | LightSwitch Dimmer | Brightness control |
@@ -276,6 +276,8 @@ Use these in automation templates, e.g. `{{ trigger.event.data.device_name }}`.
 - **Interference** — RF jamming detection
 - **Glass break** — glass break detection (GlassProtect, CombiProtect)
 - **Vibration** — vibration/shock detection (DoorProtect Plus)
+- **Tilt** — accelerometer tilt / device removed from wall (DoorProtect Plus family)
+- **Steam** — chamber-level steam vs. smoke discriminator (FireProtect 2 with smoke chamber). Lets automations distinguish a real fire from cooking/shower steam false positives
 - **External contact alert** — triggered state of an externally wired contact (e.g. reed switch on a window) connected to a DoorProtect's input terminals; toggles open/closed
 - **External contact fault** — circuit-fault indicator for the same external wiring (cable disconnect or short)
 - **Wire input alert** — triggered state of a third-party sensor wired into a MultiTransmitter or a Hub Hybrid wire input. Exposes an `alarm_type` attribute reflecting the category Ajax assigned to that input (intrusion, fire, glass_break, vibration, etc.). Available on `wire_input_mt` and `wire_input` device types

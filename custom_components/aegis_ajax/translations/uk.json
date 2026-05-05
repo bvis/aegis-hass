@@ -192,6 +192,8 @@
             "always_active": {"name": "Завжди активний"},
             "glass_break": {"name": "Розбиття скла"},
             "vibration": {"name": "Вібрація"},
+            "tilt": {"name": "Нахил"},
+            "steam": {"name": "Пара"},
             "wire_input_alert": {"name": "Сповіщення дротового входу"},
             "tamper": {"name": "Зламування корпусу"},
             "connectivity": {"name": "Підключення"},

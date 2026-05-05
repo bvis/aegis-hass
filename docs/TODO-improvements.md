@@ -20,19 +20,13 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~HA Repairs~~ (v1.2.4) — `hub_offline_24h`, `hts_chronic_failure`, `fcm_credentials_invalid` (with guided fix flow), `grpcio_version_mismatch` Repair cards (#89)
 - ~~System Health card~~ (v1.2.4) — gRPC reachability, HTS/FCM ratios, pushes received, last push / last poll ages under Settings → System (#91)
 - ~~DHCP discovery~~ (v1.2.4) — Ajax hubs on the LAN appear as Discovered cards via OUI `9C:75:6E` (#92)
+- ~~Tilt + Steam binary sensors~~ (v1.2.4) — `tilt` on DoorProtect Plus family (accelerometer), `steam` on FireProtect 2 smoke-chamber variants (steam-vs-smoke discriminator)
 
 ---
 
 ## Priority 1 — High impact, moderate effort
 
-### 1.1 Missing Binary Sensors
-**Remaining:**
-- `tilt` — DoorProtect Plus (accelerometer tilt detection)
-- `steam` — FireProtect 2 (steam detection)
-
-**Effort:** Low (1 hour).
-
-### 1.2 Lock Platform (`lock.py`)
+### 1.1 Lock Platform (`lock.py`)
 **Why:** Users with LockBridge (Yale smart lock) expect a lock entity.
 
 **Implementation:**
@@ -43,7 +37,7 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 
 **Effort:** Medium (3-4 hours). Need to compile switch_smart_lock protos.
 
-### 1.3 Valve Platform (`valve.py`)
+### 1.2 Valve Platform (`valve.py`)
 **Why:** WaterStop devices should be controlled as native HA valves, not switches.
 
 **Implementation:**

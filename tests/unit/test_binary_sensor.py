@@ -81,6 +81,12 @@ class TestBinarySensorTypes:
     def test_vibration_sensor_type_exists(self) -> None:
         assert "vibration" in BINARY_SENSOR_TYPES
 
+    def test_tilt_sensor_type_exists(self) -> None:
+        assert "tilt" in BINARY_SENSOR_TYPES
+
+    def test_steam_sensor_type_exists(self) -> None:
+        assert "steam" in BINARY_SENSOR_TYPES
+
     def test_wire_input_alert_type_exists(self) -> None:
         assert "wire_input_alert" in BINARY_SENSOR_TYPES
 
@@ -383,6 +389,32 @@ class TestDeviceTypeSensors:
     def test_door_protect_s_plus_has_vibration(self) -> None:
         assert "vibration" in _DEVICE_TYPE_SENSORS["door_protect_s_plus"]
 
+    # DoorProtect Plus accelerometer — only the `_plus` variants ship the
+    # accelerometer that distinguishes vibration from tilt.
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "door_protect_plus",
+            "door_protect_plus_fibra",
+            "door_protect_s_plus",
+            "door_protect_plus_g3_fibra",
+        ],
+    )
+    def test_door_protect_plus_family_has_tilt(self, device_type: str) -> None:
+        assert "tilt" in _DEVICE_TYPE_SENSORS[device_type]
+
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "door_protect",
+            "door_protect_fibra",
+            "door_protect_s",
+            "door_protect_g3",
+        ],
+    )
+    def test_door_protect_non_plus_has_no_tilt(self, device_type: str) -> None:
+        assert "tilt" not in _DEVICE_TYPE_SENSORS[device_type]
+
     @pytest.mark.parametrize(
         "device_type",
         [
@@ -455,6 +487,53 @@ class TestDeviceTypeSensors:
     )
     def test_fire_protect_two_smoke_variants_have_smoke(self, device_type: str) -> None:
         assert "smoke_detected" in _DEVICE_TYPE_SENSORS[device_type]
+
+    # Steam discrimination is a FireProtect 2 feature — every variant whose
+    # smoke chamber is present (i.e. that already exposes `smoke_detected`)
+    # should also surface the steam-discriminator entity so users can tell a
+    # cooking/shower steam alert apart from real smoke.
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "fire_protect_2",
+            "fire_protect_two",
+            "fire_protect_two_base",
+            "fire_protect_two_plus",
+            "fire_protect_two_plus_sb",
+            "fire_protect_two_sb",
+            "fire_protect_two_hcrb",
+            "fire_protect_two_hcsb",
+            "fire_protect_two_hs_ac",
+            "fire_protect_two_hsc_ac",
+            "fire_protect_two_hs_ac_ul",
+            "fire_protect_two_hs_rb_ul",
+            "fire_protect_two_hs_sb_ul",
+            "fire_protect_two_hsc_ac_ul",
+            "fire_protect_two_hsc_rb_ul",
+            "fire_protect_two_hsc_sb_ul",
+        ],
+    )
+    def test_fire_protect_two_smoke_variants_have_steam(self, device_type: str) -> None:
+        assert "steam" in _DEVICE_TYPE_SENSORS[device_type]
+
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "fire_protect",
+            "fire_protect_plus",
+            "fire_protect_two_hrb",
+            "fire_protect_two_hsb",
+            "fire_protect_two_crb",
+            "fire_protect_two_csb",
+            "fire_protect_two_h_ac",
+            "fire_protect_two_c_ac",
+            "fire_protect_two_hc_ac",
+            "fire_protect_two_c_rb_ul",
+            "fire_protect_two_h_rb_ul",
+        ],
+    )
+    def test_fire_protect_without_smoke_chamber_has_no_steam(self, device_type: str) -> None:
+        assert "steam" not in _DEVICE_TYPE_SENSORS[device_type]
 
     # Hub family — `hub`, `hub_plus`, `hub_two_4g` were already mapped, but
     # the v3 catalog also names `hub_two`, `hub_two_plus`, `hub_hybrid_*`,

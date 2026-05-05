@@ -192,6 +192,8 @@
             "always_active": {"name": "Immer aktiv"},
             "glass_break": {"name": "Glasbruch"},
             "vibration": {"name": "Vibration"},
+            "tilt": {"name": "Neigung"},
+            "steam": {"name": "Dampf"},
             "wire_input_alert": {"name": "Drahteingang ausgelöst"},
             "tamper": {"name": "Gehäusemanipulation"},
             "connectivity": {"name": "Konnektivität"},

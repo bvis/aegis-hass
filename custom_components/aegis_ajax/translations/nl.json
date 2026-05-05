@@ -192,6 +192,8 @@
             "always_active": {"name": "Altijd actief"},
             "glass_break": {"name": "Glasbreuk"},
             "vibration": {"name": "Vibratie"},
+            "tilt": {"name": "Kanteling"},
+            "steam": {"name": "Stoom"},
             "wire_input_alert": {"name": "Bedrade ingang alarm"},
             "tamper": {"name": "Behuizing sabotage"},
             "connectivity": {"name": "Verbinding"},

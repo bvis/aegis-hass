@@ -192,6 +192,8 @@
             "always_active": {"name": "Zawsze aktywny"},
             "glass_break": {"name": "Rozbicie szyby"},
             "vibration": {"name": "Wibracja"},
+            "tilt": {"name": "Przechylenie"},
+            "steam": {"name": "Para"},
             "wire_input_alert": {"name": "Alarm wejścia przewodowego"},
             "tamper": {"name": "Sabotaż obudowy"},
             "connectivity": {"name": "Łączność"},

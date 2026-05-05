@@ -196,6 +196,8 @@
             "always_active": {"name": "Sempre actiu"},
             "glass_break": {"name": "Trencament de vidre"},
             "vibration": {"name": "Vibració"},
+            "tilt": {"name": "Inclinació"},
+            "steam": {"name": "Vapor"},
             "wire_input_alert": {"name": "Alerta d'entrada cablejada"},
             "tamper": {"name": "Manipulació de carcassa"},
             "connectivity": {"name": "Connectivitat"},

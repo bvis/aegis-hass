@@ -192,6 +192,8 @@
             "always_active": {"name": "Vždy aktivní"},
             "glass_break": {"name": "Rozbití skla"},
             "vibration": {"name": "Vibrace"},
+            "tilt": {"name": "Náklon"},
+            "steam": {"name": "Pára"},
             "wire_input_alert": {"name": "Výstraha drátového vstupu"},
             "tamper": {"name": "Sabotáž krytu"},
             "connectivity": {"name": "Připojení"},

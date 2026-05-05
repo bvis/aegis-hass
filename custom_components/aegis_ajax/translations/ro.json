@@ -196,6 +196,8 @@
             "always_active": {"name": "Întotdeauna activ"},
             "glass_break": {"name": "Spargere geam"},
             "vibration": {"name": "Vibrație"},
+            "tilt": {"name": "Înclinare"},
+            "steam": {"name": "Abur"},
             "wire_input_alert": {"name": "Alertă intrare cablată"},
             "tamper": {"name": "Sabotaj carcasă"},
             "connectivity": {"name": "Conectivitate"},

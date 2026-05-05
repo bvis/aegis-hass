@@ -212,6 +212,8 @@
             "always_active": {"name": "Always active"},
             "glass_break": {"name": "Glass break"},
             "vibration": {"name": "Vibration"},
+            "tilt": {"name": "Tilt"},
+            "steam": {"name": "Steam"},
             "wire_input_alert": {"name": "Wire input alert"},
             "tamper": {"name": "Case tamper"},
             "connectivity": {"name": "Connectivity"},
