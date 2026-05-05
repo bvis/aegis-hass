@@ -21,31 +21,20 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~System Health card~~ (v1.2.4) — gRPC reachability, HTS/FCM ratios, pushes received, last push / last poll ages under Settings → System (#91)
 - ~~DHCP discovery~~ (v1.2.4) — Ajax hubs on the LAN appear as Discovered cards via OUI `9C:75:6E` (#92)
 - ~~Tilt + Steam binary sensors~~ (v1.2.4) — `tilt` on DoorProtect Plus family (accelerometer), `steam` on FireProtect 2 smoke-chamber variants (steam-vs-smoke discriminator)
+- ~~Lock platform~~ (v1.2.5) — `lock.py` with `AjaxLock` for `smart_lock` / `smart_lock_yale` device types. State (locked / unlocked / unlatched) parsed from the `smart_lock` LockStatus oneof; `lock` / `unlock` / HA's `lock.open` (= unlatch) wired to `SwitchSmartLockService`
 
 ---
 
 ## Priority 1 — High impact, moderate effort
 
-### 1.1 Lock Platform (`lock.py`)
-**Why:** Users with LockBridge (Yale smart lock) expect a lock entity.
+### 1.1 Valve Platform (`valve.py`) — blocked
+**Why:** WaterStop devices currently surface as a no-op (empty binary-sensor list). Native `valve` entity would let automations open/close the water shut-off valve.
 
-**Implementation:**
-1. Create `lock.py` with `AjaxLock` entity
-2. Parse `smart_lock` status from `LightDeviceStatus` (field 66)
-3. Commands via `SwitchSmartLockService` gRPC (proto exists: `switch_smart_lock/`)
-4. States: locked, unlocked, locking, unlocking, jammed
+**Blockers — both need investigating in a real WaterStop install before this can ship:**
+1. The actual valve open/closed state lives in `LightHubDevice.properties.water_stop_channel.state` (an enum: STATE_OFF / STATE_ON), which is *not* part of the `LightDeviceStatus.statuses` oneof we currently parse. Surfacing it requires extending `parse_device` to walk the `properties` oneof per device type — a small architectural change touching every property-bearing entity.
+2. No `SwitchWaterStop`-style command service exists in the v3 protos we have. Without a way to actually toggle the valve, a `valve` entity would be read-only and provide little value over the existing `water_stop_valve_stuck` malfunction signal. Need to capture the wire calls the official mobile app makes when toggling a WaterStop to identify the right service.
 
-**Effort:** Medium (3-4 hours). Need to compile switch_smart_lock protos.
-
-### 1.2 Valve Platform (`valve.py`)
-**Why:** WaterStop devices should be controlled as native HA valves, not switches.
-
-**Implementation:**
-1. Create `valve.py` with `AjaxWaterStopValve` entity
-2. Parse `water_stop_valve_stuck` status
-3. Commands need investigation — may be via device command service
-
-**Effort:** Medium (2-3 hours).
+**Effort:** Unknown until both blockers are answered. The `water_stop_valve_stuck` Simple flag could be exposed as a `PROBLEM` binary sensor in the meantime — much smaller change, doesn't pre-empt the eventual `valve` design.
 
 ---
 

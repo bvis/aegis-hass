@@ -178,6 +178,17 @@ class TestStatusParser:
         result = DevicesApi._parse_statuses([status])
         assert result.get("high_temperature") is True
 
+    @pytest.mark.parametrize(
+        "value,expected",
+        [(0, "unknown"), (1, "unlocked"), (2, "locked"), (3, "unlatched"), (99, "unknown")],
+    )
+    def test_smart_lock_status(self, value: int, expected: str) -> None:
+        status = MagicMock()
+        status.WhichOneof.return_value = "smart_lock"
+        status.smart_lock = value
+        result = DevicesApi._parse_statuses([status])
+        assert result.get("smart_lock_state") == expected
+
     def test_signal_strength(self) -> None:
         status = MagicMock()
         status.WhichOneof.return_value = "signal_strength"

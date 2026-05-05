@@ -27,6 +27,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Sensors**: Battery level, temperature, humidity, CO2, signal strength, GSM type (2G/3G/4G), Wi-Fi signal level, Wi-Fi SSID, Wi-Fi IP, IMEI, Ethernet IP/gateway/DNS, cellular signal/network, connection type
 - **Switches**: Relays, wall switches, sockets (multi-channel support)
 - **Lights**: Dimmers with brightness control
+- **Locks**: Ajax SmartLock and LockBridge (Yale) — lock, unlock, and unlatch (HA's `lock.open`) via `SwitchSmartLockService`
 - **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention
 - **Media Browser**: Browse captured photos per device via HA Media Browser
@@ -153,6 +154,7 @@ You can type any custom label during setup if yours is not listed.
 | Water Leak | LeaksProtect | Leak detected, tamper, battery |
 | Relays/Switches | Relay, WallSwitch, Socket, LightSwitch | On/off per channel |
 | Lights | LightSwitch Dimmer | Brightness control |
+| Locks | SmartLock, LockBridge (Yale) | Lock, unlock, unlatch (HA `lock.open` → momentary unlatch). State surfaces locked / unlocked / unlatched |
 | Keypads | Keypad, KeypadPlus, KeypadCombi, KeypadTouchscreen | Battery, tamper, temperature, signal, NFC status |
 | Sirens | HomeSiren, HomeSiren S, HomeSiren Fibra, HomeSiren G3, StreetSiren, StreetSiren S, StreetSiren Plus, StreetSiren Plus Fibra/G3, StreetSiren Fibra, StreetSiren Double Deck (& S / Fibra) | Battery, tamper, signal |
 | Range extenders | ReX, ReX 2, ReX 2 Fire | Battery, signal |

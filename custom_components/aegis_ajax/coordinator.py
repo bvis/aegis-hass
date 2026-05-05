@@ -64,6 +64,7 @@ _STATUS_KEY_MAP: dict[str, str] = {
     "vibration_detected": "vibration",
     "wire_input_status": "wire_input_alert",
     "transmitter_status": "wire_input_alert",
+    "smart_lock": "smart_lock_state",
 }
 
 # Statuses whose snapshot parser writes more than the single mapped key.

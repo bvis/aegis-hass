@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+
+class SmartLockError(Exception):
+    """Raised when a SwitchSmartLockService call fails."""
+
+
 _STREAM_LIGHT_DEVICES = (
     "/systems.ajax.api.ecosystem.v3.mobilegwsvc.service"
     ".stream_light_devices.StreamLightDevicesService/execute"
@@ -32,6 +37,20 @@ _DEVICE_BRIGHTNESS = (
     "/systems.ajax.api.ecosystem.v3.mobilegwsvc.service"
     ".device_command_brightness.DeviceCommandBrightnessService/execute"
 )
+
+# SmartLockStatus.LockStatus → human-readable state used by the lock entity.
+# Mirrors `proto/.../space/smartlock/smart_lock_pb2`.
+_SMART_LOCK_STATE_MAP: dict[int, str] = {
+    0: "unknown",
+    1: "unlocked",
+    2: "locked",
+    3: "unlatched",
+}
+
+# SwitchSmartLockRequest.Action enum — UNLOCK=1, LOCK=2, UNLATCH=3.
+SMART_LOCK_ACTION_LOCK = 2
+SMART_LOCK_ACTION_UNLOCK = 1
+SMART_LOCK_ACTION_UNLATCH = 3
 
 
 def _encode_string_field(field_number: int, value: str) -> bytes:
@@ -260,6 +279,12 @@ class DevicesApi:
                     if hasattr(status, "wifi_signal_level_status")
                     else 0
                 )
+            elif which == "smart_lock":
+                # The status oneof carries the LockStatus enum directly (not a
+                # sub-message), so `status.smart_lock` is already the int value.
+                result["smart_lock_state"] = _SMART_LOCK_STATE_MAP.get(
+                    int(status.smart_lock), "unknown"
+                )
         return result
 
     @staticmethod
@@ -451,6 +476,10 @@ class DevicesApi:
                                             )
                                         elif status_name == "wifi_signal_level_status":
                                             payload["value"] = int(status.wifi_signal_level_status)
+                                        elif status_name == "smart_lock":
+                                            payload["value"] = _SMART_LOCK_STATE_MAP.get(
+                                                int(status.smart_lock), "unknown"
+                                            )
 
                                         on_status_update(
                                             device_id,
@@ -492,6 +521,31 @@ class DevicesApi:
             f"Device commands not yet implemented (action={command.action}, "
             f"device={command.device_id})"
         )
+
+    async def switch_smart_lock(self, space_id: str, smart_lock_id: str, action: int) -> None:
+        """Lock / unlock / unlatch a SmartLock or LockBridge.
+
+        action: 1=UNLOCK, 2=LOCK, 3=UNLATCH (constants exported as
+        SMART_LOCK_ACTION_*). Raises SmartLockError on a failure response.
+        """
+        from v3.mobilegwsvc.service.switch_smart_lock import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.SwitchSmartLockServiceStub(channel)
+        request = request_pb2.SwitchSmartLockRequest(
+            space_id=space_id,
+            smart_lock_id=smart_lock_id,
+            action=action,
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error_type = response.failure.WhichOneof("error") or "unknown"
+            raise SmartLockError(error_type)
+        _LOGGER.debug("SmartLock %s in space %s: action=%s OK", smart_lock_id, space_id, action)
 
     async def capture_photo(self, hub_id: str, device_id: str, device_type: str) -> str | None:
         """Capture a photo using v2 PhotoOnDemandService.
