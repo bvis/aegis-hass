@@ -360,6 +360,8 @@ The required fields (configured in the integration's Options flow, stored secure
 
 Three of the four values are plain strings in the app's `res/values/strings.xml`: `project_id`, `gcm_defaultSenderId` and `google_app_id`. The fourth, `google_api_key`, is **not** in `strings.xml` (the value there is a placeholder); it ships inside `lib/<arch>/libnative-lib.so` bundled with the APK.
 
+> **iOS users:** the iOS Ajax app ships these values in `GoogleService-Info.plist` inside the signed `.ipa` bundle, which is encrypted and cannot be inspected without a jailbroken device. In practice, even if you use the Ajax app on iPhone day-to-day, **extract the credentials from the Android APK** — the Firebase project is the same on both platforms (same `project_id`, `google_app_id`, `gcm_defaultSenderId` and `google_api_key`), so values pulled from the Android build work for FCM push delivery on a Home Assistant install regardless of which OS you personally use.
+
 If FCM credentials are not configured, the integration will still work using the persistent gRPC stream for real-time updates. FCM adds an additional push notification channel for faster event delivery and enables Photo on Demand URL retrieval.
 
 ## Translations
