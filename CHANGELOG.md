@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4-beta.7] - 2026-05-07
+
+Seventh beta of the `1.2.4` line. Finishes a long-standing TODO that ate every device-control click in the integration. No Ajax wire-protocol changes; only fills in the gRPC dispatch that was missing.
+
+### Fixed
+- **Switches and dimmer brightness now actually act on the hub.** `DevicesApi.send_command` was a `NotImplementedError` placeholder since the integration's first release: `AjaxSwitch` (Relay Jeweller, WallSwitch, every Socket and LightSwitch variant) and `AjaxLight` (LightSwitch Dimmer brightness slider) registered correctly, exposed the on/off and brightness controls in the UI, and then surfaced `Failed to perform the action switch/turn_on. Device commands not yet implemented (action=on, device=<id>)` to the user on every click. The dispatcher now routes `on` → `DeviceCommandDeviceOnService.execute`, `off` → `DeviceCommandDeviceOffService.execute`, and `brightness` → `DeviceCommandBrightnessService.execute` (with `BRIGHTNESS_TYPE_ABSOLUTE`, matching HA's slider semantics). Failure responses (`hub_offline`, `hub_busy`, `permission_denied`, `hub_wrong_state`) now bubble up as `DeviceCommandError(<error>)` so HA shows a proper service-call error toast instead of an opaque `NotImplementedError`. (#104)
+
+### Internal
+- New `_build_object_type(device_type)` helper marks the matching empty-marker oneof case on the v2 `ObjectType` proto via `SetInParent()`, so the strings produced by `parse_device` (`relay`, `wall_switch`, `socket_*`, `light_switch_*`, etc.) round-trip back into a valid command request without a separate mapping table.
+- `DeviceCommandError` exception type for the new failure path; `SmartLockError` (added in `beta.6`) keeps its dedicated subclass.
+
 ## [1.2.4-beta.6] - 2026-05-06
 
 Sixth beta of the `1.2.4` line. New `lock` platform on top of `beta.5`. No Ajax wire-protocol changes.
