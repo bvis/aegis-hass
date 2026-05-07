@@ -20,21 +20,27 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~HA Repairs~~ (v1.2.4) — `hub_offline_24h`, `hts_chronic_failure`, `fcm_credentials_invalid` (with guided fix flow), `grpcio_version_mismatch` Repair cards (#89)
 - ~~System Health card~~ (v1.2.4) — gRPC reachability, HTS/FCM ratios, pushes received, last push / last poll ages under Settings → System (#91)
 - ~~DHCP discovery~~ (v1.2.4) — Ajax hubs on the LAN appear as Discovered cards via OUI `9C:75:6E` (#92)
-- ~~Tilt + Steam binary sensors~~ (v1.2.4) — `tilt` on DoorProtect Plus family (accelerometer), `steam` on FireProtect 2 smoke-chamber variants (steam-vs-smoke discriminator)
-- ~~Lock platform~~ (v1.2.5) — `lock.py` with `AjaxLock` for `smart_lock` / `smart_lock_yale` device types. State (locked / unlocked / unlatched) parsed from the `smart_lock` LockStatus oneof; `lock` / `unlock` / HA's `lock.open` (= unlatch) wired to `SwitchSmartLockService`
+- ~~Tilt + Steam binary sensors~~ (v1.2.4) — `tilt` on DoorProtect Plus family (accelerometer), `steam` on FireProtect 2 smoke-chamber variants (steam-vs-smoke discriminator) (#101)
+- ~~Lock platform~~ (v1.2.4) — `lock.py` with `AjaxLock` for `smart_lock` / `smart_lock_yale` device types. State (locked / unlocked / unlatched) parsed from the `smart_lock` LockStatus oneof; `lock` / `unlock` / HA's `lock.open` (= unlatch) wired to `SwitchSmartLockService` (#102)
+- ~~Device commands wired up~~ (v1.2.4) — `DevicesApi.send_command` no longer raises `NotImplementedError`; relays / sockets / wall switches act on the hub via `DeviceCommandDeviceOn` / `DeviceCommandDeviceOff`, dimmer brightness via `DeviceCommandBrightness`. Was a placeholder since v1.0. (#105)
+- ~~Switch state read-back~~ (v1.2.4) — `parse_device` now walks `LightHubDevice.spread_properties` for `RelayChannel` / `LightSwitchChannel` / `SocketBaseChannel` so `AjaxSwitch.is_on` reflects the actual hub state. Fixes the bistable Relay Jeweller symptom where the entity always read `False`. (#109)
+- ~~System Health diagnostics~~ (v1.2.4) — `last_update_success_time` exposed on the coordinator so the card stops rendering as `error: unknown` (#106); `Reach Ajax cloud (gRPC host)` derived from poll freshness instead of an HTTPS HEAD probe that always returned `unreachable` (#110)
+- ~~Non-blocking startup~~ (v1.2.4) — HTS connect-then-listen and FCM startup move to background tasks; first refresh no longer awaits multi-second listener startups so the integration drops out of HA's *"integration taking too long"* warning much sooner (#113, closes #112)
 
 ---
 
 ## Priority 1 — High impact, moderate effort
 
-### 1.1 Valve Platform (`valve.py`) — blocked
+### 1.1 Valve Platform (`valve.py`) — partially unblocked
 **Why:** WaterStop devices currently surface as a no-op (empty binary-sensor list). Native `valve` entity would let automations open/close the water shut-off valve.
 
-**Blockers — both need investigating in a real WaterStop install before this can ship:**
-1. The actual valve open/closed state lives in `LightHubDevice.properties.water_stop_channel.state` (an enum: STATE_OFF / STATE_ON), which is *not* part of the `LightDeviceStatus.statuses` oneof we currently parse. Surfacing it requires extending `parse_device` to walk the `properties` oneof per device type — a small architectural change touching every property-bearing entity.
-2. No `SwitchWaterStop`-style command service exists in the v3 protos we have. Without a way to actually toggle the valve, a `valve` entity would be read-only and provide little value over the existing `water_stop_valve_stuck` malfunction signal. Need to capture the wire calls the official mobile app makes when toggling a WaterStop to identify the right service.
+**Status after #109 (1.2.4-beta.9):** the `spread_properties` walker added for switch state already covers `WaterStopChannel.state` mechanically — extending it to populate a `valve_chN` key would be a one-liner. The remaining blocker is the **command path**: there is no `SwitchWaterStopService` in the v3 protos we have, so the entity would be read-only. Useful (status visibility + transition flag), but not the full valve UX.
 
-**Effort:** Unknown until both blockers are answered. The `water_stop_valve_stuck` Simple flag could be exposed as a `PROBLEM` binary sensor in the meantime — much smaller change, doesn't pre-empt the eventual `valve` design.
+**Suggested incremental ship:**
+1. Read-only `valve` entity — exposes `state` (STATE_OFF / STATE_ON), `is_transitioning`, and the `MALFUNCTION_IS_STUCK` flag as the existing `water_stop_valve_stuck` binary sensor. Lets automations *react* to the valve being closed even if HA can't toggle it.
+2. Wait for someone with a WaterStop to capture the wire calls the official mobile app makes when toggling, then add the command path.
+
+**Effort:** Low (1-2 h) for read-only ship; unknown for full bidirectional.
 
 ---
 
