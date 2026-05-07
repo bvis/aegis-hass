@@ -25,8 +25,8 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Binary Sensors**: Door open/close, motion detection, smoke, steam (FireProtect 2 chamber discriminator), leak, tamper, CO, heat, glass break, vibration, tilt (DoorProtect Plus accelerometer), CRA monitoring status, cellular connection, lid tamper, external contact alert (wired reed switches on DoorProtect/Hub Hybrid inputs), external contact fault, MultiTransmitter wired-input alert with alarm category, anti-masking, interference detection, ethernet link, Wi-Fi link, mains power
 - **Hub Network**: Real-time hub network data — ethernet/wifi/gsm connection status, Wi-Fi SSID and signal strength, IP addressing, cellular signal strength and network type, power supply status
 - **Sensors**: Battery level, temperature, humidity, CO2, signal strength, GSM type (2G/3G/4G), Wi-Fi signal level, Wi-Fi SSID, Wi-Fi IP, IMEI, Ethernet IP/gateway/DNS, cellular signal/network, connection type
-- **Switches**: Relays, wall switches, sockets (multi-channel support)
-- **Lights**: Dimmers with brightness control
+- **Switches**: Relays, wall switches, sockets (multi-channel support) — turn on/off via `DeviceCommandDeviceOn` / `DeviceCommandDeviceOff` gRPC services
+- **Lights**: Dimmers with absolute brightness control via `DeviceCommandBrightness`
 - **Locks**: Ajax SmartLock and LockBridge (Yale) — lock, unlock, and unlatch (HA's `lock.open`) via `SwitchSmartLockService`
 - **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention

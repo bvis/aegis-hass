@@ -21,6 +21,10 @@ class SmartLockError(Exception):
     """Raised when a SwitchSmartLockService call fails."""
 
 
+class DeviceCommandError(Exception):
+    """Raised when a DeviceCommand* gRPC call fails or is not supported."""
+
+
 _STREAM_LIGHT_DEVICES = (
     "/systems.ajax.api.ecosystem.v3.mobilegwsvc.service"
     ".stream_light_devices.StreamLightDevicesService/execute"
@@ -51,6 +55,29 @@ _SMART_LOCK_STATE_MAP: dict[int, str] = {
 SMART_LOCK_ACTION_LOCK = 2
 SMART_LOCK_ACTION_UNLOCK = 1
 SMART_LOCK_ACTION_UNLATCH = 3
+
+
+def _build_object_type(device_type: str) -> Any:  # noqa: ANN401
+    """Construct an `ObjectType` v2 proto with the matching `type` oneof set.
+
+    `DeviceCommandDevice{On,Off,Brightness}Request.device_type` is an
+    `ObjectType` message whose `type` oneof is selected per device family
+    (relay / wall_switch / socket_* / light_switch_* / etc.). Each inner
+    case is an empty marker message — `SetInParent()` marks the oneof
+    case as present without setting any fields. The accepted strings
+    mirror the WhichOneof("type") return values that `parse_device`
+    already produces from the snapshot, so a `Device.device_type` round-
+    trips back into a valid request without further mapping.
+    """
+    from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels import (  # noqa: PLC0415
+        object_type_pb2,
+    )
+
+    obj = object_type_pb2.ObjectType()
+    if not hasattr(obj, device_type):
+        raise DeviceCommandError(f"Unsupported device type for command: {device_type}")
+    getattr(obj, device_type).SetInParent()
+    return obj
 
 
 def _encode_string_field(field_number: int, value: str) -> bytes:
@@ -517,9 +544,96 @@ class DevicesApi:
         return task
 
     async def send_command(self, command: DeviceCommand) -> None:
-        raise NotImplementedError(
-            f"Device commands not yet implemented (action={command.action}, "
-            f"device={command.device_id})"
+        """Dispatch a device command to the right v3 DeviceCommand* service.
+
+        action="on" / "off" → DeviceCommandDeviceOn / Off (relays, sockets,
+        wall/light switches), action="brightness" → DeviceCommandBrightness
+        (LightSwitch Dimmer). Raises DeviceCommandError on unsupported
+        action / device_type or on a gRPC failure response.
+        """
+        if command.action == "on":
+            await self._device_on(command)
+        elif command.action == "off":
+            await self._device_off(command)
+        elif command.action == "brightness":
+            await self._device_brightness(command)
+        else:
+            raise DeviceCommandError(f"Unknown device command action: {command.action}")
+
+    async def _device_on(self, command: DeviceCommand) -> None:
+        from v3.mobilegwsvc.service.device_command_device_on import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandDeviceOnServiceStub(channel)
+        request = request_pb2.DeviceCommandDeviceOnRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            device_type=_build_object_type(command.device_type),
+            channels=command.channels or [1],
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"on: {error}")
+        _LOGGER.debug("Device %s on (channels=%s) OK", command.device_id, command.channels)
+
+    async def _device_off(self, command: DeviceCommand) -> None:
+        from v3.mobilegwsvc.service.device_command_device_off import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandDeviceOffServiceStub(channel)
+        request = request_pb2.DeviceCommandDeviceOffRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            device_type=_build_object_type(command.device_type),
+            channels=command.channels or [1],
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"off: {error}")
+        _LOGGER.debug("Device %s off (channels=%s) OK", command.device_id, command.channels)
+
+    async def _device_brightness(self, command: DeviceCommand) -> None:
+        from v3.mobilegwsvc.service.device_command_brightness import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        if command.brightness is None:
+            raise DeviceCommandError("brightness command requires a brightness value")
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandBrightnessServiceStub(channel)
+        # BRIGHTNESS_TYPE_ABSOLUTE=2 — the percentage we send is the new
+        # absolute target, not a delta. HA's brightness slider is always
+        # absolute, so this matches user intent.
+        request = request_pb2.DeviceCommandBrightnessRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            device_type=_build_object_type(command.device_type),
+            brightness_in_percentage=command.brightness,
+            channels=command.channels or [1],
+            brightness_type=2,
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"brightness: {error}")
+        _LOGGER.debug(
+            "Device %s brightness=%s%% (channels=%s) OK",
+            command.device_id,
+            command.brightness,
+            command.channels,
         )
 
     async def switch_smart_lock(self, space_id: str, smart_lock_id: str, action: int) -> None:

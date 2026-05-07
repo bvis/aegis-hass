@@ -412,26 +412,45 @@ class TestDevicesApiInit:
 
 
 class TestSendCommand:
+    """Dispatcher behaviour for `DevicesApi.send_command`.
+
+    These tests mock out the per-action coroutines on the instance so we
+    only assert the action-string → method routing. The actual gRPC
+    serialisation is covered by the dedicated tests below.
+    """
+
     @pytest.mark.asyncio
-    async def test_send_command_on_raises_not_implemented(self) -> None:
-        client = MagicMock()
-        api = DevicesApi(client)
+    async def test_send_command_dispatches_on(self) -> None:
+        api = DevicesApi(MagicMock())
+        api._device_on = AsyncMock()
+        api._device_off = AsyncMock()
+        api._device_brightness = AsyncMock()
         cmd = DeviceCommand.on(hub_id="h1", device_id="d1", device_type="relay", channels=[1])
-        with pytest.raises(NotImplementedError):
-            await api.send_command(cmd)
+
+        await api.send_command(cmd)
+
+        api._device_on.assert_awaited_once_with(cmd)
+        api._device_off.assert_not_called()
+        api._device_brightness.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_send_command_off_raises_not_implemented(self) -> None:
-        client = MagicMock()
-        api = DevicesApi(client)
+    async def test_send_command_dispatches_off(self) -> None:
+        api = DevicesApi(MagicMock())
+        api._device_on = AsyncMock()
+        api._device_off = AsyncMock()
+        api._device_brightness = AsyncMock()
         cmd = DeviceCommand.off(hub_id="h1", device_id="d1", device_type="relay", channels=[1])
-        with pytest.raises(NotImplementedError):
-            await api.send_command(cmd)
+
+        await api.send_command(cmd)
+
+        api._device_off.assert_awaited_once_with(cmd)
 
     @pytest.mark.asyncio
-    async def test_send_command_brightness_raises_not_implemented(self) -> None:
-        client = MagicMock()
-        api = DevicesApi(client)
+    async def test_send_command_dispatches_brightness(self) -> None:
+        api = DevicesApi(MagicMock())
+        api._device_on = AsyncMock()
+        api._device_off = AsyncMock()
+        api._device_brightness = AsyncMock()
         cmd = DeviceCommand.set_brightness(
             hub_id="h1",
             device_id="d1",
@@ -439,7 +458,208 @@ class TestSendCommand:
             brightness=50,
             channels=[1],
         )
-        with pytest.raises(NotImplementedError):
+
+        await api.send_command(cmd)
+
+        api._device_brightness.assert_awaited_once_with(cmd)
+
+    @pytest.mark.asyncio
+    async def test_send_command_unknown_action_raises(self) -> None:
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = DevicesApi(MagicMock())
+        cmd = DeviceCommand(
+            action="bogus",
+            hub_id="h1",
+            device_id="d1",
+            device_type="relay",
+            channels=[1],
+        )
+        with pytest.raises(DeviceCommandError):
+            await api.send_command(cmd)
+
+
+class TestBuildObjectType:
+    """`_build_object_type` must mark the right ObjectType.type oneof case."""
+
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "relay",
+            "relay_fibra_base",
+            "wall_switch",
+            "socket",
+            "socket_b",
+            "socket_g",
+            "socket_outlet_type_e",
+            "socket_outlet_type_f",
+            "socket_type_g_plus",
+            "light_switch",
+            "light_switch_one_gang",
+            "light_switch_two_gang",
+            "light_switch_dimmer",
+        ],
+    )
+    def test_known_device_type_sets_oneof(self, device_type: str) -> None:
+        from custom_components.aegis_ajax.api.devices import _build_object_type
+
+        obj = _build_object_type(device_type)
+
+        assert obj.WhichOneof("type") == device_type
+
+    def test_unknown_device_type_raises(self) -> None:
+        from custom_components.aegis_ajax.api.devices import (
+            DeviceCommandError,
+            _build_object_type,
+        )
+
+        with pytest.raises(DeviceCommandError):
+            _build_object_type("not_a_real_device")
+
+
+class TestDeviceCommandRoundTrip:
+    """Cover the gRPC stub interaction for the three command actions.
+
+    We patch the lazy-imported `endpoint_pb2_grpc` module's stub class so
+    each call returns a controllable response message. The test then
+    asserts on the actual request that hit the stub, catching any drift
+    between `DeviceCommand` and the proto wire format.
+    """
+
+    def _make_api(self) -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_device_on_sends_correct_request(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_device_on import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        success_response = response_pb2.DeviceCommandDeviceOnResponse(
+            success=common_response_pb2.Success()
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return success_response
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(endpoint_pb2_grpc, "DeviceCommandDeviceOnServiceStub", _StubFactory):
+            await api.send_command(
+                DeviceCommand.on(
+                    hub_id="hub-1",
+                    device_id="dev-1",
+                    device_type="relay",
+                    channels=[1],
+                )
+            )
+
+        assert len(captured) == 1
+        request = captured[0]
+        assert request.hub_id == "hub-1"
+        assert request.device_id == "dev-1"
+        assert request.device_type.WhichOneof("type") == "relay"
+        assert list(request.channels) == [1]
+
+    @pytest.mark.asyncio
+    async def test_device_off_failure_raises(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_device_off import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        failure_response = response_pb2.DeviceCommandDeviceOffResponse(
+            failure=response_pb2.DeviceCommandDeviceOffResponse.Failure(
+                hub_offline=common_response_pb2.Error(),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(return_value=failure_response)
+
+        with (
+            patch.object(endpoint_pb2_grpc, "DeviceCommandDeviceOffServiceStub", _StubFactory),
+            pytest.raises(DeviceCommandError, match="hub_offline"),
+        ):
+            await api.send_command(
+                DeviceCommand.off(
+                    hub_id="hub-1",
+                    device_id="dev-1",
+                    device_type="socket",
+                    channels=[1],
+                )
+            )
+
+    @pytest.mark.asyncio
+    async def test_brightness_sends_absolute_percentage(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_brightness import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        success_response = response_pb2.DeviceCommandBrightnessResponse(
+            success=common_response_pb2.Success()
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return success_response
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(endpoint_pb2_grpc, "DeviceCommandBrightnessServiceStub", _StubFactory):
+            await api.send_command(
+                DeviceCommand.set_brightness(
+                    hub_id="hub-1",
+                    device_id="dev-1",
+                    device_type="light_switch_dimmer",
+                    brightness=42,
+                    channels=[1],
+                )
+            )
+
+        assert len(captured) == 1
+        request = captured[0]
+        assert request.brightness_in_percentage == 42
+        absolute = request_pb2.DeviceCommandBrightnessRequest.BRIGHTNESS_TYPE_ABSOLUTE
+        assert request.brightness_type == absolute
+        assert request.device_type.WhichOneof("type") == "light_switch_dimmer"
+
+    @pytest.mark.asyncio
+    async def test_brightness_without_value_raises(self) -> None:
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        cmd = DeviceCommand(
+            action="brightness",
+            hub_id="h1",
+            device_id="d1",
+            device_type="light_switch_dimmer",
+            channels=[1],
+            brightness=None,
+        )
+        with pytest.raises(DeviceCommandError, match="brightness"):
             await api.send_command(cmd)
 
 
