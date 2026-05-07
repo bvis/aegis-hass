@@ -106,6 +106,15 @@ class TestCoordinatorInit:
         coordinator = _make_coordinator()
         assert coordinator.rooms == {}
 
+    def test_last_update_success_time_initially_none(self) -> None:
+        # Regression for #74 follow-up — the System Health card calls
+        # `coordinator.last_update_success_time` and HA renders the row as
+        # "error: unknown" if the attribute raises. The real
+        # `DataUpdateCoordinator` doesn't expose this attribute, so the
+        # subclass has to provide it — verify the default before any poll.
+        coordinator = _make_coordinator()
+        assert coordinator.last_update_success_time is None
+
 
 class TestRoomsRefresh:
     @pytest.mark.asyncio
@@ -199,6 +208,43 @@ class TestAsyncUpdateData:
         assert "devices" in result
         assert "s1" in result["spaces"]
         assert "d1" in result["devices"]
+
+    @pytest.mark.asyncio
+    async def test_update_data_sets_last_success_timestamp(self) -> None:
+        # Regression for #74 follow-up — the System Health card reads
+        # `last_update_success_time` to render the "last poll" age. Before
+        # this fix the attribute didn't exist and the entire row blew up
+        # with "error: unknown" instead of showing diagnostic data.
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        space = _make_space("s1")
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[space])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        assert coordinator.last_update_success_time is None
+        await coordinator._async_update_data()
+        first_ts = coordinator.last_update_success_time
+        assert first_ts is not None
+
+        await coordinator._async_update_data()
+        assert coordinator.last_update_success_time >= first_ts
+
+    @pytest.mark.asyncio
+    async def test_update_data_does_not_set_timestamp_on_failure(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(side_effect=RuntimeError("boom"))
+
+        with pytest.raises(Exception):  # noqa: B017 - wrapped as UpdateFailed
+            await coordinator._async_update_data()
+        assert coordinator.last_update_success_time is None
 
     @pytest.mark.asyncio
     async def test_update_data_logs_in_when_not_authenticated(self) -> None:

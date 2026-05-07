@@ -6,11 +6,12 @@ import asyncio
 import contextlib
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import HtsClient
@@ -130,6 +131,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # `hts_chronic_failure` Repair surfaced after 30 min of
         # sustained reconnect failures.
         self._hts_first_failure_at: float | None = None
+        # Wall-clock timestamp of the last successful `_async_update_data`
+        # return, exposed as `last_update_success_time` for the System
+        # Health card. HA's `DataUpdateCoordinator` only tracks the
+        # success boolean, not when it last happened.
+        self._last_update_success_time: datetime | None = None
 
     @property
     def security_api(self) -> SecurityApi:
@@ -159,6 +165,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def is_hts_connected(self) -> bool:
         """True if HTS has an active connection feeding hub-network sensors."""
         return self._hts_client is not None and self._hts_task is not None
+
+    @property
+    def last_update_success_time(self) -> datetime | None:
+        """UTC datetime of the last successful poll, or None if never polled."""
+        return self._last_update_success_time
 
     async def _login_and_persist(self) -> None:
         """Login fresh and notify the on_session_persist callback.
@@ -328,6 +339,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._start_device_streams()
                 # Start HTS for hub network data (non-blocking, graceful degradation)
                 await self._start_hts()
+                self._last_update_success_time = dt_util.utcnow()
                 return {"spaces": self.spaces, "devices": self.devices}
 
             # Skip device snapshot if all persistent streams are alive
@@ -346,6 +358,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._hts_client is None:
                 await self._start_hts()
 
+            self._last_update_success_time = dt_util.utcnow()
             return {"spaces": self.spaces, "devices": self.devices}
         except ConfigEntryAuthFailed:
             raise
