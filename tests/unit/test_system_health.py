@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -47,17 +47,12 @@ class TestSystemHealthInfo:
         return hass
 
     @pytest.mark.asyncio
-    async def test_no_entries_only_returns_reach_check(self) -> None:
-        """With no configured entries, only the gRPC reach probe + count are returned."""
+    async def test_no_entries_marks_no_accounts(self) -> None:
+        """With no configured entries, reachability falls back to a sentinel."""
         hass = self._make_hass([])
-        with patch(
-            "custom_components.aegis_ajax.system_health.system_health.async_check_can_reach_url",
-            new=MagicMock(return_value="reach-coro"),
-        ):
-            info = await _system_health_info(hass)
-        assert info["can_reach_server"] == "reach-coro"
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "no accounts configured"
         assert info["configured_accounts"] == 0
-        # No per-entry metrics should be set when there are no entries
         assert "spaces" not in info
 
     @pytest.mark.asyncio
@@ -87,11 +82,7 @@ class TestSystemHealthInfo:
         entry_b = MagicMock(runtime_data=coord_b)
         hass = self._make_hass([entry_a, entry_b])
 
-        with patch(
-            "custom_components.aegis_ajax.system_health.system_health.async_check_can_reach_url",
-            new=MagicMock(return_value="reach-coro"),
-        ):
-            info = await _system_health_info(hass)
+        info = await _system_health_info(hass)
 
         assert info["configured_accounts"] == 2
         assert info["spaces"] == 3
@@ -102,20 +93,53 @@ class TestSystemHealthInfo:
         assert info["last_push"] == "never"
         # last_poll: only coord_a has a real timestamp, ~30s old
         assert info["last_poll"].endswith("s ago")
+        # Reachability derived from poll freshness: any account polled
+        # within the staleness window means we're reachable.
+        assert info["can_reach_server"] == "reachable"
+
+    @pytest.mark.asyncio
+    async def test_can_reach_server_unreachable_when_polls_stale(self) -> None:
+        """A stale `last_update_success_time` (>10 min) flips the reach line."""
+        coord = MagicMock()
+        coord.spaces = {"s1": MagicMock()}
+        coord.is_hts_connected = False
+        coord.last_update_success_time = datetime.now(UTC) - timedelta(minutes=30)
+        listener = MagicMock()
+        listener.is_fcm_connected = False
+        listener.pushes_received = 0
+        listener.last_push_at = None
+        coord.notification_listener = listener
+
+        hass = self._make_hass([MagicMock(runtime_data=coord)])
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "unreachable"
+
+    @pytest.mark.asyncio
+    async def test_can_reach_server_never_polled(self) -> None:
+        """A fresh-install state with `last_update_success_time=None` says so explicitly."""
+        coord = MagicMock()
+        coord.spaces = {}
+        coord.is_hts_connected = False
+        coord.last_update_success_time = None
+        listener = MagicMock()
+        listener.is_fcm_connected = False
+        listener.pushes_received = 0
+        listener.last_push_at = None
+        coord.notification_listener = listener
+
+        hass = self._make_hass([MagicMock(runtime_data=coord)])
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "never polled"
 
     @pytest.mark.asyncio
     async def test_skips_entries_without_runtime_data(self) -> None:
         """A still-loading entry (no runtime_data) must not crash the card."""
         entry = MagicMock(runtime_data=None)
         hass = self._make_hass([entry])
-
-        with patch(
-            "custom_components.aegis_ajax.system_health.system_health.async_check_can_reach_url",
-            new=MagicMock(return_value="reach-coro"),
-        ):
-            info = await _system_health_info(hass)
+        info = await _system_health_info(hass)
 
         assert info["configured_accounts"] == 1
         assert info["spaces"] == 0
         assert info["hts_connected"] == "0/1"
         assert info["fcm_connected"] == "0/1"
+        assert info["can_reach_server"] == "never polled"

@@ -13,13 +13,19 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components import system_health
 from homeassistant.core import callback
 
-from custom_components.aegis_ajax.const import DOMAIN, GRPC_HOST
+from custom_components.aegis_ajax.const import DOMAIN
 
 if TYPE_CHECKING:
+    from homeassistant.components import system_health
     from homeassistant.core import HomeAssistant
+
+# Maximum age (seconds) a successful poll can have before the card
+# downgrades reachability to "unreachable". Defaults to 10 min, well
+# above the 5-min default poll interval but tight enough that a
+# genuine cloud outage shows up before users notice missing entities.
+_REACHABILITY_STALE_AFTER = 600.0
 
 
 @callback
@@ -34,11 +40,9 @@ def async_register(
 async def _system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     """Build the System Health dict for the integration's row."""
     entries = hass.config_entries.async_entries(DOMAIN)
-    info: dict[str, Any] = {
-        "can_reach_server": system_health.async_check_can_reach_url(hass, f"https://{GRPC_HOST}"),
-        "configured_accounts": len(entries),
-    }
+    info: dict[str, Any] = {"configured_accounts": len(entries)}
     if not entries:
+        info["can_reach_server"] = "no accounts configured"
         return info
 
     spaces_total = 0
@@ -74,6 +78,21 @@ async def _system_health_info(hass: HomeAssistant) -> dict[str, Any]:
             age = now_mono - listener.last_push_at
             if last_push_age_seconds is None or age < last_push_age_seconds:
                 last_push_age_seconds = age
+
+    # Derive reachability from the actual gRPC poll path we already use,
+    # not from a separate HTTPS HEAD probe. The gRPC host doesn't
+    # respond to plain HTTPS GET / HEAD, so `async_check_can_reach_url`
+    # always returned "unreachable" even when polling worked perfectly
+    # (surfaced once #106 made the rest of the card render). If any
+    # account polled successfully in the last 10 min the cloud *is*
+    # reachable from the integration's perspective, regardless of what
+    # an external HTTP probe would say.
+    if last_update_age_seconds is None:
+        info["can_reach_server"] = "never polled"
+    elif last_update_age_seconds <= _REACHABILITY_STALE_AFTER:
+        info["can_reach_server"] = "reachable"
+    else:
+        info["can_reach_server"] = "unreachable"
 
     info["spaces"] = spaces_total
     info["hts_connected"] = f"{hts_connected}/{len(entries)}"
