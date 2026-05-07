@@ -366,7 +366,22 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed("Error fetching Ajax data") from err
 
     async def _start_hts(self) -> None:
-        """Start HTS connection for hub network data (graceful degradation)."""
+        """Start HTS in the background — never block the caller.
+
+        The HTS handshake is a TCP connect plus a custom application
+        handshake that takes a few seconds in the happy path and up to
+        20 s with the auth-handshake timeout from #74. Awaiting it
+        directly inside `_async_update_data` extended the integration's
+        first refresh past HA's "integration taking too long" boot
+        threshold (#112). Wrap the connect-then-listen lifecycle in a
+        single background task so the caller returns immediately and
+        the listener establishes (or fails and self-reconnects) without
+        blocking startup. Hub-network sensors stay `unavailable` for the
+        couple of seconds it takes to connect, then become available the
+        moment the connection succeeds.
+        """
+        if self._hts_task is not None and not self._hts_task.done():
+            return
         try:
             session = self._client.session
             token_hex = session.session_token
@@ -386,16 +401,24 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device_id=session.device_id,
                 app_label=session.app_label,
             )
+        except Exception:
+            _LOGGER.debug("HTS pre-connect setup failed", exc_info=True)
+            self._hts_client = None
+            return
+        self._hts_task = asyncio.create_task(self._run_hts_lifecycle())
+        self._hts_task.add_done_callback(self._handle_hts_task_done)
+
+    async def _run_hts_lifecycle(self) -> None:
+        """Connect, log success, then drive the listen loop until disconnect."""
+        if self._hts_client is None:
+            return
+        try:
             result = await self._hts_client.connect()
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
             self._clear_hts_chronic_failure()
-            self._hts_task = asyncio.create_task(
-                self._hts_client.listen(on_state_update=self._on_hts_update)
-            )
-            self._hts_task.add_done_callback(self._handle_hts_task_done)
+            await self._hts_client.listen(on_state_update=self._on_hts_update)
         except Exception:
             _LOGGER.debug("HTS connection failed (network sensors unavailable)", exc_info=True)
-            self._handle_hts_disconnect(reconnect=False)
             self._hts_client = None
 
     def _on_hts_update(self, hub_id: str, state: HubNetworkState) -> None:

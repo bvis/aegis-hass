@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import replace
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -920,6 +921,53 @@ class TestStreamHandlers:
 
         assert coordinator.hub_network == {}
         coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_start_hts_does_not_block_on_connect(self) -> None:
+        # Regression for #112 — `_start_hts()` used to `await connect()`
+        # before returning, extending HA's first-refresh past the boot
+        # threshold. The refactored version creates a background task
+        # for connect+listen and returns immediately.
+        coordinator = self._make_coordinator_with_stream()
+        coordinator._client.session.session_token = "abcdef"
+        coordinator._client.session.user_hex_id = "00112233"
+        coordinator._client.session.device_id = "device-1"
+        coordinator._client.session.app_label = "Ajax"
+
+        slow_connect_started = asyncio.Event()
+        slow_connect_release = asyncio.Event()
+
+        async def _slow_connect(self: object) -> object:
+            slow_connect_started.set()
+            await slow_connect_release.wait()
+            return MagicMock(hubs=[])
+
+        from custom_components.aegis_ajax.api.hts.client import HtsClient
+
+        with (
+            patch.object(HtsClient, "_ssl_ctx", create=True, new=object()),
+            patch.object(HtsClient, "connect", new=_slow_connect),
+            patch.object(HtsClient, "listen", new=AsyncMock()),
+        ):
+            await asyncio.wait_for(coordinator._start_hts(), timeout=1.0)
+            assert coordinator._hts_task is not None
+            await asyncio.wait_for(slow_connect_started.wait(), timeout=1.0)
+            slow_connect_release.set()
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(coordinator._hts_task, timeout=2.0)
+
+    @pytest.mark.asyncio
+    async def test_start_hts_is_idempotent_when_task_already_running(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        coordinator._client.session.session_token = "abcdef"
+
+        existing_task = MagicMock(spec=asyncio.Task)
+        existing_task.done.return_value = False
+        coordinator._hts_task = existing_task
+
+        await coordinator._start_hts()
+
+        assert coordinator._hts_task is existing_task
 
     def test_handle_hts_task_done_clears_state(self) -> None:
         coordinator = self._make_coordinator_with_stream()

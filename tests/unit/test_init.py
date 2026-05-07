@@ -9,6 +9,46 @@ import pytest
 
 class TestAsyncSetupEntry:
     @pytest.mark.asyncio
+    async def test_setup_entry_schedules_fcm_as_background_task(self) -> None:
+        # Regression for #112 — FCM startup must not block setup. The
+        # registration round-trip (Firebase + Ajax push token) takes
+        # several seconds; awaiting it here used to push HA past the
+        # "integration taking too long" boot threshold. Now scheduled
+        # via `entry.async_create_background_task` so setup returns
+        # immediately and FCM connects in the background.
+        from custom_components.aegis_ajax import async_setup_entry
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
+        entry = MagicMock()
+        entry.entry_id = "entry-bg"
+        entry.data = {"email": "x@y", "password_hash": "h", "spaces": ["s1"]}
+        entry.options = {}
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.session = MagicMock()
+        mock_coordinator = MagicMock()
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_start_push_notifications = MagicMock()  # not awaited directly
+
+        with (
+            patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client),
+            patch(
+                "custom_components.aegis_ajax.AjaxCobrandedCoordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            await async_setup_entry(hass, entry)
+
+        # FCM startup should be scheduled, not awaited synchronously.
+        mock_coordinator.async_start_push_notifications.assert_called_once()
+        entry.async_create_background_task.assert_called_once()
+        kwargs = entry.async_create_background_task.call_args.kwargs
+        assert kwargs.get("name", "").startswith("aegis_ajax_fcm_start_")
+
+    @pytest.mark.asyncio
     async def test_setup_entry_creates_coordinator(self) -> None:
         from custom_components.aegis_ajax import async_setup_entry
 

@@ -243,16 +243,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
-    # Start FCM push notifications if configured (credentials live in data since v2)
+    # Start FCM push notifications if configured (credentials live in data since v2).
+    # Run as a background task — FCM registration + push-client start is a
+    # multi-step network round-trip (Firebase + Ajax push registration) that
+    # would otherwise block setup for several seconds, extending HA's boot
+    # phase past the "integration taking too long" threshold (#112). Push
+    # delivery already tolerates a brief gap between setup and first push.
     def _get_fcm(key: str) -> str:
         return str(entry.data.get(key, entry.options.get(key, "")))
 
-    await coordinator.async_start_push_notifications(
-        fcm_project_id=_get_fcm("fcm_project_id"),
-        fcm_app_id=_get_fcm("fcm_app_id"),
-        fcm_api_key=_get_fcm("fcm_api_key"),
-        fcm_sender_id=_get_fcm("fcm_sender_id"),
-        entry_id=entry.entry_id,
+    entry.async_create_background_task(
+        hass,
+        coordinator.async_start_push_notifications(
+            fcm_project_id=_get_fcm("fcm_project_id"),
+            fcm_app_id=_get_fcm("fcm_app_id"),
+            fcm_api_key=_get_fcm("fcm_api_key"),
+            fcm_sender_id=_get_fcm("fcm_sender_id"),
+            entry_id=entry.entry_id,
+        ),
+        name=f"aegis_ajax_fcm_start_{entry.entry_id}",
     )
 
     # Schedule photo cleanup
