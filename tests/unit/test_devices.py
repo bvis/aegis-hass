@@ -72,6 +72,133 @@ class TestParseDevice:
         assert result is None
 
 
+class TestSpreadPropertiesParser:
+    """Cover the `LightHubDevice.spread_properties` walk for switch state.
+
+    Built around real proto messages — `MagicMock` would silently
+    accept attribute reads and let the tests pass even if the parser
+    grabbed the wrong field name (the same MagicMock-hides-bug pattern
+    that masked the System Health regression in #106).
+    """
+
+    def test_relay_channel_on_populates_switch_ch1(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            relay_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.channel.CopyFrom(
+            relay_channel_pb2.RelayChannel(
+                channel_id=1,
+                is_channel_on=True,
+                is_transitioning=False,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"switch_ch1": True}
+
+    def test_relay_channel_off_populates_switch_ch1_false(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            relay_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.channel.CopyFrom(relay_channel_pb2.RelayChannel(channel_id=1, is_channel_on=False))
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"switch_ch1": False}
+
+    def test_light_switch_two_gang_populates_both_channels(self) -> None:
+        # `light_switch_two_gang` exposes 2 channels via 2 entries in
+        # spread_properties — the only place per-channel state lives.
+        # Regression for the symptom @EpicManeuver hit in #104.
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            light_switch_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        e1 = hub_dev.spread_properties.add()
+        e1.light_switch_channel.CopyFrom(
+            light_switch_channel_pb2.LightSwitchChannel(
+                id=light_switch_channel_pb2.LightSwitchChannel.CHANNEL_ID_1,
+                state=light_switch_channel_pb2.LightSwitchChannel.STATE_ON,
+            )
+        )
+        e2 = hub_dev.spread_properties.add()
+        e2.light_switch_channel.CopyFrom(
+            light_switch_channel_pb2.LightSwitchChannel(
+                id=light_switch_channel_pb2.LightSwitchChannel.CHANNEL_ID_2,
+                state=light_switch_channel_pb2.LightSwitchChannel.STATE_OFF,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"switch_ch1": True, "switch_ch2": False}
+
+    def test_light_switch_dimmer_brightness_extracted(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            light_switch_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.light_switch_channel.CopyFrom(
+            light_switch_channel_pb2.LightSwitchChannel(
+                id=light_switch_channel_pb2.LightSwitchChannel.CHANNEL_ID_1,
+                state=light_switch_channel_pb2.LightSwitchChannel.STATE_ON,
+                brightness=light_switch_channel_pb2.LightSwitchChannel.Brightness(level=42),
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"switch_ch1": True, "brightness_ch1": 42}
+
+    def test_socket_base_channel_on(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            socket_base_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.socket_base_channel.CopyFrom(
+            socket_base_channel_pb2.SocketBaseChannel(
+                id=socket_base_channel_pb2.SocketBaseChannel.CHANNEL_ID_1,
+                state=socket_base_channel_pb2.SocketBaseChannel.STATE_ON,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"switch_ch1": True}
+
+    def test_unrelated_spread_properties_ignored(self) -> None:
+        # photo_on_demand, billing_company, fire_zones, etc. share the
+        # same oneof but aren't channel-bearing — the parser should leave
+        # them alone instead of throwing.
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.photo_on_demand.SetInParent()
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {}
+
+    def test_no_spread_properties_returns_empty(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {}
+
+
 class TestDeviceStateParser:
     def test_empty_states_returns_online(self) -> None:
         result = DevicesApi._parse_device_state([])

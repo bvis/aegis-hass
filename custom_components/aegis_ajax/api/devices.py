@@ -315,6 +315,61 @@ class DevicesApi:
         return result
 
     @staticmethod
+    def _parse_spread_properties(hub_dev: Any) -> dict[str, Any]:  # noqa: ANN401
+        """Walk `LightHubDevice.spread_properties` for switch / dimmer state.
+
+        The on/off state of relays, sockets, and light switches lives in
+        the repeated `spread_properties` field — *not* in the
+        `LightDeviceStatus.statuses` oneof we already parse — and one
+        entry surfaces per physical channel. Multi-gang devices like
+        `light_switch_two_gang` therefore appear as 2 entries each
+        carrying a `LightSwitchChannel` with id 1 / 2.
+
+        Output keys mirror what `AjaxSwitch` / `AjaxLight` already read
+        (`switch_ch{N}`, `brightness_ch{N}`) so a Device parsed from a
+        snapshot now drives those entities directly. Without this, the
+        switch entity always read False regardless of the actual hub
+        state — the symptom @EpicManeuver reported in #104 for a
+        bistable Relay Jeweller.
+        """
+        result: dict[str, Any] = {}
+        spread = getattr(hub_dev, "spread_properties", None)
+        if not spread:
+            return result
+        for entry in spread:
+            which = entry.WhichOneof("properties") if hasattr(entry, "WhichOneof") else None
+            if which == "channel":
+                # RelayChannel — `channel_id` is a plain int (1..4),
+                # `is_channel_on` is a real bool.
+                ch = entry.channel
+                channel_id = int(ch.channel_id) if hasattr(ch, "channel_id") else 1
+                if channel_id <= 0:
+                    continue
+                result[f"switch_ch{channel_id}"] = bool(ch.is_channel_on)
+            elif which == "light_switch_channel":
+                # LightSwitchChannel — `id` and `state` are ChannelId and
+                # State enums (1=OFF, 2=ON). Optional `brightness.level`
+                # carries the dimmer percentage 0..100.
+                lsc = entry.light_switch_channel
+                channel_id = int(lsc.id) if hasattr(lsc, "id") else 1
+                if channel_id <= 0:
+                    continue
+                state_int = int(lsc.state) if hasattr(lsc, "state") else 0
+                result[f"switch_ch{channel_id}"] = state_int == 2  # STATE_ON
+                if lsc.HasField("brightness"):
+                    result[f"brightness_ch{channel_id}"] = int(lsc.brightness.level)
+            elif which == "socket_base_channel":
+                # SocketBaseChannel — same shape as light_switch_channel
+                # for our purposes.
+                sbc = entry.socket_base_channel
+                channel_id = int(sbc.id) if hasattr(sbc, "id") else 1
+                if channel_id <= 0:
+                    continue
+                state_int = int(sbc.state) if hasattr(sbc, "state") else 0
+                result[f"switch_ch{channel_id}"] = state_int == 2  # STATE_ON
+        return result
+
+    @staticmethod
     def parse_device(proto_light_device: Any) -> Device | None:  # noqa: ANN401
         device_kind = proto_light_device.WhichOneof("device")
         if device_kind != "hub_device":
@@ -327,6 +382,9 @@ class DevicesApi:
 
         device_type = common.object_type.WhichOneof("type") or "unknown"
 
+        statuses = DevicesApi._parse_statuses(profile.statuses)
+        statuses.update(DevicesApi._parse_spread_properties(hub_dev))
+
         return Device(
             id=profile.id,
             hub_id=common.hub_id,
@@ -337,7 +395,7 @@ class DevicesApi:
             state=DevicesApi._parse_device_state(profile.states),
             malfunctions=profile.malfunctions,
             bypassed=profile.bypassed,
-            statuses=DevicesApi._parse_statuses(profile.statuses),
+            statuses=statuses,
             battery=DevicesApi._parse_battery(profile.statuses),
         )
 
