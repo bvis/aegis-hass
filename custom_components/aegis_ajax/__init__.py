@@ -239,6 +239,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         space_ids=entry.data.get("spaces", []),
         poll_interval=entry.options.get("poll_interval", DEFAULT_POLL_INTERVAL),
         on_session_persist=_persist_session,
+        entry_id=entry.entry_id,
     )
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator

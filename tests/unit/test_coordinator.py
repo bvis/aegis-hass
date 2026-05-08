@@ -1138,3 +1138,100 @@ class TestApplyPushSecurityState:
 
         assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
         coordinator.async_set_updated_data.assert_called_once()
+
+
+class TestCachedSnapshotStart:
+    """First-refresh path now skips `get_devices_snapshot` when a cache is
+    available, returning cached devices immediately so platform setup
+    drops out of HA's *"integration taking too long"* boot warning. The
+    streams started in the same first refresh deliver a fresh snapshot
+    within seconds via `_handle_devices_snapshot`, replacing the cache.
+    Tracked in #114.
+    """
+
+    def _coordinator_with_cache(self, cached: dict[str, Device] | None) -> object:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass,
+                client=client,
+                space_ids=["s1"],
+                poll_interval=30,
+                entry_id="entry-1",
+            )
+        coordinator.hass = hass
+        # Replace the real DevicesCache with an in-memory fake
+        cache_mock = MagicMock()
+        cache_mock.async_load = AsyncMock(return_value=cached)
+        cache_mock.async_save = AsyncMock()
+        coordinator._devices_cache = cache_mock
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(
+            return_value=[_make_device("fresh-d1")]
+        )
+        coordinator._hub_object_api = MagicMock()
+        coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._start_device_streams = AsyncMock()
+        coordinator._start_hts = AsyncMock()
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_first_refresh_with_cache_skips_devices_snapshot(self) -> None:
+        cached = {"cached-d1": _make_device("cached-d1")}
+        coordinator = self._coordinator_with_cache(cached)
+
+        result = await coordinator._async_update_data()
+
+        # Cache wins: no synchronous gRPC snapshot call on the boot path
+        coordinator._devices_api.get_devices_snapshot.assert_not_called()
+        assert result["devices"] == cached
+        # Subsequent polls won't re-trigger the heavy path
+        assert coordinator._streams_started is True
+        # Streams + HTS are still kicked off (they were already non-blocking
+        # after #113; we just made sure we don't regress that)
+        coordinator._start_device_streams.assert_awaited_once()
+        coordinator._start_hts.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_first_refresh_without_cache_runs_heavy_path_and_persists(self) -> None:
+        coordinator = self._coordinator_with_cache(cached=None)
+
+        await coordinator._async_update_data()
+
+        coordinator._devices_api.get_devices_snapshot.assert_awaited()
+        assert "fresh-d1" in coordinator.devices
+        # Fresh snapshot is persisted so the next restart can warm-start
+        coordinator._devices_cache.async_save.assert_awaited_once_with(coordinator.devices)
+
+    @pytest.mark.asyncio
+    async def test_stream_snapshot_callback_persists_cache(self) -> None:
+        # When the device stream delivers its initial snapshot via
+        # `_handle_devices_snapshot`, that fresh data should overwrite the
+        # warm-started cache so the next boot reflects reality.
+        coordinator = self._coordinator_with_cache(cached={"d1": _make_device("d1")})
+        coordinator.async_set_updated_data = MagicMock()
+
+        fresh = replace(_make_device("d1"), name="Renamed")
+        coordinator._handle_devices_snapshot([fresh])
+
+        assert coordinator.devices["d1"] == fresh
+        # Persistence is scheduled as a task (sync callback can't await)
+        coordinator.hass.async_create_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_cache_when_entry_id_missing(self) -> None:
+        # Tests construct the coordinator without an entry_id. We must keep
+        # working in that mode (no cache, heavy path always) so the existing
+        # ~1080-test suite doesn't need a giant rewrite.
+        coordinator = _make_coordinator()
+        assert coordinator._devices_cache is None

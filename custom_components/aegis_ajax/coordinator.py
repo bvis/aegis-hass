@@ -28,6 +28,7 @@ from custom_components.aegis_ajax.const import (
     MIN_POLL_INTERVAL,
     ConnectionStatus,
 )
+from custom_components.aegis_ajax.device_cache import DevicesCache
 from custom_components.aegis_ajax.repairs import (
     async_clear_hts_chronic_failure,
     async_clear_hub_offline,
@@ -88,6 +89,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         space_ids: list[str],
         poll_interval: int = DEFAULT_POLL_INTERVAL,
         on_session_persist: Callable[[str, str], None] | None = None,
+        entry_id: str = "",
     ) -> None:
         poll_interval = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, poll_interval))
         super().__init__(
@@ -136,6 +138,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Health card. HA's `DataUpdateCoordinator` only tracks the
         # success boolean, not when it last happened.
         self._last_update_success_time: datetime | None = None
+        # Persistent device-snapshot cache (#114) — restored on first
+        # refresh so platform setup doesn't have to await the gRPC
+        # `get_devices_snapshot` call. Tests construct the coordinator
+        # without an entry_id; in that mode the cache is disabled.
+        self._devices_cache: DevicesCache | None = (
+            DevicesCache(hass, entry_id) if entry_id else None
+        )
 
     @property
     def security_api(self) -> SecurityApi:
@@ -327,14 +336,35 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Start persistent device streams on first update (once only)
             if not self._streams_started:
                 self._streams_started = True
-                # Fetch initial device snapshot synchronously so entities
-                # are created with real data (avoids unavailable on reload)
-                initial_devices: dict[str, Device] = {}
-                for space_id in self.spaces:
-                    space_devices = await self._devices_api.get_devices_snapshot(space_id)
-                    for device in space_devices:
-                        initial_devices[device.id] = device
-                self.devices = initial_devices
+                # Try to skip the synchronous `get_devices_snapshot` call
+                # by warming `self.devices` from the persisted cache (#114).
+                # Streams (started below) deliver a fresh snapshot via
+                # `_handle_devices_snapshot` within seconds, replacing the
+                # cached values. On a fresh install or after a corrupt
+                # cache, fall back to the heavy path so platforms still
+                # see real data when they create entities.
+                cached_devices: dict[str, Device] | None = None
+                if self._devices_cache is not None:
+                    try:
+                        cached_devices = await self._devices_cache.async_load()
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.debug("Failed to load devices cache", exc_info=True)
+                if cached_devices:
+                    self.devices = cached_devices
+                else:
+                    # Fetch initial device snapshot synchronously so entities
+                    # are created with real data (avoids unavailable on reload)
+                    initial_devices: dict[str, Device] = {}
+                    for space_id in self.spaces:
+                        space_devices = await self._devices_api.get_devices_snapshot(space_id)
+                        for device in space_devices:
+                            initial_devices[device.id] = device
+                    self.devices = initial_devices
+                    if self._devices_cache is not None and self.devices:
+                        try:
+                            await self._devices_cache.async_save(self.devices)
+                        except Exception:  # noqa: BLE001
+                            _LOGGER.debug("Failed to persist devices cache", exc_info=True)
                 # Then start persistent streams for real-time updates
                 await self._start_device_streams()
                 # Start HTS for hub network data (non-blocking, graceful degradation)
@@ -534,6 +564,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for device in devices:
             self.devices[device.id] = device
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+        # Refresh the persisted cache so the next restart can warm-start
+        # from real data instead of the previous boot's snapshot (#114).
+        # Sync callback can't await — schedule and forget.
+        if self._devices_cache is not None:
+            self.hass.async_create_task(self._devices_cache.async_save(self.devices))
 
     def _handle_status_update(self, device_id: str, status_name: str, data: dict[str, Any]) -> None:
         """Handle real-time status update from the persistent stream.
