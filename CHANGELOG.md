@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4-beta.11] - 2026-05-08
+
+Eleventh beta of the `1.2.4` line. Closes the boot-phase work on top of `beta.10`. No Ajax wire-protocol changes.
+
+### Fixed
+- **First poll cycle no longer waits on `get_devices_snapshot` before platforms can set up.** `beta.10` (#113) moved HTS handshake and FCM startup to background tasks, but the synchronous per-space `get_devices_snapshot` loop inside the first `_async_update_data` was still on the boot path — `coordinator.devices` had to be populated before `async_forward_entry_setups` ran so platforms saw real data when they created entities. On a multi-account install that round-trip was the last contributor pushing the integration past HA's *"integration taking too long"* threshold (around 30 s of pending integrations). New `DevicesCache` wraps a per-entry `Store` and persists the last-known device snapshot; on subsequent boots the first refresh tries `async_load()` first, populates `coordinator.devices` from cache on a hit, and skips the gRPC snapshot call entirely. The persistent device streams started in the same first refresh deliver a fresh snapshot via `_handle_devices_snapshot` within seconds, replacing cached values — and HA's persisted entity state already covers the very first frame anyway, so the visible window of "previous-boot state" is sub-second on a healthy install. Falls back to the heavy path on fresh install or a corrupt cache, so the worst case is unchanged. Cache writes from the stream callback go through `Store.async_delay_save` with a 30 s window so bursts of stream snapshots coalesce into one disk write rather than fanning out fire-and-forget save tasks. (#116, closes #114)
+
 ## [1.2.4-beta.10] - 2026-05-08
 
 Tenth beta of the `1.2.4` line. One performance fix on top of `beta.9`. No Ajax wire-protocol changes.
