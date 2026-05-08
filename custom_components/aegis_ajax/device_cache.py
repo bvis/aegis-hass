@@ -29,11 +29,15 @@ def _storage_key(entry_id: str) -> str:
     return f"{DOMAIN}_devices_{entry_id}"
 
 
+_SAVE_DEBOUNCE_SECONDS = 30
+
+
 class DevicesCache:
     """Wraps a per-entry Store with serialization for `Device`."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         self._store: Store[dict[str, Any]] = Store(hass, _STORAGE_VERSION, _storage_key(entry_id))
+        self._pending: dict[str, Device] = {}
 
     async def async_load(self) -> dict[str, Device] | None:
         raw = await self._store.async_load()
@@ -46,8 +50,19 @@ class DevicesCache:
             return None
 
     async def async_save(self, devices: dict[str, Device]) -> None:
-        payload = {"devices": [_serialize_device(d) for d in devices.values()]}
-        await self._store.async_save(payload)
+        await self._store.async_save(_build_payload(devices))
+
+    def async_schedule_save(self, devices: dict[str, Device]) -> None:
+        """Debounced save — coalesces bursts of stream snapshots into one
+        disk write every ~30s. Use this on hot paths; `async_save` for
+        the boot path where we want the first snapshot persisted now.
+        """
+        self._pending = devices
+        self._store.async_delay_save(lambda: _build_payload(self._pending), _SAVE_DEBOUNCE_SECONDS)
+
+
+def _build_payload(devices: dict[str, Device]) -> dict[str, Any]:
+    return {"devices": [_serialize_device(d) for d in devices.values()]}
 
 
 def _serialize_device(d: Device) -> dict[str, Any]:

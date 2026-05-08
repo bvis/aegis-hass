@@ -566,9 +566,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         # Refresh the persisted cache so the next restart can warm-start
         # from real data instead of the previous boot's snapshot (#114).
-        # Sync callback can't await — schedule and forget.
+        # Debounced — bursts of stream snapshots coalesce into one write.
         if self._devices_cache is not None:
-            self.hass.async_create_task(self._devices_cache.async_save(self.devices))
+            self._devices_cache.async_schedule_save(self.devices)
 
     def _handle_status_update(self, device_id: str, status_name: str, data: dict[str, Any]) -> None:
         """Handle real-time status update from the persistent stream.

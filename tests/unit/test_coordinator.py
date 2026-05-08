@@ -1170,6 +1170,7 @@ class TestCachedSnapshotStart:
         cache_mock = MagicMock()
         cache_mock.async_load = AsyncMock(return_value=cached)
         cache_mock.async_save = AsyncMock()
+        cache_mock.async_schedule_save = MagicMock()
         coordinator._devices_cache = cache_mock
         coordinator._client.session.is_authenticated = True
         coordinator._spaces_api = MagicMock()
@@ -1217,7 +1218,8 @@ class TestCachedSnapshotStart:
     async def test_stream_snapshot_callback_persists_cache(self) -> None:
         # When the device stream delivers its initial snapshot via
         # `_handle_devices_snapshot`, that fresh data should overwrite the
-        # warm-started cache so the next boot reflects reality.
+        # warm-started cache so the next boot reflects reality. The save
+        # is debounced via `async_schedule_save` to coalesce bursts.
         coordinator = self._coordinator_with_cache(cached={"d1": _make_device("d1")})
         coordinator.async_set_updated_data = MagicMock()
 
@@ -1225,8 +1227,7 @@ class TestCachedSnapshotStart:
         coordinator._handle_devices_snapshot([fresh])
 
         assert coordinator.devices["d1"] == fresh
-        # Persistence is scheduled as a task (sync callback can't await)
-        coordinator.hass.async_create_task.assert_called_once()
+        coordinator._devices_cache.async_schedule_save.assert_called_once_with(coordinator.devices)
 
     @pytest.mark.asyncio
     async def test_no_cache_when_entry_id_missing(self) -> None:

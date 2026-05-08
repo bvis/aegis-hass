@@ -119,3 +119,26 @@ class TestDevicesCache:
         from custom_components.aegis_ajax.device_cache import _storage_key
 
         assert _storage_key("entry-a") != _storage_key("entry-b")
+
+    def test_schedule_save_debounces_through_store(self) -> None:
+        # `async_schedule_save` must hand a payload-builder + delay to
+        # the underlying Store so bursts of stream snapshots collapse
+        # into a single disk write.
+        from custom_components.aegis_ajax.device_cache import _SAVE_DEBOUNCE_SECONDS
+
+        cache = DevicesCache(MagicMock(), "entry-1")
+        cache._store.async_delay_save = MagicMock()  # type: ignore[method-assign]
+
+        d1 = _make_device("d1")
+        cache.async_schedule_save({"d1": d1})
+
+        cache._store.async_delay_save.assert_called_once()
+        args, _ = cache._store.async_delay_save.call_args
+        data_func, delay = args
+        assert delay == _SAVE_DEBOUNCE_SECONDS
+        # Builder is lazy: it reads from `_pending` at flush time, so a
+        # later snapshot replacing `_pending` is what gets written.
+        d2 = _make_device("d2")
+        cache.async_schedule_save({"d2": d2})
+        payload = data_func()
+        assert [entry["id"] for entry in payload["devices"]] == ["d2"]
