@@ -28,6 +28,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Switches**: Relays, wall switches, sockets (multi-channel support) — turn on/off via `DeviceCommandDeviceOn` / `DeviceCommandDeviceOff` gRPC services
 - **Lights**: Dimmers with absolute brightness control via `DeviceCommandBrightness`
 - **Locks**: Ajax SmartLock and LockBridge (Yale) — lock, unlock, and unlatch (HA's `lock.open`) via `SwitchSmartLockService`
+- **Valves** (read-only): Ajax WaterStop and WaterStop Fibra surface as native `valve.*` entities reflecting `WaterStopChannel.state` (open / closed), `is_transitioning`, and a `stuck` attribute pulled from the channel-level `MALFUNCTION_IS_STUCK`. Bidirectional control waits on capturing the official app's command-side calls — file an issue with a packet capture if you have a WaterStop and we'll wire the open / close path
 - **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention
 - **Media Browser**: Browse captured photos per device via HA Media Browser
@@ -339,7 +340,7 @@ If a specific group of sensors stops working:
 ## Roadmap
 
 - [ ] Video stream support (VideoEdge, RTSP)
-- [ ] Valve platform (WaterStop) — read-only `valve` entity is unblocked (the `spread_properties` walker added in `1.2.4` already exposes `WaterStopChannel.state`); full bidirectional control still waits on capturing the official app's command-side calls
+- [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.2.5`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
 - [ ] Firmware update platform
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
 - [ ] SpaceControl (keyfob) event support

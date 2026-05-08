@@ -367,6 +367,33 @@ class DevicesApi:
                     continue
                 state_int = int(sbc.state) if hasattr(sbc, "state") else 0
                 result[f"switch_ch{channel_id}"] = state_int == 2  # STATE_ON
+            elif which == "water_stop_channel":
+                # WaterStopChannel — feeds the read-only `valve` entity (#117).
+                # State enum is distinct from the relay/switch family:
+                # 0=UNSPECIFIED, 1=UNKNOWN, 2=OFF, 3=ON. We only emit
+                # `valve_chN` for ON/OFF; UNKNOWN / UNSPECIFIED leave the
+                # key absent so the entity renders as `unknown` rather
+                # than fabricating a closed/open reading on a comms hiccup.
+                # `STATE_ON` = water flowing (valve open) follows the same
+                # convention as the relay parser above; if real-hardware
+                # testing reveals the WaterStop firmware uses the inverted
+                # mapping, flip the comparison here.
+                wsc = entry.water_stop_channel
+                channel_id = int(wsc.id) if hasattr(wsc, "id") else 1
+                if channel_id <= 0:
+                    continue
+                state_int = int(wsc.state) if hasattr(wsc, "state") else 0
+                if state_int == 3:  # STATE_ON
+                    result[f"valve_ch{channel_id}"] = True
+                elif state_int == 2:  # STATE_OFF
+                    result[f"valve_ch{channel_id}"] = False
+                if getattr(wsc, "is_transitioning", False):
+                    result[f"valve_ch{channel_id}_transitioning"] = True
+                # MALFUNCTION_IS_STUCK = 2 in the channel-level enum
+                # (distinct from the Simple-flag `water_stop_valve_stuck`
+                # parsed off `LightDeviceStatus.statuses`).
+                if 2 in [int(m) for m in getattr(wsc, "malfunctions", [])]:
+                    result[f"valve_ch{channel_id}_stuck"] = True
         return result
 
     @staticmethod
