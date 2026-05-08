@@ -27,14 +27,14 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~System Health diagnostics~~ (v1.2.4) — `last_update_success_time` exposed on the coordinator so the card stops rendering as `error: unknown` (#106); `Reach Ajax cloud (gRPC host)` derived from poll freshness instead of an HTTPS HEAD probe that always returned `unreachable` (#110)
 - ~~Non-blocking startup~~ (v1.2.4) — HTS connect-then-listen and FCM startup move to background tasks; first refresh no longer awaits multi-second listener startups so the integration drops out of HA's *"integration taking too long"* warning much sooner (#113, closes #112)
 - ~~Cached-snapshot warm start~~ (v1.2.4) — first `_async_update_data` warm-starts `coordinator.devices` from a per-entry `Store`-backed cache and skips the synchronous `get_devices_snapshot` loop on subsequent boots; persistent streams deliver fresh data within seconds. Cache writes from the stream callback go through `Store.async_delay_save` (30 s window) to coalesce bursts. Real-HA measurement: ~10 s shaved off HA total boot, ~9 s off aegis_ajax setup-to-platforms-online (#116, closes #114)
-- ~~Valve platform (read-only)~~ (v1.2.5) — `WaterStopChannel.state` / `is_transitioning` / `MALFUNCTION_IS_STUCK` surfaced via the existing `spread_properties` walker as `valve_chN` / `_transitioning` / `_stuck` keys; new `valve.py` exposes them as native HA `valve.*` entities for `water_stop` and `water_stop_base` device types. Bidirectional control still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in v3 protos) (#117)
+- ~~Valve platform (read-only)~~ (v1.3.0) — `WaterStopChannel.state` / `is_transitioning` / `MALFUNCTION_IS_STUCK` surfaced via the existing `spread_properties` walker as `valve_chN` / `_transitioning` / `_stuck` keys; new `valve.py` exposes them as native HA `valve.*` entities for `water_stop` and `water_stop_base` device types. Bidirectional control still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in v3 protos) (#117)
 
 ---
 
 ## Priority 1 — High impact, moderate effort
 
 ### 1.1 Valve Platform (`valve.py`) — bidirectional control
-**Why:** Read-only valve entity shipped in `1.2.5` (#117). The remaining gap is **opening / closing the valve from HA** — automations can react to the valve being closed by a leak, but can't trigger the shut-off themselves nor reopen after a false-positive.
+**Why:** Read-only valve entity shipped in `1.3.0` (#117). The remaining gap is **opening / closing the valve from HA** — automations can react to the valve being closed by a leak, but can't trigger the shut-off themselves nor reopen after a false-positive.
 
 **Status:** Blocked on protocol capture. There is no `SwitchWaterStopService` in the v3 protos we have. Need someone with a WaterStop to run the rig (Frida + mitmproxy on the official mobile app) and capture the gRPC call the app makes when toggling the valve from its UI.
 

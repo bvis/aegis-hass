@@ -340,7 +340,7 @@ If a specific group of sensors stops working:
 ## Roadmap
 
 - [ ] Video stream support (VideoEdge, RTSP)
-- [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.2.5`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
+- [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.3.0`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
 - [ ] Firmware update platform
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
 - [ ] SpaceControl (keyfob) event support
