@@ -36,6 +36,7 @@ PLATFORMS = [
     Platform.SWITCH,
     Platform.LIGHT,
     Platform.LOCK,
+    Platform.VALVE,
 ]
 
 type AjaxCobrandedConfigEntry = ConfigEntry[AjaxCobrandedCoordinator]

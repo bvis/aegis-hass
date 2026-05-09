@@ -198,6 +198,114 @@ class TestSpreadPropertiesParser:
         result = DevicesApi._parse_spread_properties(hub_dev)
         assert result == {}
 
+    def test_water_stop_channel_state_on_populates_valve_ch1_open(self) -> None:
+        # Read-only valve path (#117). `STATE_ON` means the channel is
+        # energised — water flowing — so the entity should report `open`.
+        # If real-hardware testing later proves the WaterStop firmware
+        # uses the inverted convention, this is the line to flip.
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            water_stop_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.water_stop_channel.CopyFrom(
+            water_stop_channel_pb2.WaterStopChannel(
+                id=water_stop_channel_pb2.WaterStopChannel.CHANNEL_ID_1,
+                state=water_stop_channel_pb2.WaterStopChannel.STATE_ON,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"valve_ch1": True}
+
+    def test_water_stop_channel_state_off_populates_valve_ch1_closed(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            water_stop_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.water_stop_channel.CopyFrom(
+            water_stop_channel_pb2.WaterStopChannel(
+                id=water_stop_channel_pb2.WaterStopChannel.CHANNEL_ID_1,
+                state=water_stop_channel_pb2.WaterStopChannel.STATE_OFF,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result == {"valve_ch1": False}
+
+    def test_water_stop_unknown_state_omits_valve_key(self) -> None:
+        # `STATE_UNKNOWN` / `STATE_UNSPECIFIED` mean the hub didn't report
+        # state (sensor reset, comms hiccup) — better to leave the key
+        # absent than to fabricate a closed/open reading. The valve entity
+        # then renders as `unknown` rather than wrong.
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            water_stop_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.water_stop_channel.CopyFrom(
+            water_stop_channel_pb2.WaterStopChannel(
+                id=water_stop_channel_pb2.WaterStopChannel.CHANNEL_ID_1,
+                state=water_stop_channel_pb2.WaterStopChannel.STATE_UNKNOWN,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert "valve_ch1" not in result
+
+    def test_water_stop_is_transitioning_flag(self) -> None:
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            water_stop_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.water_stop_channel.CopyFrom(
+            water_stop_channel_pb2.WaterStopChannel(
+                id=water_stop_channel_pb2.WaterStopChannel.CHANNEL_ID_1,
+                state=water_stop_channel_pb2.WaterStopChannel.STATE_OFF,
+                is_transitioning=True,
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result["valve_ch1_transitioning"] is True
+
+    def test_water_stop_malfunction_is_stuck_exposed(self) -> None:
+        # Distinct from the existing `water_stop_valve_stuck` Simple-flag
+        # binary sensor parsed off `LightDeviceStatus.statuses`: this one
+        # comes from the channel-level `malfunctions` repeated enum, which
+        # is what the WaterStop firmware actually sets when the motor
+        # can't seat the valve. The entity surfaces it as an attribute.
+        from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
+        from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
+            water_stop_channel_pb2,
+        )
+
+        hub_dev = light_hub_device_pb2.LightHubDevice()
+        spread = hub_dev.spread_properties.add()
+        spread.water_stop_channel.CopyFrom(
+            water_stop_channel_pb2.WaterStopChannel(
+                id=water_stop_channel_pb2.WaterStopChannel.CHANNEL_ID_1,
+                state=water_stop_channel_pb2.WaterStopChannel.STATE_ON,
+                malfunctions=[
+                    water_stop_channel_pb2.WaterStopChannel.MALFUNCTION_BATTERY_LOW_ERROR,
+                    water_stop_channel_pb2.WaterStopChannel.MALFUNCTION_IS_STUCK,
+                ],
+            )
+        )
+
+        result = DevicesApi._parse_spread_properties(hub_dev)
+        assert result["valve_ch1_stuck"] is True
+
 
 class TestDeviceStateParser:
     def test_empty_states_returns_online(self) -> None:
