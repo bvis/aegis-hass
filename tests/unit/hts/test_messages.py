@@ -60,13 +60,34 @@ class TestTlvUnescape:
     def test_unescape_esc(self) -> None:
         assert tlv_unescape_param(b"\x06\x36") == b"\x06"
 
-    def test_truncated_escape_raises(self) -> None:
-        with pytest.raises(ValueError, match="Truncated escape"):
-            tlv_unescape_param(b"\x06")
+    def test_truncated_escape_preserved(self) -> None:
+        # Lenient (#108): an orphan 0x06 at the end of a segment used to
+        # raise and kill the HTS listen loop on the very next update.
+        # Treat the byte as literal data so the message decodes and the
+        # network sensors keep working.
+        assert tlv_unescape_param(b"\x06") == b"\x06"
 
-    def test_unknown_escape_raises(self) -> None:
-        with pytest.raises(ValueError, match="Unknown escape"):
-            tlv_unescape_param(b"\x06\x01")
+    def test_unknown_escape_preserved(self) -> None:
+        # Lenient (#108): @uddinr's hub firmware emits 0x06 0x6A inside
+        # a TLV segment which our escape table doesn't recognise. Strict
+        # ValueError used to propagate and shut down the listen loop —
+        # network sensors stayed unavailable forever. Preserve both
+        # bytes literally so the rest of the message decodes; if it
+        # turns out 0x6A is actually a third escape code we don't know
+        # about, the worst case is a slightly wrong byte in one field
+        # rather than the entire HTS surface being permanently dead.
+        assert tlv_unescape_param(b"\x06\x6a") == b"\x06\x6a"
+        assert tlv_unescape_param(b"\x06\x01") == b"\x06\x01"
+
+    def test_unknown_escape_preserved_in_context(self) -> None:
+        # Surrounding bytes pass through unchanged — only the unknown
+        # escape pair is preserved as-is.
+        assert tlv_unescape_param(b"AB\x06\x6aCD") == b"AB\x06\x6aCD"
+
+    def test_known_escape_still_works_after_lenient_fallback(self) -> None:
+        # Regression: don't accidentally make 0x06 0x35 / 0x06 0x36
+        # also literal — those still mean what they always meant.
+        assert tlv_unescape_param(b"\x06\x35\x06\x6a\x06\x36") == b"\x05\x06\x6a\x06"
 
     def test_empty(self) -> None:
         assert tlv_unescape_param(b"") == b""

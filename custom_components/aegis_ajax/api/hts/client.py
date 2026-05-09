@@ -538,7 +538,21 @@ class HtsClient:
 
     async def _handle_update(self, msg: HtsMessage) -> None:
         """Parse an UPDATES message and update hub state."""
-        params = tlv_decode(msg.payload)
+        # Belt-and-suspenders for #108: even with the lenient
+        # `tlv_unescape_param` (preserves unknown 0x06 0xNN pairs), a
+        # future parser bug or a truly garbled payload should not kill
+        # the listen loop and silently take down hub-network sensors
+        # for hours. Drop the offending message, log payload hex for
+        # post-mortem, and let the next update flow normally.
+        try:
+            params = tlv_decode(msg.payload)
+        except Exception:
+            _LOGGER.debug(
+                "Failed to decode UPDATES payload (first 80 bytes: %s) — dropping message",
+                msg.payload[:80].hex(),
+                exc_info=True,
+            )
+            return
         if not params:
             return
 

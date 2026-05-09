@@ -16,9 +16,12 @@ Header layout (all big-endian):
 
 from __future__ import annotations
 
+import logging
 import struct
 from dataclasses import dataclass, field
 from enum import IntEnum
+
+_LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # TLV helpers
@@ -53,27 +56,46 @@ def tlv_escape_param(param: bytes) -> bytes:
 def tlv_unescape_param(data: bytes) -> bytes:
     """Unescape a single TLV parameter value.
 
-    Reverses:
+    Reverses the two known escape sequences:
       0x06 0x35 -> 0x05
       0x06 0x36 -> 0x06
+
+    Lenient on unknown sequences (#108): a `0x06 <other>` pair is
+    preserved as two literal bytes rather than raising. The strict
+    behaviour used to bubble a `ValueError` up through `tlv_decode`,
+    out of `_handle_update`, into `_run_hts_lifecycle`'s broad except,
+    which terminated the listen loop and left hub-network sensors
+    permanently `unavailable` for affected installs (@uddinr captured
+    `0x06 0x6A` from real firmware traffic). If the unknown pair turns
+    out to be a third escape code we don't yet know about, the worst
+    case is a slightly wrong byte in one field rather than the whole
+    HTS surface being dead. An orphan `0x06` at the end of the segment
+    is treated the same way (preserved as a literal 0x06).
     """
     out = bytearray()
     i = 0
     while i < len(data):
         b = data[i]
         if b == _ESC:
-            i += 1
-            if i >= len(data):
-                raise ValueError("Truncated escape sequence at end of TLV param")
-            nxt = data[i]
+            if i + 1 >= len(data):
+                _LOGGER.debug("Orphan 0x06 at end of TLV param; preserving literal")
+                out.append(_ESC)
+                break
+            nxt = data[i + 1]
             if nxt == _ESC_DELIM:
                 out.append(_DELIM)
-            elif nxt == _ESC_ESC:
+                i += 2
+                continue
+            if nxt == _ESC_ESC:
                 out.append(_ESC)
-            else:
-                raise ValueError(f"Unknown escape sequence 0x06 0x{nxt:02X}")
-        else:
-            out.append(b)
+                i += 2
+                continue
+            _LOGGER.debug("Unknown escape 0x06 0x%02X; preserving literal", nxt)
+            out.append(_ESC)
+            out.append(nxt)
+            i += 2
+            continue
+        out.append(b)
         i += 1
     return bytes(out)
 
