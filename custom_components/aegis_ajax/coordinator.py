@@ -370,6 +370,19 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Start HTS for hub network data (non-blocking, graceful degradation)
                 await self._start_hts()
                 self._last_update_success_time = dt_util.utcnow()
+                # One-line INFO summary so users debugging "HTS streams: 0/1" or
+                # "FCM clients: 0/1" reports (#111) can see at a glance which
+                # surfaces are coming up at startup. The HTS path is async —
+                # `_start_hts` schedules the lifecycle task and returns, so we
+                # report whether the task was scheduled here, not whether
+                # `connect()` already succeeded. The actual `HTS connected, N
+                # hub(s)` line lands once the task's connect awaits returns.
+                _LOGGER.info(
+                    "Aegis startup: device streams %d/%d started, HTS lifecycle %s",
+                    len([t for t in self._stream_tasks if not t.done()]),
+                    len(self.spaces),
+                    "scheduled" if self._hts_task is not None else "skipped",
+                )
                 return {"spaces": self.spaces, "devices": self.devices}
 
             # Skip device snapshot if all persistent streams are alive
@@ -416,7 +429,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             session = self._client.session
             token_hex = session.session_token
             if not token_hex:
-                _LOGGER.debug("No session token, skipping HTS")
+                _LOGGER.warning(
+                    "HTS startup skipped — no Ajax session token available. "
+                    "Hub network sensors will stay unavailable until authentication "
+                    "succeeds. Look earlier in the log for the authentication failure."
+                )
                 return
             # Pre-create SSL context in executor to avoid blocking event loop
             if HtsClient._ssl_ctx is None:
@@ -431,8 +448,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device_id=session.device_id,
                 app_label=session.app_label,
             )
-        except Exception:
-            _LOGGER.debug("HTS pre-connect setup failed", exc_info=True)
+        except Exception as exc:
+            _LOGGER.warning(
+                "HTS pre-connect setup failed (%s) — hub network sensors unavailable",
+                exc.__class__.__name__,
+                exc_info=True,
+            )
             self._hts_client = None
             return
         self._hts_task = asyncio.create_task(self._run_hts_lifecycle())
@@ -447,8 +468,18 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
             self._clear_hts_chronic_failure()
             await self._hts_client.listen(on_state_update=self._on_hts_update)
-        except Exception:
-            _LOGGER.debug("HTS connection failed (network sensors unavailable)", exc_info=True)
+        except Exception as exc:
+            # Surface at WARNING (#111) — a silent DEBUG made these failures
+            # invisible to users debugging "HTS streams: 0/1" reports. The
+            # previous behaviour required reproducing with custom debug
+            # logging on multiple modules. Keep `exc_info=True` so the full
+            # traceback still lands when DEBUG is enabled.
+            _LOGGER.warning(
+                "HTS connection failed (%s) — hub network sensors will be unavailable. "
+                "The integration will retry on the next poll cycle.",
+                exc.__class__.__name__,
+                exc_info=True,
+            )
             self._hts_client = None
 
     def _on_hts_update(self, hub_id: str, state: HubNetworkState) -> None:

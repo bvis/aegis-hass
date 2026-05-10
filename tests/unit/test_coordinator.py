@@ -969,6 +969,44 @@ class TestStreamHandlers:
 
         assert coordinator._hts_task is existing_task
 
+    @pytest.mark.asyncio
+    async def test_start_hts_logs_warning_when_session_token_missing(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Regression for #111 — affected users reported "HTS streams: 0/1"
+        # with empty `notification.py` and `api/hts/client.py` logs even
+        # under DEBUG. The silent skip when the session token is missing
+        # is the most common cause; promote it to WARNING so the reason
+        # is visible at default log level.
+        coordinator = self._make_coordinator_with_stream()
+        coordinator._client.session.session_token = ""
+
+        with caplog.at_level("WARNING"):
+            await coordinator._start_hts()
+
+        assert "HTS startup skipped" in caplog.text
+        assert "no Ajax session token" in caplog.text
+        assert coordinator._hts_task is None
+
+    @pytest.mark.asyncio
+    async def test_run_hts_lifecycle_logs_warning_on_connect_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Regression for #111 — `connect()` failures used to be DEBUG only,
+        # so HTS connection collapses were invisible in the user's log.
+        # Now WARNING with the exception class name + traceback (under
+        # DEBUG) for fast triage.
+        coordinator = self._make_coordinator_with_stream()
+        coordinator._hts_client = MagicMock()
+        coordinator._hts_client.connect = AsyncMock(side_effect=ConnectionRefusedError("refused"))
+
+        with caplog.at_level("WARNING"):
+            await coordinator._run_hts_lifecycle()
+
+        assert "HTS connection failed" in caplog.text
+        assert "ConnectionRefusedError" in caplog.text
+        assert coordinator._hts_client is None
+
     def test_handle_hts_task_done_clears_state(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         coordinator.hub_network["hub-1"] = HubNetworkState(ethernet_connected=True)
@@ -1236,3 +1274,22 @@ class TestCachedSnapshotStart:
         # ~1080-test suite doesn't need a giant rewrite.
         coordinator = _make_coordinator()
         assert coordinator._devices_cache is None
+
+    @pytest.mark.asyncio
+    async def test_first_refresh_emits_startup_summary(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Diagnostic INFO line for #111: at the end of the first refresh
+        # we want a single summary that says "device streams N/N started,
+        # HTS lifecycle scheduled" so users debugging "0/1" reports can
+        # see at a glance which surfaces are coming up at startup.
+        coordinator = self._coordinator_with_cache(cached={"d1": _make_device("d1")})
+        coordinator._stream_tasks = [MagicMock(done=lambda: False)]
+        coordinator._hts_task = MagicMock(done=lambda: False)
+
+        with caplog.at_level("INFO"):
+            await coordinator._async_update_data()
+
+        assert "Aegis startup" in caplog.text
+        assert "device streams 1/1" in caplog.text
+        assert "HTS lifecycle scheduled" in caplog.text

@@ -100,7 +100,10 @@ class AjaxNotificationListener:
         if self._entry_id:
             async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
-            _LOGGER.debug("FCM credentials not configured, push notifications disabled")
+            _LOGGER.info(
+                "FCM credentials not configured — push notifications disabled. "
+                "Configure them in the integration's Options to enable real-time pushes."
+            )
             return
 
         try:
@@ -110,7 +113,10 @@ class AjaxNotificationListener:
                 FcmRegisterConfig,
             )
         except ImportError:
-            _LOGGER.debug("firebase_messaging not installed, push notifications disabled")
+            _LOGGER.warning(
+                "firebase_messaging package not installed — push notifications disabled. "
+                "This is unexpected; reinstall the integration via HACS."
+            )
             return
 
         # Load or create FCM credentials
@@ -135,7 +141,7 @@ class AjaxNotificationListener:
                     raw_result = await self._hass.async_add_executor_job(registerer.register)
                 self._credentials = dict(raw_result)
                 await self._store.async_save(self._credentials)
-                _LOGGER.debug("FCM registration successful")
+                _LOGGER.info("FCM registration successful")
             except Exception:
                 _LOGGER.exception("FCM registration failed")
                 if self._entry_id:
@@ -150,7 +156,12 @@ class AjaxNotificationListener:
             _LOGGER.debug("FCM token obtained, registering with Ajax servers")
             await self._register_push_token(str(fcm_token))
         else:
-            _LOGGER.debug("No FCM token found in credentials")
+            _LOGGER.warning(
+                "FCM registration returned no token — push delivery will not work. "
+                "Most often caused by malformed FCM credentials (project_id / app_id / "
+                "api_key / sender_id mismatch). Re-extract the four values per the "
+                "integration README and re-enter them in Options."
+            )
 
         # Start push client
         try:
@@ -163,7 +174,7 @@ class AjaxNotificationListener:
                 await self._push_client.start()
             else:
                 await self._hass.async_add_executor_job(self._push_client.start)
-            _LOGGER.debug("FCM push client started for Ajax")
+            _LOGGER.info("FCM push client started — push notifications active")
         except Exception:
             _LOGGER.exception("Failed to start FCM push client")
             self._push_client = None
@@ -195,9 +206,12 @@ class AjaxNotificationListener:
             if response.HasField("success"):
                 _LOGGER.debug("Push token registered with Ajax servers")
             else:
-                _LOGGER.debug("Failed to register push token with Ajax servers")
+                _LOGGER.warning(
+                    "Ajax server rejected the push-token registration — push delivery "
+                    "may be silent. Response did not carry a `success` field."
+                )
         except Exception:
-            _LOGGER.exception("Error registering push token")
+            _LOGGER.exception("Error registering push token with Ajax servers")
 
     def _on_notification(
         self,
