@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0-beta.4] - 2026-05-10
+
+Fourth beta of the `1.3.0` line. Diagnostic-only on top of `beta.3`. No Ajax wire-protocol changes.
+
+### Changed
+- **HTS / FCM startup-failure logs are now visible at default verbosity.** Affected users in #111 reported "HTS streams: 0/1" and "FCM clients: 0/1" with empty `notification.py` and `api/hts/client.py` logs even under DEBUG. Root cause: the most diagnostic-relevant failure paths were at DEBUG level, so the actual reason a listener never came up was invisible at INFO. This release doesn't fix the underlying connection failures — we still don't know what's failing on the affected installs — but makes them visible so the next bug report can paste a useful log. HTS `connect()` exceptions now WARNING with the exception class name (full traceback preserved via `exc_info=True` for DEBUG users); missing session token now WARNING with a pointer to the earlier auth failure; pre-connect setup exceptions also promoted. The first refresh now ends with a one-line INFO summary `Aegis startup: device streams N/M started, HTS lifecycle scheduled/skipped` so the surface state is visible at a glance. On the FCM side: `firebase_messaging` not installed becomes WARNING; missing FCM credentials becomes INFO with hint; "FCM registration successful" / "FCM push client started" promoted to INFO; the no-token-after-register failure becomes WARNING with a re-extraction hint; Ajax server rejection of the push-token register also WARNING. (#122)
+
 ## [1.3.0-beta.3] - 2026-05-10
 
 Third beta of the `1.3.0` line. New device-type slice on top of `beta.2`. No Ajax wire-protocol changes.
