@@ -13,32 +13,46 @@
             "2fa": {
                 "title": "İki Faktörlü Doğrulama",
                 "description": "Doğrulama uygulamanızdaki 6 haneli kodu girin.",
-                "data": {"totp_code": "TOTP Kodu"}
+                "data": {
+                    "totp_code": "TOTP Kodu"
+                }
             },
             "select_spaces": {
                 "title": "Alan Seçimi",
                 "description": "Eklemek istediğiniz alanları (hub'ları) seçin.",
-                "data": {"spaces": "Alanlar"}
+                "data": {
+                    "spaces": "Alanlar"
+                }
             },
             "reconfigure": {
                 "title": "Aegis for Ajax — Yeniden yapılandır",
                 "description": "Hesap kimlik bilgilerinizi güncelleyin.",
-                "data": {"email": "E-posta", "password": "Şifre", "app_label": "Uygulama etiketi"}
+                "data": {
+                    "email": "E-posta",
+                    "password": "Şifre",
+                    "app_label": "Uygulama etiketi"
+                }
             },
             "reconfigure_2fa": {
                 "title": "İki Faktörlü Doğrulama",
                 "description": "Doğrulama uygulamanızdaki 6 haneli kodu girin.",
-                "data": {"totp_code": "TOTP Kodu"}
+                "data": {
+                    "totp_code": "TOTP Kodu"
+                }
             },
             "reauth_confirm": {
                 "title": "Aegis for Ajax yeniden kimlik doğrulaması",
                 "description": "{email} için Ajax oturumunuz artık geçerli değil. Erişimi geri yüklemek için hesabın mevcut parolasını girin.",
-                "data": {"password": "Parola"}
+                "data": {
+                    "password": "Parola"
+                }
             },
             "reauth_2fa": {
                 "title": "İki faktörlü kimlik doğrulama",
                 "description": "Kimlik doğrulama uygulamanızdan 6 haneli kodu girin.",
-                "data": {"totp_code": "TOTP Kodu"}
+                "data": {
+                    "totp_code": "TOTP Kodu"
+                }
             }
         },
         "error": {
@@ -150,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Fotoğraf çek"}},
+        "button": {
+            "capture_photo": {
+                "name": "Fotoğraf çek"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Güvenlik olayı",
@@ -166,6 +184,7 @@
                             "disarm": "Devre dışı",
                             "disarm_night": "Gece modu devre dışı",
                             "door_open": "Kapı açıldı",
+                            "doorbell_pressed": "Zile basıldı",
                             "fire": "Yangın",
                             "flood": "Su baskını",
                             "glass_break": "Cam kırılması",
@@ -179,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Güvenlik merkezi bağlantısı"},
-            "gsm": {"name": "Hücresel ağ bağlı"},
-            "lid": {"name": "Kapak açık"},
-            "ext_contact": {"name": "Harici kontak açık"},
-            "ext_alert": {"name": "Harici kontak alarmı"},
-            "drilling": {"name": "Gövde delme algılandı"},
-            "anti_mask": {"name": "Örtme koruması"},
-            "malfunction": {"name": "Arıza"},
-            "interference": {"name": "Parazit"},
-            "relay_stuck": {"name": "Röle takılı"},
-            "always_active": {"name": "Her zaman aktif"},
-            "glass_break": {"name": "Cam kırılması"},
-            "vibration": {"name": "Titreşim"},
-            "tilt": {"name": "Eğilme"},
-            "steam": {"name": "Buhar"},
-            "wire_input_alert": {"name": "Kablolu giriş uyarısı"},
-            "tamper": {"name": "Kasa kurcalama"},
-            "connectivity": {"name": "Bağlantı"},
-            "problem": {"name": "Cihaz sorunu"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Şebeke gücü"}
+            "monitoring": {
+                "name": "Güvenlik merkezi bağlantısı"
+            },
+            "gsm": {
+                "name": "Hücresel ağ bağlı"
+            },
+            "lid": {
+                "name": "Kapak açık"
+            },
+            "ext_contact": {
+                "name": "Harici kontak açık"
+            },
+            "ext_alert": {
+                "name": "Harici kontak alarmı"
+            },
+            "drilling": {
+                "name": "Gövde delme algılandı"
+            },
+            "anti_mask": {
+                "name": "Örtme koruması"
+            },
+            "malfunction": {
+                "name": "Arıza"
+            },
+            "interference": {
+                "name": "Parazit"
+            },
+            "relay_stuck": {
+                "name": "Röle takılı"
+            },
+            "always_active": {
+                "name": "Her zaman aktif"
+            },
+            "glass_break": {
+                "name": "Cam kırılması"
+            },
+            "vibration": {
+                "name": "Titreşim"
+            },
+            "tilt": {
+                "name": "Eğilme"
+            },
+            "steam": {
+                "name": "Buhar"
+            },
+            "wire_input_alert": {
+                "name": "Kablolu giriş uyarısı"
+            },
+            "tamper": {
+                "name": "Kasa kurcalama"
+            },
+            "connectivity": {
+                "name": "Bağlantı"
+            },
+            "problem": {
+                "name": "Cihaz sorunu"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Şebeke gücü"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "İzleme merkezi şirketi"},
-            "signal_strength": {"name": "Sinyal gücü"},
-            "mobile_network_type": {"name": "Mobil ağ türü"},
-            "wifi_signal_level": {"name": "Wi-Fi sinyal seviyesi"},
-            "sim_status": {"name": "SIM durumu"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Bağlantı türü"},
-            "wifi_ssid": {"name": "Wi-Fi SSID"},
-            "wifi_ip": {"name": "Wi-Fi IP adresi"},
-            "ethernet_ip": {"name": "Ethernet IP adresi"},
-            "ethernet_gateway": {"name": "Ethernet ağ geçidi"},
-            "ethernet_dns": {"name": "Ethernet DNS"},
-            "cellular_signal": {"name": "Hücresel sinyal"},
-            "cellular_network": {"name": "Hücresel ağ"}
+            "monitoring_company": {
+                "name": "İzleme merkezi şirketi"
+            },
+            "signal_strength": {
+                "name": "Sinyal gücü"
+            },
+            "mobile_network_type": {
+                "name": "Mobil ağ türü"
+            },
+            "wifi_signal_level": {
+                "name": "Wi-Fi sinyal seviyesi"
+            },
+            "sim_status": {
+                "name": "SIM durumu"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Bağlantı türü"
+            },
+            "wifi_ssid": {
+                "name": "Wi-Fi SSID"
+            },
+            "wifi_ip": {
+                "name": "Wi-Fi IP adresi"
+            },
+            "ethernet_ip": {
+                "name": "Ethernet IP adresi"
+            },
+            "ethernet_gateway": {
+                "name": "Ethernet ağ geçidi"
+            },
+            "ethernet_dns": {
+                "name": "Ethernet DNS"
+            },
+            "cellular_signal": {
+                "name": "Hücresel sinyal"
+            },
+            "cellular_network": {
+                "name": "Hücresel ağ"
+            }
         },
-        "switch": {"channel_1": {"name": "Kanal 1"}, "channel_2": {"name": "Kanal 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Kanal 1"
+            },
+            "channel_2": {
+                "name": "Kanal 2"
+            }
+        }
     }
 }

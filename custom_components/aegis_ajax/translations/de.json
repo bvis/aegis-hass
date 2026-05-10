@@ -13,32 +13,46 @@
             "2fa": {
                 "title": "Zwei-Faktor-Authentifizierung",
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein.",
-                "data": {"totp_code": "TOTP-Code"}
+                "data": {
+                    "totp_code": "TOTP-Code"
+                }
             },
             "select_spaces": {
                 "title": "Bereiche auswählen",
                 "description": "Wählen Sie aus, welche Bereiche (Hubs) hinzugefügt werden sollen.",
-                "data": {"spaces": "Bereiche"}
+                "data": {
+                    "spaces": "Bereiche"
+                }
             },
             "reconfigure": {
                 "title": "Aegis for Ajax neu konfigurieren",
                 "description": "Aktualisieren Sie Ihre Zugangsdaten.",
-                "data": {"email": "E-Mail", "password": "Passwort", "app_label": "App-Label"}
+                "data": {
+                    "email": "E-Mail",
+                    "password": "Passwort",
+                    "app_label": "App-Label"
+                }
             },
             "reconfigure_2fa": {
                 "title": "Zwei-Faktor-Authentifizierung",
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein.",
-                "data": {"totp_code": "TOTP-Code"}
+                "data": {
+                    "totp_code": "TOTP-Code"
+                }
             },
             "reauth_confirm": {
                 "title": "Aegis for Ajax neu authentifizieren",
                 "description": "Ihre Ajax-Sitzung für {email} ist nicht mehr gültig. Geben Sie das aktuelle Konto-Passwort ein, um den Zugriff wiederherzustellen.",
-                "data": {"password": "Passwort"}
+                "data": {
+                    "password": "Passwort"
+                }
             },
             "reauth_2fa": {
                 "title": "Zwei-Faktor-Authentifizierung",
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
-                "data": {"totp_code": "TOTP-Code"}
+                "data": {
+                    "totp_code": "TOTP-Code"
+                }
             }
         },
         "error": {
@@ -150,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Foto aufnehmen"}},
+        "button": {
+            "capture_photo": {
+                "name": "Foto aufnehmen"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Sicherheitsereignis",
@@ -166,6 +184,7 @@
                             "disarm": "Unscharfgeschaltet",
                             "disarm_night": "Nachtmodus deaktiviert",
                             "door_open": "Tür geöffnet",
+                            "doorbell_pressed": "Klingel gedrückt",
                             "fire": "Feuer",
                             "flood": "Überflutung",
                             "glass_break": "Glasbruch",
@@ -179,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Notruf-Leitstelle verbunden"},
-            "gsm": {"name": "Mobilfunk verbunden"},
-            "lid": {"name": "Gehäusedeckel geöffnet"},
-            "ext_contact": {"name": "Externer Kontakt unterbrochen"},
-            "ext_alert": {"name": "Externer Kontaktalarm"},
-            "drilling": {"name": "Gehäusebohrung erkannt"},
-            "anti_mask": {"name": "Abdeckungsschutz"},
-            "malfunction": {"name": "Fehlfunktion"},
-            "interference": {"name": "Störung"},
-            "relay_stuck": {"name": "Relais blockiert"},
-            "always_active": {"name": "Immer aktiv"},
-            "glass_break": {"name": "Glasbruch"},
-            "vibration": {"name": "Vibration"},
-            "tilt": {"name": "Neigung"},
-            "steam": {"name": "Dampf"},
-            "wire_input_alert": {"name": "Drahteingang ausgelöst"},
-            "tamper": {"name": "Gehäusemanipulation"},
-            "connectivity": {"name": "Konnektivität"},
-            "problem": {"name": "Geräteproblem"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "WLAN"},
-            "mains_power": {"name": "Netzstrom"}
+            "monitoring": {
+                "name": "Notruf-Leitstelle verbunden"
+            },
+            "gsm": {
+                "name": "Mobilfunk verbunden"
+            },
+            "lid": {
+                "name": "Gehäusedeckel geöffnet"
+            },
+            "ext_contact": {
+                "name": "Externer Kontakt unterbrochen"
+            },
+            "ext_alert": {
+                "name": "Externer Kontaktalarm"
+            },
+            "drilling": {
+                "name": "Gehäusebohrung erkannt"
+            },
+            "anti_mask": {
+                "name": "Abdeckungsschutz"
+            },
+            "malfunction": {
+                "name": "Fehlfunktion"
+            },
+            "interference": {
+                "name": "Störung"
+            },
+            "relay_stuck": {
+                "name": "Relais blockiert"
+            },
+            "always_active": {
+                "name": "Immer aktiv"
+            },
+            "glass_break": {
+                "name": "Glasbruch"
+            },
+            "vibration": {
+                "name": "Vibration"
+            },
+            "tilt": {
+                "name": "Neigung"
+            },
+            "steam": {
+                "name": "Dampf"
+            },
+            "wire_input_alert": {
+                "name": "Drahteingang ausgelöst"
+            },
+            "tamper": {
+                "name": "Gehäusemanipulation"
+            },
+            "connectivity": {
+                "name": "Konnektivität"
+            },
+            "problem": {
+                "name": "Geräteproblem"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "WLAN"
+            },
+            "mains_power": {
+                "name": "Netzstrom"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Leitstellenanbieter"},
-            "signal_strength": {"name": "Signalstärke"},
-            "mobile_network_type": {"name": "Mobilfunknetztyp"},
-            "wifi_signal_level": {"name": "WLAN-Signalstärke"},
-            "sim_status": {"name": "SIM-Status"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Verbindungstyp"},
-            "wifi_ssid": {"name": "WLAN-SSID"},
-            "wifi_ip": {"name": "WLAN-IP-Adresse"},
-            "ethernet_ip": {"name": "Ethernet IP-Adresse"},
-            "ethernet_gateway": {"name": "Ethernet-Gateway"},
-            "ethernet_dns": {"name": "Ethernet-DNS"},
-            "cellular_signal": {"name": "Mobilfunksignal"},
-            "cellular_network": {"name": "Mobilfunknetz"}
+            "monitoring_company": {
+                "name": "Leitstellenanbieter"
+            },
+            "signal_strength": {
+                "name": "Signalstärke"
+            },
+            "mobile_network_type": {
+                "name": "Mobilfunknetztyp"
+            },
+            "wifi_signal_level": {
+                "name": "WLAN-Signalstärke"
+            },
+            "sim_status": {
+                "name": "SIM-Status"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Verbindungstyp"
+            },
+            "wifi_ssid": {
+                "name": "WLAN-SSID"
+            },
+            "wifi_ip": {
+                "name": "WLAN-IP-Adresse"
+            },
+            "ethernet_ip": {
+                "name": "Ethernet IP-Adresse"
+            },
+            "ethernet_gateway": {
+                "name": "Ethernet-Gateway"
+            },
+            "ethernet_dns": {
+                "name": "Ethernet-DNS"
+            },
+            "cellular_signal": {
+                "name": "Mobilfunksignal"
+            },
+            "cellular_network": {
+                "name": "Mobilfunknetz"
+            }
         },
-        "switch": {"channel_1": {"name": "Kanal 1"}, "channel_2": {"name": "Kanal 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Kanal 1"
+            },
+            "channel_2": {
+                "name": "Kanal 2"
+            }
+        }
     }
 }

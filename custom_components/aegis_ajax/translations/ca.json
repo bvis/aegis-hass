@@ -13,12 +13,16 @@
             "2fa": {
                 "title": "Autenticacio de dos factors",
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
-                "data": {"totp_code": "Codi TOTP"}
+                "data": {
+                    "totp_code": "Codi TOTP"
+                }
             },
             "select_spaces": {
                 "title": "Seleccionar espais",
                 "description": "Tria quins espais (hubs) afegir.",
-                "data": {"spaces": "Espais"}
+                "data": {
+                    "spaces": "Espais"
+                }
             },
             "reconfigure": {
                 "title": "Reconfigurar Aegis for Ajax",
@@ -32,17 +36,23 @@
             "reconfigure_2fa": {
                 "title": "Autenticacio de dos factors",
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
-                "data": {"totp_code": "Codi TOTP"}
+                "data": {
+                    "totp_code": "Codi TOTP"
+                }
             },
             "reauth_confirm": {
                 "title": "Reautenticar Aegis for Ajax",
                 "description": "La sessio Ajax per a {email} ja no es valida. Introdueix la contrasenya actual del compte per restaurar l'acces.",
-                "data": {"password": "Contrasenya"}
+                "data": {
+                    "password": "Contrasenya"
+                }
             },
             "reauth_2fa": {
                 "title": "Autenticacio de dos factors",
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
-                "data": {"totp_code": "Codi TOTP"}
+                "data": {
+                    "totp_code": "Codi TOTP"
+                }
             }
         },
         "error": {
@@ -154,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Capturar foto"}},
+        "button": {
+            "capture_photo": {
+                "name": "Capturar foto"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Esdeveniment de seguretat",
@@ -170,6 +184,7 @@
                             "disarm": "Desarmat",
                             "disarm_night": "Desarmat nocturn",
                             "door_open": "Porta oberta",
+                            "doorbell_pressed": "Timbre premut",
                             "fire": "Foc",
                             "flood": "Inundacio",
                             "glass_break": "Trencament de vidre",
@@ -183,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Connexio CRA"},
-            "gsm": {"name": "Mobil connectat"},
-            "lid": {"name": "Tapa oberta"},
-            "ext_contact": {"name": "Contacte extern trencat"},
-            "ext_alert": {"name": "Alerta contacte extern"},
-            "drilling": {"name": "Perforacio de caixa"},
-            "anti_mask": {"name": "Anti-enmascarament"},
-            "malfunction": {"name": "Avaria"},
-            "interference": {"name": "Interferencia"},
-            "relay_stuck": {"name": "Rele bloquejat"},
-            "always_active": {"name": "Sempre actiu"},
-            "glass_break": {"name": "Trencament de vidre"},
-            "vibration": {"name": "Vibració"},
-            "tilt": {"name": "Inclinació"},
-            "steam": {"name": "Vapor"},
-            "wire_input_alert": {"name": "Alerta d'entrada cablejada"},
-            "tamper": {"name": "Manipulació de carcassa"},
-            "connectivity": {"name": "Connectivitat"},
-            "problem": {"name": "Problema del dispositiu"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Alimentació externa"}
+            "monitoring": {
+                "name": "Connexio CRA"
+            },
+            "gsm": {
+                "name": "Mobil connectat"
+            },
+            "lid": {
+                "name": "Tapa oberta"
+            },
+            "ext_contact": {
+                "name": "Contacte extern trencat"
+            },
+            "ext_alert": {
+                "name": "Alerta contacte extern"
+            },
+            "drilling": {
+                "name": "Perforacio de caixa"
+            },
+            "anti_mask": {
+                "name": "Anti-enmascarament"
+            },
+            "malfunction": {
+                "name": "Avaria"
+            },
+            "interference": {
+                "name": "Interferencia"
+            },
+            "relay_stuck": {
+                "name": "Rele bloquejat"
+            },
+            "always_active": {
+                "name": "Sempre actiu"
+            },
+            "glass_break": {
+                "name": "Trencament de vidre"
+            },
+            "vibration": {
+                "name": "Vibració"
+            },
+            "tilt": {
+                "name": "Inclinació"
+            },
+            "steam": {
+                "name": "Vapor"
+            },
+            "wire_input_alert": {
+                "name": "Alerta d'entrada cablejada"
+            },
+            "tamper": {
+                "name": "Manipulació de carcassa"
+            },
+            "connectivity": {
+                "name": "Connectivitat"
+            },
+            "problem": {
+                "name": "Problema del dispositiu"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Alimentació externa"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Companyia CRA"},
-            "signal_strength": {"name": "Intensitat de senyal"},
-            "mobile_network_type": {"name": "Tipus de xarxa mòbil"},
-            "wifi_signal_level": {"name": "Nivell de senyal Wi-Fi"},
-            "sim_status": {"name": "Estat SIM"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Tipus de connexió"},
-            "wifi_ssid": {"name": "SSID Wi-Fi"},
-            "wifi_ip": {"name": "Adreça IP Wi-Fi"},
-            "ethernet_ip": {"name": "Adreça IP Ethernet"},
-            "ethernet_gateway": {"name": "Porta d'enllaç Ethernet"},
-            "ethernet_dns": {"name": "DNS Ethernet"},
-            "cellular_signal": {"name": "Senyal cel·lular"},
-            "cellular_network": {"name": "Xarxa cel·lular"}
+            "monitoring_company": {
+                "name": "Companyia CRA"
+            },
+            "signal_strength": {
+                "name": "Intensitat de senyal"
+            },
+            "mobile_network_type": {
+                "name": "Tipus de xarxa mòbil"
+            },
+            "wifi_signal_level": {
+                "name": "Nivell de senyal Wi-Fi"
+            },
+            "sim_status": {
+                "name": "Estat SIM"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Tipus de connexió"
+            },
+            "wifi_ssid": {
+                "name": "SSID Wi-Fi"
+            },
+            "wifi_ip": {
+                "name": "Adreça IP Wi-Fi"
+            },
+            "ethernet_ip": {
+                "name": "Adreça IP Ethernet"
+            },
+            "ethernet_gateway": {
+                "name": "Porta d'enllaç Ethernet"
+            },
+            "ethernet_dns": {
+                "name": "DNS Ethernet"
+            },
+            "cellular_signal": {
+                "name": "Senyal cel·lular"
+            },
+            "cellular_network": {
+                "name": "Xarxa cel·lular"
+            }
         },
-        "switch": {"channel_1": {"name": "Canal 1"}, "channel_2": {"name": "Canal 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Canal 1"
+            },
+            "channel_2": {
+                "name": "Canal 2"
+            }
+        }
     }
 }

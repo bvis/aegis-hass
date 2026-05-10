@@ -13,12 +13,16 @@
             "2fa": {
                 "title": "Autentificare în doi pași",
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
-                "data": {"totp_code": "Cod TOTP"}
+                "data": {
+                    "totp_code": "Cod TOTP"
+                }
             },
             "select_spaces": {
                 "title": "Selectați spațiile",
                 "description": "Alegeți ce spații (hub-uri) să adăugați.",
-                "data": {"spaces": "Spații"}
+                "data": {
+                    "spaces": "Spații"
+                }
             },
             "reconfigure": {
                 "title": "Reconfigurare Aegis for Ajax",
@@ -32,17 +36,23 @@
             "reconfigure_2fa": {
                 "title": "Autentificare în doi pași",
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
-                "data": {"totp_code": "Cod TOTP"}
+                "data": {
+                    "totp_code": "Cod TOTP"
+                }
             },
             "reauth_confirm": {
                 "title": "Reautentificare Aegis for Ajax",
                 "description": "Sesiunea Ajax pentru {email} nu mai este validă. Introduceți parola curentă a contului pentru a restabili accesul.",
-                "data": {"password": "Parolă"}
+                "data": {
+                    "password": "Parolă"
+                }
             },
             "reauth_2fa": {
                 "title": "Autentificare cu doi factori",
                 "description": "Introduceți codul din 6 cifre din aplicația de autentificare.",
-                "data": {"totp_code": "Cod TOTP"}
+                "data": {
+                    "totp_code": "Cod TOTP"
+                }
             }
         },
         "error": {
@@ -154,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Capturați fotografie"}},
+        "button": {
+            "capture_photo": {
+                "name": "Capturați fotografie"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Eveniment de securitate",
@@ -170,6 +184,7 @@
                             "disarm": "Dezarmat",
                             "disarm_night": "Mod noapte dezactivat",
                             "door_open": "Usa deschisa",
+                            "doorbell_pressed": "Sonerie apăsată",
                             "fire": "Incendiu",
                             "flood": "Inundatie",
                             "glass_break": "Spargere geam",
@@ -183,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Conexiune dispecerat"},
-            "gsm": {"name": "Rețea celulară conectată"},
-            "lid": {"name": "Capac deschis"},
-            "ext_contact": {"name": "Contact extern deschis"},
-            "ext_alert": {"name": "Alertă contact extern"},
-            "drilling": {"name": "Găurire carcasă detectată"},
-            "anti_mask": {"name": "Anti-mascare"},
-            "malfunction": {"name": "Defecțiune"},
-            "interference": {"name": "Interferență"},
-            "relay_stuck": {"name": "Releu blocat"},
-            "always_active": {"name": "Întotdeauna activ"},
-            "glass_break": {"name": "Spargere geam"},
-            "vibration": {"name": "Vibrație"},
-            "tilt": {"name": "Înclinare"},
-            "steam": {"name": "Abur"},
-            "wire_input_alert": {"name": "Alertă intrare cablată"},
-            "tamper": {"name": "Sabotaj carcasă"},
-            "connectivity": {"name": "Conectivitate"},
-            "problem": {"name": "Problemă dispozitiv"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Alimentare rețea"}
+            "monitoring": {
+                "name": "Conexiune dispecerat"
+            },
+            "gsm": {
+                "name": "Rețea celulară conectată"
+            },
+            "lid": {
+                "name": "Capac deschis"
+            },
+            "ext_contact": {
+                "name": "Contact extern deschis"
+            },
+            "ext_alert": {
+                "name": "Alertă contact extern"
+            },
+            "drilling": {
+                "name": "Găurire carcasă detectată"
+            },
+            "anti_mask": {
+                "name": "Anti-mascare"
+            },
+            "malfunction": {
+                "name": "Defecțiune"
+            },
+            "interference": {
+                "name": "Interferență"
+            },
+            "relay_stuck": {
+                "name": "Releu blocat"
+            },
+            "always_active": {
+                "name": "Întotdeauna activ"
+            },
+            "glass_break": {
+                "name": "Spargere geam"
+            },
+            "vibration": {
+                "name": "Vibrație"
+            },
+            "tilt": {
+                "name": "Înclinare"
+            },
+            "steam": {
+                "name": "Abur"
+            },
+            "wire_input_alert": {
+                "name": "Alertă intrare cablată"
+            },
+            "tamper": {
+                "name": "Sabotaj carcasă"
+            },
+            "connectivity": {
+                "name": "Conectivitate"
+            },
+            "problem": {
+                "name": "Problemă dispozitiv"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Alimentare rețea"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Companie de monitorizare"},
-            "signal_strength": {"name": "Puterea semnalului"},
-            "mobile_network_type": {"name": "Tip rețea mobilă"},
-            "wifi_signal_level": {"name": "Nivel semnal Wi-Fi"},
-            "sim_status": {"name": "Status SIM"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Tip conexiune"},
-            "wifi_ssid": {"name": "SSID Wi-Fi"},
-            "wifi_ip": {"name": "Adresă IP Wi-Fi"},
-            "ethernet_ip": {"name": "Adresă IP Ethernet"},
-            "ethernet_gateway": {"name": "Gateway Ethernet"},
-            "ethernet_dns": {"name": "DNS Ethernet"},
-            "cellular_signal": {"name": "Semnal celular"},
-            "cellular_network": {"name": "Rețea celulară"}
+            "monitoring_company": {
+                "name": "Companie de monitorizare"
+            },
+            "signal_strength": {
+                "name": "Puterea semnalului"
+            },
+            "mobile_network_type": {
+                "name": "Tip rețea mobilă"
+            },
+            "wifi_signal_level": {
+                "name": "Nivel semnal Wi-Fi"
+            },
+            "sim_status": {
+                "name": "Status SIM"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Tip conexiune"
+            },
+            "wifi_ssid": {
+                "name": "SSID Wi-Fi"
+            },
+            "wifi_ip": {
+                "name": "Adresă IP Wi-Fi"
+            },
+            "ethernet_ip": {
+                "name": "Adresă IP Ethernet"
+            },
+            "ethernet_gateway": {
+                "name": "Gateway Ethernet"
+            },
+            "ethernet_dns": {
+                "name": "DNS Ethernet"
+            },
+            "cellular_signal": {
+                "name": "Semnal celular"
+            },
+            "cellular_network": {
+                "name": "Rețea celulară"
+            }
         },
-        "switch": {"channel_1": {"name": "Canal 1"}, "channel_2": {"name": "Canal 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Canal 1"
+            },
+            "channel_2": {
+                "name": "Canal 2"
+            }
+        }
     }
 }

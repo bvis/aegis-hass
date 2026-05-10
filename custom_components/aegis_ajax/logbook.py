@@ -25,6 +25,7 @@ _EVENT_DESCRIPTIONS: dict[str, str] = {
     "connection_lost": "Connection lost ({device_name})",
     "disarm": "Disarmed (via {device_name})",
     "disarm_night": "Night mode disarmed (via {device_name})",
+    "doorbell_pressed": "Doorbell pressed ({device_name})",
     "door_open": "Door opened (via {device_name})",
     "fire": "Fire detected ({device_name})",
     "flood": "Flood detected ({device_name})",

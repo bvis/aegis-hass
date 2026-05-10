@@ -150,6 +150,13 @@ _DEVICE_TYPE_SENSORS: dict[str, list[str]] = {
     "motion_cam_s_phod": ["motion_detected", "tamper"],
     "motion_cam_s_phod_am": ["motion_detected", "tamper"],
     "motion_cam_superior_phod": ["motion_detected", "tamper"],
+    # MotionCam Video family — streaming cameras (Video Doorbell, Indoor,
+    # Base). Same on-device sensors as PhOD MotionCams; the video stream
+    # itself is a separate concern (#119, see RingButtonPressed in
+    # `VIDEO_EVENT_TAG_MAP` for the doorbell ring path).
+    "motion_cam_video_base": ["motion_detected", "tamper"],
+    "motion_cam_video_doorbell": ["motion_detected", "tamper"],
+    "motion_cam_video_indoor": ["motion_detected", "tamper"],
     "combi_protect": ["motion_detected", "glass_break", "tamper"],
     "combi_protect_s": ["motion_detected", "glass_break", "tamper"],
     "combi_protect_fibra": ["motion_detected", "glass_break", "tamper"],

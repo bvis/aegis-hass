@@ -556,6 +556,99 @@ class TestExtractEventCompiledProtos:
         assert event_type == "alarm"
         assert data["raw_tag"] == "intrusion_alarm"
 
+    def test_hub_ring_button_pressed_resolves_to_doorbell_pressed(self) -> None:
+        # Wireless DoorBell (Jeweller standalone ring button paired with the
+        # hub) fires `ring_button_pressed` inside HubEventTag. Same FCM path
+        # as every other hub-level event we already parse (#119).
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
+            transition_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.hub import (  # noqa: E501
+            qualifier_pb2 as hub_qualifier_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.hub import (
+            tag_pb2 as hub_tag_pb2,
+        )
+
+        qualifier = hub_qualifier_pb2.HubEventQualifier(
+            tag=hub_tag_pb2.HubEventTag(ring_button_pressed=hub_tag_pb2.RingButtonPressed()),
+            transition=transition_pb2.EventTransition(
+                impulse=transition_pb2.EventTransition.Impulse()
+            ),
+        )
+        wrapped = self._wrap(qualifier.SerializeToString())
+
+        listener = self._make_listener()
+        result = listener._extract_event_with_compiled_protos(wrapped)
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "doorbell_pressed"
+        assert data["raw_tag"] == "ring_button_pressed"
+
+    def test_video_ring_button_pressed_resolves_to_doorbell_pressed(self) -> None:
+        # MotionCam Video Doorbell (camera-with-ring-button) fires the same
+        # event tag but inside a VideoEventQualifier — different oneof,
+        # different qualifier wrapper. Pass 4 in `_extract_event_with_
+        # compiled_protos` walks VideoEventQualifier specifically (#119).
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
+            transition_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (  # noqa: E501
+            qualifier_pb2 as video_qualifier_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (
+            tag_pb2 as video_tag_pb2,
+        )
+
+        qualifier = video_qualifier_pb2.VideoEventQualifier(
+            tag=video_tag_pb2.VideoEventTag(ring_button_pressed=video_tag_pb2.RingButtonPressed()),
+            transition=transition_pb2.EventTransition(
+                impulse=transition_pb2.EventTransition.Impulse()
+            ),
+        )
+        wrapped = self._wrap(qualifier.SerializeToString())
+
+        listener = self._make_listener()
+        result = listener._extract_event_with_compiled_protos(wrapped)
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "doorbell_pressed"
+        assert data["raw_tag"] == "ring_button_pressed"
+
+    def test_video_qualifier_motion_detected_does_not_false_positive(self) -> None:
+        # The Video Doorbell also emits non-doorbell events (motion_detected,
+        # human_detected, etc.). Those are not currently mapped so the parser
+        # must return None for them — not silently mis-fire `doorbell_pressed`.
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
+            transition_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (  # noqa: E501
+            qualifier_pb2 as video_qualifier_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (
+            tag_pb2 as video_tag_pb2,
+        )
+
+        qualifier = video_qualifier_pb2.VideoEventQualifier(
+            tag=video_tag_pb2.VideoEventTag(motion_detected=video_tag_pb2.MotionDetected()),
+            transition=transition_pb2.EventTransition(
+                triggered=transition_pb2.EventTransition.Triggered()
+            ),
+        )
+        wrapped = self._wrap(qualifier.SerializeToString())
+
+        listener = self._make_listener()
+        result = listener._extract_event_with_compiled_protos(wrapped)
+
+        # `motion_detected` from a video qualifier maps cleanly to "motion"
+        # — same downstream HA event_type the existing motion sensors emit,
+        # no need for a doorbell-only mapping.
+        assert result is not None
+        event_type, _ = result
+        assert event_type == "motion"
+
 
 class TestNotificationDedupe:
     """Issue #80: Ajax dispatches two FCM messages per security transition with

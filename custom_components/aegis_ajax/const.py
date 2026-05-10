@@ -246,6 +246,10 @@ HUB_EVENT_TAG_MAP: dict[str, str] = {
     "motion_detected": "motion",
     # Door
     "door_opened": "door_open",
+    # Doorbell — Wireless DoorBell SKU (#119). The MotionCam Video
+    # Doorbell fires its own ring through `VideoEventQualifier` instead;
+    # see `VIDEO_EVENT_TAG_MAP` below.
+    "ring_button_pressed": "doorbell_pressed",
 }
 
 # Map SpaceEventTag oneof field names to simplified HA event types. Used in
@@ -270,7 +274,25 @@ SPACE_EVENT_TAG_MAP: dict[str, str] = {
     "space_panic_button_pressed": "panic",
 }
 
+# Map VideoEventTag oneof field names to simplified HA event types. The
+# MotionCam Video Doorbell (and any other Ajax video device) fires its
+# events through `VideoEventQualifier` — distinct from the hub-level
+# `HubEventQualifier` we already parse. Pass 4 of
+# `_extract_event_with_compiled_protos` walks this. Only the events that
+# have a HA-meaningful destination are mapped; the long tail of
+# storage/temporary-access/firmware-update tags from `VideoEventTag` is
+# intentionally left unmapped (we'd just be inflating `ALL_EVENT_TYPES`
+# for events nobody automates on). Add more entries here when a real
+# automation use case shows up.
+VIDEO_EVENT_TAG_MAP: dict[str, str] = {
+    "ring_button_pressed": "doorbell_pressed",
+    "motion_detected": "motion",
+    "human_detected": "motion",
+}
+
 
 ALL_EVENT_TYPES: list[str] = sorted(
-    set(HUB_EVENT_TAG_MAP.values()) | set(SPACE_EVENT_TAG_MAP.values())
+    set(HUB_EVENT_TAG_MAP.values())
+    | set(SPACE_EVENT_TAG_MAP.values())
+    | set(VIDEO_EVENT_TAG_MAP.values())
 )

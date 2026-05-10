@@ -13,32 +13,46 @@
             "2fa": {
                 "title": "Dvoufaktorové ověření",
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
-                "data": {"totp_code": "Kód TOTP"}
+                "data": {
+                    "totp_code": "Kód TOTP"
+                }
             },
             "select_spaces": {
                 "title": "Vyberte prostory",
                 "description": "Zvolte, které prostory (huby) chcete přidat.",
-                "data": {"spaces": "Prostory"}
+                "data": {
+                    "spaces": "Prostory"
+                }
             },
             "reconfigure": {
                 "title": "Překonfigurovat Aegis for Ajax",
                 "description": "Aktualizujte přihlašovací údaje.",
-                "data": {"email": "E-mail", "password": "Heslo", "app_label": "Štítek aplikace"}
+                "data": {
+                    "email": "E-mail",
+                    "password": "Heslo",
+                    "app_label": "Štítek aplikace"
+                }
             },
             "reconfigure_2fa": {
                 "title": "Dvoufaktorové ověření",
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
-                "data": {"totp_code": "Kód TOTP"}
+                "data": {
+                    "totp_code": "Kód TOTP"
+                }
             },
             "reauth_confirm": {
                 "title": "Opětovné ověření Aegis for Ajax",
                 "description": "Vaše Ajax relace pro {email} již není platná. Zadejte aktuální heslo k účtu pro obnovení přístupu.",
-                "data": {"password": "Heslo"}
+                "data": {
+                    "password": "Heslo"
+                }
             },
             "reauth_2fa": {
                 "title": "Dvoufaktorové ověření",
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
-                "data": {"totp_code": "Kód TOTP"}
+                "data": {
+                    "totp_code": "Kód TOTP"
+                }
             }
         },
         "error": {
@@ -150,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Pořídit fotografii"}},
+        "button": {
+            "capture_photo": {
+                "name": "Pořídit fotografii"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Bezpečnostní událost",
@@ -166,6 +184,7 @@
                             "disarm": "Odstřeženo",
                             "disarm_night": "Noční režim vypnut",
                             "door_open": "Dveře otevřeny",
+                            "doorbell_pressed": "Stisknutí zvonku",
                             "fire": "Požár",
                             "flood": "Záplava",
                             "glass_break": "Rozbití skla",
@@ -179,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Připojení k pultu centrální ochrany"},
-            "gsm": {"name": "Mobilní síť připojena"},
-            "lid": {"name": "Kryt otevřen"},
-            "ext_contact": {"name": "Externí kontakt přerušen"},
-            "ext_alert": {"name": "Poplach externího kontaktu"},
-            "drilling": {"name": "Vrtání skříně detekováno"},
-            "anti_mask": {"name": "Ochrana proti maskování"},
-            "malfunction": {"name": "Porucha"},
-            "interference": {"name": "Rušení"},
-            "relay_stuck": {"name": "Relé zaseknuté"},
-            "always_active": {"name": "Vždy aktivní"},
-            "glass_break": {"name": "Rozbití skla"},
-            "vibration": {"name": "Vibrace"},
-            "tilt": {"name": "Náklon"},
-            "steam": {"name": "Pára"},
-            "wire_input_alert": {"name": "Výstraha drátového vstupu"},
-            "tamper": {"name": "Sabotáž krytu"},
-            "connectivity": {"name": "Připojení"},
-            "problem": {"name": "Problém zařízení"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Napájení ze sítě"}
+            "monitoring": {
+                "name": "Připojení k pultu centrální ochrany"
+            },
+            "gsm": {
+                "name": "Mobilní síť připojena"
+            },
+            "lid": {
+                "name": "Kryt otevřen"
+            },
+            "ext_contact": {
+                "name": "Externí kontakt přerušen"
+            },
+            "ext_alert": {
+                "name": "Poplach externího kontaktu"
+            },
+            "drilling": {
+                "name": "Vrtání skříně detekováno"
+            },
+            "anti_mask": {
+                "name": "Ochrana proti maskování"
+            },
+            "malfunction": {
+                "name": "Porucha"
+            },
+            "interference": {
+                "name": "Rušení"
+            },
+            "relay_stuck": {
+                "name": "Relé zaseknuté"
+            },
+            "always_active": {
+                "name": "Vždy aktivní"
+            },
+            "glass_break": {
+                "name": "Rozbití skla"
+            },
+            "vibration": {
+                "name": "Vibrace"
+            },
+            "tilt": {
+                "name": "Náklon"
+            },
+            "steam": {
+                "name": "Pára"
+            },
+            "wire_input_alert": {
+                "name": "Výstraha drátového vstupu"
+            },
+            "tamper": {
+                "name": "Sabotáž krytu"
+            },
+            "connectivity": {
+                "name": "Připojení"
+            },
+            "problem": {
+                "name": "Problém zařízení"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Napájení ze sítě"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Společnost PCO"},
-            "signal_strength": {"name": "Síla signálu"},
-            "mobile_network_type": {"name": "Typ mobilní sítě"},
-            "wifi_signal_level": {"name": "Úroveň Wi-Fi signálu"},
-            "sim_status": {"name": "Stav SIM karty"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Typ připojení"},
-            "wifi_ssid": {"name": "Wi-Fi SSID"},
-            "wifi_ip": {"name": "Wi-Fi IP adresa"},
-            "ethernet_ip": {"name": "IP adresa Ethernet"},
-            "ethernet_gateway": {"name": "Brána Ethernet"},
-            "ethernet_dns": {"name": "DNS Ethernet"},
-            "cellular_signal": {"name": "Signál mobilní sítě"},
-            "cellular_network": {"name": "Mobilní síť"}
+            "monitoring_company": {
+                "name": "Společnost PCO"
+            },
+            "signal_strength": {
+                "name": "Síla signálu"
+            },
+            "mobile_network_type": {
+                "name": "Typ mobilní sítě"
+            },
+            "wifi_signal_level": {
+                "name": "Úroveň Wi-Fi signálu"
+            },
+            "sim_status": {
+                "name": "Stav SIM karty"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Typ připojení"
+            },
+            "wifi_ssid": {
+                "name": "Wi-Fi SSID"
+            },
+            "wifi_ip": {
+                "name": "Wi-Fi IP adresa"
+            },
+            "ethernet_ip": {
+                "name": "IP adresa Ethernet"
+            },
+            "ethernet_gateway": {
+                "name": "Brána Ethernet"
+            },
+            "ethernet_dns": {
+                "name": "DNS Ethernet"
+            },
+            "cellular_signal": {
+                "name": "Signál mobilní sítě"
+            },
+            "cellular_network": {
+                "name": "Mobilní síť"
+            }
         },
-        "switch": {"channel_1": {"name": "Kanál 1"}, "channel_2": {"name": "Kanál 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Kanál 1"
+            },
+            "channel_2": {
+                "name": "Kanál 2"
+            }
+        }
     }
 }

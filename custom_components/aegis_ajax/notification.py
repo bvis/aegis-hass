@@ -17,6 +17,7 @@ from custom_components.aegis_ajax.const import (
     HUB_EVENT_TAG_MAP,
     RAW_TAG_TO_SECURITY_STATE,
     SPACE_EVENT_TAG_MAP,
+    VIDEO_EVENT_TAG_MAP,
 )
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
@@ -432,6 +433,9 @@ class AjaxNotificationListener:
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.space import (  # noqa: PLC0415, E501
             qualifier_pb2 as space_qualifier_pb2,
         )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (  # noqa: PLC0415, E501
+            qualifier_pb2 as video_qualifier_pb2,
+        )
 
         candidates = self._find_embedded_messages(raw)
 
@@ -472,6 +476,27 @@ class AjaxNotificationListener:
                         return event_type, data
             except Exception:
                 continue
+
+        # Pass 3 — VideoEventQualifier (#119: MotionCam Video Doorbell ring,
+        # plus motion / human detected from video devices). The video tag
+        # set is disjoint from HubEventTag so its own qualifier is needed.
+        for candidate in candidates:
+            try:
+                video_q = video_qualifier_pb2.VideoEventQualifier()
+                video_q.ParseFromString(candidate)
+            except Exception:
+                continue
+            if not video_q.HasField("tag"):
+                continue
+            tag_field = video_q.tag.WhichOneof("event_tag_case")
+            if tag_field and tag_field in VIDEO_EVENT_TAG_MAP:
+                event_type = VIDEO_EVENT_TAG_MAP[tag_field]
+                data = {"raw_tag": tag_field}
+                if video_q.HasField("transition"):
+                    trans_field = video_q.transition.WhichOneof("transition")
+                    if trans_field:
+                        data["transition"] = trans_field
+                return event_type, data
         return None
 
     @staticmethod

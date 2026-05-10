@@ -13,12 +13,16 @@
             "2fa": {
                 "title": "Two-Factor Authentication",
                 "description": "Enter the 6-digit code from your authenticator app.",
-                "data": {"totp_code": "TOTP Code"}
+                "data": {
+                    "totp_code": "TOTP Code"
+                }
             },
             "select_spaces": {
                 "title": "Select Spaces",
                 "description": "Choose which spaces (hubs) to add.",
-                "data": {"spaces": "Spaces"}
+                "data": {
+                    "spaces": "Spaces"
+                }
             },
             "reconfigure": {
                 "title": "Reconfigure Aegis for Ajax",
@@ -32,17 +36,23 @@
             "reconfigure_2fa": {
                 "title": "Two-Factor Authentication",
                 "description": "Enter the 6-digit code from your authenticator app.",
-                "data": {"totp_code": "TOTP Code"}
+                "data": {
+                    "totp_code": "TOTP Code"
+                }
             },
             "reauth_confirm": {
                 "title": "Re-authenticate Aegis for Ajax",
                 "description": "Your Ajax session for {email} is no longer valid. Enter the current account password to restore access.",
-                "data": {"password": "Password"}
+                "data": {
+                    "password": "Password"
+                }
             },
             "reauth_2fa": {
                 "title": "Two-Factor Authentication",
                 "description": "Enter the 6-digit code from your authenticator app.",
-                "data": {"totp_code": "TOTP Code"}
+                "data": {
+                    "totp_code": "TOTP Code"
+                }
             }
         },
         "error": {
@@ -170,7 +180,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Capture photo"}},
+        "button": {
+            "capture_photo": {
+                "name": "Capture photo"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Security event",
@@ -186,6 +200,7 @@
                             "disarm": "Disarmed",
                             "disarm_night": "Disarmed night",
                             "door_open": "Door opened",
+                            "doorbell_pressed": "Doorbell pressed",
                             "fire": "Fire",
                             "flood": "Flood",
                             "glass_break": "Glass break",
@@ -199,43 +214,118 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "CRA connection"},
-            "gsm": {"name": "Cellular connected"},
-            "lid": {"name": "Lid opened"},
-            "ext_contact": {"name": "External contact broken"},
-            "ext_alert": {"name": "External contact alert"},
-            "drilling": {"name": "Case drilling"},
-            "anti_mask": {"name": "Anti-masking"},
-            "malfunction": {"name": "Malfunction"},
-            "interference": {"name": "Interference"},
-            "relay_stuck": {"name": "Relay stuck"},
-            "always_active": {"name": "Always active"},
-            "glass_break": {"name": "Glass break"},
-            "vibration": {"name": "Vibration"},
-            "wire_input_alert": {"name": "Wire input alert"},
-            "tamper": {"name": "Case tamper"},
-            "connectivity": {"name": "Connectivity"},
-            "problem": {"name": "Device problem"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Mains power"}
+            "monitoring": {
+                "name": "CRA connection"
+            },
+            "gsm": {
+                "name": "Cellular connected"
+            },
+            "lid": {
+                "name": "Lid opened"
+            },
+            "ext_contact": {
+                "name": "External contact broken"
+            },
+            "ext_alert": {
+                "name": "External contact alert"
+            },
+            "drilling": {
+                "name": "Case drilling"
+            },
+            "anti_mask": {
+                "name": "Anti-masking"
+            },
+            "malfunction": {
+                "name": "Malfunction"
+            },
+            "interference": {
+                "name": "Interference"
+            },
+            "relay_stuck": {
+                "name": "Relay stuck"
+            },
+            "always_active": {
+                "name": "Always active"
+            },
+            "glass_break": {
+                "name": "Glass break"
+            },
+            "vibration": {
+                "name": "Vibration"
+            },
+            "wire_input_alert": {
+                "name": "Wire input alert"
+            },
+            "tamper": {
+                "name": "Case tamper"
+            },
+            "connectivity": {
+                "name": "Connectivity"
+            },
+            "problem": {
+                "name": "Device problem"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Mains power"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "CRA company"},
-            "signal_strength": {"name": "Signal strength"},
-            "mobile_network_type": {"name": "Mobile network type"},
-            "wifi_signal_level": {"name": "Wi-Fi signal level"},
-            "sim_status": {"name": "SIM status"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Connection type"},
-            "wifi_ssid": {"name": "Wi-Fi SSID"},
-            "wifi_ip": {"name": "Wi-Fi IP address"},
-            "ethernet_ip": {"name": "Ethernet IP address"},
-            "ethernet_gateway": {"name": "Ethernet gateway"},
-            "ethernet_dns": {"name": "Ethernet DNS"},
-            "cellular_signal": {"name": "Cellular signal"},
-            "cellular_network": {"name": "Cellular network"}
+            "monitoring_company": {
+                "name": "CRA company"
+            },
+            "signal_strength": {
+                "name": "Signal strength"
+            },
+            "mobile_network_type": {
+                "name": "Mobile network type"
+            },
+            "wifi_signal_level": {
+                "name": "Wi-Fi signal level"
+            },
+            "sim_status": {
+                "name": "SIM status"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Connection type"
+            },
+            "wifi_ssid": {
+                "name": "Wi-Fi SSID"
+            },
+            "wifi_ip": {
+                "name": "Wi-Fi IP address"
+            },
+            "ethernet_ip": {
+                "name": "Ethernet IP address"
+            },
+            "ethernet_gateway": {
+                "name": "Ethernet gateway"
+            },
+            "ethernet_dns": {
+                "name": "Ethernet DNS"
+            },
+            "cellular_signal": {
+                "name": "Cellular signal"
+            },
+            "cellular_network": {
+                "name": "Cellular network"
+            }
         },
-        "switch": {"channel_1": {"name": "Channel 1"}, "channel_2": {"name": "Channel 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Channel 1"
+            },
+            "channel_2": {
+                "name": "Channel 2"
+            }
+        }
     }
 }

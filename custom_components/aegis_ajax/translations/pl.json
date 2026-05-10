@@ -13,32 +13,46 @@
             "2fa": {
                 "title": "Uwierzytelnianie dwuskładnikowe",
                 "description": "Wprowadź 6-cyfrowy kod z aplikacji uwierzytelniającej.",
-                "data": {"totp_code": "Kod TOTP"}
+                "data": {
+                    "totp_code": "Kod TOTP"
+                }
             },
             "select_spaces": {
                 "title": "Wybierz przestrzenie",
                 "description": "Wybierz przestrzenie (huby) do dodania.",
-                "data": {"spaces": "Przestrzenie"}
+                "data": {
+                    "spaces": "Przestrzenie"
+                }
             },
             "reconfigure": {
                 "title": "Rekonfiguracja Aegis for Ajax",
                 "description": "Zaktualizuj dane logowania.",
-                "data": {"email": "E-mail", "password": "Hasło", "app_label": "Etykieta aplikacji"}
+                "data": {
+                    "email": "E-mail",
+                    "password": "Hasło",
+                    "app_label": "Etykieta aplikacji"
+                }
             },
             "reconfigure_2fa": {
                 "title": "Uwierzytelnianie dwuskładnikowe",
                 "description": "Wprowadź 6-cyfrowy kod z aplikacji uwierzytelniającej.",
-                "data": {"totp_code": "Kod TOTP"}
+                "data": {
+                    "totp_code": "Kod TOTP"
+                }
             },
             "reauth_confirm": {
                 "title": "Ponowne uwierzytelnienie Aegis for Ajax",
                 "description": "Twoja sesja Ajax dla {email} nie jest już ważna. Wprowadź aktualne hasło konta, aby przywrócić dostęp.",
-                "data": {"password": "Hasło"}
+                "data": {
+                    "password": "Hasło"
+                }
             },
             "reauth_2fa": {
                 "title": "Uwierzytelnianie dwuskładnikowe",
                 "description": "Wprowadź 6-cyfrowy kod z aplikacji uwierzytelniającej.",
-                "data": {"totp_code": "Kod TOTP"}
+                "data": {
+                    "totp_code": "Kod TOTP"
+                }
             }
         },
         "error": {
@@ -150,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Zrób zdjęcie"}},
+        "button": {
+            "capture_photo": {
+                "name": "Zrób zdjęcie"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Zdarzenie bezpieczeństwa",
@@ -166,6 +184,7 @@
                             "disarm": "Rozbrojony",
                             "disarm_night": "Tryb nocny wyłączony",
                             "door_open": "Drzwi otwarte",
+                            "doorbell_pressed": "Naciśnięto dzwonek",
                             "fire": "Pożar",
                             "flood": "Zalanie",
                             "glass_break": "Rozbicie szyby",
@@ -179,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Połączenie z centrum monitoringu"},
-            "gsm": {"name": "Sieć komórkowa"},
-            "lid": {"name": "Pokrywa otwarta"},
-            "ext_contact": {"name": "Zewnętrzny styk przerwany"},
-            "ext_alert": {"name": "Alarm zewnętrznego styku"},
-            "drilling": {"name": "Wiercenie obudowy"},
-            "anti_mask": {"name": "Antymaskowanie"},
-            "malfunction": {"name": "Usterka"},
-            "interference": {"name": "Zakłócenia"},
-            "relay_stuck": {"name": "Przekaźnik zablokowany"},
-            "always_active": {"name": "Zawsze aktywny"},
-            "glass_break": {"name": "Rozbicie szyby"},
-            "vibration": {"name": "Wibracja"},
-            "tilt": {"name": "Przechylenie"},
-            "steam": {"name": "Para"},
-            "wire_input_alert": {"name": "Alarm wejścia przewodowego"},
-            "tamper": {"name": "Sabotaż obudowy"},
-            "connectivity": {"name": "Łączność"},
-            "problem": {"name": "Problem urządzenia"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Zasilanie sieciowe"}
+            "monitoring": {
+                "name": "Połączenie z centrum monitoringu"
+            },
+            "gsm": {
+                "name": "Sieć komórkowa"
+            },
+            "lid": {
+                "name": "Pokrywa otwarta"
+            },
+            "ext_contact": {
+                "name": "Zewnętrzny styk przerwany"
+            },
+            "ext_alert": {
+                "name": "Alarm zewnętrznego styku"
+            },
+            "drilling": {
+                "name": "Wiercenie obudowy"
+            },
+            "anti_mask": {
+                "name": "Antymaskowanie"
+            },
+            "malfunction": {
+                "name": "Usterka"
+            },
+            "interference": {
+                "name": "Zakłócenia"
+            },
+            "relay_stuck": {
+                "name": "Przekaźnik zablokowany"
+            },
+            "always_active": {
+                "name": "Zawsze aktywny"
+            },
+            "glass_break": {
+                "name": "Rozbicie szyby"
+            },
+            "vibration": {
+                "name": "Wibracja"
+            },
+            "tilt": {
+                "name": "Przechylenie"
+            },
+            "steam": {
+                "name": "Para"
+            },
+            "wire_input_alert": {
+                "name": "Alarm wejścia przewodowego"
+            },
+            "tamper": {
+                "name": "Sabotaż obudowy"
+            },
+            "connectivity": {
+                "name": "Łączność"
+            },
+            "problem": {
+                "name": "Problem urządzenia"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Zasilanie sieciowe"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Firma monitorująca"},
-            "signal_strength": {"name": "Siła sygnału"},
-            "mobile_network_type": {"name": "Typ sieci komórkowej"},
-            "wifi_signal_level": {"name": "Poziom sygnału Wi-Fi"},
-            "sim_status": {"name": "Status karty SIM"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Typ połączenia"},
-            "wifi_ssid": {"name": "SSID Wi-Fi"},
-            "wifi_ip": {"name": "Adres IP Wi-Fi"},
-            "ethernet_ip": {"name": "Adres IP Ethernet"},
-            "ethernet_gateway": {"name": "Brama Ethernet"},
-            "ethernet_dns": {"name": "DNS Ethernet"},
-            "cellular_signal": {"name": "Sygnał komórkowy"},
-            "cellular_network": {"name": "Sieć komórkowa"}
+            "monitoring_company": {
+                "name": "Firma monitorująca"
+            },
+            "signal_strength": {
+                "name": "Siła sygnału"
+            },
+            "mobile_network_type": {
+                "name": "Typ sieci komórkowej"
+            },
+            "wifi_signal_level": {
+                "name": "Poziom sygnału Wi-Fi"
+            },
+            "sim_status": {
+                "name": "Status karty SIM"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Typ połączenia"
+            },
+            "wifi_ssid": {
+                "name": "SSID Wi-Fi"
+            },
+            "wifi_ip": {
+                "name": "Adres IP Wi-Fi"
+            },
+            "ethernet_ip": {
+                "name": "Adres IP Ethernet"
+            },
+            "ethernet_gateway": {
+                "name": "Brama Ethernet"
+            },
+            "ethernet_dns": {
+                "name": "DNS Ethernet"
+            },
+            "cellular_signal": {
+                "name": "Sygnał komórkowy"
+            },
+            "cellular_network": {
+                "name": "Sieć komórkowa"
+            }
         },
-        "switch": {"channel_1": {"name": "Kanał 1"}, "channel_2": {"name": "Kanał 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Kanał 1"
+            },
+            "channel_2": {
+                "name": "Kanał 2"
+            }
+        }
     }
 }

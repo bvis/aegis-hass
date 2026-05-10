@@ -13,12 +13,16 @@
             "2fa": {
                 "title": "Authentification à deux facteurs",
                 "description": "Entrez le code à 6 chiffres de votre application d'authentification.",
-                "data": {"totp_code": "Code TOTP"}
+                "data": {
+                    "totp_code": "Code TOTP"
+                }
             },
             "select_spaces": {
                 "title": "Sélectionner les espaces",
                 "description": "Choisissez les espaces (hubs) à ajouter.",
-                "data": {"spaces": "Espaces"}
+                "data": {
+                    "spaces": "Espaces"
+                }
             },
             "reconfigure": {
                 "title": "Reconfigurer Aegis for Ajax",
@@ -32,17 +36,23 @@
             "reconfigure_2fa": {
                 "title": "Authentification à deux facteurs",
                 "description": "Entrez le code à 6 chiffres de votre application d'authentification.",
-                "data": {"totp_code": "Code TOTP"}
+                "data": {
+                    "totp_code": "Code TOTP"
+                }
             },
             "reauth_confirm": {
                 "title": "Réauthentifier Aegis for Ajax",
                 "description": "Votre session Ajax pour {email} n'est plus valide. Saisissez le mot de passe actuel du compte pour restaurer l'accès.",
-                "data": {"password": "Mot de passe"}
+                "data": {
+                    "password": "Mot de passe"
+                }
             },
             "reauth_2fa": {
                 "title": "Authentification à deux facteurs",
                 "description": "Saisissez le code à 6 chiffres de votre application d'authentification.",
-                "data": {"totp_code": "Code TOTP"}
+                "data": {
+                    "totp_code": "Code TOTP"
+                }
             }
         },
         "error": {
@@ -154,7 +164,11 @@
         }
     },
     "entity": {
-        "button": {"capture_photo": {"name": "Prendre une photo"}},
+        "button": {
+            "capture_photo": {
+                "name": "Prendre une photo"
+            }
+        },
         "event": {
             "security_event": {
                 "name": "Événement de sécurité",
@@ -170,6 +184,7 @@
                             "disarm": "Désarmé",
                             "disarm_night": "Mode nuit désactivé",
                             "door_open": "Porte ouverte",
+                            "doorbell_pressed": "Sonnette appuyée",
                             "fire": "Incendie",
                             "flood": "Inondation",
                             "glass_break": "Bris de verre",
@@ -183,45 +198,124 @@
             }
         },
         "binary_sensor": {
-            "monitoring": {"name": "Connexion télésurveillance"},
-            "gsm": {"name": "Réseau cellulaire connecté"},
-            "lid": {"name": "Couvercle ouvert"},
-            "ext_contact": {"name": "Contact externe ouvert"},
-            "ext_alert": {"name": "Alerte contact externe"},
-            "drilling": {"name": "Perçage du boîtier détecté"},
-            "anti_mask": {"name": "Anti-masquage"},
-            "malfunction": {"name": "Dysfonctionnement"},
-            "interference": {"name": "Interférence"},
-            "relay_stuck": {"name": "Relais bloqué"},
-            "always_active": {"name": "Toujours actif"},
-            "glass_break": {"name": "Bris de verre"},
-            "vibration": {"name": "Vibration"},
-            "tilt": {"name": "Inclinaison"},
-            "steam": {"name": "Vapeur"},
-            "wire_input_alert": {"name": "Alerte d'entrée filaire"},
-            "tamper": {"name": "Sabotage du boîtier"},
-            "connectivity": {"name": "Connectivité"},
-            "problem": {"name": "Problème appareil"},
-            "ethernet": {"name": "Ethernet"},
-            "wifi": {"name": "Wi-Fi"},
-            "mains_power": {"name": "Alimentation secteur"}
+            "monitoring": {
+                "name": "Connexion télésurveillance"
+            },
+            "gsm": {
+                "name": "Réseau cellulaire connecté"
+            },
+            "lid": {
+                "name": "Couvercle ouvert"
+            },
+            "ext_contact": {
+                "name": "Contact externe ouvert"
+            },
+            "ext_alert": {
+                "name": "Alerte contact externe"
+            },
+            "drilling": {
+                "name": "Perçage du boîtier détecté"
+            },
+            "anti_mask": {
+                "name": "Anti-masquage"
+            },
+            "malfunction": {
+                "name": "Dysfonctionnement"
+            },
+            "interference": {
+                "name": "Interférence"
+            },
+            "relay_stuck": {
+                "name": "Relais bloqué"
+            },
+            "always_active": {
+                "name": "Toujours actif"
+            },
+            "glass_break": {
+                "name": "Bris de verre"
+            },
+            "vibration": {
+                "name": "Vibration"
+            },
+            "tilt": {
+                "name": "Inclinaison"
+            },
+            "steam": {
+                "name": "Vapeur"
+            },
+            "wire_input_alert": {
+                "name": "Alerte d'entrée filaire"
+            },
+            "tamper": {
+                "name": "Sabotage du boîtier"
+            },
+            "connectivity": {
+                "name": "Connectivité"
+            },
+            "problem": {
+                "name": "Problème appareil"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Alimentation secteur"
+            }
         },
         "sensor": {
-            "monitoring_company": {"name": "Société de télésurveillance"},
-            "signal_strength": {"name": "Intensité du signal"},
-            "mobile_network_type": {"name": "Type de réseau mobile"},
-            "wifi_signal_level": {"name": "Niveau de signal Wi-Fi"},
-            "sim_status": {"name": "État de la carte SIM"},
-            "sim_imei": {"name": "IMEI"},
-            "connection_type": {"name": "Type de connexion"},
-            "wifi_ssid": {"name": "SSID Wi-Fi"},
-            "wifi_ip": {"name": "Adresse IP Wi-Fi"},
-            "ethernet_ip": {"name": "Adresse IP Ethernet"},
-            "ethernet_gateway": {"name": "Passerelle Ethernet"},
-            "ethernet_dns": {"name": "DNS Ethernet"},
-            "cellular_signal": {"name": "Signal cellulaire"},
-            "cellular_network": {"name": "Réseau cellulaire"}
+            "monitoring_company": {
+                "name": "Société de télésurveillance"
+            },
+            "signal_strength": {
+                "name": "Intensité du signal"
+            },
+            "mobile_network_type": {
+                "name": "Type de réseau mobile"
+            },
+            "wifi_signal_level": {
+                "name": "Niveau de signal Wi-Fi"
+            },
+            "sim_status": {
+                "name": "État de la carte SIM"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Type de connexion"
+            },
+            "wifi_ssid": {
+                "name": "SSID Wi-Fi"
+            },
+            "wifi_ip": {
+                "name": "Adresse IP Wi-Fi"
+            },
+            "ethernet_ip": {
+                "name": "Adresse IP Ethernet"
+            },
+            "ethernet_gateway": {
+                "name": "Passerelle Ethernet"
+            },
+            "ethernet_dns": {
+                "name": "DNS Ethernet"
+            },
+            "cellular_signal": {
+                "name": "Signal cellulaire"
+            },
+            "cellular_network": {
+                "name": "Réseau cellulaire"
+            }
         },
-        "switch": {"channel_1": {"name": "Canal 1"}, "channel_2": {"name": "Canal 2"}}
+        "switch": {
+            "channel_1": {
+                "name": "Canal 1"
+            },
+            "channel_2": {
+                "name": "Canal 2"
+            }
+        }
     }
 }
