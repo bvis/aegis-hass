@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0-beta.5] - 2026-05-12
+
+Fifth beta of the `1.3.0` line. Real fix for the doorbell device-card on top of `beta.4`. No Ajax wire-protocol changes.
+
+### Fixed
+- **MotionCam Video Doorbell now actually appears as a device card.** `beta.3` registered `motion_cam_video_doorbell` in the device-type map but the doorbell never reached it — the diagnostic log added in `beta.4` revealed why: the device arrives on the `video_edge_channel` oneof of `LightDevice`, not `hub_device`, and was being filtered out of `parse_device` entirely. `parse_device` now handles both cases: hub devices keep the existing path, video-edge channels read `video_edge_channel_properties.video_edge_type` (an `About.Type` enum) and emit a clean device-type string (`video_edge_doorbell`, `video_edge_indoor`, `video_edge_turret`, `_bullet`, `_minidome`, `_unknown`). HL/VF/S- sub-variants collapse to their base shape; unknown enum values map to `_unknown` so a future firmware doesn't silently drop the device. All six new keys are registered in `_DEVICE_TYPE_SENSORS` with `motion_detected + tamper`; `signal_strength` / `battery` sensors skip themselves automatically for VideoEdge channels because the proto doesn't carry those statuses. (#124, surfaced by @Permudious in #119)
+
+### Internal
+- `parse_device` split into `_parse_hub_device` and `_parse_video_edge_channel` so the two oneof paths are explicit. `hub_id` for video-edge channels is set to the channel's own id (VideoEdge bridges aren't children of a Jeweller hub in Ajax's model); keeps the HA device registry happy without threading hub context into the parser.
+
 ## [1.3.0-beta.4] - 2026-05-10
 
 Fourth beta of the `1.3.0` line. Diagnostic-only on top of `beta.3`. No Ajax wire-protocol changes.
