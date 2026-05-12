@@ -65,11 +65,131 @@ class TestParseDevice:
         assert device is not None
         assert device.state == DeviceState.OFFLINE
 
-    def test_parse_non_hub_device_returns_none(self) -> None:
+    def test_parse_unsupported_oneof_returns_none(self) -> None:
+        # `video_edge` (the recorder), `smart_lock` (the auxiliary
+        # smart-lock variant) and an unset oneof all fall through to
+        # None — only `hub_device` and `video_edge_channel` are mapped.
         proto_device = MagicMock()
         proto_device.WhichOneof.return_value = "video_edge"
-        result = DevicesApi.parse_device(proto_device)
-        assert result is None
+        assert DevicesApi.parse_device(proto_device) is None
+
+    def test_parse_video_edge_channel_doorbell(self) -> None:
+        # @Permudious in #119: MotionCam Video Doorbell arrives as a
+        # `video_edge_channel` LightDevice oneof case, not `hub_device`,
+        # so it was being skipped entirely. The fix parses the channel
+        # and emits a `video_edge_doorbell` device_type so the existing
+        # `_DEVICE_TYPE_SENSORS` map surfaces motion + tamper entities
+        # and HA renders a device card.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        about_type_doorbell = 5  # About.Type.DOORBELL
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(
+                    id="cam-front-door",
+                    name="Front Door Doorbell",
+                ),
+                video_edge_channel_properties=(
+                    light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                        video_edge_type=about_type_doorbell,
+                    )
+                ),
+            )
+        )
+
+        device = DevicesApi.parse_device(light_device)
+        assert device is not None
+        assert device.id == "cam-front-door"
+        assert device.name == "Front Door Doorbell"
+        assert device.device_type == "video_edge_doorbell"
+        assert device.state == DeviceState.ONLINE
+
+    def test_parse_video_edge_channel_indoor_camera(self) -> None:
+        # INDOOR=6 is the indoor variant of the MotionCam Video family;
+        # parser shouldn't pretend it's a doorbell.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(
+                    id="cam-living",
+                    name="Living Room",
+                ),
+                video_edge_channel_properties=(
+                    light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                        video_edge_type=6,  # INDOOR
+                    )
+                ),
+            )
+        )
+
+        device = DevicesApi.parse_device(light_device)
+        assert device is not None
+        assert device.device_type == "video_edge_indoor"
+
+    def test_parse_video_edge_channel_unknown_type(self) -> None:
+        # `About.Type` is open-ended; new firmwares can introduce
+        # values we don't know yet. Emit a generic `video_edge_unknown`
+        # so the device still surfaces as a HA card with at least the
+        # device-agnostic sensors (battery, signal_strength). Beats
+        # silently dropping the device.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(
+                    id="cam-mystery", name="Mystery"
+                ),
+                video_edge_channel_properties=(
+                    light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                        video_edge_type=999,
+                    )
+                ),
+            )
+        )
+
+        device = DevicesApi.parse_device(light_device)
+        assert device is not None
+        assert device.device_type == "video_edge_unknown"
+
+    def test_parse_video_edge_channel_no_properties_returns_none(self) -> None:
+        # If the channel comes without `video_edge_channel_properties`,
+        # we have no type signal at all. Falling back to None is fine —
+        # it's the same behaviour as today and Ajax has never sent us
+        # such a payload in observed snapshots.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(id="x", name="x"),
+            )
+        )
+
+        assert DevicesApi.parse_device(light_device) is None
 
 
 class TestSpreadPropertiesParser:
