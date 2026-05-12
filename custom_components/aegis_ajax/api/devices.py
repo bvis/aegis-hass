@@ -396,14 +396,44 @@ class DevicesApi:
                     result[f"valve_ch{channel_id}_stuck"] = True
         return result
 
+    # Map `LightVideoEdgeChannel.video_edge_channel_properties.video_edge_type`
+    # (`About.Type` enum) to a HA-side device_type string parallel to the
+    # `_DEVICE_TYPE_SENSORS` keys. Only the consumer-visible variants are
+    # named — every NVR sub-type collapses to `video_edge_nvr` because users
+    # don't typically wire HA automations off recorder boxes, and the long
+    # tail (TURRET_HL, BULLET_HL_VF, S_TURRET_HL_VF, etc.) collapses to its
+    # base shape. Anything we don't recognise becomes `video_edge_unknown`
+    # so the device still appears as a HA card with the device-agnostic
+    # sensors instead of silently disappearing.
+    _VIDEO_EDGE_TYPE_MAP: dict[int, str] = {
+        2: "video_edge_turret",
+        3: "video_edge_bullet",
+        4: "video_edge_minidome",
+        5: "video_edge_doorbell",  # #119: @Permudious's MotionCam Video Doorbell
+        6: "video_edge_indoor",
+        17: "video_edge_turret",  # TURRET_HL
+        18: "video_edge_turret",  # TURRET_HL_VF
+        19: "video_edge_turret",  # S_TURRET_HL_VF
+        20: "video_edge_bullet",  # BULLET_HL
+        21: "video_edge_bullet",  # BULLET_HL_VF
+        22: "video_edge_bullet",  # S_BULLET_HL_VF
+        23: "video_edge_minidome",  # MINIDOME_HL
+        24: "video_edge_minidome",  # MINIDOME_HL_VF
+        25: "video_edge_minidome",  # S_MINIDOME_HL_VF
+    }
+
     @staticmethod
     def parse_device(proto_light_device: Any) -> Device | None:  # noqa: ANN401
         device_kind = proto_light_device.WhichOneof("device")
-        if device_kind != "hub_device":
-            _LOGGER.debug("Skipping non-hub device type: %s", device_kind)
-            return None
+        if device_kind == "hub_device":
+            return DevicesApi._parse_hub_device(proto_light_device.hub_device)
+        if device_kind == "video_edge_channel":
+            return DevicesApi._parse_video_edge_channel(proto_light_device.video_edge_channel)
+        _LOGGER.debug("Skipping unsupported device type: %s", device_kind)
+        return None
 
-        hub_dev = proto_light_device.hub_device
+    @staticmethod
+    def _parse_hub_device(hub_dev: Any) -> Device | None:  # noqa: ANN401
         common = hub_dev.common_device
         profile = common.profile
 
@@ -423,6 +453,47 @@ class DevicesApi:
             malfunctions=profile.malfunctions,
             bypassed=profile.bypassed,
             statuses=statuses,
+            battery=DevicesApi._parse_battery(profile.statuses),
+        )
+
+    @staticmethod
+    def _parse_video_edge_channel(channel: Any) -> Device | None:  # noqa: ANN401
+        """Parse a `LightVideoEdgeChannel` into a Device (#119).
+
+        Video Edge channels (MotionCam Video Doorbell, Indoor camera, NVR
+        channels, third-party RTSP cameras bridged via VideoEdge) come
+        through their own LightDevice oneof case — distinct from
+        `hub_device` — and don't expose an `object_type` field. The type
+        signal is `video_edge_channel_properties.video_edge_type`, an
+        `About.Type` enum which we map to `_DEVICE_TYPE_SENSORS`-friendly
+        strings like `video_edge_doorbell`.
+        """
+        if not channel.HasField("video_edge_channel_properties"):
+            _LOGGER.debug("video_edge_channel without properties, skipping")
+            return None
+        if not channel.HasField("profile"):
+            _LOGGER.debug("video_edge_channel without profile, skipping")
+            return None
+
+        profile = channel.profile
+        type_value = int(channel.video_edge_channel_properties.video_edge_type)
+        device_type = DevicesApi._VIDEO_EDGE_TYPE_MAP.get(type_value, "video_edge_unknown")
+
+        # No hub_id on the channel side — Ajax models the video bridge
+        # as a sibling of the hub, not a child. Falling back to the
+        # channel's own id keeps the HA device registry happy; entity
+        # routing in the integration is keyed off `device.id` anyway.
+        return Device(
+            id=profile.id,
+            hub_id=profile.id,
+            name=profile.name,
+            device_type=device_type,
+            room_id=profile.room_id if profile.room_id else None,
+            group_id=profile.group_id if profile.group_id else None,
+            state=DevicesApi._parse_device_state(profile.states),
+            malfunctions=profile.malfunctions,
+            bypassed=profile.bypassed,
+            statuses=DevicesApi._parse_statuses(profile.statuses),
             battery=DevicesApi._parse_battery(profile.statuses),
         )
 

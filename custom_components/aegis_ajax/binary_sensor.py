@@ -157,6 +157,20 @@ _DEVICE_TYPE_SENSORS: dict[str, list[str]] = {
     "motion_cam_video_base": ["motion_detected", "tamper"],
     "motion_cam_video_doorbell": ["motion_detected", "tamper"],
     "motion_cam_video_indoor": ["motion_detected", "tamper"],
+    # VideoEdge channel devices — third-party / bridged cameras that
+    # arrive on the `video_edge_channel` oneof of LightDevice rather
+    # than `hub_device` (#119, @Permudious's MotionCam Video Doorbell
+    # actually surfaces here, not under `motion_cam_video_*` as we
+    # first guessed in beta.3). They don't carry the Jeweller-side
+    # signal_strength / battery, so the device-agnostic sensors in
+    # `sensor.py` skip themselves naturally; motion / tamper still
+    # surface when the camera exposes them via `LightDeviceStatus`.
+    "video_edge_bullet": ["motion_detected", "tamper"],
+    "video_edge_doorbell": ["motion_detected", "tamper"],
+    "video_edge_indoor": ["motion_detected", "tamper"],
+    "video_edge_minidome": ["motion_detected", "tamper"],
+    "video_edge_turret": ["motion_detected", "tamper"],
+    "video_edge_unknown": ["motion_detected", "tamper"],
     "combi_protect": ["motion_detected", "glass_break", "tamper"],
     "combi_protect_s": ["motion_detected", "glass_break", "tamper"],
     "combi_protect_fibra": ["motion_detected", "glass_break", "tamper"],
