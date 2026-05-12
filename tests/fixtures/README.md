@@ -43,3 +43,17 @@ hardware emitting that status — every unit test passed because
 test would have caught the regression in CI without waiting for a user
 beta. See `feedback_audit_parser_before_extending.md` for the broader
 lesson.
+
+## Captures committed
+
+- **`bvis_home_fleet.bin`** — 11-device snapshot from a `Hub 2 4G`
+  install (the maintainer's). Mix of `door_protect`,
+  `door_protect_plus`, `motion_cam_phod`, `keypad_combi`, plus one
+  unsupported `LightDevice` oneof case (parser returns `None`, exercising
+  that path). All ids/names/`hub_id`/sorting keys scrubbed to
+  `dev-NNN` / `hub-001` / `<object_type> fixture N`; statuses, states,
+  enums and oneof shapes preserved verbatim so the parser exercises
+  the wire shape it sees in the wild. **No `video_edge_channel` device** —
+  the maintainer doesn't own one. A capture with one (e.g. from
+  @Permudious's MotionCam Video Doorbell, #119) would be the next
+  highest-value addition.

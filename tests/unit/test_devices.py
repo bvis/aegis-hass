@@ -1903,11 +1903,14 @@ class TestSnapshotReplay:
 
         for path in bin_files:
             payload = path.read_bytes()
-            # We don't assert specific devices — every install has a
-            # different fleet — only that the parser doesn't blow up
-            # and that we get a non-error result.
+            # We don't assert specific device counts or ids — every
+            # install has a different fleet — only that the parser
+            # doesn't blow up and produces at least one Device. An
+            # empty list usually means the snapshot was a failure
+            # message or a no-op, not the parser-coverage we want.
             devices = await self._replay(payload)
             assert isinstance(devices, list), f"Fixture {path.name} did not yield a list"
+            assert devices, f"Fixture {path.name} produced no devices — wrong capture?"
 
 
 class TestProtoHelpers:
