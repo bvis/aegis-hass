@@ -301,10 +301,14 @@ class DevicesApi:
             elif which == "interference_detected":
                 result["interference"] = True
             elif which == "wifi_signal_level_status":
+                # `wifi_signal_level_status` is a sub-message wrapping the
+                # actual enum, not a plain int (#119, surfaced when video-
+                # edge channels added in beta.5 started hitting this path).
+                # `int(sub_message)` blew up with TypeError and killed the
+                # device-stream loop in a reconnect cycle.
+                sub = getattr(status, "wifi_signal_level_status", None)
                 result["wifi_signal_level"] = (
-                    int(status.wifi_signal_level_status)
-                    if hasattr(status, "wifi_signal_level_status")
-                    else 0
+                    int(getattr(sub, "wifi_signal_level", 0)) if sub is not None else 0
                 )
             elif which == "smart_lock":
                 # The status oneof carries the LockStatus enum directly (not a
@@ -658,7 +662,14 @@ class DevicesApi:
                                                 else True
                                             )
                                         elif status_name == "wifi_signal_level_status":
-                                            payload["value"] = int(status.wifi_signal_level_status)
+                                            # Sub-message wrapping the enum,
+                                            # not a plain int (#119).
+                                            sub = getattr(status, "wifi_signal_level_status", None)
+                                            payload["value"] = (
+                                                int(getattr(sub, "wifi_signal_level", 0))
+                                                if sub is not None
+                                                else 0
+                                            )
                                         elif status_name == "smart_lock":
                                             payload["value"] = _SMART_LOCK_STATE_MAP.get(
                                                 int(status.smart_lock), "unknown"

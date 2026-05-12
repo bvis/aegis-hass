@@ -738,10 +738,24 @@ class TestStatusParser:
         result = DevicesApi._parse_statuses([status])
         assert result.get("interference") is True
 
-    def test_wifi_signal_level_status(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "wifi_signal_level_status"
-        status.wifi_signal_level_status = 4
+    def test_wifi_signal_level_status_real_proto(self) -> None:
+        # Regression for the TypeError @Permudious hit on beta.5 (#119): the
+        # MagicMock version above silently allowed `int(status.wifi_signal_
+        # level_status)` to pass even though the real proto field is a
+        # sub-message (`WifiSignalLevelStatus`) with a nested
+        # `wifi_signal_level` enum — the actual int lives one level deeper.
+        # Use a real proto instance so the parser exercises the same shape
+        # the wire delivers.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_status_pb2,
+        )
+
+        status = light_device_status_pb2.LightDeviceStatus(
+            wifi_signal_level_status=(
+                light_device_status_pb2.LightDeviceStatus.WifiSignalLevelStatus(wifi_signal_level=4)
+            )
+        )
+
         result = DevicesApi._parse_statuses([status])
         assert result.get("wifi_signal_level") == 4
 
