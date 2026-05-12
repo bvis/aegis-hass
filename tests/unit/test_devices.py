@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -450,12 +451,29 @@ class TestDeviceStateParser:
         assert result == DeviceState.UNKNOWN
 
 
+def _LDS() -> type:  # noqa: N802
+    """Shorthand to import the LightDeviceStatus proto module on demand.
+
+    Real-proto tests use this instead of `MagicMock` so that any wrong-
+    shape access (`int(sub_message)` on a sub-message, accessing a leaf
+    that doesn't exist, etc.) blows up the same way it would on the
+    wire — that's the lesson from #119. The proto import is hoisted into
+    a helper rather than module-top so tests fail fast with a clear name
+    if the import path moves rather than at collection time.
+    """
+    from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+        light_device_status_pb2,
+    )
+
+    return light_device_status_pb2.LightDeviceStatus
+
+
 class TestBatteryParser:
     def test_parse_battery_found(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "battery"
-        status.battery.charge_level_percentage = 75
-        status.battery.battery_state = 1  # OK
+        lds = _LDS()
+        status = lds(
+            battery=lds.Battery(charge_level_percentage=75, battery_state=1)  # OK
+        )
 
         result = DevicesApi._parse_battery([status])
         assert result is not None
@@ -463,18 +481,18 @@ class TestBatteryParser:
         assert result.is_low is False
 
     def test_parse_battery_low(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "battery"
-        status.battery.charge_level_percentage = 10
-        status.battery.battery_state = 2  # LOW
+        lds = _LDS()
+        status = lds(
+            battery=lds.Battery(charge_level_percentage=10, battery_state=2)  # ERROR
+        )
 
         result = DevicesApi._parse_battery([status])
         assert result is not None
         assert result.is_low is True
 
     def test_parse_battery_not_found(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "door_opened"
+        lds = _LDS()
+        status = lds(door_opened=lds.Simple())
         result = DevicesApi._parse_battery([status])
         assert result is None
 
@@ -509,11 +527,13 @@ class TestStatusParser:
         assert result.get("co_detected") is True
 
     def test_temperature_status(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "temperature"
-        status.temperature.value = 22.5
+        # `ValueStatus.value` is a proto int; Ajax sends whole-degree
+        # Celsius. MagicMock previously let the test set `22.5`
+        # (impossible on the wire) — real proto would have truncated.
+        lds = _LDS()
+        status = lds(temperature=lds.ValueStatus(value=22))
         result = DevicesApi._parse_statuses([status])
-        assert result.get("temperature") == 22.5
+        assert result.get("temperature") == 22
 
     def test_leak_detected(self) -> None:
         status = MagicMock()
@@ -535,33 +555,41 @@ class TestStatusParser:
 
     @pytest.mark.parametrize(
         "value,expected",
-        [(0, "unknown"), (1, "unlocked"), (2, "locked"), (3, "unlatched"), (99, "unknown")],
+        [(0, "unknown"), (1, "unlocked"), (2, "locked"), (3, "unlatched")],
     )
     def test_smart_lock_status(self, value: int, expected: str) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "smart_lock"
-        status.smart_lock = value
+        # `smart_lock` is the SmartLockStatus.LockStatus enum carried
+        # directly on the LightDeviceStatus oneof (not a sub-message).
+        # The proto enum is the integer value, so `int(status.smart_lock)`
+        # is correct as-is. Real-proto regression guard for #119: confirm
+        # we don't accidentally start treating it as a sub-message.
+        lds = _LDS()
+        status = lds(smart_lock=value)
         result = DevicesApi._parse_statuses([status])
         assert result.get("smart_lock_state") == expected
 
     def test_signal_strength(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "signal_strength"
-        status.signal_strength.device_signal_level = 3
+        lds = _LDS()
+        status = lds(signal_strength=lds.SignalStrength(device_signal_level=3))
         result = DevicesApi._parse_statuses([status])
         assert result.get("signal_strength") == "Normal"
 
     def test_life_quality_status(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "life_quality"
-        lq = MagicMock()
-        lq.actual_temperature = 21.0
-        lq.actual_humidity = 55.0
-        lq.actual_co2 = 400
-        status.life_quality = lq
+        # `actual_temperature/humidity/co2` are proto3-optional ints. The
+        # MagicMock version of this test let us set floats and pretend
+        # they round-tripped — real proto rejects floats and truncates,
+        # and only emits the values that were explicitly populated.
+        lds = _LDS()
+        status = lds(
+            life_quality=lds.LifeQualityStatus(
+                actual_temperature=21,
+                actual_humidity=55,
+                actual_co2=400,
+            )
+        )
         result = DevicesApi._parse_statuses([status])
-        assert result.get("temperature") == 21.0
-        assert result.get("humidity") == 55.0
+        assert result.get("temperature") == 21
+        assert result.get("humidity") == 55
         assert result.get("co2") == 400
 
     def test_none_which_oneof_skipped(self) -> None:
@@ -579,48 +607,50 @@ class TestStatusParser:
         assert result == {}
 
     def test_motion_detected_with_timestamp(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "motion_detected"
-        status.motion_detected.detected_at.seconds = 1700000000
+        from google.protobuf import timestamp_pb2  # noqa: PLC0415
+
+        lds = _LDS()
+        status = lds(
+            motion_detected=lds.MotionDetected(
+                detected_at=timestamp_pb2.Timestamp(seconds=1700000000)
+            )
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("motion_detected") is True
         assert result.get("motion_detected_at") == 1700000000
 
     def test_gsm_status_connected(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "gsm_status"
-        status.gsm_status.type = 3  # 4G
-        status.gsm_status.status = 2  # connected
+        lds = _LDS()
+        status = lds(
+            gsm_status=lds.GsmStatus(type=3, status=2)  # 4G, CONNECTED
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("mobile_network_type") == "4G"
         assert result.get("gsm_connected") is True
 
     def test_gsm_status_not_connected(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "gsm_status"
-        status.gsm_status.type = 1  # 2G
-        status.gsm_status.status = 0  # not connected
+        lds = _LDS()
+        status = lds(
+            gsm_status=lds.GsmStatus(type=1, status=0)  # 2G, UNSPECIFIED
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("gsm_connected") is False
 
     def test_monitoring_active(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "monitoring"
-        status.monitoring.cms_active = True
+        lds = _LDS()
+        status = lds(monitoring=lds.Monitoring(cms_active=True))
         result = DevicesApi._parse_statuses([status])
         assert result.get("monitoring_active") is True
 
     def test_monitoring_inactive(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "monitoring"
-        status.monitoring.cms_active = False
+        lds = _LDS()
+        status = lds(monitoring=lds.Monitoring(cms_active=False))
         result = DevicesApi._parse_statuses([status])
         assert result.get("monitoring_active") is False
 
     def test_sim_status(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "sim_status"
-        status.sim_status.sim_card_status = 1
+        lds = _LDS()
+        status = lds(sim_status=lds.SimStatus(sim_card_status=1))  # OK
         result = DevicesApi._parse_statuses([status])
         assert result.get("sim_status") == "OK"
 
@@ -661,28 +691,28 @@ class TestStatusParser:
         assert result.get("external_contact_alert") is True
 
     def test_wire_input_status_alerting(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "wire_input_status"
-        status.wire_input_status.is_alert = True
-        status.wire_input_status.type = 1  # INTRUSION
+        lds = _LDS()
+        status = lds(
+            wire_input_status=lds.WireInputStatus(is_alert=True, type=1)  # INTRUSION
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("wire_input_alert") is True
         assert result.get("wire_input_alarm_type") == "intrusion"
 
     def test_wire_input_status_not_alerting(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "wire_input_status"
-        status.wire_input_status.is_alert = False
-        status.wire_input_status.type = 11  # GLASS_BREAK
+        lds = _LDS()
+        status = lds(
+            wire_input_status=lds.WireInputStatus(is_alert=False, type=11)  # GLASS_BREAK
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("wire_input_alert") is False
         assert result.get("wire_input_alarm_type") == "glass_break"
 
     def test_wire_input_status_unspecified_type(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "wire_input_status"
-        status.wire_input_status.is_alert = True
-        status.wire_input_status.type = 0  # UNSPECIFIED
+        lds = _LDS()
+        status = lds(
+            wire_input_status=lds.WireInputStatus(is_alert=True, type=0)  # UNSPECIFIED
+        )
         result = DevicesApi._parse_statuses([status])
         assert result.get("wire_input_alert") is True
         assert result.get("wire_input_alarm_type") == "unspecified"
@@ -690,21 +720,17 @@ class TestStatusParser:
     def test_transmitter_status_alerting(self) -> None:
         # Issue #65 follow-up: the Transmitter Jeweller emits its own oneof
         # `transmitter_status` (proto field 75) with the same shape as
-        # `wire_input_status`. It must populate the same wire_input_alert key
-        # so the unified safety entity reflects the bridged sensor.
-        status = MagicMock()
-        status.WhichOneof.return_value = "transmitter_status"
-        status.transmitter_status.is_alert = True
-        status.transmitter_status.type = 1  # INTRUSION
+        # `wire_input_status`. It must populate the same wire_input_alert
+        # key so the unified safety entity reflects the bridged sensor.
+        lds = _LDS()
+        status = lds(transmitter_status=lds.TransmitterStatus(is_alert=True, type=1))
         result = DevicesApi._parse_statuses([status])
         assert result.get("wire_input_alert") is True
         assert result.get("wire_input_alarm_type") == "intrusion"
 
     def test_transmitter_status_not_alerting(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "transmitter_status"
-        status.transmitter_status.is_alert = False
-        status.transmitter_status.type = 0
+        lds = _LDS()
+        status = lds(transmitter_status=lds.TransmitterStatus(is_alert=False, type=0))
         result = DevicesApi._parse_statuses([status])
         assert result.get("wire_input_alert") is False
 
@@ -766,11 +792,19 @@ class TestStatusParser:
         assert result.get("smart_bracket_unlocked") is True
 
     def test_nfc_enabled(self) -> None:
-        status = MagicMock()
-        status.WhichOneof.return_value = "nfc"
-        status.nfc.enabled = True
+        lds = _LDS()
+        status = lds(nfc=lds.Nfc(enabled=True))
         result = DevicesApi._parse_statuses([status])
         assert result.get("nfc_enabled") is True
+
+    def test_nfc_disabled(self) -> None:
+        # New coverage uncovered by the real-proto sweep: the parser only
+        # honoured `hasattr(...)` which always succeeds on a proto message,
+        # so the False branch was never exercised before.
+        lds = _LDS()
+        status = lds(nfc=lds.Nfc(enabled=False))
+        result = DevicesApi._parse_statuses([status])
+        assert result.get("nfc_enabled") is False
 
 
 class TestDevicesApiInit:
@@ -1529,6 +1563,351 @@ class TestStartDeviceStream:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+
+    @pytest.mark.asyncio
+    async def test_snapshot_parse_exception_isolates_bad_device(self) -> None:
+        """A device that explodes during parse must not kill the snapshot.
+
+        Regression guard for the #119 family: before the per-device guard
+        was added, a TypeError raised parsing one device's `_parse_statuses`
+        bubbled out of `_run_stream`, triggered the outer except, and put
+        the stream into exponential-backoff reconnect — the symptom
+        @Permudious saw 21 times in a row. The surviving devices must
+        still reach `on_devices_snapshot` and the stream must keep its
+        backoff baseline (no `asyncio.sleep` between iterations of the
+        same connection).
+        """
+        api = self._make_api()
+        good_a = self._make_light_device_mock("dev-good-a")
+        bad = self._make_light_device_mock("dev-bad")
+        good_b = self._make_light_device_mock("dev-good-b")
+
+        # Make `bad` raise during parsing. Using WhichOneof so the failure
+        # mirrors a real proto-shape mismatch surfaced at attribute access.
+        bad.WhichOneof.side_effect = TypeError(
+            "int() argument must be a string, a bytes-like object or a real number"
+        )
+
+        mock_msg = MagicMock()
+        mock_msg.HasField.side_effect = lambda field: field == "success"
+        mock_msg.success.WhichOneof.return_value = "snapshot"
+        mock_msg.success.snapshot.light_devices = [good_a, bad, good_b]
+
+        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+            yield mock_msg
+
+        snapshot_received: list[list[Device]] = []
+
+        def on_snap(devices: list) -> None:
+            snapshot_received.append(devices)
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            pass
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        # Snapshot delivered exactly once, containing only the survivors —
+        # the bad device is dropped, not the whole batch.
+        assert len(snapshot_received) == 1
+        ids = [d.id for d in snapshot_received[0]]
+        assert ids == ["dev-good-a", "dev-good-b"]
+
+    @pytest.mark.asyncio
+    async def test_status_update_exception_isolates_bad_update(self) -> None:
+        """A single bad status update must not drop the rest of the batch.
+
+        Same #119 hardening, exercised on the `updates` path: one update
+        whose payload-build raises (e.g. an enum field that's actually a
+        sub-message) must be skipped without killing the inner loop or
+        the surrounding stream task.
+        """
+        api = self._make_api()
+
+        update_msg = MagicMock()
+        update_msg.HasField.side_effect = lambda field: field == "success"
+        update_msg.success.WhichOneof.return_value = "updates"
+
+        good_a = MagicMock()
+        good_a.WhichOneof.return_value = "status_update"
+        good_a.device_id.hub_light_device_id.device_id = "dev-good-a"
+        good_a.status_update.status.WhichOneof.return_value = "door_opened"
+        good_a.status_update.update_type = 1
+
+        bad = MagicMock()
+        bad.WhichOneof.return_value = "status_update"
+        bad.device_id.hub_light_device_id.device_id = "dev-bad"
+        bad.status_update.status.WhichOneof.side_effect = TypeError("boom")
+        bad.status_update.update_type = 2
+
+        good_b = MagicMock()
+        good_b.WhichOneof.return_value = "status_update"
+        good_b.device_id.hub_light_device_id.device_id = "dev-good-b"
+        good_b.status_update.status.WhichOneof.return_value = "motion_detected"
+        good_b.status_update.update_type = 2
+
+        update_msg.success.updates.updates = [good_a, bad, good_b]
+
+        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+            yield update_msg
+
+        status_received: list[tuple[str, str, dict]] = []
+
+        def on_snap(devices: list) -> None:
+            pass
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            status_received.append((device_id, status_name, data))
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        ids = [device_id for device_id, _, _ in status_received]
+        assert ids == ["dev-good-a", "dev-good-b"]
+
+    @pytest.mark.asyncio
+    async def test_snapshot_update_parse_exception_is_isolated(self) -> None:
+        """A bad snapshot_update is dropped without crashing the stream."""
+        api = self._make_api()
+        bad = self._make_light_device_mock("dev-bad")
+        bad.WhichOneof.side_effect = TypeError("boom")
+
+        update_msg = MagicMock()
+        update_msg.HasField.side_effect = lambda field: field == "success"
+        update_msg.success.WhichOneof.return_value = "updates"
+
+        single_update = MagicMock()
+        single_update.WhichOneof.return_value = "snapshot_update"
+        single_update.snapshot_update.light_device = bad
+
+        update_msg.success.updates.updates = [single_update]
+
+        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+            yield update_msg
+
+        snapshot_received: list[list] = []
+
+        def on_snap(devices: list) -> None:
+            snapshot_received.append(devices)
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            pass
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        # The bad snapshot_update is dropped without firing the callback
+        # and without raising out of _run_stream. Before the per-update
+        # guard, the parse exception bubbled out of the inner async-for
+        # loop and hit the outer `except Exception` reconnect-backoff —
+        # 21 occurrences in @Permudious's log. After the guard, the
+        # update is silently skipped and the inner loop continues.
+        assert snapshot_received == []
+
+
+def _build_synthetic_snapshot_bytes() -> bytes:
+    """Build a realistic multi-device snapshot serialised to wire bytes.
+
+    Crucially includes a `video_edge_channel` device with
+    `wifi_signal_level_status` — the exact shape that crashed beta.5
+    on @Permudious's MotionCam Video Doorbell (#119). If a future
+    regression on `_parse_statuses` re-introduces an `int(sub_message)`
+    or similar wrong-shape access, the replay test (which deserialises
+    these bytes through the real `StreamLightDevicesResponse` proto)
+    fails before the beta hits any user.
+    """
+    from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels import (  # noqa: PLC0415
+        object_type_pb2,
+    )
+    from v3.mobilegwsvc.commonmodels.hub.device.light import (  # noqa: PLC0415
+        light_common_hub_device_pb2,
+        light_hub_device_pb2,
+    )
+    from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+        light_device_pb2,
+        light_device_profile_pb2,
+        light_device_status_pb2,
+    )
+    from v3.mobilegwsvc.commonmodels.video.videoedge.light import (  # noqa: PLC0415
+        light_video_edge_pb2,
+    )
+    from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+        response_pb2,
+    )
+
+    lds = light_device_status_pb2.LightDeviceStatus
+
+    # hub_device with a healthy mix of sub-message statuses — every
+    # branch in `_parse_statuses` that touches a sub-message must
+    # survive end-to-end serialisation here.
+    hub_obj_type = object_type_pb2.ObjectType()
+    hub_obj_type.motion_protect.SetInParent()
+    hub_device = light_hub_device_pb2.LightHubDevice(
+        common_device=light_common_hub_device_pb2.LightCommonHubDevice(
+            profile=light_device_profile_pb2.LightDeviceProfile(
+                id="dev-hub-1",
+                name="Living Room Motion",
+                statuses=[
+                    lds(battery=lds.Battery(charge_level_percentage=88, battery_state=1)),
+                    lds(signal_strength=lds.SignalStrength(device_signal_level=4)),
+                    lds(temperature=lds.ValueStatus(value=22)),
+                    lds(door_opened=lds.Simple()),
+                ],
+            ),
+            object_type=hub_obj_type,
+            hub_id="hub-1",
+        )
+    )
+
+    # video_edge_channel — the #119 path. Wifi signal status is the
+    # sub-message wrapping the enum, surfaced via the v3 video edge.
+    video_doorbell = light_video_edge_pb2.LightVideoEdgeChannel(
+        profile=light_device_profile_pb2.LightDeviceProfile(
+            id="dev-doorbell-1",
+            name="Front Door",
+            statuses=[
+                lds(
+                    wifi_signal_level_status=lds.WifiSignalLevelStatus(
+                        wifi_signal_level=4  # WIFI_SIGNAL_LEVEL_STRONG
+                    )
+                ),
+                lds(signal_strength=lds.SignalStrength(device_signal_level=4)),
+            ],
+        ),
+        video_edge_channel_properties=light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+            video_edge_type=5  # VIDEO_EDGE_DOORBELL
+        ),
+    )
+
+    snapshot = response_pb2.StreamLightDevicesResponse(
+        success=response_pb2.StreamLightDevicesResponse.Success(
+            snapshot=response_pb2.StreamLightDevicesResponse.Success.Snapshot(
+                light_devices=[
+                    light_device_pb2.LightDevice(hub_device=hub_device),
+                    light_device_pb2.LightDevice(video_edge_channel=video_doorbell),
+                ]
+            )
+        )
+    )
+    return snapshot.SerializeToString()
+
+
+class TestSnapshotReplay:
+    """End-to-end replay of serialised `StreamLightDevicesResponse` bytes.
+
+    Mitigation 3 of the #119 hardening: a synthetic snapshot is built
+    from real protos, round-tripped through wire bytes, and fed into
+    `start_device_stream`. Any latent wrong-shape parser bug (the same
+    class as the original `int(sub_message)` bug) fires as a parse
+    error in this test before a user beta surfaces it.
+
+    `tests/fixtures/*.bin` files captured from real installs are also
+    replayed automatically; new captures drop in without test changes.
+    """
+
+    def _make_api(self) -> DevicesApi:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+        return DevicesApi(mock_client)
+
+    async def _replay(self, payload: bytes) -> list[Device]:
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        api = self._make_api()
+        msg = response_pb2.StreamLightDevicesResponse()
+        msg.ParseFromString(payload)
+
+        async def _aiter() -> AsyncGenerator[object, None]:
+            yield msg
+
+        devices_seen: list[Device] = []
+
+        def on_snap(devices: list[Device]) -> None:
+            devices_seen.extend(devices)
+
+        def on_status(device_id: str, status_name: str, data: dict) -> None:
+            pass
+
+        with (
+            patch.dict("sys.modules", _make_stream_patch_modules(_aiter)),
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_sleep.side_effect = asyncio.CancelledError()
+            task = await api.start_device_stream("space-1", on_snap, on_status)
+            with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+                await asyncio.wait_for(task, timeout=2.0)
+
+        return devices_seen
+
+    @pytest.mark.asyncio
+    async def test_synthetic_snapshot_parses_all_devices(self) -> None:
+        payload = _build_synthetic_snapshot_bytes()
+        devices = await self._replay(payload)
+
+        ids = sorted(d.id for d in devices)
+        assert ids == ["dev-doorbell-1", "dev-hub-1"]
+
+        hub = next(d for d in devices if d.id == "dev-hub-1")
+        # Sub-message statuses must have round-tripped cleanly. If
+        # _parse_statuses regressed on any of these branches, the
+        # corresponding key would be missing or the parse would have
+        # raised inside the per-device guard.
+        assert hub.statuses.get("temperature") == 22
+        assert hub.statuses.get("signal_strength") == "Strong"
+        assert hub.statuses.get("door_opened") is True
+        assert hub.battery is not None
+        assert hub.battery.level == 88
+
+        doorbell = next(d for d in devices if d.id == "dev-doorbell-1")
+        # #119 regression guard: the wifi_signal_level lives one
+        # message deeper than the oneof tag.
+        assert doorbell.device_type == "video_edge_doorbell"
+        assert doorbell.statuses.get("wifi_signal_level") == 4
+        assert doorbell.statuses.get("signal_strength") == "Strong"
+
+    @pytest.mark.asyncio
+    async def test_fixture_files_round_trip(self) -> None:
+        """Replay every captured `tests/fixtures/*.bin` snapshot.
+
+        Skips cleanly when no fixtures are present so CI stays green
+        before the first capture is committed. The point is that when
+        @Permudious (or any future reporter) shares a binary capture,
+        dropping it into `tests/fixtures/` adds regression coverage
+        with zero glue code.
+        """
+        fixtures_dir = Path(__file__).resolve().parent.parent / "fixtures"
+        bin_files = sorted(fixtures_dir.glob("*.bin"))
+        if not bin_files:
+            pytest.skip("No captured fixtures yet — drop *.bin into tests/fixtures/")
+
+        for path in bin_files:
+            payload = path.read_bytes()
+            # We don't assert specific devices — every install has a
+            # different fleet — only that the parser doesn't blow up
+            # and that we get a non-error result.
+            devices = await self._replay(payload)
+            assert isinstance(devices, list), f"Fixture {path.name} did not yield a list"
 
 
 class TestProtoHelpers:

@@ -531,6 +531,94 @@ class DevicesApi:
 
         return devices
 
+    def _handle_update(
+        self,
+        update: Any,  # noqa: ANN401
+        on_devices_snapshot: Callable[[list[Device]], None],
+        on_status_update: Callable[[str, str, dict[str, Any]], None],
+    ) -> None:
+        """Dispatch a single LightDeviceUpdate.
+
+        Extracted out of the stream loop so the caller can wrap each
+        update in try/except — one bad update must not kill the inner
+        async-for loop (#119).
+        """
+        update_kind = update.WhichOneof("update")
+        if update_kind == "status_update":
+            try:
+                device_id = update.device_id.hub_light_device_id.device_id
+            except AttributeError:
+                _LOGGER.debug("Could not extract device_id from update")
+                return
+
+            status = update.status_update.status
+            status_name = status.WhichOneof("status")
+            if status_name is None:
+                return
+
+            op = int(update.status_update.update_type)
+            payload: dict[str, Any] = {"op": op}
+            if status_name in ("wire_input_status", "transmitter_status"):
+                sub = getattr(status, status_name)
+                if hasattr(sub, "is_alert"):
+                    payload["is_alert"] = bool(sub.is_alert)
+                if hasattr(sub, "type"):
+                    payload["alarm_type"] = _ALARM_TYPE_NAMES.get(int(sub.type), "unspecified")
+            elif status_name == "temperature":
+                payload["value"] = status.temperature.value
+            elif status_name == "life_quality":
+                lq = status.life_quality
+                values: dict[str, Any] = {}
+                if hasattr(lq, "actual_temperature"):
+                    values["temperature"] = lq.actual_temperature
+                if hasattr(lq, "actual_humidity"):
+                    values["humidity"] = lq.actual_humidity
+                if hasattr(lq, "actual_co2"):
+                    values["co2"] = lq.actual_co2
+                if values:
+                    payload["values"] = values
+            elif status_name == "signal_strength":
+                signal_int = int(status.signal_strength.device_signal_level)
+                payload["value"] = _SIGNAL_LEVEL_MAP.get(signal_int, f"Unknown ({signal_int})")
+            elif status_name == "gsm_status":
+                gsm = status.gsm_status
+                gsm_int = int(gsm.type) if hasattr(gsm, "type") else 0
+                payload["values"] = {
+                    "mobile_network_type": _GSM_TYPE_MAP.get(gsm_int, "Unknown"),
+                    "gsm_connected": (int(gsm.status) == 2 if hasattr(gsm, "status") else False),
+                }
+            elif status_name == "monitoring":
+                payload["value"] = (
+                    bool(status.monitoring.cms_active)
+                    if hasattr(status.monitoring, "cms_active")
+                    else False
+                )
+            elif status_name == "sim_status":
+                sim_int = (
+                    int(status.sim_status.sim_card_status)
+                    if hasattr(status.sim_status, "sim_card_status")
+                    else 0
+                )
+                payload["value"] = _SIM_STATUS_MAP.get(sim_int, f"Unknown ({sim_int})")
+            elif status_name == "nfc":
+                payload["value"] = (
+                    bool(status.nfc.enabled) if hasattr(status.nfc, "enabled") else True
+                )
+            elif status_name == "wifi_signal_level_status":
+                # Sub-message wrapping the enum, not a plain int (#119).
+                sub = getattr(status, "wifi_signal_level_status", None)
+                payload["value"] = (
+                    int(getattr(sub, "wifi_signal_level", 0)) if sub is not None else 0
+                )
+            elif status_name == "smart_lock":
+                payload["value"] = _SMART_LOCK_STATE_MAP.get(int(status.smart_lock), "unknown")
+
+            on_status_update(device_id, status_name, payload)
+        elif update_kind == "snapshot_update":
+            device = self.parse_device(update.snapshot_update.light_device)
+            if device is not None:
+                on_devices_snapshot([device])
+
     async def start_device_stream(
         self,
         space_id: str,
@@ -571,7 +659,20 @@ class DevicesApi:
                             if which == "snapshot":
                                 devices: list[Device] = []
                                 for light_device in msg.success.snapshot.light_devices:
-                                    device = self.parse_device(light_device)
+                                    # Per-device guard: one bad LightDevice
+                                    # (latent parser bug exposed by a new
+                                    # oneof case — see #119) must not kill
+                                    # the snapshot or trigger reconnect.
+                                    try:
+                                        device = self.parse_device(light_device)
+                                    except Exception:  # noqa: BLE001
+                                        _LOGGER.warning(
+                                            "Skipping device in snapshot for space %s "
+                                            "due to parse error",
+                                            space_id,
+                                            exc_info=True,
+                                        )
+                                        continue
                                     if device is not None:
                                         devices.append(device)
                                 on_devices_snapshot(devices)
@@ -579,113 +680,21 @@ class DevicesApi:
                                 backoff = 5.0
                             elif which == "updates":
                                 for update in msg.success.updates.updates:
-                                    update_kind = update.WhichOneof("update")
-                                    if update_kind == "status_update":
-                                        try:
-                                            device_id = (
-                                                update.device_id.hub_light_device_id.device_id
-                                            )
-                                        except AttributeError:
-                                            _LOGGER.debug("Could not extract device_id from update")
-                                            continue
-
-                                        status = update.status_update.status
-                                        status_name = status.WhichOneof("status")
-                                        if status_name is None:
-                                            continue
-
-                                        op = int(update.status_update.update_type)
-                                        payload: dict[str, Any] = {"op": op}
-                                        if status_name in (
-                                            "wire_input_status",
-                                            "transmitter_status",
-                                        ):
-                                            sub = getattr(status, status_name)
-                                            if hasattr(sub, "is_alert"):
-                                                payload["is_alert"] = bool(sub.is_alert)
-                                            if hasattr(sub, "type"):
-                                                payload["alarm_type"] = _ALARM_TYPE_NAMES.get(
-                                                    int(sub.type), "unspecified"
-                                                )
-                                        elif status_name == "temperature":
-                                            payload["value"] = status.temperature.value
-                                        elif status_name == "life_quality":
-                                            lq = status.life_quality
-                                            values: dict[str, Any] = {}
-                                            if hasattr(lq, "actual_temperature"):
-                                                values["temperature"] = lq.actual_temperature
-                                            if hasattr(lq, "actual_humidity"):
-                                                values["humidity"] = lq.actual_humidity
-                                            if hasattr(lq, "actual_co2"):
-                                                values["co2"] = lq.actual_co2
-                                            if values:
-                                                payload["values"] = values
-                                        elif status_name == "signal_strength":
-                                            signal_int = int(
-                                                status.signal_strength.device_signal_level
-                                            )
-                                            payload["value"] = _SIGNAL_LEVEL_MAP.get(
-                                                signal_int, f"Unknown ({signal_int})"
-                                            )
-                                        elif status_name == "gsm_status":
-                                            gsm = status.gsm_status
-                                            gsm_int = int(gsm.type) if hasattr(gsm, "type") else 0
-                                            payload["values"] = {
-                                                "mobile_network_type": _GSM_TYPE_MAP.get(
-                                                    gsm_int, "Unknown"
-                                                ),
-                                                "gsm_connected": (
-                                                    int(gsm.status) == 2
-                                                    if hasattr(gsm, "status")
-                                                    else False
-                                                ),
-                                            }
-                                        elif status_name == "monitoring":
-                                            payload["value"] = (
-                                                bool(status.monitoring.cms_active)
-                                                if hasattr(status.monitoring, "cms_active")
-                                                else False
-                                            )
-                                        elif status_name == "sim_status":
-                                            sim_int = (
-                                                int(status.sim_status.sim_card_status)
-                                                if hasattr(status.sim_status, "sim_card_status")
-                                                else 0
-                                            )
-                                            payload["value"] = _SIM_STATUS_MAP.get(
-                                                sim_int, f"Unknown ({sim_int})"
-                                            )
-                                        elif status_name == "nfc":
-                                            payload["value"] = (
-                                                bool(status.nfc.enabled)
-                                                if hasattr(status.nfc, "enabled")
-                                                else True
-                                            )
-                                        elif status_name == "wifi_signal_level_status":
-                                            # Sub-message wrapping the enum,
-                                            # not a plain int (#119).
-                                            sub = getattr(status, "wifi_signal_level_status", None)
-                                            payload["value"] = (
-                                                int(getattr(sub, "wifi_signal_level", 0))
-                                                if sub is not None
-                                                else 0
-                                            )
-                                        elif status_name == "smart_lock":
-                                            payload["value"] = _SMART_LOCK_STATE_MAP.get(
-                                                int(status.smart_lock), "unknown"
-                                            )
-
-                                        on_status_update(
-                                            device_id,
-                                            status_name,
-                                            payload,
+                                    # Per-update guard: one malformed update
+                                    # (bad sub-message shape, unknown enum,
+                                    # etc.) must not kill the inner loop.
+                                    # See #119 hardening notes.
+                                    try:
+                                        self._handle_update(
+                                            update, on_devices_snapshot, on_status_update
                                         )
-                                    elif update_kind == "snapshot_update":
-                                        device = self.parse_device(
-                                            update.snapshot_update.light_device
+                                    except Exception:  # noqa: BLE001
+                                        _LOGGER.warning(
+                                            "Skipping device update for space %s "
+                                            "due to parse error",
+                                            space_id,
+                                            exc_info=True,
                                         )
-                                        if device is not None:
-                                            on_devices_snapshot([device])
                         elif msg.HasField("failure"):
                             _LOGGER.error(
                                 "Device stream failure for space %s: %s",
