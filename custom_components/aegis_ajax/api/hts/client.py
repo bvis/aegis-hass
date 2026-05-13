@@ -598,6 +598,16 @@ class HtsClient:
                 self._on_state_update(hub_id, new_state)
             return
 
+        # Sub-key 11 is the hub-network delta channel. The longer variants
+        # (~50 bytes) carry the anchor keys we recognise and are handled
+        # above. Shorter variants (~34 bytes) appear every few seconds on
+        # some firmwares and only carry fields we don't surface. Falling
+        # through to `_schedule_hub_refresh` here meant a `REQUEST_FULL_
+        # SETTINGS + REQUEST_FULL_STATUS` round-trip on every heartbeat
+        # (#111) — same parser, same keys, no new information. Drop it. (#111)
+        if sub_key == 11:
+            return
+
         self._schedule_hub_refresh(hub_id, f"unknown update sub-key {sub_key}")
 
     def _hub_id_from_message(self, msg: HtsMessage) -> str | None:

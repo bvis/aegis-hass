@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **HTS `sub-key 11` heartbeats no longer trigger a full snapshot refresh on every tick.** @Hansontech190 and @b0arkz observed `Hub <id>: requesting fresh HTS snapshot after unknown update sub-key 11` firing every few seconds, each time pulling a `REQUEST_FULL_SETTINGS + REQUEST_FULL_STATUS` round-trip (~8.6 KB) from the Ajax cloud. Sub-key 11 is the hub-network delta channel: longer variants (~50 byte payload) carry the anchor keys we already parse, shorter variants (~34 byte payload) only carry fields we don't surface. Both flow through the same `parse_hub_params`, so the refresh round-trip could not learn anything the next long-form delta wouldn't carry on its own. The handler now drops the short variants silently and only escalates to a snapshot refresh on genuinely unknown sub-keys. Net effect on affected installs: zero behaviour change for hub-network sensors, large drop in HTS traffic and idle CPU. (#111)
+
 ## [1.3.0-beta.7] - 2026-05-13
 
 Seventh beta of the `1.3.0` line. Hardening pass on top of `beta.6`. No Ajax wire-protocol changes; no entity-level behaviour change for healthy installs.

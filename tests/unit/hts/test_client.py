@@ -392,6 +392,77 @@ class TestHandleUpdate:
         client.request_hub_data.assert_awaited_once_with("12345678")
 
     @pytest.mark.asyncio
+    async def test_subkey_11_with_anchor_keys_updates_state_without_refresh(self) -> None:
+        # Regression for #111: short deltas on sub-key 11 carry no anchor
+        # keys and used to fire a full-snapshot refresh on every heartbeat.
+        # The long-form variant (50 byte payload with anchor keys) must
+        # still parse and update hub state — that's the path real
+        # network changes flow through.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._hub_states["12345678"] = HubNetworkState(ethernet_connected=True)
+        client._on_state_update = MagicMock()
+        client.request_hub_data = AsyncMock()
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",  # sub-key 11
+                    b"\x48",  # KEY_ACTIVE_CHANNELS — anchor key, marks as network delta
+                    b"\x02",  # wifi bit set
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        state = client.hub_states["12345678"]
+        assert state.wifi_connected is True
+        client._on_state_update.assert_called_once_with("12345678", state)
+        client.request_hub_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_subkey_11_without_anchor_keys_drops_silently(self) -> None:
+        # Regression for #111: Hansontech190 and b0arkz reported sub-key
+        # 11 messages every few seconds with a 34-byte payload that
+        # contained no anchor keys. The handler used to fall through to
+        # `_schedule_hub_refresh` and trigger a full settings+status
+        # round-trip per heartbeat. Now the handler drops these without
+        # firing a refresh — the same parser would not learn anything
+        # new from the snapshot, so the round-trip is pure stress on the
+        # Ajax cloud and HA's event loop.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._on_state_update = MagicMock()
+        client.request_hub_data = AsyncMock()
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",  # sub-key 11
+                    b"\x99",  # unknown key
+                    b"\x01",  # opaque value
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+        await asyncio.sleep(0)
+
+        client.request_hub_data.assert_not_called()
+        client._on_state_update.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_listen_keeps_connection_open_on_idle_read_timeout(self) -> None:
         client = _make_client()
         client._connected = True
