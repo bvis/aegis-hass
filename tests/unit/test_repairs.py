@@ -9,6 +9,7 @@ import pytest
 from custom_components.aegis_ajax.const import DOMAIN
 from custom_components.aegis_ajax.repairs import (
     ISSUE_FCM_CREDENTIALS_INVALID,
+    ISSUE_FCM_NOT_CONFIGURED,
     ISSUE_GRPCIO_VERSION_MISMATCH,
     ISSUE_HTS_CHRONIC_FAILURE,
     ISSUE_HUB_OFFLINE_24H,
@@ -17,10 +18,12 @@ from custom_components.aegis_ajax.repairs import (
     _parse_version,
     async_check_grpcio_version,
     async_clear_fcm_credentials_invalid,
+    async_clear_fcm_not_configured,
     async_clear_hts_chronic_failure,
     async_clear_hub_offline,
     async_create_fix_flow,
     async_register_fcm_credentials_invalid,
+    async_register_fcm_not_configured,
     async_register_hts_chronic_failure,
     async_register_hub_offline,
 )
@@ -96,6 +99,31 @@ class TestFcmCredentialsRepair:
         kwargs = create.call_args.kwargs
         assert kwargs["is_fixable"] is True
         assert kwargs["data"] == {"entry_id": "entry-abc"}
+
+
+class TestFcmNotConfiguredRepair:
+    def test_register_per_entry(self) -> None:
+        hass = MagicMock()
+        with patch("custom_components.aegis_ajax.repairs.ir.async_create_issue") as create:
+            async_register_fcm_not_configured(hass, entry_id="entry-abc")
+
+        create.assert_called_once()
+        args, kwargs = create.call_args
+        assert args[2] == f"{ISSUE_FCM_NOT_CONFIGURED}:entry-abc"
+        # `not configured` is a WARNING — feature missing, not an error. `invalid`
+        # stays ERROR because the user actively configured wrong values.
+        from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+        assert kwargs["severity"] == ir.IssueSeverity.WARNING
+        assert kwargs["is_fixable"] is True
+        assert kwargs["data"] == {"entry_id": "entry-abc"}
+
+    def test_clear_per_entry(self) -> None:
+        hass = MagicMock()
+        with patch("custom_components.aegis_ajax.repairs.ir.async_delete_issue") as delete:
+            async_clear_fcm_not_configured(hass, entry_id="entry-abc")
+
+        delete.assert_called_once_with(hass, DOMAIN, f"{ISSUE_FCM_NOT_CONFIGURED}:entry-abc")
 
 
 class TestParseVersion:
@@ -277,6 +305,16 @@ class TestAsyncCreateFixFlow:
         flow = await async_create_fix_flow(hass, f"{ISSUE_FCM_CREDENTIALS_INVALID}:entry-xyz", None)
         assert isinstance(flow, FcmCredentialsRepairFlow)
         assert flow._entry_id == "entry-xyz"
+
+    @pytest.mark.asyncio
+    async def test_returns_fcm_flow_for_not_configured_issue(self) -> None:
+        """`fcm_not_configured` uses the same form as `fcm_credentials_invalid`."""
+        hass = MagicMock()
+        flow = await async_create_fix_flow(
+            hass, f"{ISSUE_FCM_NOT_CONFIGURED}:entry-abc", {"entry_id": "entry-abc"}
+        )
+        assert isinstance(flow, FcmCredentialsRepairFlow)
+        assert flow._entry_id == "entry-abc"
 
     @pytest.mark.asyncio
     async def test_falls_back_to_confirm_flow_for_unknown_issue(self) -> None:

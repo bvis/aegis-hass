@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",
             "description": "Firebase Cloud Messaging-registratie is voor dit account mislukt. De ingestelde FCM Project ID / App ID / API Key / Sender ID komen waarschijnlijk niet overeen met je co-branded Ajax-app, of de API-sleutel is ingetrokken. Push-afhankelijke functies (directe arm/disarm-status, security_event-entiteit, foto-URL's van MotionCam) vallen terug op langzamere polling totdat dit is opgelost. Open het menu Configureren van de integratie om de FCM-inloggegevens opnieuw in te voeren - zie de sectie 'How to obtain FCM credentials' in de README."
+        },
+        "fcm_not_configured": {
+            "title": "Pushmeldingen niet geconfigureerd — realtime gebeurtenissen uitgeschakeld",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Aegis FCM-inloggegevens configureren",
+                        "description": "Voor dit account zijn nooit FCM-inloggegevens ingesteld, dus realtime gebeurtenissen van Ajax (deurbel, in/uit schakelen, alarm) kunnen Home Assistant niet bereiken — de integratie valt terug op pollen elke 5 minuten. Vul hieronder de vier FCM-waarden van je co-branded Ajax-app in en de integratie wordt opnieuw geladen. Zie de sectie 'How to obtain FCM credentials' in de README voor instructies om ze uit te lezen.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Het Aegis-account waarvoor deze Repair is aangemaakt, is niet meer geconfigureerd. Niets te repareren."
+                }
+            }
         }
     },
     "entity": {

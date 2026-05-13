@@ -174,6 +174,26 @@
                 }
             }
         },
+        "fcm_not_configured": {
+            "title": "Push notifications not configured — real-time events disabled",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Configure Aegis FCM credentials",
+                        "description": "FCM credentials have never been set for this account, so real-time events from Ajax (doorbell ring, arm/disarm pushes, alarm) cannot reach Home Assistant — the integration falls back to polling every 5 minutes. Enter the four FCM values for your co-branded Ajax app below and the integration will reload. See the README's 'How to obtain FCM credentials' section for how to extract them from your Ajax app.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "The Aegis account this Repair was raised for is no longer configured. Nothing to fix."
+                }
+            }
+        },
         "grpcio_version_mismatch": {
             "title": "Aegis needs grpcio {required} or newer (found {current})",
             "description": "Aegis depends on `grpcio` for the gRPC channel that talks to the Ajax cloud, and your Home Assistant install ships `grpcio` {current}. Login can fail with cryptic HTTP/2 errors below {required}. On Home Assistant Core or Container the integration manifest pins the version on install, but on Home Assistant OS the runtime ships system-wide grpcio that this manifest cannot influence — you'll typically need to upgrade Home Assistant OS to a build that includes a newer grpcio. The Repair clears automatically on the next reload once the version crosses {required}."

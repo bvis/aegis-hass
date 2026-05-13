@@ -35,6 +35,7 @@ DOCS_BASE_URL = "https://github.com/bvis/aegis-hass#"
 ISSUE_HUB_OFFLINE_24H = "hub_offline_24h"
 ISSUE_HTS_CHRONIC_FAILURE = "hts_chronic_failure"
 ISSUE_FCM_CREDENTIALS_INVALID = "fcm_credentials_invalid"
+ISSUE_FCM_NOT_CONFIGURED = "fcm_not_configured"
 ISSUE_GRPCIO_VERSION_MISMATCH = "grpcio_version_mismatch"
 
 # Floor below which the integration's gRPC calls have historically failed
@@ -125,6 +126,31 @@ def async_register_fcm_credentials_invalid(hass: HomeAssistant, *, entry_id: str
 
 def async_clear_fcm_credentials_invalid(hass: HomeAssistant, *, entry_id: str) -> None:
     ir.async_delete_issue(hass, DOMAIN, _issue_id(ISSUE_FCM_CREDENTIALS_INVALID, entry_id))
+
+
+def async_register_fcm_not_configured(hass: HomeAssistant, *, entry_id: str) -> None:
+    """FCM credentials are not set on this entry, so real-time pushes are off.
+
+    Distinct from `fcm_credentials_invalid` (which means keys were tried and
+    rejected): this fires when the four FCM fields are empty. Real-time
+    events (doorbell ring, arm/disarm pushes, alarm) won't reach HA until
+    keys are entered. Fixable in-place via `FcmCredentialsRepairFlow`,
+    same form as the invalid-credentials repair.
+    """
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _issue_id(ISSUE_FCM_NOT_CONFIGURED, entry_id),
+        is_fixable=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=ISSUE_FCM_NOT_CONFIGURED,
+        data={"entry_id": entry_id},
+        learn_more_url=f"{DOCS_BASE_URL}push-notifications-fcm",
+    )
+
+
+def async_clear_fcm_not_configured(hass: HomeAssistant, *, entry_id: str) -> None:
+    ir.async_delete_issue(hass, DOMAIN, _issue_id(ISSUE_FCM_NOT_CONFIGURED, entry_id))
 
 
 def _parse_version(value: str) -> tuple[int, ...]:
@@ -242,9 +268,10 @@ async def async_create_fix_flow(
     data: dict[str, str | int | float | None] | None,
 ) -> RepairsFlow:
     """HA discovery hook — returns the right flow for each fixable issue."""
-    if issue_id.startswith(f"{ISSUE_FCM_CREDENTIALS_INVALID}:"):
-        entry_id = (data or {}).get("entry_id") or issue_id.split(":", 1)[1]
-        return FcmCredentialsRepairFlow(str(entry_id))
+    for prefix in (ISSUE_FCM_CREDENTIALS_INVALID, ISSUE_FCM_NOT_CONFIGURED):
+        if issue_id.startswith(f"{prefix}:"):
+            entry_id = (data or {}).get("entry_id") or issue_id.split(":", 1)[1]
+            return FcmCredentialsRepairFlow(str(entry_id))
     # Fall back: HA's built-in confirm-only flow. Should not be hit since
     # we only mark FCM as fixable today.
     from homeassistant.components.repairs import ConfirmRepairFlow  # noqa: PLC0415

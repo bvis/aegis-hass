@@ -21,7 +21,9 @@ from custom_components.aegis_ajax.const import (
 )
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
+    async_clear_fcm_not_configured,
     async_register_fcm_credentials_invalid,
+    async_register_fcm_not_configured,
 )
 
 if TYPE_CHECKING:
@@ -99,11 +101,16 @@ class AjaxNotificationListener:
         # credentials roundtrip can re-raise it from a clean slate.
         if self._entry_id:
             async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
+            async_clear_fcm_not_configured(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
-            _LOGGER.info(
-                "FCM credentials not configured — push notifications disabled. "
-                "Configure them in the integration's Options to enable real-time pushes."
+            _LOGGER.warning(
+                "FCM credentials not configured — push notifications disabled, "
+                "real-time events (doorbell ring, arm/disarm, alarm) will not reach HA. "
+                "Configure them in Settings → Devices & Services → Aegis for Ajax → Configure, "
+                "or open the Repair card surfaced under Settings → Repairs."
             )
+            if self._entry_id:
+                async_register_fcm_not_configured(self._hass, entry_id=self._entry_id)
             return
 
         try:

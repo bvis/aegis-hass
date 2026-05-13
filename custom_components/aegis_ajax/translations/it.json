@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Notifiche push disabilitate - credenziali FCM rifiutate",
             "description": "La registrazione Firebase Cloud Messaging non e riuscita per questo account. I valori FCM Project ID / App ID / API Key / Sender ID configurati probabilmente non corrispondono alla tua app Ajax co-branded, oppure la API key e stata revocata. Le funzionalita basate sul push (stato istantaneo di armato/disarmato, entita security_event, URL delle foto da MotionCam) ripiegheranno su polling piu lento finche non viene corretto. Apri il menu Configura dell'integrazione per reinserire le credenziali FCM - consulta la sezione 'How to obtain FCM credentials' del README."
+        },
+        "fcm_not_configured": {
+            "title": "Notifiche push non configurate — eventi in tempo reale disattivati",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Configurare le credenziali FCM di Aegis",
+                        "description": "Le credenziali FCM non sono mai state impostate per questo account, quindi gli eventi in tempo reale di Ajax (campanello, armo/disarmo, allarme) non possono raggiungere Home Assistant — l'integrazione ripiega sul polling ogni 5 minuti. Inserisci sotto i quattro valori FCM per la tua app Ajax co-brandizzata e l'integrazione verra ricaricata. Consulta la sezione 'How to obtain FCM credentials' del README per estrarli dalla tua app Ajax.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "L'account Aegis per cui e stato sollevato questo Repair non e piu configurato. Niente da riparare."
+                }
+            }
         }
     },
     "entity": {

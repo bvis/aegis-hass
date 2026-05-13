@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Repair card when FCM credentials are missing.** Surfaces under **Settings → Repairs** as "Push notifications not configured — real-time events disabled" with a one-click fix flow that re-uses the existing `fcm_credentials_invalid` form (Project ID / App ID / API Key / Sender ID). Real-time events (doorbell ring, arm/disarm pushes, alarm) require FCM, but until now an unconfigured install was completely silent — the only log line was at INFO level, which HA hides by default. The repair is raised on every integration start when no `fcm_api_key` is set and cleared on the first successful FCM start. Translations in all 14 locales. (#119, #129)
+
+### Changed
+- **"FCM credentials not configured" log promoted from INFO to WARNING.** Now visible in HA's default log level without enabling the integration's debug logger. Healthy installs (FCM configured and registered) remain log-silent during normal operation, so the rule becomes: no FCM line at WARNING = FCM is OK. (#119, #129)
+
 ## [1.3.0-beta.8] - 2026-05-13
 
 Eighth beta of the `1.3.0` line. Targeted HTS-traffic fix on top of `beta.7`. No Ajax wire-protocol changes; no entity-level behaviour change for healthy installs.

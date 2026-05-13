@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Notificacoes push desativadas - credenciais FCM rejeitadas",
             "description": "O registo no Firebase Cloud Messaging falhou para esta conta. Os valores configurados de FCM Project ID / App ID / API Key / Sender ID provavelmente nao correspondem a sua aplicacao Ajax co-branded, ou a chave da API foi revogada. As funcionalidades baseadas em push (estado instantaneo de armar/desarmar, entidade security_event, URLs de fotos do MotionCam) caem para polling mais lento ate a correcao. Abra o menu Configurar da integracao para introduzir novamente as credenciais FCM - consulte a seccao 'How to obtain FCM credentials' do README."
+        },
+        "fcm_not_configured": {
+            "title": "Notificacoes push nao configuradas — eventos em tempo real desativados",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Configurar credenciais FCM do Aegis",
+                        "description": "As credenciais FCM nunca foram definidas para esta conta, por isso os eventos em tempo real do Ajax (campainha, armar/desarmar, alarme) nao chegam ao Home Assistant — a integracao recorre a polling a cada 5 minutos. Introduz abaixo os quatro valores FCM para a tua app Ajax co-brand e a integracao sera recarregada. Consulta a seccao 'How to obtain FCM credentials' do README para os extrair.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "A conta Aegis para a qual este Repair foi gerado ja nao esta configurada. Nada a reparar."
+                }
+            }
         }
     },
     "entity": {

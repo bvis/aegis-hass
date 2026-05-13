@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Push bildirimleri devre disi - FCM kimlik bilgileri reddedildi",
             "description": "Bu hesap icin Firebase Cloud Messaging kaydi basarisiz oldu. Yapilandirilmis FCM Project ID / App ID / API Key / Sender ID degerleri buyuk olasilikla co-branded Ajax uygulamaniza karsilik gelmiyor veya API anahtari iptal edilmis. Push'a bagimli ozellikler (anlik armed/disarmed durumu, security_event varligi, MotionCam'den foto URL'leri) bu duzeltilene kadar daha yavas polling'e dusecektir. FCM kimlik bilgilerini yeniden girmek icin entegrasyonun Yapilandir menusunu acin - README'deki 'How to obtain FCM credentials' bolumune bakin."
+        },
+        "fcm_not_configured": {
+            "title": "Push bildirimleri yapilandirilmadi — gercek zamanli olaylar devre disi",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Aegis FCM kimlik bilgilerini yapilandir",
+                        "description": "Bu hesap icin FCM kimlik bilgileri hic ayarlanmadi, bu yuzden Ajax'tan gelen gercek zamanli olaylar (kapi zili, kurma/devre disi birakma, alarm) Home Assistant'a ulasamiyor — entegrasyon her 5 dakikada bir polling'e duser. Asagida co-brand Ajax uygulamaniz icin dort FCM degerini girin ve entegrasyon yeniden yuklenecek. Bunlari uygulamanizdan cikarmak icin README'deki 'How to obtain FCM credentials' bolumune bakin.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Bu Repair'in olusturuldugu Aegis hesabi artik yapilandirilmadi. Onarilacak bir sey yok."
+                }
+            }
         }
     },
     "entity": {

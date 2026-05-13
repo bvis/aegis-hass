@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Push-сповіщення вимкнено — облікові дані FCM відхилено",
             "description": "Реєстрація Firebase Cloud Messaging не вдалась для цього облікового запису. Налаштовані FCM Project ID / App ID / API Key / Sender ID, ймовірно, не відповідають вашому co-branded додатку Ajax, або API-ключ було відкликано. Функції, що залежать від push (миттєвий стан armed/disarmed, сутність security_event, URL-адреси фото з MotionCam), повернуться до повільнішого polling, доки це не буде виправлено. Відкрийте меню Налаштувати інтеграції, щоб повторно ввести облікові дані FCM — див. розділ 'How to obtain FCM credentials' у README."
+        },
+        "fcm_not_configured": {
+            "title": "Push-povidomlennia ne nalashtovano — podii v realnomu chasi vimkneno",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Nalashtuvaty FCM-poslidninnia dlia Aegis",
+                        "description": "FCM-poslidninnia nikoli ne buly nalashtovani dlia tsoho oblikovoho zapisu, tomu podii v realnomu chasi vid Ajax (dzvinok, armuvannia/rozarmuvannia, alarm) ne mozhut dosiahty Home Assistant — intehratsiia perekhodyt na opytuvannia kozhni 5 khvylyn. Vvedit nyzhche chotyry znachennia FCM dlia vashoho co-brand dodatka Ajax, i intehratsiia bude perezavantazhena. Dyvit sektsiiu 'How to obtain FCM credentials' u README, shchob yikh vydobuty.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Oblikovyi zapys Aegis, dlia yakoho bulo stvoreno tsei Repair, bilshe ne nalashtovanyi. Nichoho remontuvaty."
+                }
+            }
         }
     },
     "entity": {

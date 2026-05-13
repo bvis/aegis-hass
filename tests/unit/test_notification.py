@@ -239,8 +239,11 @@ class TestAsyncStartFcmRepairs:
     """The FCM listener raises a Repair when registration / push start fails."""
 
     @pytest.mark.asyncio
-    async def test_no_repair_when_fcm_unconfigured(self) -> None:
-        """No api_key → no Repair (push is just opt-out, not broken)."""
+    async def test_not_configured_repair_raised_when_fcm_unconfigured(self) -> None:
+        """No api_key → raise `fcm_not_configured` repair so the user gets a
+        visible nudge to enter keys via the Repair card, plus a WARNING log
+        line (instead of the previous silent INFO). `fcm_credentials_invalid`
+        is left alone — it's a different state (keys present but rejected)."""
         hass = MagicMock()
         coordinator = MagicMock()
         listener = AjaxNotificationListener(
@@ -256,15 +259,25 @@ class TestAsyncStartFcmRepairs:
         with (
             patch(
                 "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
-            ) as reg,
+            ) as reg_invalid,
             patch(
                 "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"
-            ) as clr,
+            ) as clr_invalid,
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_not_configured"
+            ) as reg_missing,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"
+            ) as clr_missing,
         ):
             await listener.async_start()
 
-        reg.assert_not_called()
-        clr.assert_called_once_with(hass, entry_id="entry-x")
+        reg_invalid.assert_not_called()
+        clr_invalid.assert_called_once_with(hass, entry_id="entry-x")
+        # Cleared once at the top of async_start (start with a clean slate)
+        # then re-registered after the missing-api-key check fires.
+        clr_missing.assert_called_once_with(hass, entry_id="entry-x")
+        reg_missing.assert_called_once_with(hass, entry_id="entry-x")
 
     @pytest.mark.asyncio
     async def test_register_failure_raises_repair(self) -> None:
@@ -287,6 +300,8 @@ class TestAsyncStartFcmRepairs:
                 "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
             ) as reg,
             patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
             patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
         ):
             await listener.async_start()

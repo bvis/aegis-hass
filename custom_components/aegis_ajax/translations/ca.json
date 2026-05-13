@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Notificacions push desactivades: credencials FCM rebutjades",
             "description": "El registre a Firebase Cloud Messaging ha fallat per a aquest compte. Probablement, el FCM Project ID / App ID / API Key / Sender ID configurats no es corresponen amb la teva app Ajax co-branded, o la API key s'ha revocat. Les funcions que depenen del push (estat instantani d'armat/desarmat, entitat security_event, URL de fotos de MotionCam) cauran a polling mes lent fins que es corregeixi. Obre el menu Configurar de la integracio per reintroduir les credencials FCM - consulta la seccio 'How to obtain FCM credentials' del README."
+        },
+        "fcm_not_configured": {
+            "title": "Notificacions push no configurades — esdeveniments en temps real desactivats",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Configurar credencials FCM d'Aegis",
+                        "description": "Les credencials FCM no s'han configurat mai per a aquest compte, de manera que els esdeveniments en temps real d'Ajax (timbre, armat/desarmat, alarma) no poden arribar a Home Assistant — la integracio recau en el sondeig cada 5 minuts. Introdueix els quatre valors FCM de la teva app Ajax co-branded a continuacio i la integracio es recarregara. Consulta la seccio 'How to obtain FCM credentials' del README.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "El compte d'Aegis per al qual s'ha generat aquest Repair ja no esta configurat. No hi ha res a reparar."
+                }
+            }
         }
     },
     "entity": {

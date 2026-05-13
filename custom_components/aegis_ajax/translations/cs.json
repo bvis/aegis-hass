@@ -161,6 +161,26 @@
         "fcm_credentials_invalid": {
             "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",
             "description": "Registrace Firebase Cloud Messaging selhala pro tento ucet. Konfigurovane hodnoty FCM Project ID / App ID / API Key / Sender ID pravdepodobne neodpovidaji vasi co-brandove aplikaci Ajax, nebo byl API klic zneplatnen. Funkce zavisle na pushi (okamzity stav armed/disarmed, entita security_event, URL fotek z MotionCam) prejdou na pomalejsi polling, dokud to nenapravite. Otevrete nabidku Konfigurovat integrace a zadejte znovu prihlasovaci udaje FCM - viz sekce 'How to obtain FCM credentials' v README."
+        },
+        "fcm_not_configured": {
+            "title": "Push notifikace nejsou nakonfigurovany — udalosti v realnem case zakazany",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Nakonfigurovat FCM prihlasovaci udaje pro Aegis",
+                        "description": "FCM prihlasovaci udaje nikdy nebyly pro tento ucet nastaveny, takze udalosti v realnem case od Ajax (zvoneni dvernich zvonku, zapnuti/vypnuti alarmu, alarm) nemohou dorazit do Home Assistant — integrace se vraci k pollingu kazdych 5 minut. Nize zadejte ctyri hodnoty FCM pro vasi co-brandovou aplikaci Ajax a integrace se znovu nacte. Postup ziskani najdete v sekci 'How to obtain FCM credentials' v README.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Ajaxsky ucet, pro ktery byl tento Repair vyvolan, jiz neni nakonfigurovan. Neni co opravovat."
+                }
+            }
         }
     },
     "entity": {
