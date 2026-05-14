@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **FCM registration / push-start failures now emit a cause-specific WARNING instead of a generic stack trace.** Until now every FCM error landed in the log as `FCM registration failed` plus a traceback, leaving the user with nothing actionable. The library raises plain `RuntimeError` / `Exception` with the cause encoded only in the message string, so the listener now classifies on substrings before logging: `Unable to establish subscription with Google Cloud Messaging` points the user at credential-set consistency (the four values must come from the same Firebase project); HTTP `403` / `API key not valid` describes the expected `fcm_api_key` format (`AIza` + 35 chars); network / DNS / timeout errors name the FCM hosts the HA host needs to reach; everything else falls back to the original message wrapped in `FCM registration failed: ...` so no signal is lost. No UI / Repair changes — same `fcm_credentials_invalid` card is raised in all failure paths, only the log gets sharper. (#131)
+
 ## [1.3.0-beta.9] - 2026-05-14
 
 Ninth beta of the `1.3.0` line. Surfaces FCM-misconfiguration as an actionable UI signal so users stop discovering it through silent real-time-event failures. No Ajax wire-protocol changes.

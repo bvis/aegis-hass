@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.aegis_ajax.notification import AjaxNotificationListener
+from custom_components.aegis_ajax.notification import (
+    AjaxNotificationListener,
+    _classify_fcm_failure,
+)
 
 _FCM_KWARGS = {
     "fcm_project_id": "test-project",
@@ -307,6 +310,61 @@ class TestAsyncStartFcmRepairs:
             await listener.async_start()
 
         reg.assert_called_once_with(hass, entry_id="entry-x")
+
+
+class TestClassifyFcmFailure:
+    """`_classify_fcm_failure` turns library errors into actionable WARNINGs (#131)."""
+
+    def test_gcm_subscription_rejection_points_at_project_consistency(self) -> None:
+        # Hansontech190's report: firebase-messaging raises this exact
+        # RuntimeError when the four credentials don't all belong to the
+        # same Firebase project. The user-facing message must steer them
+        # toward checking sender_id/app_id/project_id consistency, not
+        # toward extraction internals (no APK / cobrand / .so wording).
+        msg = _classify_fcm_failure(
+            RuntimeError("Unable to establish subscription with Google Cloud Messaging.")
+        )
+        assert "rejected by Google" in msg
+        assert "same Firebase project" in msg
+        assert "fcm_sender_id" in msg and "fcm_app_id" in msg and "fcm_project_id" in msg
+        # No leakage of extraction jargon to user logs
+        for forbidden in ("APK", "cobrand", "libnative", "strings.xml"):
+            assert forbidden not in msg
+
+    def test_403_api_key_rejection_explains_format(self) -> None:
+        msg = _classify_fcm_failure(RuntimeError("API key not valid. Please pass a valid API key."))
+        assert "API key" in msg
+        assert "AIza" in msg
+        assert "39 chars" in msg
+
+    def test_403_status_code_in_message_classifies_as_api_key_rejected(self) -> None:
+        msg = _classify_fcm_failure(RuntimeError("Got HTTP 403 from FCM register endpoint"))
+        assert "API key" in msg
+        assert "AIza" in msg
+
+    def test_network_error_points_at_dns_firewall(self) -> None:
+        msg = _classify_fcm_failure(OSError("Failed to resolve android.clients.google.com"))
+        assert "reach Google FCM servers" in msg
+        assert "DNS" in msg or "firewall" in msg
+
+    def test_timeout_classified_as_network(self) -> None:
+        msg = _classify_fcm_failure(TimeoutError("Connection timeout while contacting FCM"))
+        assert "reach Google FCM servers" in msg
+
+    def test_unknown_error_falls_back_to_generic_with_message(self) -> None:
+        # Don't lose the original exception text in the fallback path —
+        # it's the only signal a human has to diagnose a case we haven't
+        # taught the classifier yet.
+        msg = _classify_fcm_failure(RuntimeError("something completely unexpected"))
+        assert msg.startswith("FCM registration failed")
+        assert "something completely unexpected" in msg
+
+    def test_empty_exception_message_still_returns_a_string(self) -> None:
+        # Some library paths raise bare RuntimeError() with no message.
+        # Don't crash the listener; surface the class name instead.
+        msg = _classify_fcm_failure(RuntimeError())
+        assert "FCM registration failed" in msg
+        assert "RuntimeError" in msg
 
 
 class TestApplySecurityStateFromEvent:

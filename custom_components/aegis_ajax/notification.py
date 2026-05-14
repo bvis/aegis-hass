@@ -43,6 +43,43 @@ STORAGE_VERSION = 1
 NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 
 
+def _classify_fcm_failure(exc: BaseException) -> str:
+    """Return a user-actionable WARNING message for an FCM registration / push-client error.
+
+    `firebase-messaging` raises plain `RuntimeError` / `Exception` with the cause
+    encoded only in the message string, so we discriminate on substrings. Every
+    branch gives the user (and any reader of the default-level log) a concrete
+    next step, instead of the generic "FCM registration failed" the integration
+    used through `1.3.0-beta.9`.
+    """
+    msg = str(exc) if exc else ""
+    lower = msg.lower()
+
+    if "subscription" in lower and "google cloud messaging" in lower:
+        return (
+            "FCM registration rejected by Google. The four credentials must all "
+            "come from the same Firebase project — fcm_sender_id must match the "
+            "numeric prefix inside fcm_app_id, and fcm_api_key must be paired "
+            "with that same fcm_project_id. Re-enter all four together via the "
+            "Repair card under Settings → Repairs."
+        )
+    if "api key not valid" in lower or "api_key_invalid" in lower or " 403" in f" {msg}":
+        return (
+            "FCM API key was rejected by Google (403). The expected fcm_api_key "
+            'format is "AIza" followed by 35 alphanumeric / underscore / hyphen '
+            "characters (39 chars total). Re-check the value entered via the "
+            "Repair card under Settings → Repairs."
+        )
+    if any(token in lower for token in ("failed to resolve", "connection", "timeout", "network")):
+        return (
+            "Couldn't reach Google FCM servers. Check the HA host can reach "
+            "android.clients.google.com / firebaseinstallations.googleapis.com "
+            "(firewall, DNS, or proxy issue). The Repair card stays raised until "
+            "the next successful registration."
+        )
+    return f"FCM registration failed: {msg or exc.__class__.__name__}"
+
+
 class AjaxNotificationListener:
     """Manages FCM push notification registration and listening."""
 
@@ -149,8 +186,8 @@ class AjaxNotificationListener:
                 self._credentials = dict(raw_result)
                 await self._store.async_save(self._credentials)
                 _LOGGER.info("FCM registration successful")
-            except Exception:
-                _LOGGER.exception("FCM registration failed")
+            except Exception as exc:
+                _LOGGER.warning(_classify_fcm_failure(exc), exc_info=True)
                 if self._entry_id:
                     async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
                 return
@@ -182,8 +219,8 @@ class AjaxNotificationListener:
             else:
                 await self._hass.async_add_executor_job(self._push_client.start)
             _LOGGER.info("FCM push client started — push notifications active")
-        except Exception:
-            _LOGGER.exception("Failed to start FCM push client")
+        except Exception as exc:
+            _LOGGER.warning(_classify_fcm_failure(exc), exc_info=True)
             self._push_client = None
             if self._entry_id:
                 async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
