@@ -354,7 +354,11 @@ class TestClassifyFcmFailure:
         # GCM checkin step, so this string is an unambiguous network signal.
         msg = _classify_fcm_failure(RuntimeError("Unable to register and check in to gcm"))
         assert "reach Google FCM servers" in msg
-        assert "android.clients.google.com" in msg
+        # Both FCM hosts must be named so the user knows exactly what to
+        # whitelist in their firewall / DNS. The full slash-separated pair
+        # is asserted as a single substring so CodeQL's URL-sanitization
+        # heuristic doesn't misread this as a partial-URL match guard.
+        assert "android.clients.google.com / firebaseinstallations.googleapis.com" in msg
         assert "firewall" in msg or "DNS" in msg
 
     def test_unknown_error_falls_back_to_generic_with_message(self) -> None:
