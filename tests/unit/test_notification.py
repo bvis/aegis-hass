@@ -313,48 +313,54 @@ class TestAsyncStartFcmRepairs:
 
 
 class TestClassifyFcmFailure:
-    """`_classify_fcm_failure` turns library errors into actionable WARNINGs (#131)."""
+    """`_classify_fcm_failure` turns library errors into actionable WARNINGs.
+
+    Each branch corresponds to one of the three literal `RuntimeError` strings
+    `firebase-messaging` 0.4.5 actually emits. The mapping was verified by an
+    empirical probe (deliberate credential corruptions + DNS block of FCM
+    hosts) — not by reading the library source — so the substrings here are
+    guaranteed to be the ones the listener observes in production.
+    """
 
     def test_gcm_subscription_rejection_points_at_project_consistency(self) -> None:
-        # Hansontech190's report: firebase-messaging raises this exact
-        # RuntimeError when the four credentials don't all belong to the
-        # same Firebase project. The user-facing message must steer them
-        # toward checking sender_id/app_id/project_id consistency, not
-        # toward extraction internals (no APK / cobrand / .so wording).
+        # Probe result: emitted for ANY credential-set error (bad sender_id,
+        # api_key with or without AIza prefix, project_id, app_id with valid
+        # shape). Hansontech190's case (#131) lands here. Message must steer
+        # the user toward checking the four-value consistency, not toward
+        # extraction internals (no APK / cobrand / .so wording).
         msg = _classify_fcm_failure(
             RuntimeError("Unable to establish subscription with Google Cloud Messaging.")
         )
         assert "rejected by Google" in msg
         assert "same Firebase project" in msg
         assert "fcm_sender_id" in msg and "fcm_app_id" in msg and "fcm_project_id" in msg
-        # No leakage of extraction jargon to user logs
         for forbidden in ("APK", "cobrand", "libnative", "strings.xml"):
             assert forbidden not in msg
 
-    def test_403_api_key_rejection_explains_format(self) -> None:
-        msg = _classify_fcm_failure(RuntimeError("API key not valid. Please pass a valid API key."))
-        assert "API key" in msg
-        assert "AIza" in msg
-        assert "39 chars" in msg
+    def test_fcm_install_failure_points_at_app_id_format(self) -> None:
+        # Probe result: emitted when the Firebase Installation API rejects the
+        # request with HTTP 400 INVALID_ARGUMENT, which empirically only fires
+        # when `fcm_app_id` is malformed enough that Firebase cannot parse it.
+        # Other shapes (bad api_key, wrong project_id) surface as the
+        # subscription branch above.
+        msg = _classify_fcm_failure(RuntimeError("Unable to register with fcm"))
+        assert "fcm_app_id" in msg
+        assert "1:" in msg and "sender" in msg  # the format hint
+        assert "Repair card" in msg
 
-    def test_403_status_code_in_message_classifies_as_api_key_rejected(self) -> None:
-        msg = _classify_fcm_failure(RuntimeError("Got HTTP 403 from FCM register endpoint"))
-        assert "API key" in msg
-        assert "AIza" in msg
-
-    def test_network_error_points_at_dns_firewall(self) -> None:
-        msg = _classify_fcm_failure(OSError("Failed to resolve android.clients.google.com"))
+    def test_gcm_checkin_failure_points_at_network(self) -> None:
+        # Probe result: emitted exclusively on network failure (DNS / firewall
+        # / FCM hosts unreachable). The four credentials are not used by the
+        # GCM checkin step, so this string is an unambiguous network signal.
+        msg = _classify_fcm_failure(RuntimeError("Unable to register and check in to gcm"))
         assert "reach Google FCM servers" in msg
-        assert "DNS" in msg or "firewall" in msg
-
-    def test_timeout_classified_as_network(self) -> None:
-        msg = _classify_fcm_failure(TimeoutError("Connection timeout while contacting FCM"))
-        assert "reach Google FCM servers" in msg
+        assert "android.clients.google.com" in msg
+        assert "firewall" in msg or "DNS" in msg
 
     def test_unknown_error_falls_back_to_generic_with_message(self) -> None:
-        # Don't lose the original exception text in the fallback path —
-        # it's the only signal a human has to diagnose a case we haven't
-        # taught the classifier yet.
+        # Future-proofing: if firebase-messaging changes its error strings or
+        # a different exception slips through (aiohttp leak, etc.), preserve
+        # the original message so a human reading the log can still diagnose.
         msg = _classify_fcm_failure(RuntimeError("something completely unexpected"))
         assert msg.startswith("FCM registration failed")
         assert "something completely unexpected" in msg

@@ -46,11 +46,29 @@ NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 def _classify_fcm_failure(exc: BaseException) -> str:
     """Return a user-actionable WARNING message for an FCM registration / push-client error.
 
-    `firebase-messaging` raises plain `RuntimeError` / `Exception` with the cause
-    encoded only in the message string, so we discriminate on substrings. Every
-    branch gives the user (and any reader of the default-level log) a concrete
-    next step, instead of the generic "FCM registration failed" the integration
-    used through `1.3.0-beta.9`.
+    `firebase-messaging` 0.4.5 raises plain `RuntimeError` with one of three
+    fixed message strings, hiding any HTTP status and aiohttp cause behind
+    internal `_logger` calls — so `__cause__` / `__context__` are always None
+    and the only signal we get is the literal `str(exc)`.
+
+    The three branches below were measured empirically (probe against real FCM
+    endpoints with deliberate credential corruptions + a DNS block of the FCM
+    hosts), not inferred from the source:
+
+      * "Unable to establish subscription with Google Cloud Messaging."
+        — dominant failure mode for any credential-set error (bad sender_id,
+        api_key, project_id, or app_id with valid shape). Hansontech190's
+        case lands here.
+
+      * "Unable to register with fcm"
+        — fires only when the app_id is malformed enough that the Firebase
+        Installation API rejects it with HTTP 400. The shape `1:<sender>:
+        <platform>:<hex>` is what Firebase parses.
+
+      * "Unable to register and check in to gcm"
+        — the four credentials are not used in the GCM checkin step, so this
+        string only appears when the FCM hosts are unreachable (DNS, firewall,
+        proxy). aiohttp errors are swallowed by the library's retry loop.
     """
     msg = str(exc) if exc else ""
     lower = msg.lower()
@@ -63,14 +81,14 @@ def _classify_fcm_failure(exc: BaseException) -> str:
             "with that same fcm_project_id. Re-enter all four together via the "
             "Repair card under Settings → Repairs."
         )
-    if "api key not valid" in lower or "api_key_invalid" in lower or " 403" in f" {msg}":
+    if "unable to register with fcm" in lower:
         return (
-            "FCM API key was rejected by Google (403). The expected fcm_api_key "
-            'format is "AIza" followed by 35 alphanumeric / underscore / hyphen '
-            "characters (39 chars total). Re-check the value entered via the "
+            "Firebase rejected the app credentials. Most likely fcm_app_id has "
+            'an invalid format — the expected shape is "1:<numeric sender>:'
+            '<platform>:<hex suffix>". Re-check the value entered via the '
             "Repair card under Settings → Repairs."
         )
-    if any(token in lower for token in ("failed to resolve", "connection", "timeout", "network")):
+    if "unable to register and check in to gcm" in lower:
         return (
             "Couldn't reach Google FCM servers. Check the HA host can reach "
             "android.clients.google.com / firebaseinstallations.googleapis.com "
