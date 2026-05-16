@@ -566,6 +566,31 @@ class HtsClient:
                 return
             hub_id_bytes = bytes.fromhex(hub_id)
             kv = self._extract_device_kv(params, hub_id_bytes)
+            # Probe for #123: surface what sub-keys non-hub devices carry
+            # in the same body. We don't parse those rows yet — this log
+            # is the empirical baseline ahead of mapping sub-keys (e.g.
+            # WallSwitch 0x42 current_ma / 0x43 power_wth) to sensors.
+            # DEBUG-only, so default-level installs pay nothing.
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                body_label = "SETTINGS_BODY" if sub_key == 5 else "STATUS_BODY"
+                non_hub = [
+                    (did, kvs)
+                    for did, kvs in self._extract_all_devices_kv(params)
+                    if did != hub_id_bytes
+                ]
+                if non_hub:
+                    summary = ", ".join(
+                        f"{did.hex().upper()}=["
+                        + ",".join(f"0x{k:02x}({len(kvs[k])}b)" for k in sorted(kvs))
+                        + "]"
+                        for did, kvs in non_hub
+                    )
+                    _LOGGER.debug(
+                        "Hub %s: %s non-hub devices (#123 probe): %s",
+                        hub_id,
+                        body_label,
+                        summary,
+                    )
             if kv:
                 _LOGGER.debug(
                     "Hub %s: parsed %d keys from %s",
@@ -699,6 +724,54 @@ class HtsClient:
             # Skip 2-byte keys (extended keys we don't need yet)
             i += 2
         return kv
+
+    @staticmethod
+    def _extract_all_devices_kv(
+        params: list[bytes],
+    ) -> list[tuple[bytes, dict[int, bytes]]]:
+        """Walk the whole body and emit per-device kv tuples.
+
+        Generalises `_extract_device_kv`, which only returns the section
+        belonging to one specific device id. The full body is a flat
+        list shaped as
+
+            [sub_key, marker_A, k1, v1, k2, v2, ..., marker_B, k1, v1, ...]
+
+        where every 4-byte param is a device id marker and the 1-byte
+        params between markers are sub-keys (with the next param as the
+        value). 2-byte extended keys are skipped on purpose — same rule
+        as `_extract_device_kv`. Orphan params before the first marker
+        (the leading sub_key byte, malformed prefixes) are skipped too.
+
+        Returns a list preserving the body's encounter order so callers
+        can distinguish the hub's section (always first today) from
+        per-device sections.
+        """
+        result: list[tuple[bytes, dict[int, bytes]]] = []
+        current_id: bytes | None = None
+        current_kv: dict[int, bytes] = {}
+        i = 0
+        while i < len(params):
+            p = params[i]
+            if len(p) == 4:
+                if current_id is not None:
+                    result.append((current_id, current_kv))
+                current_id = p
+                current_kv = {}
+                i += 1
+                continue
+            if current_id is None:
+                i += 1
+                continue
+            if i + 1 >= len(params):
+                break
+            val_p = params[i + 1]
+            if len(p) == 1:
+                current_kv[p[0]] = val_p
+            i += 2
+        if current_id is not None:
+            result.append((current_id, current_kv))
+        return result
 
     # ------------------------------------------------------------------
     # Ping
