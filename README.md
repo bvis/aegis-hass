@@ -344,7 +344,6 @@ If a specific group of sensors stops working:
 - [ ] Firmware update platform
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
 - [ ] SpaceControl (keyfob) event support
-- [ ] "Unknown app label" Repair card (#99)
 
 ## Push Notifications (Optional)
 
