@@ -346,32 +346,44 @@ If a specific group of sensors stops working:
 - [ ] SpaceControl (keyfob) event support
 - [ ] "Unknown app label" Repair card (#99)
 
-## Push Notifications (Optional)
+## Push Notifications (Optional, but strongly recommended)
 
-For real-time push notifications via Firebase Cloud Messaging (FCM), you need to provide FCM credentials. These are the standard Firebase configuration values used by the Ajax mobile app.
+The integration can run with or without Firebase Cloud Messaging (FCM) push, but the two configurations behave very differently:
 
-The required fields (configured in the integration's Options flow, stored securely in config entry data):
-- **FCM Project ID** — Firebase project identifier
-- **FCM App ID** — Firebase application ID
-- **FCM API Key** — Firebase Web API key
-- **FCM Sender ID** — GCM/FCM sender ID
+| Behaviour | With FCM | Without FCM |
+| --- | --- | --- |
+| Arm / disarm / night-mode state in the alarm panel | Real-time (push) | Up to 5 minutes late (next poll cycle) |
+| Event entity firings (alarm, tamper, panic, doorbell ring, fire / smoke, CO, flood, glass break, motion, door open, battery low, connection lost, malfunction) | Real-time | Never — these only ride the FCM channel |
+| Photo-on-Demand URL retrieval (snapshot pulls) | Available | Not available |
+| Device sensor state (temperature, signal strength, open / closed contacts, …) | Real-time (gRPC stream) | Real-time (gRPC stream) |
+| Hub network info, SIM info, room / space topology | Polled | Polled |
 
-### How to obtain FCM credentials
+If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can dismiss the related Repair card; the integration will not break.
 
-Three of the four values are plain strings in the app's `res/values/strings.xml`: `project_id`, `gcm_defaultSenderId` and `google_app_id`. The fourth, `google_api_key`, is **not** in `strings.xml` (the value there is a placeholder); it ships inside `lib/<arch>/libnative-lib.so` bundled with the APK.
+### The four values
 
-> **iOS users:** the iOS Ajax app ships these values in `GoogleService-Info.plist` inside the signed `.ipa` bundle, which is encrypted and cannot be inspected without a jailbroken device. In practice, even if you use the Ajax app on iPhone day-to-day, **extract the credentials from the Android APK** — the Firebase project is the same on both platforms (same `project_id`, `google_app_id`, `gcm_defaultSenderId` and `google_api_key`), so values pulled from the Android build work for FCM push delivery on a Home Assistant install regardless of which OS you personally use.
+Configured in the integration's Options flow (Settings → Devices & Services → Aegis for Ajax → Configure) and stored securely in config entry data:
+
+- **FCM Project ID**
+- **FCM App ID**
+- **FCM API Key**
+- **FCM Sender ID**
+
+All four must belong to the **same Firebase project** — the one the Ajax mobile app uses. Obtaining them is the user's responsibility and is out of scope for this project's documentation.
 
 ### Sanity-check before submitting
 
-Two quick consistency checks that catch the most common "credentials rejected" reports:
+Three quick consistency checks that catch the most common "credentials rejected" reports:
 
 1. **`fcm_sender_id` must equal the digit chunk between the first two colons of `fcm_app_id`.** Example: if `fcm_app_id = 1:608123456502:android:…`, then `fcm_sender_id` is `608123456502`. If they don't match, those two values came from different Firebase projects.
-2. **`fcm_api_key` and `fcm_project_id` must come from the same Firebase project too** — i.e. extracted together as a set, not picked individually from different sources.
+2. **`fcm_api_key` must start with `AIza` and be exactly 39 characters long.**
+3. **All four values must come as a coherent set from one Firebase project** — not picked individually from different sources.
 
-If both checks pass and submission still fails, the WARNING line emitted by the integration (visible at HA's default log level under **Settings → System → Logs**) names the specific subsystem that rejected: project consistency, app-id format, or a network-reach issue with Google's FCM hosts.
+### If submission still fails
 
-If FCM credentials are not configured, the integration will still work using the persistent gRPC stream for real-time updates. FCM adds an additional push notification channel for faster event delivery and enables Photo on Demand URL retrieval.
+If the shape checks pass and Google still rejects, the WARNING line under **Settings → System → Logs** names the specific cause (project consistency, app-id format, or network reach to Google's FCM hosts). Re-enter the four values together via the Repair card under **Settings → Repairs** once you have a coherent set.
+
+If you cannot obtain a coherent set, leaving FCM unconfigured is a fully supported (degraded) configuration — device sensors and a polled view of the alarm panel still work.
 
 ## Translations
 
