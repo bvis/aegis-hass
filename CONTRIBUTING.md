@@ -42,6 +42,19 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `refactor:` Code refactoring
 - `test:` Tests
 
+## Credentials and secrets
+
+Do not commit FCM credentials (`fcm_project_id`, `fcm_app_id`, `fcm_api_key`, `fcm_sender_id`), Ajax session tokens, OAuth client secrets, or any other credential — in source, tests, fixtures, issues, PR descriptions, or commit messages. Each user supplies their own values through the integration's config flow (Settings → Devices & Services → Aegis for Ajax → Configure) or through the Repair card; the README's [How to obtain FCM credentials](README.md#how-to-obtain-fcm-credentials) walks end users through the extraction on their own machines.
+
+Patterns to watch for in `git diff` before staging:
+
+- `AIza[A-Za-z0-9_-]{35}` (Google API key)
+- `1:[0-9]+:android:[0-9a-f]+` (Firebase App ID)
+- `.env`, `credentials.json`, `*.pem`, `*.p12` files
+- Long alphanumeric strings paired with words like `token`, `secret`, or `bearer`
+
+GitHub's secret scanning runs on every push. Alerts on credentials in current code should be fixed by reverting the commit and re-staging without the value.
+
 ## Adding a New Device Type
 
 1. Find the device's `ObjectType` variant in the proto files
