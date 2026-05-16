@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Réseau cellulaire"
+            },
+            "current": {
+                "name": "Courant"
+            },
+            "energy_consumed": {
+                "name": "Énergie électrique consommée"
+            },
+            "power_derived": {
+                "name": "Puissance (calculée)"
             }
         },
         "switch": {

@@ -6,6 +6,8 @@ import json
 from dataclasses import replace
 from unittest.mock import MagicMock
 
+import pytest
+
 from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
 from custom_components.aegis_ajax.api.hub_object import SimCardInfo
 from custom_components.aegis_ajax.api.models import (
@@ -530,3 +532,128 @@ class TestHubMonitoringCompanySensor:
         sensor = AjaxHubMonitoringCompanySensor(coordinator, "space-1", "hub-1")
 
         assert sensor.available is False
+
+
+# ---------------------------------------------------------------------------
+# Per-device electrical sensors (#123)
+# ---------------------------------------------------------------------------
+
+
+class TestAjaxDeviceElectricalSensors:
+    """Current / energy / derived-power sensors for WallSwitch / Socket."""
+
+    @staticmethod
+    def _make_coordinator(
+        device_type: str = "wall_switch",
+        online: bool = True,
+        current_ma: int | None = 40,
+        power_consumed_wh: int | None = 2409,
+    ) -> MagicMock:
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+        from custom_components.aegis_ajax.api.models import Device
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        device = Device(
+            id="311B058D",
+            hub_id="002B1A51",
+            name="Relay",
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE if online else DeviceState.OFFLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+        coordinator.devices = {"311B058D": device}
+        if current_ma is not None or power_consumed_wh is not None:
+            coordinator.device_readings = {
+                "311B058D": DeviceReadings(
+                    current_ma=current_ma,
+                    power_consumed_wh=power_consumed_wh,
+                )
+            }
+        else:
+            coordinator.device_readings = {}
+        return coordinator
+
+    def test_current_sensor_scales_milliamps_to_amps(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(current_ma=40)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        assert sensor.native_value == 0.04
+
+    def test_current_sensor_none_when_no_reading_yet(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(current_ma=None, power_consumed_wh=None)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        assert sensor.native_value is None
+
+    def test_current_sensor_unavailable_when_no_reading_yet(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(current_ma=None, power_consumed_wh=None)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        assert sensor.available is False
+
+    def test_current_sensor_unavailable_when_device_offline(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(online=False)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        assert sensor.available is False
+
+    def test_energy_sensor_scales_watthours_to_kwh(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceEnergyConsumedSensor
+
+        coordinator = self._make_coordinator(power_consumed_wh=2409)
+        sensor = AjaxDeviceEnergyConsumedSensor(coordinator, "311B058D")
+        assert sensor.native_value == 2.409
+
+    def test_energy_sensor_state_class_is_total_increasing(self) -> None:
+        # Required for HA Energy dashboard integration with a cumulative meter
+        # (so a meter-reset is treated as a reset, not negative consumption).
+        from homeassistant.components.sensor import SensorStateClass
+
+        from custom_components.aegis_ajax.sensor import AjaxDeviceEnergyConsumedSensor
+
+        coordinator = self._make_coordinator()
+        sensor = AjaxDeviceEnergyConsumedSensor(coordinator, "311B058D")
+        assert sensor.state_class is SensorStateClass.TOTAL_INCREASING
+
+    def test_derived_power_uses_nominal_voltage(self) -> None:
+        # PRO renders 9W from 0.04A × 230V; we mirror that exactly.
+        from custom_components.aegis_ajax.sensor import AjaxDeviceDerivedPowerSensor
+
+        coordinator = self._make_coordinator(current_ma=40)
+        sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
+        assert sensor.native_value == pytest.approx(9.2)
+
+    def test_derived_power_disabled_by_default(self) -> None:
+        # The current+energy pair are the load-bearing entities; the
+        # derived power is opt-in to avoid surfacing 3 sensors per relay
+        # for the common case where users only want the consumption meter.
+        from custom_components.aegis_ajax.sensor import AjaxDeviceDerivedPowerSensor
+
+        coordinator = self._make_coordinator()
+        sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
+        assert sensor.entity_registry_enabled_default is False
+
+    def test_unique_ids_distinct_across_three_entities(self) -> None:
+        from custom_components.aegis_ajax.sensor import (
+            AjaxDeviceCurrentSensor,
+            AjaxDeviceDerivedPowerSensor,
+            AjaxDeviceEnergyConsumedSensor,
+        )
+
+        coordinator = self._make_coordinator()
+        uids = {
+            AjaxDeviceCurrentSensor(coordinator, "311B058D")._attr_unique_id,
+            AjaxDeviceEnergyConsumedSensor(coordinator, "311B058D")._attr_unique_id,
+            AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")._attr_unique_id,
+        }
+        assert len(uids) == 3

@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Mobilní síť"
+            },
+            "current": {
+                "name": "Proud"
+            },
+            "energy_consumed": {
+                "name": "Spotřebovaná elektrická energie"
+            },
+            "power_derived": {
+                "name": "Výkon (odvozený)"
             }
         },
         "switch": {

@@ -130,6 +130,91 @@ def _ip_val(val: bytes) -> str:
     return _int_to_ip(ip_int)
 
 
+def _int_be_val(val: bytes | None) -> int | None:
+    """Parse a big-endian unsigned integer of arbitrary length (1-4 bytes).
+
+    Returns None when the input is missing or empty. The Ajax hub sends
+    integers with the smallest length that fits (1 byte while readings
+    are zero, 2-4 bytes once the WallSwitch has measurable draw), so
+    `len(val)` is not fixed across messages — `int.from_bytes` handles
+    any length the same way.
+    """
+    if not val:
+        return None
+    return int.from_bytes(val, "big")
+
+
+# ---------------------------------------------------------------------------
+# Per-device TLV keys (WallSwitch / Socket family)
+# ---------------------------------------------------------------------------
+#
+# Distinct from the hub-level keys above: same numeric sub-key carries
+# different meaning depending on which device's row of the body it
+# belongs to. For the hub, 0x42 is `wifi_ip`; for a WallSwitch row, 0x42
+# is `current_ma`. The Ajax mobile app reads them through a separate TLV
+# container (`poz0` in Ajax PRO 2.47 smali) — see #123 for the audit
+# trail.
+
+DEVICE_KEY_CURRENT_MA = 0x42
+DEVICE_KEY_POWER_CONSUMED_WH = 0x43
+
+# device_type strings (as produced by `DevicesApi`) that emit the
+# electrical-reading sub-keys. Mirrors SWITCH_DEVICE_TYPES in switch.py
+# minus the light-switch variants whose firmware doesn't measure current
+# (those are dry-contact relays, not load-meters). When a new
+# electrical-reading-capable device family appears, add it here and to
+# SWITCH_DEVICE_TYPES.
+ELECTRICAL_DEVICE_TYPES: frozenset[str] = frozenset(
+    {
+        "wall_switch",
+        "relay",
+        "relay_fibra_base",
+        "socket",
+        "socket_b",
+        "socket_g",
+        "socket_outlet_type_e",
+        "socket_outlet_type_f",
+        "socket_type_g_plus",
+    }
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class DeviceReadings:
+    """Immutable snapshot of a single device's electrical readings.
+
+    `current_ma` and `power_consumed_wh` are `None` when the device does
+    not emit them, when the body simply hadn't been refreshed yet, or
+    when the sub-key was missing on a body that did include the device.
+    Consumers should treat any `None` as "no measurement available" and
+    render the entity as `unknown` rather than zero.
+    """
+
+    current_ma: int | None = None
+    power_consumed_wh: int | None = None
+
+
+def parse_device_readings(
+    device_type: str,
+    kv: dict[int, bytes],
+) -> DeviceReadings | None:
+    """Map a per-device TLV kv block to `DeviceReadings`.
+
+    Returns `None` when the device type does not emit electrical
+    readings (so callers can early-out and avoid creating empty
+    snapshots). For an electrical-capable device the return is always
+    a `DeviceReadings` instance, even if both sub-keys are absent from
+    the kv block — the empty case is still useful for callers to know
+    the device was *present* in the body.
+    """
+    if device_type not in ELECTRICAL_DEVICE_TYPES:
+        return None
+    return DeviceReadings(
+        current_ma=_int_be_val(kv.get(DEVICE_KEY_CURRENT_MA)),
+        power_consumed_wh=_int_be_val(kv.get(DEVICE_KEY_POWER_CONSUMED_WH)),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------

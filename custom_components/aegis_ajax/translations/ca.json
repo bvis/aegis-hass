@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Xarxa cel·lular"
+            },
+            "current": {
+                "name": "Corrent"
+            },
+            "energy_consumed": {
+                "name": "Energia elèctrica consumida"
+            },
+            "power_derived": {
+                "name": "Potència (derivada)"
             }
         },
         "switch": {

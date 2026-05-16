@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Mobilfunknetz"
+            },
+            "current": {
+                "name": "Strom"
+            },
+            "energy_consumed": {
+                "name": "Verbrauchte elektrische Energie"
+            },
+            "power_derived": {
+                "name": "Leistung (berechnet)"
             }
         },
         "switch": {

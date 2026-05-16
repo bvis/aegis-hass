@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Rețea celulară"
+            },
+            "current": {
+                "name": "Curent"
+            },
+            "energy_consumed": {
+                "name": "Energie electrică consumată"
+            },
+            "power_derived": {
+                "name": "Putere (derivată)"
             }
         },
         "switch": {

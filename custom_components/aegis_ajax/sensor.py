@@ -7,12 +7,26 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfElectricCurrent,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.aegis_ajax.api.hts.hub_state import ELECTRICAL_DEVICE_TYPES
 from custom_components.aegis_ajax.api.models import MonitoringCompanyStatus
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
+
+# Nominal grid voltage assumed when deriving instantaneous power from
+# current (#123). The Ajax mobile app does the same — the device card
+# shows "230 V" as a fixed label, then renders Power = V × A. The
+# WallSwitch firmware does not report measured voltage on the wire.
+NOMINAL_GRID_VOLTAGE_V = 230.0
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -144,6 +158,13 @@ async def async_setup_entry(
             entities.append(AjaxHubEthernetDnsSensor(coordinator, space.hub_id))
             entities.append(AjaxHubCellularSignalSensor(coordinator, space.hub_id))
             entities.append(AjaxHubCellularNetworkSensor(coordinator, space.hub_id))
+
+    # Per-device electrical sensors for WallSwitch / Socket family (#123)
+    for device_id, device in coordinator.devices.items():
+        if device.device_type in ELECTRICAL_DEVICE_TYPES:
+            entities.append(AjaxDeviceCurrentSensor(coordinator, device_id))
+            entities.append(AjaxDeviceEnergyConsumedSensor(coordinator, device_id))
+            entities.append(AjaxDeviceDerivedPowerSensor(coordinator, device_id))
 
     async_add_entities(entities)
 
@@ -446,3 +467,115 @@ class AjaxHubCellularNetworkSensor(_HubNetworkSensor):
     def native_value(self) -> str | None:
         state = self.coordinator.hub_network.get(self._hub_id)
         return state.gsm_network_type if state else None
+
+
+# ---------------------------------------------------------------------------
+# Per-device electrical sensors (WallSwitch / Socket family, #123)
+# ---------------------------------------------------------------------------
+
+
+class _AjaxDeviceReadingsBase(CoordinatorEntity[AjaxCobrandedCoordinator], SensorEntity):
+    """Shared scaffold for the current / energy / power triplet.
+
+    Each subclass picks its own translation_key, device_class, state_class
+    and unit. All three pull from `coordinator.device_readings[device_id]`
+    which is populated by the HTS path (see `_on_hts_device_kv`).
+    """
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        device = coordinator.devices.get(device_id)
+        if device:
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
+
+    @property
+    def available(self) -> bool:
+        device = self.coordinator.devices.get(self._device_id)
+        if device is None or not device.is_online:
+            return False
+        # No reading has arrived yet — entity stays unavailable instead of
+        # rendering 0.0, otherwise the Energy dashboard would integrate a
+        # phantom zero baseline before the hub's first STATUS_BODY.
+        return self._device_id in self.coordinator.device_readings
+
+
+class AjaxDeviceCurrentSensor(_AjaxDeviceReadingsBase):
+    """Live current draw of a WallSwitch / Socket-family device (A)."""
+
+    _attr_translation_key = "current"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"aegis_ajax_{device_id}_current"
+
+    @property
+    def native_value(self) -> float | None:
+        readings = self.coordinator.device_readings.get(self._device_id)
+        if readings is None or readings.current_ma is None:
+            return None
+        return readings.current_ma / 1000.0
+
+
+class AjaxDeviceEnergyConsumedSensor(_AjaxDeviceReadingsBase):
+    """Cumulative electric energy consumed by the device (kWh).
+
+    `total_increasing` ties the entity into HA's Energy dashboard. The
+    Ajax PRO app exposes a "reset consumption meter" button on the same
+    device card; if the user presses it, the meter restarts from zero
+    and HA treats that as a meter reset rather than negative
+    consumption, which is exactly the `total_increasing` contract.
+    """
+
+    _attr_translation_key = "energy_consumed"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_suggested_display_precision = 3
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"aegis_ajax_{device_id}_energy_consumed"
+
+    @property
+    def native_value(self) -> float | None:
+        readings = self.coordinator.device_readings.get(self._device_id)
+        if readings is None or readings.power_consumed_wh is None:
+            return None
+        return readings.power_consumed_wh / 1000.0
+
+
+class AjaxDeviceDerivedPowerSensor(_AjaxDeviceReadingsBase):
+    """Instantaneous power derived from current × nominal grid voltage (W).
+
+    The WallSwitch firmware does not measure voltage; the Ajax mobile
+    app shows the nominal grid voltage (230 V) as a constant label and
+    derives "Power" from `current × 230`. We mirror that behaviour so
+    the HA sensor value matches what the user sees in the official app.
+    `NOMINAL_GRID_VOLTAGE_V` is module-level for grep-ability if a
+    future PR turns it into a configuration option.
+    """
+
+    _attr_translation_key = "power_derived"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_entity_registry_enabled_default = False
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"aegis_ajax_{device_id}_power_derived"
+
+    @property
+    def native_value(self) -> float | None:
+        readings = self.coordinator.device_readings.get(self._device_id)
+        if readings is None or readings.current_ma is None:
+            return None
+        return (readings.current_ma / 1000.0) * NOMINAL_GRID_VOLTAGE_V

@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Мобільна мережа"
+            },
+            "current": {
+                "name": "Струм"
+            },
+            "energy_consumed": {
+                "name": "Спожита електроенергія"
+            },
+            "power_derived": {
+                "name": "Потужність (розрахована)"
             }
         },
         "switch": {

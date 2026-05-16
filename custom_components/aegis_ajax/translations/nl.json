@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Mobiel netwerk"
+            },
+            "current": {
+                "name": "Stroom"
+            },
+            "energy_consumed": {
+                "name": "Verbruikte elektrische energie"
+            },
+            "power_derived": {
+                "name": "Vermogen (afgeleid)"
             }
         },
         "switch": {

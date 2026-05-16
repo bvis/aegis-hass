@@ -317,3 +317,97 @@ class TestHelpers:
 
     def test_ip_val_too_short_returns_empty(self) -> None:
         assert _ip_val(bytes([192, 168])) == ""
+
+
+# ---------------------------------------------------------------------------
+# Per-device readings (WallSwitch / Socket family, #123)
+# ---------------------------------------------------------------------------
+
+from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: E402
+    DEVICE_KEY_CURRENT_MA,
+    DEVICE_KEY_POWER_CONSUMED_WH,
+    ELECTRICAL_DEVICE_TYPES,
+    DeviceReadings,
+    _int_be_val,
+    parse_device_readings,
+)
+
+
+class TestIntBeVal:
+    def test_returns_none_for_none_or_empty(self) -> None:
+        assert _int_be_val(None) is None
+        assert _int_be_val(b"") is None
+
+    def test_single_byte(self) -> None:
+        assert _int_be_val(b"\x28") == 40
+
+    def test_two_bytes_be(self) -> None:
+        assert _int_be_val(b"\x01\x00") == 256
+
+    def test_four_bytes_be(self) -> None:
+        assert _int_be_val(b"\x00\x00\x09\x69") == 0x969  # 2409
+
+
+class TestDeviceReadingsDefaults:
+    def test_defaults_none(self) -> None:
+        r = DeviceReadings()
+        assert r.current_ma is None
+        assert r.power_consumed_wh is None
+
+    def test_is_frozen(self) -> None:
+        r = DeviceReadings(current_ma=40, power_consumed_wh=2411)
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            r.current_ma = 99  # type: ignore[misc]
+
+
+class TestParseDeviceReadings:
+    def test_non_electrical_type_returns_none(self) -> None:
+        # MotionProtect-family detectors don't emit current_ma / power_wh.
+        assert (
+            parse_device_readings(
+                "motion_protect",
+                {DEVICE_KEY_CURRENT_MA: b"\x28", DEVICE_KEY_POWER_CONSUMED_WH: b"\x09"},
+            )
+            is None
+        )
+
+    def test_wall_switch_full(self) -> None:
+        r = parse_device_readings(
+            "wall_switch",
+            {
+                DEVICE_KEY_CURRENT_MA: b"\x00\x00\x00\x28",  # 40 mA
+                DEVICE_KEY_POWER_CONSUMED_WH: b"\x00\x00\x09\x69",  # 2409 Wh
+            },
+        )
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409)
+
+    def test_socket_partial_only_current(self) -> None:
+        # Power-consumed sub-key may be absent on a freshly-installed device.
+        r = parse_device_readings(
+            "socket",
+            {DEVICE_KEY_CURRENT_MA: b"\x05"},
+        )
+        assert r == DeviceReadings(current_ma=5, power_consumed_wh=None)
+
+    def test_electrical_type_with_empty_kv(self) -> None:
+        # The device's row was in the body but it carried no readings —
+        # returns a DeviceReadings with both fields None, not None.
+        r = parse_device_readings("relay_fibra_base", {})
+        assert r == DeviceReadings(current_ma=None, power_consumed_wh=None)
+
+    def test_known_electrical_types(self) -> None:
+        # Sanity-check: every type the switch platform treats as a
+        # power-controllable relay that *should* emit readings is in
+        # ELECTRICAL_DEVICE_TYPES.
+        for dt in (
+            "wall_switch",
+            "relay",
+            "relay_fibra_base",
+            "socket",
+            "socket_b",
+            "socket_g",
+            "socket_outlet_type_e",
+            "socket_outlet_type_f",
+            "socket_type_g_plus",
+        ):
+            assert dt in ELECTRICAL_DEVICE_TYPES, dt

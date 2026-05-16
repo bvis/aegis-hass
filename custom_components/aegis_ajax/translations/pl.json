@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Sieć komórkowa"
+            },
+            "current": {
+                "name": "Prąd"
+            },
+            "energy_consumed": {
+                "name": "Zużyta energia elektryczna"
+            },
+            "power_derived": {
+                "name": "Moc (obliczona)"
             }
         },
         "switch": {

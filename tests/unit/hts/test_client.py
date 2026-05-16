@@ -627,6 +627,115 @@ class TestHandleUpdateNonHubProbe:
         assert "0x43" in text
 
     @pytest.mark.asyncio
+    async def test_on_device_kv_fires_once_per_non_hub_device(self) -> None:
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x09",
+                    bytes.fromhex("12345678"),
+                    b"\x48",
+                    b"\x02",
+                    bytes.fromhex("311B058D"),
+                    b"\x42",
+                    b"\x00\x28",
+                    b"\x43",
+                    b"\x00\x09",
+                    bytes.fromhex("AABBCCDD"),
+                    b"\x05",
+                    b"\x01",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        assert captured == [
+            ("12345678", "311B058D", {0x42: b"\x00\x28", 0x43: b"\x00\x09"}),
+            ("12345678", "AABBCCDD", {0x05: b"\x01"}),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_on_device_kv_skips_empty_device_rows(self) -> None:
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x09",
+                    bytes.fromhex("12345678"),
+                    b"\x48",
+                    b"\x02",
+                    # Lone device marker without any kv pairs — must not
+                    # emit (otherwise the coordinator wakes up for nothing).
+                    bytes.fromhex("AABBCCDD"),
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        assert captured == []
+
+    @pytest.mark.asyncio
+    async def test_on_device_kv_callback_exception_doesnt_break_loop(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging as _logging
+
+        caplog.set_level(_logging.ERROR, logger="custom_components.aegis_ajax.api.hts.client")
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+
+        def _raises(hub_id: str, did: str, kv: dict[int, bytes]) -> None:
+            raise RuntimeError("synthetic")
+
+        client._on_device_kv = _raises
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x09",
+                    bytes.fromhex("12345678"),
+                    b"\x48",
+                    b"\x02",
+                    bytes.fromhex("311B058D"),
+                    b"\x42",
+                    b"\x00\x28",
+                ]
+            ),
+        )
+
+        # Must not raise out of _handle_update — the listen loop has to
+        # survive a buggy coordinator callback (#108 / parser hardening
+        # mindset). The error must be logged with exc_info though.
+        await client._handle_update(msg)
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("on_device_kv callback raised" in r.getMessage() for r in errors)
+
+    @pytest.mark.asyncio
     async def test_probe_silent_when_only_hub_row_present(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -649,6 +758,69 @@ class TestHandleUpdateNonHubProbe:
 
         probe_lines = [r for r in caplog.records if "#123 probe" in r.getMessage()]
         assert probe_lines == []
+
+
+class TestStatusRefreshLoop:
+    """Periodic REQUEST_FULL_STATUS keeps device-level readings live (#123)."""
+
+    @pytest.mark.asyncio
+    async def test_loop_calls_send_request_full_status_for_each_hub(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "custom_components.aegis_ajax.api.hts.client.STATUS_REFRESH_INTERVAL",
+            0,
+        )
+        client = _make_client()
+        client._connected = True
+        client._hubs = [
+            MagicMock(hub_id="11111111"),
+            MagicMock(hub_id="22222222"),
+        ]
+        send = AsyncMock()
+        client._send_request_full_status = send  # type: ignore[method-assign]
+
+        async def _stop_after_first_tick() -> None:
+            await asyncio.sleep(0)
+            client._connected = False
+
+        stop_task = asyncio.create_task(_stop_after_first_tick())
+        await client._status_refresh_loop()
+        await stop_task
+
+        # First tick must have fanned out to both hubs.
+        assert send.await_args_list[0].args == ("11111111",)
+        assert send.await_args_list[1].args == ("22222222",)
+
+    @pytest.mark.asyncio
+    async def test_loop_swallows_send_errors_without_terminating(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging as _logging
+
+        caplog.set_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.hts.client")
+        monkeypatch.setattr(
+            "custom_components.aegis_ajax.api.hts.client.STATUS_REFRESH_INTERVAL",
+            0,
+        )
+        client = _make_client()
+        client._connected = True
+        client._hubs = [MagicMock(hub_id="11111111")]
+        send = AsyncMock(side_effect=[OSError("transient"), None])
+        client._send_request_full_status = send  # type: ignore[method-assign]
+
+        async def _stop_after_two_ticks() -> None:
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            client._connected = False
+
+        stop_task = asyncio.create_task(_stop_after_two_ticks())
+        await client._status_refresh_loop()
+        await stop_task
+
+        # Second tick should have run despite the first one raising.
+        assert send.await_count >= 1
+        assert any("Periodic STATUS refresh failed" in r.getMessage() for r in caplog.records)
 
 
 class TestPingLoop:

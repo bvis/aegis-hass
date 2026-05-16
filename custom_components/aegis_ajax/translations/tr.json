@@ -327,6 +327,15 @@
             },
             "cellular_network": {
                 "name": "Hücresel ağ"
+            },
+            "current": {
+                "name": "Akım"
+            },
+            "energy_consumed": {
+                "name": "Tüketilen elektrik enerjisi"
+            },
+            "power_derived": {
+                "name": "Güç (türetilmiş)"
             }
         },
         "switch": {

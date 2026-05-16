@@ -42,7 +42,10 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
-    from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
+    from custom_components.aegis_ajax.api.hts.hub_state import (
+        DeviceReadings,
+        HubNetworkState,
+    )
     from custom_components.aegis_ajax.api.models import Device, Room, Space
     from custom_components.aegis_ajax.notification import AjaxNotificationListener
 
@@ -124,6 +127,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
         self.hub_network: dict[str, HubNetworkState] = {}
+        # Per-device electrical readings (current_ma / power_consumed_wh)
+        # populated from HTS STATUS_BODY rows of WallSwitch / Socket
+        # family devices (#123). Keyed by upper-case 8-char device id
+        # (same shape as `self.devices` keys). Empty dict = no readings
+        # snapshotted yet OR no electrical devices in the install.
+        self.device_readings: dict[str, DeviceReadings] = {}
         # Per-space monotonic timestamp of when the hub first reported
         # offline (cleared on the first ONLINE poll). Drives the
         # `hub_offline_24h` Repair surfaced after sustained downtime.
@@ -467,7 +476,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             result = await self._hts_client.connect()
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
             self._clear_hts_chronic_failure()
-            await self._hts_client.listen(on_state_update=self._on_hts_update)
+            await self._hts_client.listen(
+                on_state_update=self._on_hts_update,
+                on_device_kv=self._on_hts_device_kv,
+            )
         except Exception as exc:
             # Surface at WARNING (#111) — a silent DEBUG made these failures
             # invisible to users debugging "HTS streams: 0/1" reports. The
@@ -487,6 +499,33 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hub_network[hub_id] = state
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
+    def _on_hts_device_kv(self, hub_id: str, device_id_hex: str, kv: dict[int, bytes]) -> None:
+        """Translate a per-device HTS kv block into `DeviceReadings` (#123).
+
+        Called once per non-hub device row inside a STATUS_BODY or
+        SETTINGS_BODY. Looks up the device's type from the snapshot the
+        gRPC stream populated; non-electrical types are filtered out by
+        `parse_device_readings` returning `None`. When a new reading
+        arrives that differs from the cached one, mutates
+        `coordinator.device_readings` and fires `async_set_updated_data`
+        so the sensor entities pick the change up immediately.
+        """
+        from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
+            parse_device_readings,
+        )
+
+        device = self.devices.get(device_id_hex)
+        if device is None:
+            return
+        readings = parse_device_readings(device.device_type, kv)
+        if readings is None:
+            return
+        if self.device_readings.get(device_id_hex) == readings:
+            return
+        self.device_readings[device_id_hex] = readings
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+        _ = hub_id  # currently unused; kept in the signature for symmetry with on_state_update
+
     def _handle_hts_task_done(self, task: asyncio.Task[None]) -> None:
         """Clear stale HTS state when the listen task exits."""
         if task.cancelled():
@@ -499,8 +538,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Drop stale HTS state so hub network entities become unavailable."""
         self._hts_task = None
         self._hts_client = None
-        if self.hub_network:
+        if self.hub_network or self.device_readings:
             self.hub_network.clear()
+            self.device_readings.clear()
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         # Track the first failure of an otherwise-healthy run so we can
         # raise a Repair after a sustained outage. Successful reconnect

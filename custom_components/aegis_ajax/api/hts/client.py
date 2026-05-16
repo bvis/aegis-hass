@@ -52,6 +52,14 @@ HTS_HOST = "hts.prod.ajax.systems"
 HTS_PORT = 443
 PING_INTERVAL = 30
 READ_TIMEOUT = 40
+# Period of the background REQUEST_FULL_STATUS refresh that keeps
+# per-device electrical readings (#123) and any other status-only
+# fields fresh. STATUS_BODY is otherwise only emitted on boot; sub-key
+# 11 deltas are deliberately dropped (#111). 60s matches HA's
+# `MIN_POLL_INTERVAL` floor — small enough to feel live on the Energy
+# dashboard, large enough to leave hub bandwidth headroom (each
+# refresh is ~2.7 KB encrypted).
+STATUS_REFRESH_INTERVAL = 60
 # Bound the full 4-step auth handshake. Without this, a server that keeps the
 # TCP connection alive but feeds bytes slowly can keep `_receive_message()`'s
 # per-chunk reads under READ_TIMEOUT forever, so the coroutine never resolves.
@@ -105,10 +113,16 @@ class HtsClient:
 
         self._ping_task: asyncio.Task[None] | None = None
         self._data_request_task: asyncio.Task[None] | None = None
+        self._status_refresh_task: asyncio.Task[None] | None = None
         self._read_buf = bytearray()
         self._consecutive_read_timeouts = 0
         self._hub_states: dict[str, HubNetworkState] = {}
         self._on_state_update: Callable[[str, HubNetworkState], None] | None = None
+        # Per-device kv callback wired by the coordinator for #123. The
+        # client itself does not know which devices emit electrical
+        # readings — it just forwards every non-hub kv block from a
+        # STATUS/SETTINGS body and lets the coordinator filter by type.
+        self._on_device_kv: Callable[[str, str, dict[int, bytes]], None] | None = None
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
 
     # ------------------------------------------------------------------
@@ -416,13 +430,31 @@ class HtsClient:
     # ------------------------------------------------------------------
 
     async def request_hub_data(self, hub_id: str) -> None:
-        """Send REQUEST_SETTINGS_ID, REQUEST_FULL_SETTINGS, and REQUEST_FULL_STATUS."""
-        hub_id_int = int(hub_id, 16)
+        """Send REQUEST_FULL_SETTINGS *and* REQUEST_FULL_STATUS.
+
+        Used at startup / after the unknown-update fallback path. The
+        periodic refresh loop (#123) uses the lighter
+        `_send_request_full_status` alone — SETTINGS is ~6 KB and only
+        carries config that does not change at runtime, so requesting
+        it every 60s would be pure waste.
+        """
+        await self._send_request_full_settings(hub_id)
+        await self._send_request_full_status(hub_id)
+
+    async def _send_request_full_settings(self, hub_id: str) -> None:
+        """REQUEST_FULL_SETTINGS (sub-key=3) — heavy, ~6 KB response."""
+        await self._send_request_payload(hub_id, sub_key=3, label="REQUEST_FULL_SETTINGS")
+
+    async def _send_request_full_status(self, hub_id: str) -> None:
+        """REQUEST_FULL_STATUS (sub-key=7) — lighter, ~2.7 KB response with live readings."""
+        await self._send_request_payload(hub_id, sub_key=7, label="REQUEST_FULL_STATUS")
+
+    async def _send_request_payload(self, hub_id: str, *, sub_key: int, label: str) -> None:
+        """Generic 3-param REQUEST sender shared by SETTINGS and STATUS variants."""
         if self._writer is None:
             raise HtsConnectionError("Not connected")
-
-        # REQUEST_FULL_SETTINGS (sub-key=3)
-        settings_payload = tlv_encode([bytes([3]), bytes([1]), bytes([1])])
+        hub_id_int = int(hub_id, 16)
+        payload = tlv_encode([bytes([sub_key]), bytes([1]), bytes([1])])
         msg = HtsMessage(
             sender=self._sender_id,
             receiver=hub_id_int,
@@ -430,7 +462,7 @@ class HtsClient:
             link=10,
             flags=0,
             msg_type=MsgType.UPDATES,
-            payload=settings_payload,
+            payload=payload,
         )
         raw = build_message(msg)
         padded = pad16(raw)
@@ -440,39 +472,29 @@ class HtsClient:
             raise HtsConnectionError("Not connected")
         self._writer.write(frame)
         await self._writer.drain()
-        _LOGGER.debug("Sent REQUEST_FULL_SETTINGS to %s", hub_id)
-
-        # REQUEST_FULL_STATUS (sub-key=7)
-        status_payload = tlv_encode([bytes([7]), bytes([1]), bytes([1])])
-        msg2 = HtsMessage(
-            sender=self._sender_id,
-            receiver=hub_id_int,
-            seq_num=self._next_seq(),
-            link=10,
-            flags=0,
-            msg_type=MsgType.UPDATES,
-            payload=status_payload,
-        )
-        raw2 = build_message(msg2)
-        padded2 = pad16(raw2)
-        encrypted2 = encrypt(padded2)
-        frame2 = encode_frame(encrypted2)
-        self._writer.write(frame2)
-        await self._writer.drain()
-        _LOGGER.debug("Sent REQUEST_FULL_STATUS to %s", hub_id)
+        _LOGGER.debug("Sent %s to %s", label, hub_id)
 
     async def listen(
         self,
         on_state_update: Callable[[str, HubNetworkState], None] | None = None,
+        on_device_kv: Callable[[str, str, dict[int, bytes]], None] | None = None,
     ) -> None:
         """Main receive loop: ACK messages and dispatch UPDATES.
 
         Args:
             on_state_update: Optional callback invoked with (hub_id, state) whenever
                              a hub state changes.
+            on_device_kv: Optional callback invoked with (hub_id, device_id_hex, kv)
+                          once per non-hub device row contained in a STATUS_BODY or
+                          SETTINGS_BODY message. `device_id_hex` is upper-case to
+                          match `coordinator.devices` keys. The coordinator decides
+                          which device types consume the kv (#123 electrical
+                          readings live here).
         """
         self._on_state_update = on_state_update
+        self._on_device_kv = on_device_kv
         self._ping_task = asyncio.create_task(self._ping_loop())
+        self._status_refresh_task = asyncio.create_task(self._status_refresh_loop())
 
         # Request hub data immediately (connection is stable now)
         async def _request_data() -> None:
@@ -566,18 +588,35 @@ class HtsClient:
                 return
             hub_id_bytes = bytes.fromhex(hub_id)
             kv = self._extract_device_kv(params, hub_id_bytes)
-            # Probe for #123: surface what sub-keys non-hub devices carry
-            # in the same body. We don't parse those rows yet — this log
-            # is the empirical baseline ahead of mapping sub-keys (e.g.
-            # WallSwitch 0x42 current_ma / 0x43 power_wth) to sensors.
-            # DEBUG-only, so default-level installs pay nothing.
+            # Walk every device row in the body once. Two consumers:
+            #   1. #123 readings — emit each non-hub kv via on_device_kv
+            #      so the coordinator can parse it as `DeviceReadings`
+            #      (current_ma / power_consumed_wh for WallSwitch and
+            #      the Socket family). The client itself stays
+            #      device-type-agnostic.
+            #   2. DEBUG probe — log the sub-keys per device when
+            #      DEBUG logging is on for this module, so the post-
+            #      mortem of an unfamiliar device family is one log
+            #      sample away. Default-level installs pay nothing.
+            non_hub: list[tuple[bytes, dict[int, bytes]]] = [
+                (did, kvs)
+                for did, kvs in self._extract_all_devices_kv(params)
+                if did != hub_id_bytes
+            ]
+            if self._on_device_kv is not None:
+                for did, kvs in non_hub:
+                    if not kvs:
+                        continue
+                    try:
+                        self._on_device_kv(hub_id, did.hex().upper(), kvs)
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.exception(
+                            "on_device_kv callback raised for hub %s device %s",
+                            hub_id,
+                            did.hex().upper(),
+                        )
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 body_label = "SETTINGS_BODY" if sub_key == 5 else "STATUS_BODY"
-                non_hub = [
-                    (did, kvs)
-                    for did, kvs in self._extract_all_devices_kv(params)
-                    if did != hub_id_bytes
-                ]
                 if non_hub:
                     summary = ", ".join(
                         f"{did.hex().upper()}=["
@@ -789,6 +828,30 @@ class HtsClient:
                     self._connected = False
                     break
 
+    async def _status_refresh_loop(self) -> None:
+        """Periodically pull STATUS_BODY so device readings stay live (#123).
+
+        Phase A revealed STATUS_BODY only arrives on connect — sub-key
+        11 deltas are silently dropped (#111). For per-device electrical
+        sensors (WallSwitch / Socket current and energy meters) to feel
+        live, we re-request STATUS every `STATUS_REFRESH_INTERVAL`
+        seconds. Failures are logged and treated as transient: the
+        next tick retries; only an actual disconnect aborts the loop.
+        """
+        while self._connected:
+            await asyncio.sleep(STATUS_REFRESH_INTERVAL)
+            if not self._connected:
+                break
+            for hub in list(self._hubs):
+                try:
+                    await self._send_request_full_status(hub.hub_id)
+                except Exception:  # noqa: BLE001
+                    _LOGGER.debug(
+                        "Periodic STATUS refresh failed for hub %s",
+                        hub.hub_id,
+                        exc_info=True,
+                    )
+
     # ------------------------------------------------------------------
     # Close
     # ------------------------------------------------------------------
@@ -812,6 +875,11 @@ class HtsClient:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._ping_task
             self._ping_task = None
+        if self._status_refresh_task is not None:
+            self._status_refresh_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._status_refresh_task
+            self._status_refresh_task = None
         if self._writer is not None:
             with contextlib.suppress(Exception):
                 self._writer.close()

@@ -103,6 +103,10 @@ class TestCoordinatorInit:
         coordinator = _make_coordinator()
         assert coordinator.hub_network == {}
 
+    def test_device_readings_initially_empty(self) -> None:
+        coordinator = _make_coordinator()
+        assert coordinator.device_readings == {}
+
     def test_rooms_initially_empty(self) -> None:
         coordinator = _make_coordinator()
         assert coordinator.rooms == {}
@@ -1293,3 +1297,101 @@ class TestCachedSnapshotStart:
         assert "Aegis startup" in caplog.text
         assert "device streams 1/1" in caplog.text
         assert "HTS lifecycle scheduled" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Per-device readings via HTS (#123)
+# ---------------------------------------------------------------------------
+
+
+class TestOnHtsDeviceKv:
+    """Coordinator translates HTS per-device kv into DeviceReadings."""
+
+    def _make_electrical_device(
+        self, device_id: str = "311B058D", device_type: str = "wall_switch"
+    ) -> Device:
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name="Relay",
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+
+    def test_wall_switch_readings_stored_and_event_fired(self) -> None:
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        coordinator.devices["311B058D"] = self._make_electrical_device()
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._on_hts_device_kv(
+            "002B1A51",
+            "311B058D",
+            {0x42: b"\x00\x00\x00\x28", 0x43: b"\x00\x00\x09\x69"},
+        )
+
+        assert coordinator.device_readings["311B058D"] == DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_unknown_device_id_is_ignored(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._on_hts_device_kv("002B1A51", "DEADBEEF", {0x42: b"\x00\x28"})
+
+        assert coordinator.device_readings == {}
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_non_electrical_device_type_is_ignored(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.devices["311B058D"] = self._make_electrical_device(device_type="door_protect")
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._on_hts_device_kv("002B1A51", "311B058D", {0x42: b"\x00\x28"})
+
+        assert coordinator.device_readings == {}
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_unchanged_readings_dont_trigger_refresh(self) -> None:
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        coordinator.devices["311B058D"] = self._make_electrical_device()
+        coordinator.device_readings["311B058D"] = DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._on_hts_device_kv(
+            "002B1A51",
+            "311B058D",
+            {0x42: b"\x00\x00\x00\x28", 0x43: b"\x00\x00\x09\x69"},
+        )
+
+        # Same values — no entity refresh needed.
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_hts_disconnect_clears_device_readings(self) -> None:
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        coordinator.device_readings["311B058D"] = DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._handle_hts_disconnect(reconnect=False)
+
+        assert coordinator.device_readings == {}
+        # Both hub_network and device_readings clear in the same call,
+        # so async_set_updated_data fires exactly once.
+        coordinator.async_set_updated_data.assert_called_once()
