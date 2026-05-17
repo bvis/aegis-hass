@@ -42,6 +42,18 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Sentinel value used for both `installed_version` and `latest_version`
+# when the Ajax cloud reports no pending update. HA's `UpdateEntity`
+# treats matching non-None versions as "up to date" and renders the
+# entity state as `STATE_OFF`; with both versions left at `None` the
+# entity would render as `unknown`, which is misleading because the
+# absence of a pending update IS the "up to date" signal from Ajax.
+# The placeholder is also surfaced on `installed_version` while an
+# update IS pending so the state computation lands on `STATE_ON` —
+# Ajax's `streamHubObject` does not carry the currently-installed
+# firmware version, so this is the most truthful answer we can give.
+_INSTALLED_VERSION_PLACEHOLDER = "current"
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -84,17 +96,20 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], UpdateE
 
     @property
     def installed_version(self) -> str | None:
-        # The streamHubObject payload does not carry the currently-installed
-        # firmware version. HA renders the entity with just `latest_version`
-        # in that case, which is the intended behaviour.
-        return None
+        # See `_INSTALLED_VERSION_PLACEHOLDER` for why this is always a
+        # constant rather than `None`: HA's state computation needs a
+        # non-`None` installed version to differentiate "up to date"
+        # from "unknown".
+        return _INSTALLED_VERSION_PLACEHOLDER
 
     @property
     def latest_version(self) -> str | None:
         info = self._info
-        if info is None:
-            return None
-        return info.target_version or None
+        if info is None or not info.target_version:
+            # No pending update from Ajax — mirror installed_version so
+            # HA computes `STATE_OFF` and renders "Up to date".
+            return _INSTALLED_VERSION_PLACEHOLDER
+        return info.target_version
 
     @property
     def in_progress(self) -> bool:

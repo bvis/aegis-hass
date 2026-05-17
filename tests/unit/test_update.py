@@ -49,12 +49,14 @@ class TestAjaxHubFirmwareUpdate:
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
         assert entity._attr_unique_id == "aegis_ajax_002B1A51_firmware"
 
-    def test_installed_version_always_none(self) -> None:
-        """Ajax stream doesn't expose installed version — HA renders just `latest`."""
+    def test_installed_version_is_constant_placeholder(self) -> None:
+        """Ajax doesn't expose installed version; entity always reports the placeholder."""
+        from custom_components.aegis_ajax.update import _INSTALLED_VERSION_PLACEHOLDER
+
         info = HubFirmwareUpdateInfo(target_version="2.17.0", state=HUB_FW_STATE_NOT_STARTED)
         coordinator = self._make_coordinator(info)
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
-        assert entity.installed_version is None
+        assert entity.installed_version == _INSTALLED_VERSION_PLACEHOLDER
 
     def test_latest_version_reflects_pending_update(self) -> None:
         info = HubFirmwareUpdateInfo(target_version="2.17.0", state=HUB_FW_STATE_NOT_STARTED)
@@ -62,12 +64,19 @@ class TestAjaxHubFirmwareUpdate:
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
         assert entity.latest_version == "2.17.0"
 
-    def test_latest_version_none_when_no_pending_update(self) -> None:
-        """Absence of `hub_firmware_updates` entry == hub is up to date."""
+    def test_latest_version_matches_installed_when_no_pending_update(self) -> None:
+        """Up-to-date case: latest == installed so HA renders STATE_OFF, not unknown."""
         coordinator = self._make_coordinator(None)
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
-        assert entity.latest_version is None
+        assert entity.latest_version == entity.installed_version
         assert entity.in_progress is False
+
+    def test_latest_version_falls_back_to_placeholder_on_empty_target(self) -> None:
+        """Defensive: an empty target_version string is treated as 'no pending update'."""
+        info = HubFirmwareUpdateInfo(target_version="", state=HUB_FW_STATE_NOT_STARTED)
+        coordinator = self._make_coordinator(info)
+        entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
+        assert entity.latest_version == entity.installed_version
 
     def test_in_progress_true_when_downloading(self) -> None:
         info = HubFirmwareUpdateInfo(target_version="2.17.0", state=HUB_FW_STATE_DOWNLOADING)
@@ -99,12 +108,22 @@ class TestAjaxHubFirmwareUpdate:
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
         assert entity.device_class is UpdateDeviceClass.FIRMWARE
 
-    def test_empty_target_version_renders_as_none(self) -> None:
-        """Defensive: an empty version string is reported as no latest available."""
-        info = HubFirmwareUpdateInfo(target_version="", state=HUB_FW_STATE_NOT_STARTED)
+    def test_state_resolves_to_off_when_no_pending_update(self) -> None:
+        """Smoke-check the full HA state computation lands on 'off' (up to date)."""
+        from homeassistant.const import STATE_OFF
+
+        coordinator = self._make_coordinator(None)
+        entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
+        # HA's UpdateEntity.state returns STATE_OFF when installed == latest.
+        assert entity.state == STATE_OFF
+
+    def test_state_resolves_to_on_when_pending_update(self) -> None:
+        from homeassistant.const import STATE_ON
+
+        info = HubFirmwareUpdateInfo(target_version="2.17.0", state=HUB_FW_STATE_NOT_STARTED)
         coordinator = self._make_coordinator(info)
         entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
-        assert entity.latest_version is None
+        assert entity.state == STATE_ON
 
 
 class TestAsyncSetupEntry:
