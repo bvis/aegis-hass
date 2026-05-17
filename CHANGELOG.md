@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0-beta.2] - 2026-05-17
+
+Bug-fix beta on top of `1.4.0-beta.1`. One change: FCM credential fields in **Settings → Options** can now be cleared from the UI.
+
+### Fixed
+- **Clearing FCM credentials in the options flow now actually removes them.** Until this release, emptying the four FCM fields (`fcm_project_id`, `fcm_app_id`, `fcm_api_key`, `fcm_sender_id`) and saving left the previous values in `entry.data`, so reopening the options form re-populated the stale credentials and there was no way to remove them through the UI. An empty submitted field is now treated as an explicit deletion: the key is dropped from `entry.data`. Mixed submissions (some cleared, some changed) keep the changed values and drop the cleared ones in the same update. The `fcm_not_configured` Repair card is raised again on next start once all four are cleared, matching the no-credentials path on a fresh install. (#139, fixes #138, reported by @Hansontech190)
+
 ## [1.4.0-beta.1] - 2026-05-17
 
 First beta of the `1.4.0` line. Opens with **WallSwitch / Socket electrical readings** (#123) and a structural cleanup of the HTS update path: per-device delta pushes (`STATUS_UPDATE` sub-key `0x0b`, `SETTINGS_UPDATE` `0x0c`) are now consumed in place instead of dropped silently. MINOR bump because three new sensor entity classes ship; no breaking changes.
