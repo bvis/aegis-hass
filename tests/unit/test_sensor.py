@@ -686,6 +686,76 @@ class TestAjaxDeviceElectricalSensors:
         sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
         assert sensor.entity_registry_enabled_default is False
 
+    @pytest.mark.asyncio
+    async def test_native_value_falls_back_to_restored_when_no_live_reading(self) -> None:
+        """Bruno's case: hub never re-pushes constant readings (#123)."""
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        from homeassistant.components.sensor import SensorExtraStoredData
+
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(current_ma=None, power_consumed_wh=None)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        # Simulate HA RestoreSensor handing us last persisted value.
+        sensor.async_get_last_sensor_data = _AsyncMock(
+            return_value=SensorExtraStoredData(native_value=0.04, native_unit_of_measurement="A")
+        )
+        # Patch out the upstream subscribers/event loop touches on add.
+        sensor.async_internal_added_to_hass = _AsyncMock()
+        sensor.async_on_remove = MagicMock()
+        sensor.hass = MagicMock()
+        await sensor.async_added_to_hass()
+
+        # No live reading → returns the restored 0.04 A instead of None.
+        assert sensor.native_value == 0.04
+        assert sensor.available is True
+
+    @pytest.mark.asyncio
+    async def test_live_reading_wins_over_restored_value(self) -> None:
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        from homeassistant.components.sensor import SensorExtraStoredData
+
+        from custom_components.aegis_ajax.sensor import AjaxDeviceVoltageSensor
+
+        coordinator = self._make_coordinator(voltage_v=231)
+        sensor = AjaxDeviceVoltageSensor(coordinator, "311B058D")
+        sensor.async_get_last_sensor_data = _AsyncMock(
+            return_value=SensorExtraStoredData(native_value=228, native_unit_of_measurement="V")
+        )
+        sensor.async_internal_added_to_hass = _AsyncMock()
+        sensor.async_on_remove = MagicMock()
+        sensor.hass = MagicMock()
+        await sensor.async_added_to_hass()
+
+        # Live reading 231 V > restored 228 V — fresh value wins.
+        assert sensor.native_value == 231.0
+
+    @pytest.mark.asyncio
+    async def test_restore_skips_non_numeric_state(self) -> None:
+        """`unknown` or `unavailable` strings can't be parsed back as floats."""
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        from homeassistant.components.sensor import SensorExtraStoredData
+
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        coordinator = self._make_coordinator(current_ma=None, power_consumed_wh=None)
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        sensor.async_get_last_sensor_data = _AsyncMock(
+            return_value=SensorExtraStoredData(
+                native_value="unknown", native_unit_of_measurement="A"
+            )
+        )
+        sensor.async_internal_added_to_hass = _AsyncMock()
+        sensor.async_on_remove = MagicMock()
+        sensor.hass = MagicMock()
+        await sensor.async_added_to_hass()
+
+        assert sensor.native_value is None
+        assert sensor.available is False
+
     def test_unique_ids_distinct_across_four_entities(self) -> None:
         from custom_components.aegis_ajax.sensor import (
             AjaxDeviceCurrentSensor,

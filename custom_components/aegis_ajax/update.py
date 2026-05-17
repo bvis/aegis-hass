@@ -115,3 +115,26 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], UpdateE
     def in_progress(self) -> bool:
         info = self._info
         return info is not None and info.state == HUB_FW_STATE_DOWNLOADING
+
+    @property
+    def release_summary(self) -> str | None:
+        # The Ajax stream doesn't expose the currently-installed firmware
+        # version, so "Up-to-date" here is shorthand for "Ajax has not
+        # queued an update for this hub right now" — not a positive
+        # confirmation that the hub is running the latest firmware Ajax
+        # has ever published. The Ajax cloud schedules updates on its
+        # own; this integration only mirrors what the cloud is telling
+        # us, and the entity is informational (no install action).
+        info = self._info
+        if info is None:
+            return (
+                "Ajax has not queued a firmware update for this hub. "
+                "The actual installed firmware version is not exposed by "
+                "Ajax to the integration, so 'Up-to-date' reflects only "
+                "the absence of a queued update."
+            )
+        return (
+            f"Ajax has queued firmware {info.target_version} for this hub. "
+            "The hub will install it on its own; this entity is "
+            "informational and cannot trigger or skip the update."
+        )
