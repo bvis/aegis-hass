@@ -1318,6 +1318,11 @@ class TestHubFirmwareRefresh:
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True
         coordinator._streams_started = True
+        # Force the SIM/firmware refresh branch to fire — `monotonic()`
+        # returns a small value on freshly-booted CI runners, so the
+        # default `_sim_info_last_fetch = 0` doesn't always exceed the
+        # 3600 s gate.
+        coordinator._sim_info_last_fetch = -10_000.0
         coordinator._spaces_api = MagicMock()
         coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
         coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
