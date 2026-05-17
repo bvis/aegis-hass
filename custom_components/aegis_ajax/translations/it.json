@@ -331,6 +331,9 @@
             "current": {
                 "name": "Corrente"
             },
+            "voltage": {
+                "name": "Tensione"
+            },
             "energy_consumed": {
                 "name": "Energia elettrica consumata"
             },

@@ -331,6 +331,9 @@
             "current": {
                 "name": "Струм"
             },
+            "voltage": {
+                "name": "Напруга"
+            },
             "energy_consumed": {
                 "name": "Спожита електроенергія"
             },

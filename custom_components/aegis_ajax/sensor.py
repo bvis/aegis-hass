@@ -11,6 +11,7 @@ from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
     UnitOfElectricCurrent,
+    UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTemperature,
@@ -22,10 +23,11 @@ from custom_components.aegis_ajax.api.models import MonitoringCompanyStatus
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
 
-# Nominal grid voltage assumed when deriving instantaneous power from
-# current (#123). The Ajax mobile app does the same — the device card
-# shows "230 V" as a fixed label, then renders Power = V × A. The
-# WallSwitch firmware does not report measured voltage on the wire.
+# Fallback voltage used to derive instantaneous power when the device
+# hasn't reported a real voltage reading yet (#123). Recent WallSwitch
+# firmwares emit `voltage` on HTS sub-key 0x35 (signed short, volts);
+# older firmwares omit the field, so we land on this nominal value the
+# Ajax mobile app uses as its labelled "230 V" baseline.
 NOMINAL_GRID_VOLTAGE_V = 230.0
 
 if TYPE_CHECKING:
@@ -163,6 +165,7 @@ async def async_setup_entry(
     for device_id, device in coordinator.devices.items():
         if device.device_type in ELECTRICAL_DEVICE_TYPES:
             entities.append(AjaxDeviceCurrentSensor(coordinator, device_id))
+            entities.append(AjaxDeviceVoltageSensor(coordinator, device_id))
             entities.append(AjaxDeviceEnergyConsumedSensor(coordinator, device_id))
             entities.append(AjaxDeviceDerivedPowerSensor(coordinator, device_id))
 
@@ -523,6 +526,33 @@ class AjaxDeviceCurrentSensor(_AjaxDeviceReadingsBase):
         return readings.current_ma / 1000.0
 
 
+class AjaxDeviceVoltageSensor(_AjaxDeviceReadingsBase):
+    """Live line voltage reported by a WallSwitch / Socket-family device (V).
+
+    Comes straight from HTS sub-key 0x35 of the device's TLV block,
+    no scaling. Older firmwares (pre-WallSwitch PRO 2.47 era) don't
+    emit the sub-key — the entity then stays `unknown` until the
+    device reports one.
+    """
+
+    _attr_translation_key = "voltage"
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"aegis_ajax_{device_id}_voltage"
+
+    @property
+    def native_value(self) -> float | None:
+        readings = self.coordinator.device_readings.get(self._device_id)
+        if readings is None or readings.voltage_v is None:
+            return None
+        return float(readings.voltage_v)
+
+
 class AjaxDeviceEnergyConsumedSensor(_AjaxDeviceReadingsBase):
     """Cumulative electric energy consumed by the device (kWh).
 
@@ -552,14 +582,13 @@ class AjaxDeviceEnergyConsumedSensor(_AjaxDeviceReadingsBase):
 
 
 class AjaxDeviceDerivedPowerSensor(_AjaxDeviceReadingsBase):
-    """Instantaneous power derived from current × nominal grid voltage (W).
+    """Instantaneous power derived from current × voltage (W).
 
-    The WallSwitch firmware does not measure voltage; the Ajax mobile
-    app shows the nominal grid voltage (230 V) as a constant label and
-    derives "Power" from `current × 230`. We mirror that behaviour so
-    the HA sensor value matches what the user sees in the official app.
-    `NOMINAL_GRID_VOLTAGE_V` is module-level for grep-ability if a
-    future PR turns it into a configuration option.
+    Uses the device's reported voltage when present (HTS sub-key 0x35);
+    falls back to `NOMINAL_GRID_VOLTAGE_V` only for firmwares that don't
+    emit it. The Ajax mobile app renders the Power line on the device
+    card the same way — `current × voltage` — so the HA value matches
+    what the user sees in the official app.
     """
 
     _attr_translation_key = "power_derived"
@@ -578,4 +607,9 @@ class AjaxDeviceDerivedPowerSensor(_AjaxDeviceReadingsBase):
         readings = self.coordinator.device_readings.get(self._device_id)
         if readings is None or readings.current_ma is None:
             return None
-        return (readings.current_ma / 1000.0) * NOMINAL_GRID_VOLTAGE_V
+        voltage = (
+            float(readings.voltage_v)
+            if readings.voltage_v is not None and readings.voltage_v > 0
+            else NOMINAL_GRID_VOLTAGE_V
+        )
+        return (readings.current_ma / 1000.0) * voltage

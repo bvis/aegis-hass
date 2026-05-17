@@ -331,6 +331,9 @@
             "current": {
                 "name": "Stroom"
             },
+            "voltage": {
+                "name": "Spanning"
+            },
             "energy_consumed": {
                 "name": "Verbruikte elektrische energie"
             },

@@ -331,6 +331,9 @@
             "current": {
                 "name": "Akım"
             },
+            "voltage": {
+                "name": "Voltaj"
+            },
             "energy_consumed": {
                 "name": "Tüketilen elektrik enerjisi"
             },

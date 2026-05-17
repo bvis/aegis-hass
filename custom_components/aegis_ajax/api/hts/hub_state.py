@@ -155,6 +155,7 @@ def _int_be_val(val: bytes | None) -> int | None:
 # container (`poz0` in Ajax PRO 2.47 smali) — see #123 for the audit
 # trail.
 
+DEVICE_KEY_VOLTAGE_V = 0x35
 DEVICE_KEY_CURRENT_MA = 0x42
 DEVICE_KEY_POWER_CONSUMED_WH = 0x43
 
@@ -183,15 +184,22 @@ ELECTRICAL_DEVICE_TYPES: frozenset[str] = frozenset(
 class DeviceReadings:
     """Immutable snapshot of a single device's electrical readings.
 
-    `current_ma` and `power_consumed_wh` are `None` when the device does
-    not emit them, when the body simply hadn't been refreshed yet, or
-    when the sub-key was missing on a body that did include the device.
-    Consumers should treat any `None` as "no measurement available" and
-    render the entity as `unknown` rather than zero.
+    All three fields are `None` when the device does not emit them,
+    when the body simply hadn't been refreshed yet, or when the
+    sub-key was missing on a body that did include the device.
+    Consumers should treat any `None` as "no measurement available"
+    and render the entity as `unknown` rather than zero.
+
+    `voltage_v` is a signed short straight from the wire (sub-key
+    0x35, named `voltage` in Ajax PRO 2.47's `poz0` TLV container);
+    units are volts as the device reports them, no scaling. Older
+    WallSwitch firmwares omit the sub-key entirely — power-derived
+    callers must fall back to a nominal voltage in that case.
     """
 
     current_ma: int | None = None
     power_consumed_wh: int | None = None
+    voltage_v: int | None = None
 
 
 def parse_device_readings(
@@ -229,6 +237,9 @@ def parse_device_readings(
             _int_be_val(kv[DEVICE_KEY_POWER_CONSUMED_WH])
             if DEVICE_KEY_POWER_CONSUMED_WH in kv
             else base.power_consumed_wh
+        ),
+        voltage_v=(
+            _int_be_val(kv[DEVICE_KEY_VOLTAGE_V]) if DEVICE_KEY_VOLTAGE_V in kv else base.voltage_v
         ),
     )
 

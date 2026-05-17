@@ -331,6 +331,9 @@
             "current": {
                 "name": "Proud"
             },
+            "voltage": {
+                "name": "Napětí"
+            },
             "energy_consumed": {
                 "name": "Spotřebovaná elektrická energie"
             },

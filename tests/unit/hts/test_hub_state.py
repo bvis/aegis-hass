@@ -326,6 +326,7 @@ class TestHelpers:
 from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: E402
     DEVICE_KEY_CURRENT_MA,
     DEVICE_KEY_POWER_CONSUMED_WH,
+    DEVICE_KEY_VOLTAGE_V,
     ELECTRICAL_DEVICE_TYPES,
     DeviceReadings,
     _int_be_val,
@@ -377,9 +378,28 @@ class TestParseDeviceReadings:
             {
                 DEVICE_KEY_CURRENT_MA: b"\x00\x00\x00\x28",  # 40 mA
                 DEVICE_KEY_POWER_CONSUMED_WH: b"\x00\x00\x09\x69",  # 2409 Wh
+                DEVICE_KEY_VOLTAGE_V: b"\x00\xe6",  # 230 V
             },
         )
-        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409)
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409, voltage_v=230)
+
+    def test_voltage_parsed_when_other_keys_absent(self) -> None:
+        # Voltage updates can land on their own — current and energy
+        # must stay absent rather than zeroed.
+        r = parse_device_readings(
+            "wall_switch",
+            {DEVICE_KEY_VOLTAGE_V: b"\x00\xe7"},  # 231 V
+        )
+        assert r == DeviceReadings(current_ma=None, power_consumed_wh=None, voltage_v=231)
+
+    def test_partial_update_with_only_voltage_keeps_current_and_energy(self) -> None:
+        prior = DeviceReadings(current_ma=40, power_consumed_wh=2409, voltage_v=228)
+        r = parse_device_readings(
+            "wall_switch",
+            {DEVICE_KEY_VOLTAGE_V: b"\x00\xe7"},  # 231 V
+            existing=prior,
+        )
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409, voltage_v=231)
 
     def test_socket_partial_only_current(self) -> None:
         # Power-consumed sub-key may be absent on a freshly-installed device.

@@ -548,6 +548,7 @@ class TestAjaxDeviceElectricalSensors:
         online: bool = True,
         current_ma: int | None = 40,
         power_consumed_wh: int | None = 2409,
+        voltage_v: int | None = None,
     ) -> MagicMock:
         from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
         from custom_components.aegis_ajax.api.models import Device
@@ -568,11 +569,12 @@ class TestAjaxDeviceElectricalSensors:
             battery=None,
         )
         coordinator.devices = {"311B058D": device}
-        if current_ma is not None or power_consumed_wh is not None:
+        if current_ma is not None or power_consumed_wh is not None or voltage_v is not None:
             coordinator.device_readings = {
                 "311B058D": DeviceReadings(
                     current_ma=current_ma,
                     power_consumed_wh=power_consumed_wh,
+                    voltage_v=voltage_v,
                 )
             }
         else:
@@ -626,12 +628,53 @@ class TestAjaxDeviceElectricalSensors:
         assert sensor.state_class is SensorStateClass.TOTAL_INCREASING
 
     def test_derived_power_uses_nominal_voltage(self) -> None:
-        # PRO renders 9W from 0.04A × 230V; we mirror that exactly.
+        # No voltage reported by the device (older firmware) → falls back to
+        # the labelled 230 V baseline, same as the Ajax app does.
         from custom_components.aegis_ajax.sensor import AjaxDeviceDerivedPowerSensor
 
-        coordinator = self._make_coordinator(current_ma=40)
+        coordinator = self._make_coordinator(current_ma=40, voltage_v=None)
         sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
         assert sensor.native_value == pytest.approx(9.2)
+
+    def test_derived_power_uses_real_voltage_when_present(self) -> None:
+        # 0.04 A × 231 V = 9.24 W; PRO renders the line the same way.
+        from custom_components.aegis_ajax.sensor import AjaxDeviceDerivedPowerSensor
+
+        coordinator = self._make_coordinator(current_ma=40, voltage_v=231)
+        sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
+        assert sensor.native_value == pytest.approx(9.24)
+
+    def test_derived_power_falls_back_when_voltage_is_zero(self) -> None:
+        # Sentinel-zero is the firmware's "unset" marker, not a real
+        # 0 V reading. Treat it as missing and use the nominal baseline.
+        from custom_components.aegis_ajax.sensor import AjaxDeviceDerivedPowerSensor
+
+        coordinator = self._make_coordinator(current_ma=40, voltage_v=0)
+        sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
+        assert sensor.native_value == pytest.approx(9.2)
+
+    def test_voltage_sensor_returns_value(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceVoltageSensor
+
+        coordinator = self._make_coordinator(voltage_v=230)
+        sensor = AjaxDeviceVoltageSensor(coordinator, "311B058D")
+        assert sensor.native_value == 230.0
+
+    def test_voltage_sensor_none_when_not_reported(self) -> None:
+        from custom_components.aegis_ajax.sensor import AjaxDeviceVoltageSensor
+
+        coordinator = self._make_coordinator(current_ma=40, voltage_v=None)
+        sensor = AjaxDeviceVoltageSensor(coordinator, "311B058D")
+        assert sensor.native_value is None
+
+    def test_voltage_sensor_device_class_voltage(self) -> None:
+        from homeassistant.components.sensor import SensorDeviceClass
+
+        from custom_components.aegis_ajax.sensor import AjaxDeviceVoltageSensor
+
+        coordinator = self._make_coordinator(voltage_v=230)
+        sensor = AjaxDeviceVoltageSensor(coordinator, "311B058D")
+        assert sensor.device_class is SensorDeviceClass.VOLTAGE
 
     def test_derived_power_disabled_by_default(self) -> None:
         # The current+energy pair are the load-bearing entities; the
@@ -643,17 +686,19 @@ class TestAjaxDeviceElectricalSensors:
         sensor = AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")
         assert sensor.entity_registry_enabled_default is False
 
-    def test_unique_ids_distinct_across_three_entities(self) -> None:
+    def test_unique_ids_distinct_across_four_entities(self) -> None:
         from custom_components.aegis_ajax.sensor import (
             AjaxDeviceCurrentSensor,
             AjaxDeviceDerivedPowerSensor,
             AjaxDeviceEnergyConsumedSensor,
+            AjaxDeviceVoltageSensor,
         )
 
-        coordinator = self._make_coordinator()
+        coordinator = self._make_coordinator(voltage_v=230)
         uids = {
             AjaxDeviceCurrentSensor(coordinator, "311B058D")._attr_unique_id,
+            AjaxDeviceVoltageSensor(coordinator, "311B058D")._attr_unique_id,
             AjaxDeviceEnergyConsumedSensor(coordinator, "311B058D")._attr_unique_id,
             AjaxDeviceDerivedPowerSensor(coordinator, "311B058D")._attr_unique_id,
         }
-        assert len(uids) == 3
+        assert len(uids) == 4

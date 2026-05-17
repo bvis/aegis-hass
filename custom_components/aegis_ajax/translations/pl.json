@@ -331,6 +331,9 @@
             "current": {
                 "name": "Prąd"
             },
+            "voltage": {
+                "name": "Napięcie"
+            },
             "energy_consumed": {
                 "name": "Zużyta energia elektryczna"
             },

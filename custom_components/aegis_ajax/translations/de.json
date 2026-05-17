@@ -331,6 +331,9 @@
             "current": {
                 "name": "Strom"
             },
+            "voltage": {
+                "name": "Spannung"
+            },
             "energy_consumed": {
                 "name": "Verbrauchte elektrische Energie"
             },
