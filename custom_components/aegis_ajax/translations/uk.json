@@ -82,6 +82,7 @@
                     "fcm_app_id": "ID додатку FCM",
                     "fcm_api_key": "Ключ API FCM",
                     "fcm_sender_id": "ID відправника FCM",
+                    "clear_fcm_credentials": "Видалити облікові дані FCM (очищає всі чотири поля)",
                     "photo_retention_days": "Зберігання фото (днів)",
                     "photo_max_per_device": "Макс. фото на пристрій (0 = необмежено)",
                     "auto_create_labels": "Автоматично створювати та призначати мітки Aegis сутностям"

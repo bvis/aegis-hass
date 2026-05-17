@@ -437,22 +437,34 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                 ).hexdigest()
             else:
                 user_input.pop("pin_code", None)
-            # Move FCM credentials into config_entry.data (encrypted storage).
-            # Empty strings mean "clear this credential", so drop those keys
-            # from entry.data instead of persisting "" (issue #138).
+            # FCM credentials live in `entry.data` (encrypted storage).
+            # Two routes can update them:
+            #   1. The dedicated "Delete FCM credentials" toggle wipes all
+            #      four keys unconditionally — the unambiguous deletion
+            #      path, immune to selector-default round-trips.
+            #   2. Otherwise, any non-empty value in a FCM field updates
+            #      that key. An empty string also clears the key, but
+            #      only if the field was actually submitted as empty —
+            #      the password selector tends to round-trip its prior
+            #      value, so the toggle above is the recommended way to
+            #      clear credentials (issue #138).
+            clear_fcm = user_input.pop("clear_fcm_credentials", False)
             fcm_input = {k: user_input.pop(k) for k in _FCM_KEYS if k in user_input}
-            if fcm_input:
-                new_data = {**self._entry.data}
+            new_data = {**self._entry.data}
+            if clear_fcm:
+                for k in _FCM_KEYS:
+                    new_data.pop(k, None)
+            else:
                 for k, v in fcm_input.items():
                     if v:
                         new_data[k] = v
                     else:
                         new_data.pop(k, None)
-                if new_data != self._entry.data:
-                    self.hass.config_entries.async_update_entry(
-                        self._entry,
-                        data=new_data,
-                    )
+            if new_data != self._entry.data:
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    data=new_data,
+                )
             return self.async_create_entry(title="", data=user_input)
         return self.async_show_form(
             step_id="init",
@@ -475,20 +487,21 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     ),
                     vol.Optional(
                         "fcm_project_id",
-                        default=self._get_fcm("fcm_project_id"),
+                        description={"suggested_value": self._get_fcm("fcm_project_id")},
                     ): str,
                     vol.Optional(
                         "fcm_app_id",
-                        default=self._get_fcm("fcm_app_id"),
+                        description={"suggested_value": self._get_fcm("fcm_app_id")},
                     ): str,
                     vol.Optional(
                         "fcm_api_key",
-                        default=self._get_fcm("fcm_api_key"),
+                        description={"suggested_value": self._get_fcm("fcm_api_key")},
                     ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
                     vol.Optional(
                         "fcm_sender_id",
-                        default=self._get_fcm("fcm_sender_id"),
+                        description={"suggested_value": self._get_fcm("fcm_sender_id")},
                     ): str,
+                    vol.Optional("clear_fcm_credentials", default=False): bool,
                     vol.Optional(
                         CONF_PHOTO_RETENTION_DAYS,
                         default=self._entry.options.get(

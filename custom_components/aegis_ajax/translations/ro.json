@@ -82,6 +82,7 @@
                     "fcm_app_id": "ID aplicație FCM",
                     "fcm_api_key": "Cheie API FCM",
                     "fcm_sender_id": "ID expeditor FCM",
+                    "clear_fcm_credentials": "Șterge acreditările FCM (golește toate cele patru câmpuri)",
                     "photo_retention_days": "Reținere fotografii (zile)",
                     "photo_max_per_device": "Max fotografii per dispozitiv (0 = nelimitat)",
                     "auto_create_labels": "Creează și atribuie automat etichete Aegis entităților"

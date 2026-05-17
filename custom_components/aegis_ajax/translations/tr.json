@@ -82,6 +82,7 @@
                     "fcm_app_id": "FCM Uygulama Kimliği",
                     "fcm_api_key": "FCM API Anahtarı",
                     "fcm_sender_id": "FCM Gönderici Kimliği",
+                    "clear_fcm_credentials": "FCM kimlik bilgilerini sil (dört alanı da temizler)",
                     "photo_retention_days": "Fotoğraf saklama süresi (gün)",
                     "photo_max_per_device": "Cihaz başına maks. fotoğraf (0 = sınırsız)",
                     "auto_create_labels": "Aegis etiketlerini otomatik olarak oluştur ve varlıklara ata"

@@ -642,6 +642,62 @@ class TestOptionsFlow:
         assert new_data["fcm_sender_id"] == "new_sender"
 
     @pytest.mark.asyncio
+    async def test_options_flow_clear_fcm_toggle_removes_all_keys(self) -> None:
+        """'Delete FCM credentials' toggle wipes all four keys regardless of field values (#138)."""
+        flow, entry = self._make_flow(
+            data={
+                "email": "x@y",
+                "fcm_project_id": "old_proj",
+                "fcm_app_id": "old_app",
+                "fcm_api_key": "old_key",
+                "fcm_sender_id": "old_sender",
+            }
+        )
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        flow.hass.config_entries.async_update_entry = MagicMock()
+
+        # The toggle wins even when the form re-submits the prior FCM values
+        # (selector-default round-trip case — what HA's password field does).
+        await flow.async_step_init(
+            {
+                "poll_interval": 60,
+                "use_pin_code": False,
+                "fcm_project_id": "old_proj",
+                "fcm_app_id": "old_app",
+                "fcm_api_key": "old_key",
+                "fcm_sender_id": "old_sender",
+                "clear_fcm_credentials": True,
+            }
+        )
+
+        flow.hass.config_entries.async_update_entry.assert_called_once()
+        new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
+        for k in ("fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"):
+            assert k not in new_data
+        assert new_data["email"] == "x@y"
+        # The toggle itself must not leak into entry.options
+        stored_options = flow.async_create_entry.call_args[1]["data"]
+        assert "clear_fcm_credentials" not in stored_options
+
+    @pytest.mark.asyncio
+    async def test_options_flow_clear_fcm_toggle_off_keeps_normal_update_path(self) -> None:
+        flow, entry = self._make_flow(data={"fcm_project_id": "old"})
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        flow.hass.config_entries.async_update_entry = MagicMock()
+
+        await flow.async_step_init(
+            {
+                "poll_interval": 60,
+                "use_pin_code": False,
+                "fcm_project_id": "new_proj",
+                "clear_fcm_credentials": False,
+            }
+        )
+
+        new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
+        assert new_data["fcm_project_id"] == "new_proj"
+
+    @pytest.mark.asyncio
     async def test_options_flow_clearing_fcm_also_strips_legacy_options(self) -> None:
         """Legacy installs kept FCM in entry.options; clearing must also drop them there."""
         flow, entry = self._make_flow(

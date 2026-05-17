@@ -82,6 +82,7 @@
                     "fcm_app_id": "ID app FCM",
                     "fcm_api_key": "Chiave API FCM",
                     "fcm_sender_id": "ID mittente FCM",
+                    "clear_fcm_credentials": "Elimina credenziali FCM (cancella tutti e quattro i campi)",
                     "photo_retention_days": "Conservazione foto (giorni)",
                     "photo_max_per_device": "Max foto per dispositivo (0 = illimitato)",
                     "auto_create_labels": "Crea e assegna automaticamente etichette Aegis alle entità"

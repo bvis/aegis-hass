@@ -82,6 +82,7 @@
                     "fcm_app_id": "ID aplikace FCM",
                     "fcm_api_key": "API klíč FCM",
                     "fcm_sender_id": "ID odesílatele FCM",
+                    "clear_fcm_credentials": "Smazat FCM přihlašovací údaje (vymaže všechna čtyři pole)",
                     "photo_retention_days": "Uchovávání fotografií (dny)",
                     "photo_max_per_device": "Max fotografií na zařízení (0 = neomezeno)",
                     "auto_create_labels": "Automaticky vytvářet a přiřazovat štítky Aegis entitám"

@@ -82,6 +82,7 @@
                     "fcm_app_id": "ID aplikacji FCM",
                     "fcm_api_key": "Klucz API FCM",
                     "fcm_sender_id": "ID nadawcy FCM",
+                    "clear_fcm_credentials": "Usuń poświadczenia FCM (czyści wszystkie cztery pola)",
                     "photo_retention_days": "Przechowywanie zdjęć (dni)",
                     "photo_max_per_device": "Maks. zdjęć na urządzenie (0 = bez limitu)",
                     "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji"
