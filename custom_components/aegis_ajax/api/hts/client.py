@@ -52,14 +52,6 @@ HTS_HOST = "hts.prod.ajax.systems"
 HTS_PORT = 443
 PING_INTERVAL = 30
 READ_TIMEOUT = 40
-# Period of the background REQUEST_FULL_STATUS refresh that keeps
-# per-device electrical readings (#123) and any other status-only
-# fields fresh. STATUS_BODY is otherwise only emitted on boot; sub-key
-# 11 deltas are deliberately dropped (#111). 60s matches HA's
-# `MIN_POLL_INTERVAL` floor — small enough to feel live on the Energy
-# dashboard, large enough to leave hub bandwidth headroom (each
-# refresh is ~2.7 KB encrypted).
-STATUS_REFRESH_INTERVAL = 60
 # Bound the full 4-step auth handshake. Without this, a server that keeps the
 # TCP connection alive but feeds bytes slowly can keep `_receive_message()`'s
 # per-chunk reads under READ_TIMEOUT forever, so the coroutine never resolves.
@@ -113,7 +105,6 @@ class HtsClient:
 
         self._ping_task: asyncio.Task[None] | None = None
         self._data_request_task: asyncio.Task[None] | None = None
-        self._status_refresh_task: asyncio.Task[None] | None = None
         self._read_buf = bytearray()
         self._consecutive_read_timeouts = 0
         self._hub_states: dict[str, HubNetworkState] = {}
@@ -494,7 +485,6 @@ class HtsClient:
         self._on_state_update = on_state_update
         self._on_device_kv = on_device_kv
         self._ping_task = asyncio.create_task(self._ping_loop())
-        self._status_refresh_task = asyncio.create_task(self._status_refresh_loop())
 
         # Request hub data immediately (connection is stable now)
         async def _request_data() -> None:
@@ -662,14 +652,58 @@ class HtsClient:
                 self._on_state_update(hub_id, new_state)
             return
 
-        # Sub-key 11 is the hub-network delta channel. The longer variants
-        # (~50 bytes) carry the anchor keys we recognise and are handled
-        # above. Shorter variants (~34 bytes) appear every few seconds on
-        # some firmwares and only carry fields we don't surface. Falling
-        # through to `_schedule_hub_refresh` here meant a `REQUEST_FULL_
-        # SETTINGS + REQUEST_FULL_STATUS` round-trip on every heartbeat
-        # (#111) — same parser, same keys, no new information. Drop it. (#111)
-        if sub_key == 11:
+        # Sub-keys 11 (STATUS_UPDATE) and 12 (SETTINGS_UPDATE) are the
+        # hub's per-device push channels: the hub emits one of these
+        # whenever any single device's status (11) or settings (12)
+        # change. Payload shape is identical to one device's row inside
+        # a body — `[sub_key, device_id_4b, k1, v1, k2, v2, ...]` — so
+        # the same `_extract_all_devices_kv` walker pulls out the
+        # device id + kv block. Routed through `on_device_kv` so the
+        # coordinator's existing per-device handler (#123) consumes
+        # both the boot-time STATUS_BODY snapshot and these live pushes
+        # via one code path.
+        #
+        # Bandwidth note: longer hub-network variants of these sub-keys
+        # (~50 bytes) were previously diverted to `_extract_direct_kv`
+        # above. That path still fires before this one and handles
+        # hub-network deltas. Anything reaching here is a per-device
+        # delta; if `kvs` is empty (e.g. firmware-internal heartbeat)
+        # the helper just skips. This subsumes the #111 `sub_key == 11
+        # return` drop — the issue there was firing `_schedule_hub_
+        # refresh` on every heartbeat (~8.6 KB round-trip), not the
+        # silent drop itself. Now we read the delta in-place.
+        if sub_key in (11, 12) and hub_id:
+            non_hub = [
+                (did, kvs)
+                for did, kvs in self._extract_all_devices_kv(params)
+                if did != bytes.fromhex(hub_id)
+            ]
+            if self._on_device_kv is not None:
+                for did, kvs in non_hub:
+                    if not kvs:
+                        continue
+                    try:
+                        self._on_device_kv(hub_id, did.hex().upper(), kvs)
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.exception(
+                            "on_device_kv callback raised for hub %s device %s",
+                            hub_id,
+                            did.hex().upper(),
+                        )
+            if _LOGGER.isEnabledFor(logging.DEBUG) and non_hub:
+                update_label = "STATUS_UPDATE" if sub_key == 11 else "SETTINGS_UPDATE"
+                summary = ", ".join(
+                    f"{did.hex().upper()}=["
+                    + ",".join(f"0x{k:02x}({len(kvs[k])}b)" for k in sorted(kvs))
+                    + "]"
+                    for did, kvs in non_hub
+                )
+                _LOGGER.debug(
+                    "Hub %s: %s push (#123): %s",
+                    hub_id,
+                    update_label,
+                    summary,
+                )
             return
 
         self._schedule_hub_refresh(hub_id, f"unknown update sub-key {sub_key}")
@@ -828,30 +862,6 @@ class HtsClient:
                     self._connected = False
                     break
 
-    async def _status_refresh_loop(self) -> None:
-        """Periodically pull STATUS_BODY so device readings stay live (#123).
-
-        Phase A revealed STATUS_BODY only arrives on connect — sub-key
-        11 deltas are silently dropped (#111). For per-device electrical
-        sensors (WallSwitch / Socket current and energy meters) to feel
-        live, we re-request STATUS every `STATUS_REFRESH_INTERVAL`
-        seconds. Failures are logged and treated as transient: the
-        next tick retries; only an actual disconnect aborts the loop.
-        """
-        while self._connected:
-            await asyncio.sleep(STATUS_REFRESH_INTERVAL)
-            if not self._connected:
-                break
-            for hub in list(self._hubs):
-                try:
-                    await self._send_request_full_status(hub.hub_id)
-                except Exception:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "Periodic STATUS refresh failed for hub %s",
-                        hub.hub_id,
-                        exc_info=True,
-                    )
-
     # ------------------------------------------------------------------
     # Close
     # ------------------------------------------------------------------
@@ -875,11 +885,6 @@ class HtsClient:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._ping_task
             self._ping_task = None
-        if self._status_refresh_task is not None:
-            self._status_refresh_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._status_refresh_task
-            self._status_refresh_task = None
         if self._writer is not None:
             with contextlib.suppress(Exception):
                 self._writer.close()

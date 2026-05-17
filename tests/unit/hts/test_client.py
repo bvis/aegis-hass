@@ -760,67 +760,138 @@ class TestHandleUpdateNonHubProbe:
         assert probe_lines == []
 
 
-class TestStatusRefreshLoop:
-    """Periodic REQUEST_FULL_STATUS keeps device-level readings live (#123)."""
+class TestStatusUpdatePush:
+    """STATUS_UPDATE (sub-key 11) / SETTINGS_UPDATE (12) push deltas.
+
+    These are emitted by the hub on its own cadence — no client-side
+    subscribe is needed (the audit on PRO 2.47 showed both the single
+    and bulk subscribe msg-types are deprecated and uncalled). The
+    handler must route the per-device kv payload through the same
+    `on_device_kv` callback used for the boot-time STATUS_BODY snapshot,
+    so the coordinator side stays a single code path.
+    """
 
     @pytest.mark.asyncio
-    async def test_loop_calls_send_request_full_status_for_each_hub(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(
-            "custom_components.aegis_ajax.api.hts.client.STATUS_REFRESH_INTERVAL",
-            0,
-        )
+    async def test_status_update_routes_through_on_device_kv(self) -> None:
         client = _make_client()
-        client._connected = True
-        client._hubs = [
-            MagicMock(hub_id="11111111"),
-            MagicMock(hub_id="22222222"),
+        client._hubs = [MagicMock(hub_id="12345678")]
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",  # STATUS_UPDATE
+                    bytes.fromhex("311B058D"),
+                    b"\x42",
+                    b"\x00\x28",
+                    b"\x43",
+                    b"\x00\x09",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        assert captured == [
+            ("12345678", "311B058D", {0x42: b"\x00\x28", 0x43: b"\x00\x09"}),
         ]
-        send = AsyncMock()
-        client._send_request_full_status = send  # type: ignore[method-assign]
-
-        async def _stop_after_first_tick() -> None:
-            await asyncio.sleep(0)
-            client._connected = False
-
-        stop_task = asyncio.create_task(_stop_after_first_tick())
-        await client._status_refresh_loop()
-        await stop_task
-
-        # First tick must have fanned out to both hubs.
-        assert send.await_args_list[0].args == ("11111111",)
-        assert send.await_args_list[1].args == ("22222222",)
 
     @pytest.mark.asyncio
-    async def test_loop_swallows_send_errors_without_terminating(
-        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        import logging as _logging
-
-        caplog.set_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.hts.client")
-        monkeypatch.setattr(
-            "custom_components.aegis_ajax.api.hts.client.STATUS_REFRESH_INTERVAL",
-            0,
-        )
+    async def test_settings_update_routes_through_on_device_kv(self) -> None:
+        # Same routing for sub-key 0x0c. We don't currently consume
+        # settings-only sub-keys but the coordinator's electrical-type
+        # filter is the single gate; emitting them keeps the surface
+        # area uniform.
         client = _make_client()
-        client._connected = True
-        client._hubs = [MagicMock(hub_id="11111111")]
-        send = AsyncMock(side_effect=[OSError("transient"), None])
-        client._send_request_full_status = send  # type: ignore[method-assign]
+        client._hubs = [MagicMock(hub_id="12345678")]
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0c",  # SETTINGS_UPDATE
+                    bytes.fromhex("311B058D"),
+                    b"\x40",
+                    b"\x01",
+                ]
+            ),
+        )
 
-        async def _stop_after_two_ticks() -> None:
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
-            client._connected = False
+        await client._handle_update(msg)
 
-        stop_task = asyncio.create_task(_stop_after_two_ticks())
-        await client._status_refresh_loop()
-        await stop_task
+        assert captured == [("12345678", "311B058D", {0x40: b"\x01"})]
 
-        # Second tick should have run despite the first one raising.
-        assert send.await_count >= 1
-        assert any("Periodic STATUS refresh failed" in r.getMessage() for r in caplog.records)
+    @pytest.mark.asyncio
+    async def test_status_update_with_hub_marker_is_ignored(self) -> None:
+        # Same shape but the device id IS the hub — hub-level deltas
+        # are owned by the `_extract_direct_kv` / `parse_hub_params`
+        # path above; do not double-route them through on_device_kv.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",
+                    bytes.fromhex("12345678"),
+                    b"\x05",
+                    b"\x01",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        assert captured == []
+
+    @pytest.mark.asyncio
+    async def test_status_update_no_longer_schedules_full_refresh(self) -> None:
+        # Pre-#111 behaviour was a full snapshot round-trip on every
+        # sub-key 11 (every few seconds — the original WallSwitch
+        # bandwidth bug). Confirm the new path consumes the delta
+        # without firing `_schedule_hub_refresh`.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._schedule_hub_refresh = MagicMock()  # type: ignore[method-assign]
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",
+                    bytes.fromhex("311B058D"),
+                    b"\x42",
+                    b"\x00\x28",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        client._schedule_hub_refresh.assert_not_called()
 
 
 class TestPingLoop:
