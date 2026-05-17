@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0-beta.3] - 2026-05-17
+
+Beta against `1.4.0-beta.1`'s WallSwitch electrical surface. Two changes on top of `1.4.0-beta.2`: the load-bearing readings no longer disappear on every relay toggle, and the WallSwitch's actual line voltage is now exposed as a sensor (driving the derived-power calculation from a real reading instead of a 230 V constant).
+
+### Added
+- **Live line voltage sensor for WallSwitch / Socket-family devices** (`sensor.<name>_voltage`, V, `device_class=voltage`, `state_class=measurement`). The WallSwitch firmware does report measured voltage on the wire — the value lives in HTS sub-key `0x35` of the device's TLV row (`poz0.voltage` in Ajax PRO 2.47's smali, consumed by `ckh.mapCommonSwitchProps` and rendered as the "Voltage" line on the PRO device card). The previous beta missed this consumer in the initial APK audit and assumed the value wasn't exposed, falling back to a hardcoded 230 V for the derived-power sensor. The new entity matches the value PRO renders for the same device (228-231 V on a 230 V mains, surfaced by @brunovdw68 in #123). Translations in all 14 locales. (#140, surfaced by @brunovdw68 in #123)
+
+### Changed
+- **`power_derived` now uses the device-reported voltage instead of a hardcoded 230 V.** When the WallSwitch reports a non-zero `voltage_v`, the sensor renders `current_ma × voltage_v / 1000`; the `NOMINAL_GRID_VOLTAGE_V = 230` constant survives only as the fallback for firmwares that don't emit the voltage sub-key or report it as sentinel-zero. The Ajax PRO app uses the same `current × voltage` product on the same device card, so the HA value now stays in lock-step with what the user sees in the app. (#140)
+
+### Fixed
+- **WallSwitch electrical sensors no longer drop to `unknown` on every relay toggle.** `parse_device_readings` rebuilt the snapshot from scratch on every per-device kv block, so a `STATUS_UPDATE` push that didn't carry sub-keys `0x42` / `0x43` produced `DeviceReadings(None, None)` and overwrote the cached values — `current`, `energy_consumed` and `power_derived` then rendered `unknown` until the next periodic `STATUS_BODY` snapshot (~60 s). `energy_consumed` reappeared on a different cadence because the two sub-keys are pushed independently. Add an `existing` parameter (symmetric with `parse_hub_params`); only fields whose sub-keys are present in the kv update get rewritten, the rest survive from the prior snapshot. Boot-time `STATUS_BODY` snapshots are unchanged (no `existing` in the cache yet). (#140, fixes regression in `1.4.0-beta.1`, reported by @brunovdw68)
+
+### Internal
+- Test suite grew to **1215** unit tests, coverage 85.46%. New cases cover voltage parsing, partial-update merge for all three readings, and the `power_derived` fallback path when voltage is absent or sentinel-zero.
+
 ## [1.4.0-beta.2] - 2026-05-17
 
 Bug-fix beta on top of `1.4.0-beta.1`. One change: FCM credential fields in **Settings → Options** can now be cleared from the UI.
