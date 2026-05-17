@@ -117,6 +117,24 @@ class TestAjaxHubFirmwareUpdate:
         # HA's UpdateEntity.state returns STATE_OFF when installed == latest.
         assert entity.state == STATE_OFF
 
+    def test_release_summary_explains_up_to_date_semantics(self) -> None:
+        """No pending update — release_summary clarifies it's not a positive confirmation."""
+        coordinator = self._make_coordinator(None)
+        entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
+        summary = entity.release_summary
+        assert summary is not None
+        assert "not queued" in summary.lower()
+        assert "not exposed" in summary.lower()
+
+    def test_release_summary_names_target_version_when_update_queued(self) -> None:
+        info = HubFirmwareUpdateInfo(target_version="2.17.0", state=HUB_FW_STATE_NOT_STARTED)
+        coordinator = self._make_coordinator(info)
+        entity = AjaxHubFirmwareUpdate(coordinator, "002B1A51")
+        summary = entity.release_summary
+        assert summary is not None
+        assert "2.17.0" in summary
+        assert "informational" in summary.lower()
+
     def test_state_resolves_to_on_when_pending_update(self) -> None:
         from homeassistant.const import STATE_ON
 

@@ -6,7 +6,12 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    RestoreSensor,
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
@@ -477,12 +482,23 @@ class AjaxHubCellularNetworkSensor(_HubNetworkSensor):
 # ---------------------------------------------------------------------------
 
 
-class _AjaxDeviceReadingsBase(CoordinatorEntity[AjaxCobrandedCoordinator], SensorEntity):
-    """Shared scaffold for the current / energy / power triplet.
+class _AjaxDeviceReadingsBase(CoordinatorEntity[AjaxCobrandedCoordinator], RestoreSensor):
+    """Shared scaffold for the current / voltage / energy / power quartet.
 
     Each subclass picks its own translation_key, device_class, state_class
-    and unit. All three pull from `coordinator.device_readings[device_id]`
-    which is populated by the HTS path (see `_on_hts_device_kv`).
+    and unit, and provides `_live_native_value` reading from
+    `coordinator.device_readings[device_id]` (populated by the HTS path
+    in `_on_hts_device_kv`).
+
+    Restoration on boot (#123): some Ajax hubs only emit electrical
+    readings via `STATUS_UPDATE` deltas on change, not in the initial
+    `STATUS_BODY` snapshot. For loads that run at a constant rate for
+    hours (e.g. a relay driving fixed-speed ventilation), no delta
+    arrives until the load actually shifts, so the sensor would render
+    `unknown` after every restart even though the last known value is
+    still the truth. `RestoreSensor` lets us seed the entity from its
+    last persisted state on HA boot; the value is refreshed in place
+    as soon as the next live delta lands.
     """
 
     _attr_has_entity_name = True
@@ -490,19 +506,48 @@ class _AjaxDeviceReadingsBase(CoordinatorEntity[AjaxCobrandedCoordinator], Senso
     def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
+        # Per-entity fallback used when the coordinator has no live reading
+        # yet but HA restored a state from the previous run. Populated by
+        # `async_added_to_hass`; stays `None` on a fresh install.
+        self._restored_native_value: float | None = None
         device = coordinator.devices.get(device_id)
         if device:
             self._attr_device_info = build_device_info(device, coordinator.rooms)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_sensor_data()
+        if last is None or last.native_value is None:
+            return
+        try:
+            self._restored_native_value = float(last.native_value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            # State recorded as a non-numeric string (e.g. "unknown")
+            # or a non-castable type (date/Decimal) — skip the restore.
+            self._restored_native_value = None
+
+    @property
+    def _live_native_value(self) -> float | None:
+        """Subclass-specific lookup against `coordinator.device_readings`."""
+        raise NotImplementedError
+
+    @property
+    def native_value(self) -> float | None:
+        live = self._live_native_value
+        if live is not None:
+            return live
+        return self._restored_native_value
 
     @property
     def available(self) -> bool:
         device = self.coordinator.devices.get(self._device_id)
         if device is None or not device.is_online:
             return False
-        # No reading has arrived yet — entity stays unavailable instead of
-        # rendering 0.0, otherwise the Energy dashboard would integrate a
-        # phantom zero baseline before the hub's first STATUS_BODY.
-        return self._device_id in self.coordinator.device_readings
+        # Entity is available if we have a live reading OR a restored
+        # value from the previous run. Otherwise we'd render `unknown`
+        # for hours on installs whose hub only emits readings on
+        # change (#123 follow-up).
+        return self._live_native_value is not None or self._restored_native_value is not None
 
 
 class AjaxDeviceCurrentSensor(_AjaxDeviceReadingsBase):
@@ -519,7 +564,7 @@ class AjaxDeviceCurrentSensor(_AjaxDeviceReadingsBase):
         self._attr_unique_id = f"aegis_ajax_{device_id}_current"
 
     @property
-    def native_value(self) -> float | None:
+    def _live_native_value(self) -> float | None:
         readings = self.coordinator.device_readings.get(self._device_id)
         if readings is None or readings.current_ma is None:
             return None
@@ -545,7 +590,7 @@ class AjaxDeviceVoltageSensor(_AjaxDeviceReadingsBase):
         self._attr_unique_id = f"aegis_ajax_{device_id}_voltage"
 
     @property
-    def native_value(self) -> float | None:
+    def _live_native_value(self) -> float | None:
         readings = self.coordinator.device_readings.get(self._device_id)
         if readings is None or readings.voltage_v is None:
             return None
@@ -573,7 +618,7 @@ class AjaxDeviceEnergyConsumedSensor(_AjaxDeviceReadingsBase):
         self._attr_unique_id = f"aegis_ajax_{device_id}_energy_consumed"
 
     @property
-    def native_value(self) -> float | None:
+    def _live_native_value(self) -> float | None:
         readings = self.coordinator.device_readings.get(self._device_id)
         if readings is None or readings.power_consumed_wh is None:
             return None
@@ -601,7 +646,7 @@ class AjaxDeviceDerivedPowerSensor(_AjaxDeviceReadingsBase):
         self._attr_unique_id = f"aegis_ajax_{device_id}_power_derived"
 
     @property
-    def native_value(self) -> float | None:
+    def _live_native_value(self) -> float | None:
         readings = self.coordinator.device_readings.get(self._device_id)
         if readings is None or readings.current_ma is None:
             return None
