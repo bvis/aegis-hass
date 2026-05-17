@@ -28,18 +28,13 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 - ~~Non-blocking startup~~ (v1.2.4) — HTS connect-then-listen and FCM startup move to background tasks; first refresh no longer awaits multi-second listener startups so the integration drops out of HA's *"integration taking too long"* warning much sooner (#113, closes #112)
 - ~~Cached-snapshot warm start~~ (v1.2.4) — first `_async_update_data` warm-starts `coordinator.devices` from a per-entry `Store`-backed cache and skips the synchronous `get_devices_snapshot` loop on subsequent boots; persistent streams deliver fresh data within seconds. Cache writes from the stream callback go through `Store.async_delay_save` (30 s window) to coalesce bursts. Real-HA measurement: ~10 s shaved off HA total boot, ~9 s off aegis_ajax setup-to-platforms-online (#116, closes #114)
 - ~~Valve platform (read-only)~~ (v1.3.0) — `WaterStopChannel.state` / `is_transitioning` / `MALFUNCTION_IS_STUCK` surfaced via the existing `spread_properties` walker as `valve_chN` / `_transitioning` / `_stuck` keys; new `valve.py` exposes them as native HA `valve.*` entities for `water_stop` and `water_stop_base` device types. Bidirectional control still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in v3 protos) (#117)
+- ~~WallSwitch / Socket electrical readings~~ (v1.4.0-beta.1 → beta.4) — `sensor.<name>_current` (A), `sensor.<name>_voltage` (V, beta.3+), `sensor.<name>_energy_consumed` (kWh, ties into HA Energy dashboard with `total_increasing`), and `sensor.<name>_power_derived` (W, disabled by default, uses the device-reported voltage when present and falls back to `NOMINAL_GRID_VOLTAGE_V` otherwise). Per-device delta pushes from the hub are consumed in place, with merge semantics so partial updates don't blank the cached readings on every relay toggle (#123, #137, #140, beta.3 partial-update fix in #140)
+- ~~"Delete FCM credentials" toggle in options flow~~ (v1.4.0-beta.2 → beta.4) — explicit boolean that drops the four FCM keys from `entry.data` unconditionally, plus a switch from `default=` to `description={"suggested_value": ...}` so the form fields actually round-trip an empty submission instead of restoring the prior value. Two iterations: #139 fixed the persistence handler, #141 fixed the form schema after Hansontech190 reported the password field couldn't be cleared through the UI (#138, #139, #141)
+- ~~Parser hardening~~ (v1.3.0-beta.7) — `_parse_statuses` sub-message branches now build inputs with real `LightDeviceStatus(...)` instances instead of `MagicMock` (sweep across signal_strength, gsm_status, sim_status, monitoring, life_quality, temperature, wire_input_status, transmitter_status, smart_lock, nfc, motion_detected); per-device / per-update `try/except` in `_run_stream` so one bad device or update no longer kills the stream; `TestSnapshotReplay` deserialises a real `StreamLightDevicesResponse` and replays it end-to-end, with auto-replay over every `tests/fixtures/*.bin` (#126, #127, follow-up to #119)
 
 ---
 
 ## Priority 1 — High impact, moderate effort
-
-### ~~1.0 Parser hardening — robustness pass after the beta.5/beta.6 regression~~
-**Status:** Done on `fix/parser-hardening-after-119`. All three mitigations landed:
-1. `_parse_statuses` MagicMock→real-proto sweep — `TestBatteryParser` and the sub-message branches of `TestStatusParser` (signal_strength, gsm_status, sim_status, monitoring, life_quality, temperature, wire_input_status, transmitter_status, smart_lock, nfc, motion_detected) now build their inputs with `LightDeviceStatus(...)`. No new latent shape bugs surfaced — the wifi_signal_level_status fix from beta.6 was apparently the only one.
-2. Per-device / per-update `try/except` in `_run_stream` — one bad device or update is logged at WARNING and skipped; the stream stays alive, no exponential-backoff reconnect cycle. Status-update handling extracted into `_handle_update`.
-3. Snapshot-replay scaffold — `TestSnapshotReplay::test_synthetic_snapshot_parses_all_devices` builds a multi-device snapshot (incl. the #119 `wifi_signal_level_status` shape on a `video_edge_channel`), serialises to wire bytes, deserialises and feeds it through `start_device_stream`. `test_fixture_files_round_trip` auto-replays every `tests/fixtures/*.bin` capture (skip when empty). Drop-in directory for future user captures documented in `tests/fixtures/README.md`.
-
----
 
 ### 1.1 Valve Platform (`valve.py`) — bidirectional control
 **Why:** Read-only valve entity shipped in `1.3.0` (#117). The remaining gap is **opening / closing the valve from HA** — automations can react to the valve being closed by a leak, but can't trigger the shut-off themselves nor reopen after a false-positive.
@@ -63,13 +58,6 @@ Prioritized list of remaining improvements based on HA platinum integration patt
 **Why:** Show alarm events as HA persistent notifications with configurable filters.
 
 **Effort:** Medium (2 hours).
-
-### 2.3 Unknown App Label Repair (#99)
-**Why:** When the user configures a label the Ajax backend rejects, the integration today surfaces UNAUTHENTICATED / PERMISSION_DENIED gRPC errors with no clear remediation. A Repair card with a fix flow (the same `KNOWN_APP_LABELS` dropdown the config flow uses) would replace stack traces with a one-click fix.
-
-**Implementation:** Capture the gRPC error shape backend returns for unknown labels (vs. wrong credentials), introduce `UnknownAppLabelError(AuthenticationError)` subclass, branch in coordinator's auth-failure path, add `UnknownAppLabelRepairFlow`. Same pattern as the FCM fix flow shipped in #96.
-
-**Effort:** Medium (3-4 hours, gated on capturing the discriminating error shape).
 
 ---
 
