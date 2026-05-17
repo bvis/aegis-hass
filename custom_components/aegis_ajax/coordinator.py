@@ -564,9 +564,16 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Drop stale HTS state so hub network entities become unavailable."""
         self._hts_task = None
         self._hts_client = None
-        if self.hub_network or self.device_readings:
+        # Hub-network state IS stale once HTS drops — we can't know the
+        # hub's current connection state without the stream, and showing
+        # a 5-minute-old `wifi_ssid` would mislead the user.
+        # Per-device electrical readings (#146) are device-state the hub
+        # itself remembers across our socket outage; keep them visible so
+        # a transient reconnect doesn't blow away the value the user was
+        # just looking at. The next STATUS_UPDATE delta refreshes them
+        # in place when HTS reconnects.
+        if self.hub_network:
             self.hub_network.clear()
-            self.device_readings.clear()
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         # Track the first failure of an otherwise-healthy run so we can
         # raise a Repair after a sustained outage. Successful reconnect

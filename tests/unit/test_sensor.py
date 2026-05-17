@@ -756,6 +756,61 @@ class TestAjaxDeviceElectricalSensors:
         assert sensor.native_value is None
         assert sensor.available is False
 
+    def test_sensor_stays_available_across_hts_disconnect(self) -> None:
+        """#146 — transient HTS reconnect must not blank the readings sensors.
+
+        The hub remembers device state across our socket outage, so the
+        cached value remains the truth until a fresh STATUS_UPDATE delta
+        lands when HTS comes back. Without this, every reconnect cycle
+        (5+ min on busy installs) renders the sensor `unavailable` even
+        though we have a perfectly good last-known value.
+        """
+        from unittest.mock import patch as _patch
+
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+        from custom_components.aegis_ajax.api.models import Device
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+        from custom_components.aegis_ajax.sensor import AjaxDeviceCurrentSensor
+
+        hass = MagicMock()
+        client = MagicMock()
+        with _patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=client, space_ids=["s1"], poll_interval=30
+            )
+        coordinator.hass = hass
+        coordinator.devices = {
+            "311B058D": Device(
+                id="311B058D",
+                hub_id="002B1A51",
+                name="Relay",
+                device_type="wall_switch",
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={},
+                battery=None,
+            )
+        }
+        coordinator.device_readings["311B058D"] = DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+
+        sensor = AjaxDeviceCurrentSensor(coordinator, "311B058D")
+        assert sensor.available is True
+        assert sensor.native_value == 0.04
+
+        coordinator._handle_hts_disconnect(reconnect=False)
+
+        # Readings preserved → sensor reports the cached value, not `unavailable`.
+        assert sensor.available is True
+        assert sensor.native_value == 0.04
+
     def test_unique_ids_distinct_across_four_entities(self) -> None:
         from custom_components.aegis_ajax.sensor import (
             AjaxDeviceCurrentSensor,

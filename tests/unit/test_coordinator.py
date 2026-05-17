@@ -1486,18 +1486,41 @@ class TestOnHtsDeviceKv:
         )
         coordinator.async_set_updated_data.assert_called_once()
 
-    def test_hts_disconnect_clears_device_readings(self) -> None:
-        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+    def test_hts_disconnect_preserves_device_readings(self) -> None:
+        """#146 — keep last-known readings visible across transient HTS reconnects.
+
+        Hub-network state is genuinely stale once the stream drops, but
+        per-device electrical readings reflect device-state the hub
+        itself remembers, so the cached value remains the truth until a
+        fresh STATUS_UPDATE delta lands.
+        """
+        from custom_components.aegis_ajax.api.hts.hub_state import (
+            DeviceReadings,
+            HubNetworkState,
+        )
 
         coordinator = _make_coordinator()
-        coordinator.device_readings["311B058D"] = DeviceReadings(
-            current_ma=40, power_consumed_wh=2409
-        )
+        coordinator.hub_network["hub-1"] = HubNetworkState(ethernet_connected=True)
+        readings = DeviceReadings(current_ma=40, power_consumed_wh=2409)
+        coordinator.device_readings["311B058D"] = readings
         coordinator.async_set_updated_data = MagicMock()
 
         coordinator._handle_hts_disconnect(reconnect=False)
 
-        assert coordinator.device_readings == {}
-        # Both hub_network and device_readings clear in the same call,
-        # so async_set_updated_data fires exactly once.
+        assert coordinator.hub_network == {}
+        assert coordinator.device_readings == {"311B058D": readings}
         coordinator.async_set_updated_data.assert_called_once()
+
+    def test_hts_disconnect_with_only_readings_does_not_broadcast(self) -> None:
+        """No state change to broadcast — readings stay untouched, hub_network already empty."""
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        readings = DeviceReadings(current_ma=40, power_consumed_wh=2409)
+        coordinator.device_readings["311B058D"] = readings
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._handle_hts_disconnect(reconnect=False)
+
+        assert coordinator.device_readings == {"311B058D": readings}
+        coordinator.async_set_updated_data.assert_not_called()
