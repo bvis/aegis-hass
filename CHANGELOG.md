@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0-beta.4] - 2026-05-17
+
+Follow-up to `1.4.0-beta.2`: the previous fix for clearing FCM credentials in the options form was incomplete. Hansontech190 reported on #138 that on beta.3 the credentials still re-appear, with the extra clue that the API Key field "shows the original key in grey" when cleared — the password field can't be reliably emptied through the UI. The persistence handler was correct; the form schema was the problem.
+
+### Added
+- **"Delete FCM credentials" toggle** in the options form. Toggling it on and saving drops all four FCM keys from the entry unconditionally, regardless of what the form fields currently contain. The unambiguous deletion path, immune to the password-field UI quirk. Translations in all 14 locales. (#141, follow-up to #139, fixes #138)
+
+### Fixed
+- **FCM fields now respect empty submissions.** Switched the four FCM voluptuous fields from `default=` to `description={"suggested_value": ...}`. The frontend still pre-fills the prior value as a suggestion, but voluptuous no longer re-fills missing keys, so an empty submission stays empty end-to-end instead of being silently restored to the prior value. (#141)
+
 ## [1.4.0-beta.3] - 2026-05-17
 
 Beta against `1.4.0-beta.1`'s WallSwitch electrical surface. Two changes on top of `1.4.0-beta.2`: the load-bearing readings no longer disappear on every relay toggle, and the WallSwitch's actual line voltage is now exposed as a sensor (driving the derived-power calculation from a real reading instead of a 230 V constant).
