@@ -1380,6 +1380,43 @@ class TestOnHtsDeviceKv:
         # Same values — no entity refresh needed.
         coordinator.async_set_updated_data.assert_not_called()
 
+    def test_partial_update_does_not_clear_cached_readings(self) -> None:
+        """Relay-state push without electrical keys must NOT blank out the readings (#123)."""
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        coordinator.devices["311B058D"] = self._make_electrical_device()
+        coordinator.device_readings["311B058D"] = DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data = MagicMock()
+
+        # Push containing only the on/off state byte — no 0x42 / 0x43.
+        coordinator._on_hts_device_kv("002B1A51", "311B058D", {0x05: b"\x01"})
+
+        assert coordinator.device_readings["311B058D"] == DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_partial_update_with_only_current_keeps_cached_energy(self) -> None:
+        """Energy-consumed updates arrive on a different cadence than current (#123)."""
+        from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
+
+        coordinator = _make_coordinator()
+        coordinator.devices["311B058D"] = self._make_electrical_device()
+        coordinator.device_readings["311B058D"] = DeviceReadings(
+            current_ma=10, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data = MagicMock()
+
+        coordinator._on_hts_device_kv("002B1A51", "311B058D", {0x42: b"\x00\x00\x00\x28"})
+
+        assert coordinator.device_readings["311B058D"] == DeviceReadings(
+            current_ma=40, power_consumed_wh=2409
+        )
+        coordinator.async_set_updated_data.assert_called_once()
+
     def test_hts_disconnect_clears_device_readings(self) -> None:
         from custom_components.aegis_ajax.api.hts.hub_state import DeviceReadings
 

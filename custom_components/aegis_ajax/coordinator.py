@@ -517,7 +517,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device = self.devices.get(device_id_hex)
         if device is None:
             return
-        readings = parse_device_readings(device.device_type, kv)
+        readings = parse_device_readings(
+            device.device_type,
+            kv,
+            existing=self.device_readings.get(device_id_hex),
+        )
         if readings is None:
             return
         if self.device_readings.get(device_id_hex) == readings:

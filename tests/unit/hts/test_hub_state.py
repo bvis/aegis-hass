@@ -395,6 +395,41 @@ class TestParseDeviceReadings:
         r = parse_device_readings("relay_fibra_base", {})
         assert r == DeviceReadings(current_ma=None, power_consumed_wh=None)
 
+    def test_partial_update_without_keys_preserves_existing(self) -> None:
+        """STATUS_UPDATE deltas often omit 0x42/0x43; cached readings must survive (#123)."""
+        prior = DeviceReadings(current_ma=40, power_consumed_wh=2409)
+        # kv carries an unrelated sub-key (the relay state byte) — neither
+        # electrical sub-key is present.
+        r = parse_device_readings("wall_switch", {0x05: b"\x01"}, existing=prior)
+        assert r == prior
+
+    def test_partial_update_with_only_current_keeps_energy(self) -> None:
+        prior = DeviceReadings(current_ma=10, power_consumed_wh=2409)
+        r = parse_device_readings(
+            "wall_switch",
+            {DEVICE_KEY_CURRENT_MA: b"\x00\x00\x00\x28"},
+            existing=prior,
+        )
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409)
+
+    def test_partial_update_with_only_energy_keeps_current(self) -> None:
+        prior = DeviceReadings(current_ma=40, power_consumed_wh=1000)
+        r = parse_device_readings(
+            "socket",
+            {DEVICE_KEY_POWER_CONSUMED_WH: b"\x00\x00\x09\x69"},
+            existing=prior,
+        )
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=2409)
+
+    def test_no_existing_passed_falls_back_to_overwrite(self) -> None:
+        # Boot-time snapshot path: no prior cache, fresh DeviceReadings built
+        # straight from the kv block.
+        r = parse_device_readings(
+            "wall_switch",
+            {DEVICE_KEY_CURRENT_MA: b"\x28"},
+        )
+        assert r == DeviceReadings(current_ma=40, power_consumed_wh=None)
+
     def test_known_electrical_types(self) -> None:
         # Sanity-check: every type the switch platform treats as a
         # power-controllable relay that *should* emit readings is in
