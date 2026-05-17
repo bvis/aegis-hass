@@ -151,9 +151,8 @@ def _int_be_val(val: bytes | None) -> int | None:
 # Distinct from the hub-level keys above: same numeric sub-key carries
 # different meaning depending on which device's row of the body it
 # belongs to. For the hub, 0x42 is `wifi_ip`; for a WallSwitch row, 0x42
-# is `current_ma`. The Ajax mobile app reads them through a separate TLV
-# container (`poz0` in Ajax PRO 2.47 smali) — see #123 for the audit
-# trail.
+# is `current_ma`. Per-device readings come through a separate TLV
+# container in the same body — see #123 for context.
 
 DEVICE_KEY_VOLTAGE_V = 0x35
 DEVICE_KEY_CURRENT_MA = 0x42
@@ -190,11 +189,10 @@ class DeviceReadings:
     Consumers should treat any `None` as "no measurement available"
     and render the entity as `unknown` rather than zero.
 
-    `voltage_v` is a signed short straight from the wire (sub-key
-    0x35, named `voltage` in Ajax PRO 2.47's `poz0` TLV container);
-    units are volts as the device reports them, no scaling. Older
-    WallSwitch firmwares omit the sub-key entirely — power-derived
-    callers must fall back to a nominal voltage in that case.
+    `voltage_v` is the device-reported line voltage as a signed
+    short, in volts (no scaling). Older WallSwitch firmwares omit
+    it entirely — power-derived callers must fall back to a nominal
+    voltage in that case.
     """
 
     current_ma: int | None = None

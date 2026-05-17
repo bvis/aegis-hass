@@ -25,9 +25,9 @@ from custom_components.aegis_ajax.entity import build_device_info
 
 # Fallback voltage used to derive instantaneous power when the device
 # hasn't reported a real voltage reading yet (#123). Recent WallSwitch
-# firmwares emit `voltage` on HTS sub-key 0x35 (signed short, volts);
-# older firmwares omit the field, so we land on this nominal value the
-# Ajax mobile app uses as its labelled "230 V" baseline.
+# firmwares report a measured voltage to the hub; older firmwares omit
+# it, so we land on this nominal value — the same baseline the official
+# app uses when no measurement is available.
 NOMINAL_GRID_VOLTAGE_V = 230.0
 
 if TYPE_CHECKING:
@@ -529,10 +529,9 @@ class AjaxDeviceCurrentSensor(_AjaxDeviceReadingsBase):
 class AjaxDeviceVoltageSensor(_AjaxDeviceReadingsBase):
     """Live line voltage reported by a WallSwitch / Socket-family device (V).
 
-    Comes straight from HTS sub-key 0x35 of the device's TLV block,
-    no scaling. Older firmwares (pre-WallSwitch PRO 2.47 era) don't
-    emit the sub-key — the entity then stays `unknown` until the
-    device reports one.
+    Reads the device-reported line voltage as a signed short, no
+    scaling. Older firmwares don't report it — the entity then
+    stays `unknown` until the device sends a reading.
     """
 
     _attr_translation_key = "voltage"
@@ -584,11 +583,10 @@ class AjaxDeviceEnergyConsumedSensor(_AjaxDeviceReadingsBase):
 class AjaxDeviceDerivedPowerSensor(_AjaxDeviceReadingsBase):
     """Instantaneous power derived from current × voltage (W).
 
-    Uses the device's reported voltage when present (HTS sub-key 0x35);
-    falls back to `NOMINAL_GRID_VOLTAGE_V` only for firmwares that don't
-    emit it. The Ajax mobile app renders the Power line on the device
-    card the same way — `current × voltage` — so the HA value matches
-    what the user sees in the official app.
+    Uses the device's reported voltage when present; falls back to
+    `NOMINAL_GRID_VOLTAGE_V` only for firmwares that don't report
+    one. Same `current × voltage` product the official app renders
+    on the device card, so the HA value matches what the user sees.
     """
 
     _attr_translation_key = "power_derived"
