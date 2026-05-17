@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0-beta.7] - 2026-05-17
+
+Transparency beta. Two changes targeted at honesty of the user-visible state.
+
+### Added
+- **`release_summary` on `update.hub_firmware`.** Clicking the entity in HA's dashboard surfaces a short explanation in the detail panel: "Up-to-date" only means "Ajax has not queued an update for this hub right now". The actual installed firmware version is not carried by the Ajax stream and we can't compare against any catalog, so the absence of a queued update is the only signal we have. When an update IS queued the summary names the target version and notes that the integration cannot trigger or skip the install. (#144)
+
+### Fixed
+- **Electrical-reading sensors keep their last known value across restarts.** Bruno reported that on his hub the WallSwitch readings sub-keys are absent from the boot snapshot — the hub only emits them via per-device delta pushes when the load actually changes. For loads that run constant for hours (relay driving fixed-speed ventilation), no delta arrives until the load shifts, so `current` / `voltage` / `energy_consumed` / `power_derived` rendered `unknown` after every restart for an arbitrary amount of time. The four sensor classes now extend HA's `RestoreSensor` and fall back to the persisted last-known value when no live reading is available. The Energy dashboard's `total_increasing` semantics are preserved. (#144, #123)
+
 ## [1.4.0-beta.6] - 2026-05-17
 
 Hotfix for `1.4.0-beta.5`: the new `update.hub_firmware` entity rendered as `unknown` ("Firmware desconocido") on healthy installs instead of "Up-to-date".
