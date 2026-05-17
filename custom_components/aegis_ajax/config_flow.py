@@ -437,13 +437,22 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                 ).hexdigest()
             else:
                 user_input.pop("pin_code", None)
-            # Move FCM credentials into config_entry.data (encrypted storage)
-            fcm_data = {k: user_input.pop(k) for k in _FCM_KEYS if k in user_input}
-            if any(fcm_data.values()):
-                self.hass.config_entries.async_update_entry(
-                    self._entry,
-                    data={**self._entry.data, **fcm_data},
-                )
+            # Move FCM credentials into config_entry.data (encrypted storage).
+            # Empty strings mean "clear this credential", so drop those keys
+            # from entry.data instead of persisting "" (issue #138).
+            fcm_input = {k: user_input.pop(k) for k in _FCM_KEYS if k in user_input}
+            if fcm_input:
+                new_data = {**self._entry.data}
+                for k, v in fcm_input.items():
+                    if v:
+                        new_data[k] = v
+                    else:
+                        new_data.pop(k, None)
+                if new_data != self._entry.data:
+                    self.hass.config_entries.async_update_entry(
+                        self._entry,
+                        data=new_data,
+                    )
             return self.async_create_entry(title="", data=user_input)
         return self.async_show_form(
             step_id="init",
