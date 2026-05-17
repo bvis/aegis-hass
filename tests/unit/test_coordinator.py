@@ -1354,6 +1354,7 @@ class TestHubFirmwareRefresh:
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True
         coordinator._streams_started = True
+        coordinator._sim_info_last_fetch = -10_000.0
         # Pre-seed a stale entry
         coordinator.hub_firmware_updates["hub-1"] = HubFirmwareUpdateInfo(
             target_version="2.16.0", state=HUB_FW_STATE_NOT_STARTED
