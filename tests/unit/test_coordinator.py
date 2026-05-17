@@ -1224,6 +1224,7 @@ class TestCachedSnapshotStart:
         )
         coordinator._hub_object_api = MagicMock()
         coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_firmware_info = AsyncMock(return_value=None)
         coordinator._start_device_streams = AsyncMock()
         coordinator._start_hts = AsyncMock()
         return coordinator
@@ -1302,6 +1303,68 @@ class TestCachedSnapshotStart:
 # ---------------------------------------------------------------------------
 # Per-device readings via HTS (#123)
 # ---------------------------------------------------------------------------
+
+
+class TestHubFirmwareRefresh:
+    """Coordinator piggybacks firmware fetch on the SIM refresh cadence."""
+
+    @pytest.mark.asyncio
+    async def test_firmware_info_stored_when_returned(self) -> None:
+        from custom_components.aegis_ajax.api.hub_object import (
+            HUB_FW_STATE_DOWNLOADING,
+            HubFirmwareUpdateInfo,
+        )
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+        coordinator._hub_object_api = MagicMock()
+        coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_firmware_info = AsyncMock(
+            return_value=HubFirmwareUpdateInfo(
+                target_version="2.17.0", state=HUB_FW_STATE_DOWNLOADING
+            )
+        )
+
+        await coordinator._async_update_data()
+
+        # _make_space defaults hub_id to "hub-1"
+        assert "hub-1" in coordinator.hub_firmware_updates
+        assert coordinator.hub_firmware_updates["hub-1"].target_version == "2.17.0"
+        assert coordinator.hub_firmware_updates["hub-1"].state == HUB_FW_STATE_DOWNLOADING
+
+    @pytest.mark.asyncio
+    async def test_firmware_entry_cleared_when_api_returns_none(self) -> None:
+        """Hub reports no pending update → previous cached entry must be dropped."""
+        from custom_components.aegis_ajax.api.hub_object import (
+            HUB_FW_STATE_NOT_STARTED,
+            HubFirmwareUpdateInfo,
+        )
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        # Pre-seed a stale entry
+        coordinator.hub_firmware_updates["hub-1"] = HubFirmwareUpdateInfo(
+            target_version="2.16.0", state=HUB_FW_STATE_NOT_STARTED
+        )
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+        coordinator._hub_object_api = MagicMock()
+        coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_firmware_info = AsyncMock(return_value=None)
+
+        await coordinator._async_update_data()
+
+        assert "hub-1" not in coordinator.hub_firmware_updates
 
 
 class TestOnHtsDeviceKv:

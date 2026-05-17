@@ -15,7 +15,11 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import HtsClient
-from custom_components.aegis_ajax.api.hub_object import HubObjectApi, SimCardInfo
+from custom_components.aegis_ajax.api.hub_object import (
+    HubFirmwareUpdateInfo,
+    HubObjectApi,
+    SimCardInfo,
+)
 from custom_components.aegis_ajax.api.media import MediaApi
 from custom_components.aegis_ajax.api.models import Device as DeviceModel
 from custom_components.aegis_ajax.api.security import SecurityApi
@@ -111,6 +115,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.devices: dict[str, Device] = {}
         self.rooms: dict[str, Room] = {}
         self.sim_info: dict[str, SimCardInfo] = {}
+        # Pending hub firmware update keyed by hub_id (#updates). Absent
+        # entry = the hub reports no pending update OR the streamHubObject
+        # call hasn't completed yet. Refreshed on the same hourly cycle
+        # as `sim_info`. Read-only; the integration never calls the
+        # install RPC even though the proto exposes one.
+        self.hub_firmware_updates: dict[str, HubFirmwareUpdateInfo] = {}
         self._notification_listener: AjaxNotificationListener | None = None
         self._stream_tasks: list[asyncio.Task[None]] = []
         self._streams_started: bool = False
@@ -301,14 +311,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.spaces = new_spaces
             self._update_hub_offline_repairs(now)
 
-            # Fetch SIM info for each hub (cached, refresh once per hour)
+            # Fetch SIM info and pending firmware update for each hub.
+            # Both come from the same `streamHubObject` snapshot, so we
+            # piggyback firmware on the SIM refresh cadence (once per
+            # hour). The firmware fetch always re-runs because a pending
+            # update can be cleared between cycles, unlike SIM info
+            # which we cache once.
             sim_refresh_interval = 3600.0
             if now - self._sim_info_last_fetch > sim_refresh_interval:
                 for space in self.spaces.values():
-                    if space.hub_id and space.hub_id not in self.sim_info:
+                    if not space.hub_id:
+                        continue
+                    if space.hub_id not in self.sim_info:
                         sim = await self._hub_object_api.get_sim_info(space.hub_id)
                         if sim:
                             self.sim_info[space.hub_id] = sim
+                    fw = await self._hub_object_api.get_firmware_info(space.hub_id)
+                    if fw is None:
+                        self.hub_firmware_updates.pop(space.hub_id, None)
+                    else:
+                        self.hub_firmware_updates[space.hub_id] = fw
                 self._sim_info_last_fetch = now
 
             # Fetch rooms for each space (cached, refresh once per hour). Used

@@ -349,6 +349,11 @@
             "channel_2": {
                 "name": "Kanał 2"
             }
+        },
+        "update": {
+            "hub_firmware": {
+                "name": "Oprogramowanie"
+            }
         }
     }
 }

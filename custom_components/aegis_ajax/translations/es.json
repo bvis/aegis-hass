@@ -365,6 +365,11 @@
             "channel_2": {
                 "name": "Canal 2"
             }
+        },
+        "update": {
+            "hub_firmware": {
+                "name": "Firmware"
+            }
         }
     }
 }
