@@ -478,7 +478,18 @@ class AjaxProblemSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySenso
 
 
 class AjaxCraConnectionSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySensorEntity):
-    """Binary sensor reporting whether the space has approved monitoring."""
+    """Live "Central receptora de alarmas → Conectada" status for a hub.
+
+    The Ajax mobile app renders that same row from `monitoring.cms_active`
+    on the hub's status snapshot — a real-time per-hub boolean of whether
+    the CMS channel is currently up. We keep `space.has_monitoring` as a
+    fallback for installs whose hub firmware doesn't emit `monitoring`
+    in its statuses (some older / cobranded firmwares), so the entity
+    still reflects "a monitoring company is on the account" in that path.
+
+    The diagnostic `sensor.<hub>_compania_cra` exposes the actual company
+    names + statuses for accounts that need to inspect approvals.
+    """
 
     _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -495,11 +506,21 @@ class AjaxCraConnectionSensor(CoordinatorEntity[AjaxCobrandedCoordinator], Binar
 
     @property
     def available(self) -> bool:
+        hub = self.coordinator.devices.get(self._hub_id)
+        # Primary signal is on the hub — available once we have a fresh
+        # snapshot that includes its `monitoring` status oneof. Fall back
+        # to the space-level snapshot for firmwares that don't emit it,
+        # avoiding a misleading `off` before either source has loaded.
+        if hub is not None and "monitoring_active" in hub.statuses:
+            return True
         space = self.coordinator.spaces.get(self._space_id)
         return space is not None and space.monitoring_companies_loaded
 
     @property
     def is_on(self) -> bool:
+        hub = self.coordinator.devices.get(self._hub_id)
+        if hub is not None and "monitoring_active" in hub.statuses:
+            return bool(hub.statuses["monitoring_active"])
         space = self.coordinator.spaces.get(self._space_id)
         return space.has_monitoring if space is not None else False
 

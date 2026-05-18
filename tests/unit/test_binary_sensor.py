@@ -322,6 +322,60 @@ class TestAjaxCraConnectionSensor:
 
         assert sensor.available is False
 
+    def test_is_on_when_hub_reports_cms_active(self) -> None:
+        """Primary signal — matches the Ajax app's "Conectada" row (#?).
+
+        The hub's `monitoring.cms_active` flag is the same boolean the
+        mobile app surfaces on the "Central receptora de alarmas" row.
+        It takes priority over the (empty) `monitoring_companies` list:
+        cobranded installs (Protegim, AIKO, etc.) often have an active
+        CMS channel without an APPROVED company entry in the snapshot.
+        """
+        hub = replace(self._make_hub_device(), statuses={"monitoring_active": True})
+        coordinator = MagicMock()
+        coordinator.devices = {"hub-1": hub}
+        coordinator.spaces = {"space-1": self._make_space(())}
+
+        sensor = AjaxCraConnectionSensor(coordinator, "space-1", "hub-1")
+
+        assert sensor.available is True
+        assert sensor.is_on is True
+
+    def test_is_off_when_hub_reports_cms_inactive(self) -> None:
+        """Hub-reported `cms_active=False` wins even with an approved company."""
+        hub = replace(self._make_hub_device(), statuses={"monitoring_active": False})
+        coordinator = MagicMock()
+        coordinator.devices = {"hub-1": hub}
+        coordinator.spaces = {
+            "space-1": self._make_space(
+                (
+                    MonitoringCompany(
+                        name="Central One",
+                        status=MonitoringCompanyStatus.APPROVED,
+                    ),
+                )
+            )
+        }
+
+        sensor = AjaxCraConnectionSensor(coordinator, "space-1", "hub-1")
+
+        assert sensor.available is True
+        assert sensor.is_on is False
+
+    def test_available_via_hub_status_when_space_snapshot_not_loaded(self) -> None:
+        """Hub status is enough — don't gate availability on the space snapshot."""
+        hub = replace(self._make_hub_device(), statuses={"monitoring_active": True})
+        coordinator = MagicMock()
+        coordinator.devices = {"hub-1": hub}
+        coordinator.spaces = {
+            "space-1": replace(self._make_space(()), monitoring_companies_loaded=False)
+        }
+
+        sensor = AjaxCraConnectionSensor(coordinator, "space-1", "hub-1")
+
+        assert sensor.available is True
+        assert sensor.is_on is True
+
 
 class TestDeviceTypeSensors:
     def test_glass_protect_s_in_device_types(self) -> None:
