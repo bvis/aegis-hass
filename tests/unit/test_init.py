@@ -175,6 +175,40 @@ class TestAsyncSetupEntry:
         mock_client.session.set_session.assert_not_called()
 
 
+class TestProtoDescriptorCollisionGuard:
+    """#151 — surface a remediation hint when protobuf descriptor pool collides."""
+
+    def test_logs_remediation_for_duplicate_file_name(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging as _logging
+
+        from custom_components.aegis_ajax import _log_proto_descriptor_collision
+
+        exc = TypeError(
+            "Couldn't build proto file into descriptor pool: "
+            "duplicate file name systems/ajax/api/ecosystem/v2/hubsvc/"
+            "commonmodels/object_type.proto"
+        )
+        with caplog.at_level(_logging.ERROR, logger="custom_components.aegis_ajax"):
+            _log_proto_descriptor_collision(exc)
+
+        assert any("backup copy" in r.message for r in caplog.records), (
+            "remediation hint should mention the backup-folder scenario"
+        )
+        assert any("custom_components" in r.message for r in caplog.records)
+
+    def test_no_log_for_unrelated_typeerror(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging as _logging
+
+        from custom_components.aegis_ajax import _log_proto_descriptor_collision
+
+        with caplog.at_level(_logging.ERROR, logger="custom_components.aegis_ajax"):
+            _log_proto_descriptor_collision(TypeError("something else broke"))
+
+        assert not caplog.records, "guard should only fire for descriptor-pool collisions"
+
+
 class TestOptionsUpdateListener:
     @pytest.mark.asyncio
     async def test_options_change_triggers_reload(self) -> None:
