@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-05-18
+
+Diagnostic patch. When the integration fails to load because of duplicate protobuf descriptors (almost always a stale or backup copy of `aegis_ajax` sitting next to the live one in `custom_components/`), Home Assistant used to surface the bare `TypeError("Couldn't build proto file into descriptor pool: duplicate file name ...")` and render it as the cryptic "Invalid handler specified" in the UI. The integration now logs an `ERROR` that spells out the most likely cause and the remediation before re-raising. No code behaviour change for successful installs.
+
+### Fixed
+- **Friendlier failure mode when two copies of the integration coexist in `custom_components/`** (#151, reported by @mschev). The first proto-triggering import in `__init__.py` is now wrapped in a narrow `try/except TypeError`; when the exception text contains "duplicate file name" the integration logs an `ERROR` naming the scenario (stale backup folder, partial HACS update) and the remediation path (list `custom_components/`, move or rename any non-active `aegis_ajax*` folder, restart). The original exception is re-raised so HA's existing broken-integration handling is unchanged.
+
+### Internal
+- Test suite at **1263** unit tests (was 1261 in `1.4.4`); coverage 85.84% (was 85.88%; small dip is the new helper). The classification + log message live in `_log_proto_descriptor_collision`; two new tests cover the duplicate-file-name path and the no-op-for-unrelated-TypeError path.
+
 ## [1.4.4] - 2026-05-18
 
 Patch release fixing a regression in the `binary_sensor.<hub>_conexion_cra` entity. The CRA-connection sensor stopped reflecting the hub's real-time `monitoring.cms_active` flag after `1.2.3-beta.1` and started deriving its state from the `Space.monitoring_companies` snapshot — which is empty for cobranded installs (Protegim, AIKO, others) and for accounts that don't have an explicit APPROVED monitoring-company entry. The entity rendered `off` ("Desconectada") on those installs even with a healthy CMS channel — visibly out of sync with the "Central receptora de alarmas → Conectada" row the Ajax mobile app surfaces from the same hub status. SemVer PATCH; no schema, behaviour, or migration impact for installs whose CRA already showed correctly.
