@@ -8,21 +8,53 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 
-from custom_components.aegis_ajax.api.client import AjaxGrpcClient
-from custom_components.aegis_ajax.const import (
+_LOGGER = logging.getLogger(__name__)
+
+
+def _log_proto_descriptor_collision(exc: TypeError) -> None:
+    """Spell out a remediation when protobuf's descriptor pool collides (#151).
+
+    `_descriptor_pool.AddSerializedFile` raises
+    `TypeError("Couldn't build proto file into descriptor pool: duplicate
+    file name ...")` when two `_pb2.py` modules try to register the same
+    proto path in protobuf's global default pool — almost always a stale
+    copy of this integration in `custom_components/` (backup folder,
+    partial HACS update). HA's UI surfaces the bare TypeError as the
+    cryptic "Invalid handler specified", so we log the fix path before
+    re-raising. No-op for unrelated TypeErrors.
+    """
+    if "duplicate file name" not in str(exc):
+        return
+    _LOGGER.error(
+        "Aegis for Ajax failed to load: duplicate protobuf descriptors "
+        "detected (%s). This usually means there's a stale or backup copy "
+        "of the integration alongside the live one in custom_components/ "
+        "(any folder starting with 'aegis_ajax' other than the active "
+        "install will trip this). List custom_components/, move or rename "
+        "the extra folder so it no longer starts with 'aegis_ajax', and "
+        "restart Home Assistant. A clean uninstall + reinstall via HACS "
+        "also clears it.",
+        exc,
+    )
+
+
+try:
+    from custom_components.aegis_ajax.api.client import AjaxGrpcClient
+except TypeError as exc:
+    _log_proto_descriptor_collision(exc)
+    raise
+from custom_components.aegis_ajax.const import (  # noqa: E402
     CONF_AUTO_CREATE_LABELS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     LABELS,
 )
-from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
-from custom_components.aegis_ajax.repairs import async_check_grpcio_version
+from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator  # noqa: E402
+from custom_components.aegis_ajax.repairs import async_check_grpcio_version  # noqa: E402
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
-
-_LOGGER = logging.getLogger(__name__)
 
 _FCM_KEYS = {"fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"}
 
