@@ -700,6 +700,39 @@ class TestExtractEventCompiledProtos:
         assert event_type == "doorbell_pressed"
         assert data["raw_tag"] == "ring_button_pressed"
 
+    def test_smartlock_doorbell_pressed_resolves_to_doorbell_pressed(self) -> None:
+        # Ajax SmartLock / LockBridge (Yale) with integrated ring button
+        # fires its press inside `SmartLockEventQualifier` — disjoint oneof
+        # from HubEventTag and VideoEventTag, so the parser needs its own
+        # pass (Pass 4 in `_extract_event_with_compiled_protos`) for #158.
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
+            transition_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.smartlock import (  # noqa: E501
+            qualifier_pb2 as smartlock_qualifier_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.smartlock import (  # noqa: E501
+            tag_pb2 as smartlock_tag_pb2,
+        )
+
+        qualifier = smartlock_qualifier_pb2.SmartLockEventQualifier(
+            tag=smartlock_tag_pb2.SmartLockEventTag(
+                doorbell_pressed=smartlock_tag_pb2.DoorbellPressed()
+            ),
+            transition=transition_pb2.EventTransition(
+                impulse=transition_pb2.EventTransition.Impulse()
+            ),
+        )
+        wrapped = self._wrap(qualifier.SerializeToString())
+
+        listener = self._make_listener()
+        result = listener._extract_event_with_compiled_protos(wrapped)
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "doorbell_pressed"
+        assert data["raw_tag"] == "doorbell_pressed"
+
     def test_video_qualifier_motion_detected_does_not_false_positive(self) -> None:
         # The Video Doorbell also emits non-doorbell events (motion_detected,
         # human_detected, etc.). Those are not currently mapped so the parser

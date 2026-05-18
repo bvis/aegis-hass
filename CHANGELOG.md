@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.2] - 2026-05-19
+
+Beta bump adding the SmartLock leg of the "doorbell ring" event surface. Closes the last of the three doorbell SKUs in the Ajax catalog: Wireless DoorBell (hub-level) and MotionCam Video Doorbell already routed in `1.4.5` stable; this beta adds the SmartLock / LockBridge (Yale) variant. Routed through a new `SmartLockEventQualifier` parser pass that mirrors the existing video qualifier walker, so the user-facing surface (an `event` entity firing with `event_type: doorbell_pressed` and `raw_tag: doorbell_pressed`) is identical across all three SKUs and the same automation works regardless of which hardware the user owns.
+
+### Added
+- **`doorbell_pressed` event for Ajax SmartLock / LockBridge (Yale) variants with integrated ring button** (#158, reported by @Sven2410). `SmartLockEventQualifier` from `event/smartlock/qualifier.proto` now walked as Pass 4 in `_extract_event_with_compiled_protos`; the `doorbell_pressed` oneof maps to the same HA event_type the Wireless DoorBell (hub) and MotionCam Video Doorbell (video) already fire. No new device-type registration needed — SmartLock / LockBridge devices already surface as `lock` entities since `1.2.4`. Other SmartLock tags (`locked_by_keypad`, `locked_automatically`, …) intentionally remain unmapped — those transitions already surface via the `lock` entity's state. Translations land in all 14 locales (no-op — `doorbell_pressed` was already translated for the hub/video path).
+
+### Internal
+- Test suite at **1282** unit tests (was 1281 in `1.5.0-beta.1`); coverage unchanged at the same band. One new test in `tests/unit/test_notification.py` (`test_smartlock_doorbell_pressed_resolves_to_doorbell_pressed`) uses a real `SmartLockEventQualifier` proto instance to cover Pass 4.
+
 ## [1.5.0-beta.1] - 2026-05-18
 
 First MINOR-line beta. Bundles the regression fix for the CRA-company diagnostic sensor (rooted in `1.2.3` and only fully diagnosed today), the UX cleanup that drops the `"multiple"` sentinel in favour of the actual company names, and two foundation pieces for the modern Ajax client-version envelope: a `getMonitoringCompany`-based name resolver and a new `set_photo_on_demand_mode` service. SemVer MINOR because of the new service and the new public `MonitoringCompany.hex_id` field.

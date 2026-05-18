@@ -296,9 +296,23 @@ VIDEO_EVENT_TAG_MAP: dict[str, str] = {
     "human_detected": "motion",
 }
 
+# Map SmartLockEventTag oneof field names to simplified HA event types. Ajax
+# SmartLock / LockBridge (Yale) variants with an integrated ring button fire
+# the press through `SmartLockEventQualifier` — disjoint from
+# `HubEventQualifier` and `VideoEventQualifier`. Pass 4 of
+# `_extract_event_with_compiled_protos` walks this. The rest of the SmartLock
+# tag vocabulary (locked_by_keypad, locked_automatically, …) is intentionally
+# unmapped here: those transitions already surface via the `lock` entity's
+# state, mirroring how `VIDEO_EVENT_TAG_MAP` only mirrors the events with a
+# distinct automation hook.
+SMARTLOCK_EVENT_TAG_MAP: dict[str, str] = {
+    "doorbell_pressed": "doorbell_pressed",
+}
+
 
 ALL_EVENT_TYPES: list[str] = sorted(
     set(HUB_EVENT_TAG_MAP.values())
     | set(SPACE_EVENT_TAG_MAP.values())
     | set(VIDEO_EVENT_TAG_MAP.values())
+    | set(SMARTLOCK_EVENT_TAG_MAP.values())
 )

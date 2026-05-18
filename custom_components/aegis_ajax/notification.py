@@ -16,6 +16,7 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     HUB_EVENT_TAG_MAP,
     RAW_TAG_TO_SECURITY_STATE,
+    SMARTLOCK_EVENT_TAG_MAP,
     SPACE_EVENT_TAG_MAP,
     VIDEO_EVENT_TAG_MAP,
 )
@@ -506,6 +507,9 @@ class AjaxNotificationListener:
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.hub import (  # noqa: PLC0415, E501
             qualifier_pb2 as hub_qualifier_pb2,
         )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.smartlock import (  # noqa: PLC0415, E501
+            qualifier_pb2 as smartlock_qualifier_pb2,
+        )
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.space import (  # noqa: PLC0415, E501
             qualifier_pb2 as space_qualifier_pb2,
         )
@@ -570,6 +574,30 @@ class AjaxNotificationListener:
                 data = {"raw_tag": tag_field}
                 if video_q.HasField("transition"):
                     trans_field = video_q.transition.WhichOneof("transition")
+                    if trans_field:
+                        data["transition"] = trans_field
+                return event_type, data
+
+        # Pass 4 — SmartLockEventQualifier (#158: SmartLock / LockBridge Yale
+        # variants with an integrated ring button fire `doorbell_pressed`
+        # inside this qualifier — disjoint oneof from HubEventTag and
+        # VideoEventTag). The remaining SmartLock tags (locked_by_keypad, …)
+        # already surface via the `lock` entity's state so they stay
+        # unmapped here on purpose.
+        for candidate in candidates:
+            try:
+                smartlock_q = smartlock_qualifier_pb2.SmartLockEventQualifier()
+                smartlock_q.ParseFromString(candidate)
+            except Exception:
+                continue
+            if not smartlock_q.HasField("tag"):
+                continue
+            tag_field = smartlock_q.tag.WhichOneof("event_tag_case")
+            if tag_field and tag_field in SMARTLOCK_EVENT_TAG_MAP:
+                event_type = SMARTLOCK_EVENT_TAG_MAP[tag_field]
+                data = {"raw_tag": tag_field}
+                if smartlock_q.HasField("transition"):
+                    trans_field = smartlock_q.transition.WhichOneof("transition")
                     if trans_field:
                         data["transition"] = trans_field
                 return event_type, data
