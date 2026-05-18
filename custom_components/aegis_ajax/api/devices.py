@@ -891,3 +891,75 @@ class DevicesApi:
         except Exception:
             _LOGGER.exception("Error capturing photo for %s", device_id)
             return None
+
+    async def set_photo_on_demand_mode(
+        self,
+        hub_id: str,
+        *,
+        user_enabled: bool | None = None,
+        scenario_enabled: bool | None = None,
+    ) -> None:
+        """Toggle hub-wide Photo on Demand mode (user and/or scenario channels).
+
+        The request proto's two switches live in a oneof, so a single RPC
+        only flips one of them; we issue one call per provided argument.
+        At least one of `user_enabled` / `scenario_enabled` is required.
+        Idempotent: re-sending the current value succeeds without error.
+        """
+        if user_enabled is None and scenario_enabled is None:
+            raise DeviceCommandError(
+                "set_photo_on_demand_mode requires user_enabled and/or scenario_enabled"
+            )
+
+        from v3.mobilegwsvc.service.device_command_photo_on_demand_mode import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandPhotoOnDemandModeServiceStub(channel)
+        request_cls = request_pb2.DeviceCommandPhotoOnDemandModeRequest
+        user_modes = request_cls.PhotoOnDemandModeUser
+        scenario_modes = request_cls.PhotoOnDemandModeScenario
+
+        calls: list[tuple[str, request_pb2.DeviceCommandPhotoOnDemandModeRequest]] = []
+        if user_enabled is not None:
+            calls.append(
+                (
+                    "user",
+                    request_cls(
+                        hub_id=hub_id,
+                        photo_on_demand_mode_user=(
+                            user_modes.PHOTO_ON_DEMAND_MODE_USER_ENABLE
+                            if user_enabled
+                            else user_modes.PHOTO_ON_DEMAND_MODE_USER_DISABLE
+                        ),
+                    ),
+                )
+            )
+        if scenario_enabled is not None:
+            calls.append(
+                (
+                    "scenario",
+                    request_cls(
+                        hub_id=hub_id,
+                        photo_on_demand_mode_scenario=(
+                            scenario_modes.PHOTO_ON_DEMAND_MODE_SCENARIO_ENABLE
+                            if scenario_enabled
+                            else scenario_modes.PHOTO_ON_DEMAND_MODE_SCENARIO_DISABLE
+                        ),
+                    ),
+                )
+            )
+
+        for label, request in calls:
+            response = await stub.execute(request, metadata=metadata, timeout=15)
+            if response.HasField("failure"):
+                error = response.failure.WhichOneof("error") or "unknown"
+                raise DeviceCommandError(f"photo_on_demand_mode {label}: {error}")
+            _LOGGER.debug(
+                "Hub %s photo_on_demand_mode.%s set OK",
+                hub_id,
+                label,
+            )

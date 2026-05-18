@@ -180,6 +180,41 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
         )
 
 
+async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Handle the set_photo_on_demand_mode service call.
+
+    Toggles the hub-wide Photo on Demand mode that gates camera-equipped
+    devices from delivering on-demand snapshots. Two independent channels:
+    `user` (whether hub users can request photos) and `scenario` (whether
+    scenarios/automations can trigger captures). At least one must be
+    provided; the other is left untouched.
+    """
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    user_enabled = call.data.get("user")
+    scenario_enabled = call.data.get("scenario")
+    if user_enabled is None and scenario_enabled is None:
+        raise ServiceValidationError(
+            "set_photo_on_demand_mode requires at least one of `user` or `scenario`."
+        )
+
+    targets = _resolve_target_space_ids(hass, call)
+    if not targets:
+        raise ServiceValidationError(
+            "set_photo_on_demand_mode: no Aegis alarm panel found for the given target."
+        )
+
+    for coordinator, space_id in targets:
+        space = coordinator.spaces.get(space_id)
+        if space is None or not space.hub_id:
+            continue
+        await coordinator.devices_api.set_photo_on_demand_mode(
+            space.hub_id,
+            user_enabled=user_enabled,
+            scenario_enabled=scenario_enabled,
+        )
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate config entry to newer version."""
     if entry.version == 1:
@@ -340,10 +375,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     async def _press_panic_button_handler(call: ServiceCall) -> None:
         await _async_handle_press_panic_button(hass, call)
 
+    async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
+        await _async_handle_set_photo_on_demand_mode(hass, call)
+
     if not hass.services.has_service(DOMAIN, "force_arm"):
         hass.services.async_register(DOMAIN, "force_arm", _force_arm_handler)
         hass.services.async_register(DOMAIN, "force_arm_night", _force_arm_night_handler)
         hass.services.async_register(DOMAIN, "press_panic_button", _press_panic_button_handler)
+        hass.services.async_register(
+            DOMAIN, "set_photo_on_demand_mode", _set_photo_on_demand_mode_handler
+        )
 
     # Reload integration when options change (e.g. FCM credentials)
     entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))

@@ -143,6 +143,24 @@
                     "description": "Optional caller longitude forwarded to Ajax. Use with latitude."
                 }
             }
+        },
+        "set_photo_on_demand_mode": {
+            "name": "Set Photo on Demand mode",
+            "description": "Enable or disable Photo on Demand mode on a hub. Two independent channels can be toggled separately — user requests (whether hub users can request photos from the Ajax app) and scenarios (whether scenarios / automations can trigger captures). Leave a field unset to keep its current value. At least one is required.",
+            "fields": {
+                "user": {
+                    "name": "User requests",
+                    "description": "When set, enables or disables on-demand photo requests initiated by hub users. Leave unset to keep the current value."
+                },
+                "scenario": {
+                    "name": "Scenarios",
+                    "description": "When set, enables or disables Photo on Demand captures triggered by Ajax scenarios / automations. Leave unset to keep the current value."
+                },
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
+                }
+            }
         }
     },
     "issues": {

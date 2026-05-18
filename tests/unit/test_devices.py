@@ -2030,3 +2030,100 @@ class TestCapturePhotoV2:
         idx = request.find(b"\x18")
         assert idx != -1
         assert request[idx + 1] == 2  # device type 2 for outdoor
+
+
+class TestSetPhotoOnDemandMode:
+    """Tests for DevicesApi.set_photo_on_demand_mode (DeviceCommandPhotoOnDemandModeService)."""
+
+    def _make_api(self) -> DevicesApi:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+        return DevicesApi(mock_client)
+
+    @pytest.mark.asyncio
+    async def test_requires_at_least_one_channel(self) -> None:
+        """Calling without either argument raises DeviceCommandError."""
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        with pytest.raises(DeviceCommandError, match="user_enabled"):
+            await api.set_photo_on_demand_mode("hub-1")
+
+    @pytest.mark.asyncio
+    async def test_user_only_sends_single_call(self) -> None:
+        """Setting only user_enabled fires exactly one gRPC execute."""
+        api = self._make_api()
+        stub = MagicMock()
+        stub.execute = AsyncMock(return_value=MagicMock(HasField=MagicMock(return_value=False)))
+
+        with patch(
+            "v3.mobilegwsvc.service.device_command_photo_on_demand_mode.endpoint_pb2_grpc.DeviceCommandPhotoOnDemandModeServiceStub",
+            return_value=stub,
+        ):
+            await api.set_photo_on_demand_mode("hub-XYZ", user_enabled=True)
+
+        assert stub.execute.await_count == 1
+        sent = stub.execute.await_args_list[0].args[0]
+        assert sent.hub_id == "hub-XYZ"
+        # USER_ENABLE = 2; field name on the oneof tracks WhichOneof:
+        assert sent.WhichOneof("additional_param") == "photo_on_demand_mode_user"
+        assert sent.photo_on_demand_mode_user == 2
+
+    @pytest.mark.asyncio
+    async def test_scenario_disable_sends_correct_enum(self) -> None:
+        api = self._make_api()
+        stub = MagicMock()
+        stub.execute = AsyncMock(return_value=MagicMock(HasField=MagicMock(return_value=False)))
+
+        with patch(
+            "v3.mobilegwsvc.service.device_command_photo_on_demand_mode.endpoint_pb2_grpc.DeviceCommandPhotoOnDemandModeServiceStub",
+            return_value=stub,
+        ):
+            await api.set_photo_on_demand_mode("hub-1", scenario_enabled=False)
+
+        sent = stub.execute.await_args_list[0].args[0]
+        assert sent.WhichOneof("additional_param") == "photo_on_demand_mode_scenario"
+        # SCENARIO_DISABLE = 1
+        assert sent.photo_on_demand_mode_scenario == 1
+
+    @pytest.mark.asyncio
+    async def test_both_channels_send_two_calls(self) -> None:
+        api = self._make_api()
+        stub = MagicMock()
+        stub.execute = AsyncMock(return_value=MagicMock(HasField=MagicMock(return_value=False)))
+
+        with patch(
+            "v3.mobilegwsvc.service.device_command_photo_on_demand_mode.endpoint_pb2_grpc.DeviceCommandPhotoOnDemandModeServiceStub",
+            return_value=stub,
+        ):
+            await api.set_photo_on_demand_mode("hub-1", user_enabled=True, scenario_enabled=True)
+
+        assert stub.execute.await_count == 2
+        sent_oneofs = [
+            call.args[0].WhichOneof("additional_param") for call in stub.execute.await_args_list
+        ]
+        assert sent_oneofs == ["photo_on_demand_mode_user", "photo_on_demand_mode_scenario"]
+
+    @pytest.mark.asyncio
+    async def test_failure_response_raises(self) -> None:
+        """A gRPC response with .failure set raises DeviceCommandError with the error name."""
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        failure = MagicMock()
+        failure.WhichOneof.return_value = "bad_request"
+        response = MagicMock()
+        response.HasField.return_value = True
+        response.failure = failure
+        stub = MagicMock()
+        stub.execute = AsyncMock(return_value=response)
+
+        with (
+            patch(
+                "v3.mobilegwsvc.service.device_command_photo_on_demand_mode.endpoint_pb2_grpc.DeviceCommandPhotoOnDemandModeServiceStub",
+                return_value=stub,
+            ),
+            pytest.raises(DeviceCommandError, match="user.*bad_request"),
+        ):
+            await api.set_photo_on_demand_mode("hub-1", user_enabled=True)

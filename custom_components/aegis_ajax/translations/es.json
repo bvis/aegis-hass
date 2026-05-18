@@ -144,6 +144,24 @@
                     "description": "Longitud opcional de quien llama, reenviada a Ajax. Úsala junto con latitud."
                 }
             }
+        },
+        "set_photo_on_demand_mode": {
+            "name": "Configurar modo Foto bajo demanda",
+            "description": "Activa o desactiva el modo Foto bajo demanda en un hub. Dos canales independientes que se pueden alternar por separado: peticiones de usuario (si los usuarios del hub pueden pedir fotos desde la app Ajax) y escenarios (si los escenarios / automatizaciones pueden disparar capturas). Deja un campo sin valor para mantener su estado actual. Al menos uno de los dos es obligatorio.",
+            "fields": {
+                "user": {
+                    "name": "Peticiones de usuario",
+                    "description": "Si está marcado, activa o desactiva las peticiones de foto bajo demanda iniciadas por los usuarios del hub. Déjalo sin valor para mantener el estado actual."
+                },
+                "scenario": {
+                    "name": "Escenarios",
+                    "description": "Si está marcado, activa o desactiva las capturas Foto bajo demanda disparadas por escenarios / automatizaciones de Ajax. Déjalo sin valor para mantener el estado actual."
+                },
+                "entity_id": {
+                    "name": "Entidad",
+                    "description": "Entidad del panel de alarma del espacio cuyo modo de hub actualizar. Si se omite, se aplica a todos los espacios configurados."
+                }
+            }
         }
     },
     "issues": {

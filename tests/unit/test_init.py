@@ -708,3 +708,74 @@ class TestAsyncRemoveEntry:
             await async_remove_entry(hass, entry)
 
         mock_client.logout.assert_not_called()
+
+
+class TestSetPhotoOnDemandModeHandler:
+    """Verify guards + dispatch of _async_handle_set_photo_on_demand_mode."""
+
+    def _make_call(self, data: dict) -> MagicMock:
+        call = MagicMock()
+        call.data = data
+        return call
+
+    @pytest.mark.asyncio
+    async def test_missing_both_channels_raises(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_set_photo_on_demand_mode
+
+        hass = MagicMock()
+        with pytest.raises(ServiceValidationError, match="`user`.*`scenario`"):
+            await _async_handle_set_photo_on_demand_mode(hass, self._make_call({}))
+
+    @pytest.mark.asyncio
+    async def test_no_target_raises(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_set_photo_on_demand_mode
+
+        with patch(
+            "custom_components.aegis_ajax._resolve_target_space_ids",
+            return_value=[],
+        ):
+            hass = MagicMock()
+            with pytest.raises(ServiceValidationError, match="no Aegis alarm panel"):
+                await _async_handle_set_photo_on_demand_mode(hass, self._make_call({"user": True}))
+
+    @pytest.mark.asyncio
+    async def test_dispatches_to_devices_api(self) -> None:
+        from custom_components.aegis_ajax import _async_handle_set_photo_on_demand_mode
+
+        coordinator = MagicMock()
+        coordinator.devices_api.set_photo_on_demand_mode = AsyncMock()
+        coordinator.spaces = {"space-1": MagicMock(hub_id="HUB-A")}
+
+        with patch(
+            "custom_components.aegis_ajax._resolve_target_space_ids",
+            return_value=[(coordinator, "space-1")],
+        ):
+            hass = MagicMock()
+            await _async_handle_set_photo_on_demand_mode(
+                hass, self._make_call({"user": True, "scenario": False})
+            )
+
+        coordinator.devices_api.set_photo_on_demand_mode.assert_awaited_once_with(
+            "HUB-A", user_enabled=True, scenario_enabled=False
+        )
+
+    @pytest.mark.asyncio
+    async def test_skips_targets_without_hub_id(self) -> None:
+        from custom_components.aegis_ajax import _async_handle_set_photo_on_demand_mode
+
+        coordinator = MagicMock()
+        coordinator.devices_api.set_photo_on_demand_mode = AsyncMock()
+        coordinator.spaces = {"space-1": MagicMock(hub_id="")}
+
+        with patch(
+            "custom_components.aegis_ajax._resolve_target_space_ids",
+            return_value=[(coordinator, "space-1")],
+        ):
+            hass = MagicMock()
+            await _async_handle_set_photo_on_demand_mode(hass, self._make_call({"user": True}))
+
+        coordinator.devices_api.set_photo_on_demand_mode.assert_not_called()

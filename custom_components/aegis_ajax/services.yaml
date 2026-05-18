@@ -91,3 +91,44 @@ press_panic_button:
           max: 180
           step: any
           mode: box
+
+set_photo_on_demand_mode:
+  name: Set Photo on Demand mode
+  description: >-
+    Enable or disable Photo on Demand mode on a hub. Two independent
+    channels can be toggled separately — `user` (whether hub users can
+    request photos on demand from the Ajax app) and `scenario` (whether
+    scenarios / automations can trigger captures). Leave a field unset to
+    keep its current value. At least one of the two is required.
+  target:
+    entity:
+      domain: alarm_control_panel
+      integration: aegis_ajax
+  fields:
+    user:
+      name: User requests
+      description: >-
+        When set, enables or disables on-demand photo requests initiated
+        by hub users. Leave unset to keep the current value.
+      required: false
+      selector:
+        boolean:
+    scenario:
+      name: Scenarios
+      description: >-
+        When set, enables or disables Photo on Demand captures triggered
+        by Ajax scenarios / automations. Leave unset to keep the current
+        value.
+      required: false
+      selector:
+        boolean:
+    entity_id:
+      name: Entity
+      description: >-
+        Alarm panel entity for the space whose hub mode to update. If
+        omitted, applies to every configured space.
+      required: false
+      selector:
+        entity:
+          domain: alarm_control_panel
+          integration: aegis_ajax
