@@ -488,8 +488,12 @@ class TestOptionsFlow:
         config_entry = MagicMock()
         config_entry.options = options or {}
         config_entry.data = data or {}
+        config_entry.entry_id = "test-entry-id"
         flow = AjaxCobrandedOptionsFlow(config_entry)
         flow.hass = MagicMock()
+        # `async_step_init` awaits async_reload when data changes (#148),
+        # so the default MagicMock that wraps it must be awaitable.
+        flow.hass.config_entries.async_reload = AsyncMock()
         return flow, config_entry
 
     def test_options_flow_init(self) -> None:
@@ -696,6 +700,55 @@ class TestOptionsFlow:
 
         new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
         assert new_data["fcm_project_id"] == "new_proj"
+
+    @pytest.mark.asyncio
+    async def test_options_flow_reloads_when_data_changes(self) -> None:
+        """#148 — FCM creds in entry.data must trigger an explicit reload.
+
+        The `_async_options_update_listener` would normally fire after
+        `async_finish_flow` writes options, but when only `data` changes
+        and `options` round-trip identical, the framework's second
+        `async_update_entry(options=...)` short-circuits without firing
+        a listener — leaving the FCM client running with stale
+        credentials until the user manually reloads. Mirror the
+        repair-flow pattern: await `async_reload` explicitly.
+        """
+        flow, entry = self._make_flow(data={"email": "x@y"})
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        flow.hass.config_entries.async_update_entry = MagicMock()
+
+        await flow.async_step_init(
+            {
+                "poll_interval": 60,
+                "use_pin_code": False,
+                "fcm_project_id": "proj",
+                "fcm_app_id": "app",
+                "fcm_api_key": "key",
+                "fcm_sender_id": "123",
+            }
+        )
+
+        flow.hass.config_entries.async_reload.assert_awaited_once_with("test-entry-id")
+
+    @pytest.mark.asyncio
+    async def test_options_flow_no_reload_when_data_unchanged(self) -> None:
+        """Non-FCM option tweaks (poll_interval, etc.) leave entry.data alone.
+
+        The existing `_async_options_update_listener` will still fire on
+        options changes — we only want to add a second reload when data
+        actually changed (the FCM-creds path). Otherwise users editing
+        the polling interval would trigger redundant reloads.
+        """
+        flow, entry = self._make_flow(data={"email": "x@y"})
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        flow.hass.config_entries.async_update_entry = MagicMock()
+
+        await flow.async_step_init({"poll_interval": 90, "use_pin_code": False})
+
+        # No data changes → async_update_entry should NOT be invoked,
+        # and our explicit async_reload should NOT fire.
+        flow.hass.config_entries.async_update_entry.assert_not_called()
+        flow.hass.config_entries.async_reload.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_options_flow_clearing_fcm_also_strips_legacy_options(self) -> None:

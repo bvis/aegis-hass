@@ -465,6 +465,17 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     self._entry,
                     data=new_data,
                 )
+                # Explicitly reload — mirror the repair-flow pattern (#148).
+                # The `_async_options_update_listener` would normally pick
+                # this up after `async_finish_flow` writes `options`, but
+                # when only `data` changes (FCM creds, password) and
+                # `options` round-trip identical to the prior values, the
+                # framework's second `async_update_entry(options=...)`
+                # short-circuits without firing a listener — leaving the
+                # FCM client running with the old credentials until the
+                # user manually reloads. `async_reload` is serialised on
+                # `entry.setup_lock`, so racing with the listener is safe.
+                await self.hass.config_entries.async_reload(self._entry.entry_id)
             return self.async_create_entry(title="", data=user_input)
         return self.async_show_form(
             step_id="init",
