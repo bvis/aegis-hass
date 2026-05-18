@@ -572,3 +572,312 @@ class TestPressPanicButton:
             pytest.raises(RuntimeError, match="permissions_denied"),
         ):
             await api.press_panic_button("space-1")
+
+
+_GET_MONITORING_REQ = (
+    "systems.ajax.api.mobile.v2.space.company.monitoring.get_monitoring_company_request_pb2"
+)
+_GET_MONITORING_GRPC = (
+    "systems.ajax.api.mobile.v2.space.company.monitoring"
+    ".space_monitoring_company_endpoints_pb2_grpc"
+)
+
+
+class TestParseMonitoringCompanyHexId:
+    def test_extracts_hex_id_when_present(self) -> None:
+        proto_company = MagicMock()
+        proto_company.company_info.name = "Central One"
+        proto_company.company_info.hex_id = "AABBDC47"
+        proto_company.status = 2
+
+        result = SpacesApi.parse_monitoring_company(proto_company)
+
+        assert result.hex_id == "AABBDC47"
+        assert result.name == "Central One"
+
+    def test_hex_id_defaults_to_empty_when_field_absent(self) -> None:
+        proto_company = MagicMock(spec=["company_info", "status"])
+        proto_company.company_info = MagicMock(spec=["name"])
+        proto_company.company_info.name = "Central"
+        proto_company.status = 2
+
+        result = SpacesApi.parse_monitoring_company(proto_company)
+
+        assert result.hex_id == ""
+
+
+class TestGetMonitoringCompany:
+    @pytest.mark.asyncio
+    async def test_returns_parsed_company_on_success(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        proto_company = MagicMock()
+        proto_company.company_info.name = "EXPANSIVA"
+        proto_company.company_info.hex_id = "0000016A"
+        proto_company.status = 2
+
+        success_response = MagicMock()
+        success_response.WhichOneof.return_value = "success"
+        success_response.success.company = proto_company
+
+        stub_instance = MagicMock()
+        stub_instance.getMonitoringCompany = AsyncMock(return_value=success_response)
+
+        request_pb2 = MagicMock()
+        grpc_module = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=stub_instance)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _GET_MONITORING_REQ: request_pb2,
+                _GET_MONITORING_GRPC: grpc_module,
+            },
+        ):
+            result = await api.get_monitoring_company("space-1", "0000016A")
+
+        assert result is not None
+        assert result.name == "EXPANSIVA"
+        assert result.hex_id == "0000016A"
+        assert result.status == MonitoringCompanyStatus.APPROVED
+
+        # Verify the request that was sent (request was built from the patched module)
+        stub_instance.getMonitoringCompany.assert_awaited_once()
+        assert request_pb2.GetMonitoringCompanyRequest.call_args.kwargs == {
+            "company_hex_id": "0000016A",
+            "space_id": "space-1",
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_failure_response(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        failure_response = MagicMock()
+        failure_response.WhichOneof.return_value = "failure"
+
+        stub_instance = MagicMock()
+        stub_instance.getMonitoringCompany = AsyncMock(return_value=failure_response)
+
+        request_pb2 = MagicMock()
+        grpc_module = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=stub_instance)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _GET_MONITORING_REQ: request_pb2,
+                _GET_MONITORING_GRPC: grpc_module,
+            },
+        ):
+            result = await api.get_monitoring_company("space-1", "00000000")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_rpc_exception(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        stub_instance = MagicMock()
+        stub_instance.getMonitoringCompany = AsyncMock(side_effect=RuntimeError("boom"))
+
+        request_pb2 = MagicMock()
+        grpc_module = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=stub_instance)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _GET_MONITORING_REQ: request_pb2,
+                _GET_MONITORING_GRPC: grpc_module,
+            },
+        ):
+            result = await api.get_monitoring_company("space-1", "any")
+
+        assert result is None
+
+
+class TestGetSpaceSnapshotResolvesMissingNames:
+    """get_space_snapshot fills empty names via getMonitoringCompany."""
+
+    @pytest.mark.asyncio
+    async def test_resolves_missing_name_when_hex_id_present(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        # Company arrived with empty name but a hex_id — the modern shape.
+        unresolved = MagicMock()
+        unresolved.company_info.name = ""
+        unresolved.company_info.hex_id = "0000016A"
+        unresolved.status = 2
+
+        snapshot_msg = MagicMock()
+        snapshot_msg.HasField.side_effect = lambda f: f == "success"
+        snapshot_msg.success.WhichOneof.return_value = "snapshot"
+        snapshot_msg.success.snapshot.rooms = []
+        snapshot_msg.success.snapshot.monitoring_companies = [unresolved]
+
+        stream = _async_iter([snapshot_msg])
+        space_stub = MagicMock()
+        space_stub.stream = MagicMock(return_value=stream)
+
+        # The resolver's response — fully populated company.
+        resolved_proto = MagicMock()
+        resolved_proto.company_info.name = "EXPANSIVA"
+        resolved_proto.company_info.hex_id = "0000016A"
+        resolved_proto.status = 2
+
+        resolve_response = MagicMock()
+        resolve_response.WhichOneof.return_value = "success"
+        resolve_response.success.company = resolved_proto
+
+        monitoring_stub = MagicMock()
+        monitoring_stub.getMonitoringCompany = AsyncMock(return_value=resolve_response)
+
+        stream_request_pb2 = MagicMock()
+        space_grpc = MagicMock(SpaceServiceStub=MagicMock(return_value=space_stub))
+        locator_pb2 = MagicMock()
+
+        get_monitoring_req_pb2 = MagicMock()
+        get_monitoring_grpc = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=monitoring_stub)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: stream_request_pb2,
+                _SPACE_GRPC: space_grpc,
+                _SPACE_LOCATOR: locator_pb2,
+                _GET_MONITORING_REQ: get_monitoring_req_pb2,
+                _GET_MONITORING_GRPC: get_monitoring_grpc,
+            },
+        ):
+            snapshot = await api.get_space_snapshot("space-1")
+
+        # The resolver fired exactly once and the resulting snapshot has the name.
+        monitoring_stub.getMonitoringCompany.assert_awaited_once()
+        assert snapshot.monitoring_companies[0].name == "EXPANSIVA"
+        assert snapshot.monitoring_companies[0].hex_id == "0000016A"
+        # Status from the snapshot stream wins (authoritative state source).
+        assert snapshot.monitoring_companies[0].status == MonitoringCompanyStatus.APPROVED
+
+    @pytest.mark.asyncio
+    async def test_skips_resolver_when_name_already_present(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        populated = MagicMock()
+        populated.company_info.name = "Already Named"
+        populated.company_info.hex_id = "AABBCCDD"
+        populated.status = 2
+
+        snapshot_msg = MagicMock()
+        snapshot_msg.HasField.side_effect = lambda f: f == "success"
+        snapshot_msg.success.WhichOneof.return_value = "snapshot"
+        snapshot_msg.success.snapshot.rooms = []
+        snapshot_msg.success.snapshot.monitoring_companies = [populated]
+
+        stream = _async_iter([snapshot_msg])
+        space_stub = MagicMock()
+        space_stub.stream = MagicMock(return_value=stream)
+
+        monitoring_stub = MagicMock()
+        monitoring_stub.getMonitoringCompany = AsyncMock()
+
+        stream_request_pb2 = MagicMock()
+        space_grpc = MagicMock(SpaceServiceStub=MagicMock(return_value=space_stub))
+        locator_pb2 = MagicMock()
+        get_monitoring_req_pb2 = MagicMock()
+        get_monitoring_grpc = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=monitoring_stub)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: stream_request_pb2,
+                _SPACE_GRPC: space_grpc,
+                _SPACE_LOCATOR: locator_pb2,
+                _GET_MONITORING_REQ: get_monitoring_req_pb2,
+                _GET_MONITORING_GRPC: get_monitoring_grpc,
+            },
+        ):
+            snapshot = await api.get_space_snapshot("space-1")
+
+        monitoring_stub.getMonitoringCompany.assert_not_called()
+        assert snapshot.monitoring_companies[0].name == "Already Named"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_original_record_when_resolver_returns_none(self) -> None:
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+
+        api = SpacesApi(mock_client)
+
+        unresolved = MagicMock()
+        unresolved.company_info.name = ""
+        unresolved.company_info.hex_id = "DEADBEEF"
+        unresolved.status = 1
+
+        snapshot_msg = MagicMock()
+        snapshot_msg.HasField.side_effect = lambda f: f == "success"
+        snapshot_msg.success.WhichOneof.return_value = "snapshot"
+        snapshot_msg.success.snapshot.rooms = []
+        snapshot_msg.success.snapshot.monitoring_companies = [unresolved]
+
+        stream = _async_iter([snapshot_msg])
+        space_stub = MagicMock()
+        space_stub.stream = MagicMock(return_value=stream)
+
+        failure_response = MagicMock()
+        failure_response.WhichOneof.return_value = "failure"
+
+        monitoring_stub = MagicMock()
+        monitoring_stub.getMonitoringCompany = AsyncMock(return_value=failure_response)
+
+        stream_request_pb2 = MagicMock()
+        space_grpc = MagicMock(SpaceServiceStub=MagicMock(return_value=space_stub))
+        locator_pb2 = MagicMock()
+        get_monitoring_req_pb2 = MagicMock()
+        get_monitoring_grpc = MagicMock(
+            SpaceMonitoringCompanyServiceStub=MagicMock(return_value=monitoring_stub)
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: stream_request_pb2,
+                _SPACE_GRPC: space_grpc,
+                _SPACE_LOCATOR: locator_pb2,
+                _GET_MONITORING_REQ: get_monitoring_req_pb2,
+                _GET_MONITORING_GRPC: get_monitoring_grpc,
+            },
+        ):
+            snapshot = await api.get_space_snapshot("space-1")
+
+        # Name stays empty (resolver failed), hex_id + status preserved.
+        assert snapshot.monitoring_companies[0].name == ""
+        assert snapshot.monitoring_companies[0].hex_id == "DEADBEEF"
+        assert snapshot.monitoring_companies[0].status == MonitoringCompanyStatus.PENDING_APPROVAL

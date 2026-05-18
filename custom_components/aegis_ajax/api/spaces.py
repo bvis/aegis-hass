@@ -101,17 +101,69 @@ class SpacesApi:
     @staticmethod
     def parse_monitoring_company(proto_company: Any) -> MonitoringCompany:  # noqa: ANN401
         name = ""
-        if hasattr(proto_company, "company_info") and hasattr(proto_company.company_info, "name"):
-            raw_name = proto_company.company_info.name
-            if isinstance(raw_name, str):
-                name = raw_name
-            elif hasattr(raw_name, "value") and isinstance(raw_name.value, str):
-                name = raw_name.value
+        hex_id = ""
+        if hasattr(proto_company, "company_info"):
+            company_info = proto_company.company_info
+            if hasattr(company_info, "name"):
+                raw_name = company_info.name
+                if isinstance(raw_name, str):
+                    name = raw_name
+                elif hasattr(raw_name, "value") and isinstance(raw_name.value, str):
+                    name = raw_name.value
+            if hasattr(company_info, "hex_id") and isinstance(company_info.hex_id, str):
+                hex_id = company_info.hex_id
         try:
             status = MonitoringCompanyStatus(proto_company.status)
         except ValueError:
             status = MonitoringCompanyStatus.UNSPECIFIED
-        return MonitoringCompany(name=name, status=status)
+        return MonitoringCompany(name=name, status=status, hex_id=hex_id)
+
+    async def get_monitoring_company(
+        self, space_id: str, company_hex_id: str
+    ) -> MonitoringCompany | None:
+        """Resolve a CRA company's full record by `(space_id, company_hex_id)`.
+
+        Wraps `SpaceMonitoringCompanyService.getMonitoringCompany`. Returns
+        a `MonitoringCompany` on success, `None` on a `failure` response or
+        any RPC error — callers should be ready to treat the lookup as
+        best-effort. Used as a fallback by `get_space_snapshot` when the
+        stream-level snapshot only carries `hex_id` without a populated
+        `name` (the modern client-version response shape).
+        """
+        from systems.ajax.api.mobile.v2.space.company.monitoring import (  # noqa: PLC0415
+            get_monitoring_company_request_pb2,
+            space_monitoring_company_endpoints_pb2_grpc,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = space_monitoring_company_endpoints_pb2_grpc.SpaceMonitoringCompanyServiceStub(
+            channel
+        )
+        request = get_monitoring_company_request_pb2.GetMonitoringCompanyRequest(
+            company_hex_id=company_hex_id,
+            space_id=space_id,
+        )
+        try:
+            response = await stub.getMonitoringCompany(request, metadata=metadata, timeout=15)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "getMonitoringCompany RPC failed for space %s hex_id %s",
+                space_id,
+                company_hex_id,
+                exc_info=True,
+            )
+            return None
+        which = response.WhichOneof("response") if hasattr(response, "WhichOneof") else None
+        if which != "success":
+            _LOGGER.debug(
+                "getMonitoringCompany returned non-success (%s) for space %s hex_id %s",
+                which,
+                space_id,
+                company_hex_id,
+            )
+            return None
+        return self.parse_monitoring_company(response.success.company)
 
     async def list_spaces(self) -> list[Space]:
         from v3.mobilegwsvc.service.find_user_spaces_with_pagination import (  # noqa: PLC0415
@@ -182,6 +234,16 @@ class SpacesApi:
             if callable(cancel):
                 cancel()
 
+        # Best-effort name resolution for companies that arrived with an
+        # empty name field but a usable hex_id — happens on modern client
+        # versions where the legacy `monitoring_companies` slot ships the
+        # tuple `(hex_id, status)` without an attached name. Falls back to
+        # the original record on any RPC failure so the snapshot still
+        # surfaces the company by its known status.
+        monitoring_companies = [
+            await self._resolve_company_name(space_id, company) for company in monitoring_companies
+        ]
+
         return SpaceSnapshot(
             rooms=tuple(rooms),
             monitoring_companies=tuple(monitoring_companies),
@@ -189,6 +251,28 @@ class SpacesApi:
             groups=groups,
             group_mode_enabled=group_mode_enabled,
         )
+
+    async def _resolve_company_name(
+        self, space_id: str, company: MonitoringCompany
+    ) -> MonitoringCompany:
+        """Fill in `company.name` via `getMonitoringCompany` when missing.
+
+        No-op when `name` is already populated or `hex_id` is empty. Returns
+        the original `company` if the resolver returns `None` (RPC failure
+        or backend `failure` response) so callers always have a usable
+        record.
+        """
+        if company.name or not company.hex_id:
+            return company
+        resolved = await self.get_monitoring_company(space_id, company.hex_id)
+        if resolved is None or not resolved.name:
+            return company
+        # Trust the resolver's name; keep the snapshot's status (the stream
+        # is the authoritative state source, the lookup may return cached
+        # data on the company-tenancy side).
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        return dc_replace(company, name=resolved.name)
 
     async def list_rooms(self, space_id: str) -> list[Room]:
         """Return the rooms defined in the given space."""

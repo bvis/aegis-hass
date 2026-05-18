@@ -24,10 +24,19 @@ class MonitoringCompanyStatus(IntEnum):
 
 @dataclass(frozen=True)
 class MonitoringCompany:
-    """Represents a monitoring company attached to a space."""
+    """Represents a monitoring company attached to a space.
+
+    `hex_id` is the stable per-company opaque identifier the Ajax cloud uses
+    to address this company on every endpoint that returns or accepts a
+    `SpaceMonitoringCompany`. Kept alongside `name` so the integration can
+    resolve a missing name through `SpaceMonitoringCompanyService.getMonitoringCompany`
+    when the space-stream snapshot only ships `(hex_id, status)` without a
+    name attached.
+    """
 
     name: str
     status: MonitoringCompanyStatus
+    hex_id: str = ""
 
 
 @dataclass(frozen=True)
