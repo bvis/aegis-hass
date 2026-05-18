@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-05-18
+
+Cosmetic i18n patch. The WallSwitch power sensor's display name in the device card drops the parenthetical "(derived)" / "(derivada)" / equivalent across all 14 locales, falling in line with the HA convention that every `device_class=power` sensor labels simply "Power". The value is still computed as `current × voltage` (with a 230V nominal fallback when firmware doesn't emit voltage); the "(derived)" suffix added visual noise without giving the average user anything actionable. No code, schema, or `entity_id` changes — `translation_key`, `unique_id`, class name and computation logic stay untouched, so zero migration impact for existing installs.
+
+### Changed
+- **`power_derived` sensor renders as "Power"** in all 14 locales (#123, reported by @brunovdw68). Was "Power (derived)" / "Potencia (derivada)" / "Vermogen (afgeleid)" / etc. The computation is unchanged and the technical "this is calculated" signal lives elsewhere now: the entity is `entity_registry_enabled_default=False` (only users who explicitly enable it see it), the `translation_key` and `unique_id` still carry `power_derived` (visible in dev-tools and template editor), and the README documents the computation. Cosmetic change only — display name in the entity card.
+
 ## [1.4.1] - 2026-05-18
 
 Patch release. The transient HTS reconnect cycle (typically ~5 min on busy installs, multiple times per day) no longer blanks HTS-cached sensors to `unavailable`. Hub-cached state (per-device electrical readings, hub IP / SSID / DNS / signal level, ethernet/wifi/gsm channel flags) keeps rendering its last value through the dropout and refreshes in place on the next `STATUS_UPDATE` / `STATUS_BODY` delta. The single deliberate exception is `binary_sensor.<hub>_alimentacion_externa` (mains power) which still flips to `unavailable` so a real hub-power loss during an HTS outage can't be silenced by a cached `on` snapshot. No new functionality, no breaking changes.
