@@ -371,15 +371,26 @@ Configured in the integration's Options flow (Settings → Devices & Services �
 - **FCM API Key**
 - **FCM Sender ID**
 
-All four must belong to the **same Firebase project** — the one the Ajax mobile app uses. Obtaining them is the user's responsibility and is out of scope for this project's documentation.
+All four belong to the **same Firebase project** — the one your Ajax mobile app uses for its own push notifications. The integration registers with that project as an additional FCM client, so it needs the same four values the app already carries.
+
+### Where the values live
+
+Three of the four are plain strings in the Android APK's resources at `res/values/strings.xml`:
+
+- `project_id` — short slug, e.g. `my-firebase-project-id` (kebab-case, no spaces)
+- `gcm_defaultSenderId` — pure digit string (~12 digits, no prefix); the same digits that appear between the first two colons of `google_app_id`
+- `google_app_id` — `1:<sender_id>:android:<long hex hash>` (starts with `1:`, ends with a ~40-char hex blob)
+
+The fourth, `google_api_key`, is **not** in `strings.xml` (the entry there is a placeholder string); it ships inside the native library bundled with the APK at `lib/<arch>/libnative-lib.so`. The value starts with `AIza` and is exactly 39 characters long, so it's easy to spot when scanning printable strings out of the binary.
+
+> **Using the Ajax app on iPhone?** The iOS build ships these values in `GoogleService-Info.plist` inside the signed `.ipa` bundle, which is encrypted and unreadable without a jailbroken device. The Firebase project is identical on both platforms, so extract the four values from the Android APK regardless of which OS you use day-to-day — pulled from the Android build, they work for FCM push delivery on a Home Assistant install on any phone OS.
 
 ### Sanity-check before submitting
 
-Three quick consistency checks that catch the most common "credentials rejected" reports:
+Two quick consistency checks that catch the most common "credentials rejected" reports:
 
 1. **`fcm_sender_id` must equal the digit chunk between the first two colons of `fcm_app_id`.** Example: if `fcm_app_id = 1:608123456502:android:…`, then `fcm_sender_id` is `608123456502`. If they don't match, those two values came from different Firebase projects.
-2. **`fcm_api_key` must start with `AIza` and be exactly 39 characters long.**
-3. **All four values must come as a coherent set from one Firebase project** — not picked individually from different sources.
+2. **All four values must come as a coherent set from one Firebase project** — not picked individually from different sources.
 
 ### If submission still fails
 
