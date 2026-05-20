@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.4] - 2026-05-20
+
+Observability beta bump — purely additive, no runtime behaviour change. Surfaces the data needed to triage in-flight reports on the `1.5.0` line (notably the per-group push debugging in #148) without having to ask reporters for ad-hoc custom logging.
+
+### Internal
+- **`diagnostics.py` `spaces` block now emits `groups` and `group_mode_enabled`** so the per-group state visible to the integration is recoverable from a single Download Diagnostics dump (#148). The previous schema only emitted `name / security_state / online / malfunctions`, which made a missing-vs-empty `space.groups` impossible to distinguish from the JSON alone.
+- **`_parse_and_fire_event` in `notification.py` now logs `event_type / raw_tag / group_id` at DEBUG** as soon as the parser resolves a push payload. Closes the long-standing blind spot where the only way to know what the parser extracted from a user's payload was to add ad-hoc logging mid-debugging.
+- Test suite at **1294** unit tests (was 1291 in `1.5.0-beta.3`); coverage unchanged at the same band. Two new tests in `test_diagnostics.py::TestAsyncGetConfigEntryDiagnostics` exercise the `groups` block (populated + empty paths), one new test class `TestParseAndFireEventLogging` (two cases: group_id present and absent) covers the parser log line.
+
 ## [1.5.0-beta.3] - 2026-05-19
 
 Beta bump fixing the long-standing delay on per-group alarm panels in spaces configured with Ajax groups (zones). Arming or disarming a single group from the Ajax mobile app now updates the matching `alarm_control_panel.<group>` instantly via the FCM push channel; previously the per-group state only refreshed on the next hourly poll (or on a manual reload), so users with groups would see HA out of sync with the app for up to an hour. Space-wide events are unchanged.

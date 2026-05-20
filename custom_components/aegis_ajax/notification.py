@@ -449,6 +449,12 @@ class AjaxNotificationListener:
                     group_info = self._extract_space_source_info(raw)
                     if group_info:
                         event_data.update(group_info)
+                _LOGGER.debug(
+                    "Push event parsed: event_type=%s raw_tag=%s group_id=%s",
+                    event_type,
+                    event_data.get("raw_tag"),
+                    event_data.get("group_id"),
+                )
                 # Try to route to the correct space by matching hub_id from raw bytes
                 target_space = self._find_space_for_event(raw)
                 if target_space:

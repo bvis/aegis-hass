@@ -145,3 +145,62 @@ class TestAsyncGetConfigEntryDiagnostics:
         entry.runtime_data.notification_listener = None
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert result["notification_listener"] is False
+
+    @pytest.mark.asyncio
+    async def test_spaces_include_groups_when_present(self, entry: MagicMock) -> None:
+        # The diagnostics block must expose `groups` + `group_mode_enabled`
+        # so support requests for group-related issues (#148) can be
+        # diagnosed without re-asking for a custom log. Previously the
+        # serializer omitted both fields and a missing block was
+        # indistinguishable from an actually-empty `space.groups`.
+        from dataclasses import replace
+
+        from custom_components.aegis_ajax.api.models import Group
+
+        groups = (
+            Group(
+                id="g1",
+                space_id="space-1",
+                name="Home",
+                security_state=SecurityState.ARMED,
+                sorting_key="01",
+            ),
+            Group(
+                id="g2",
+                space_id="space-1",
+                name="Studio",
+                security_state=SecurityState.DISARMED,
+                sorting_key="02",
+            ),
+        )
+        entry.runtime_data.spaces = {
+            "space-1": replace(_make_space(), groups=groups, group_mode_enabled=True)
+        }
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        space_info = result["spaces"]["space-1"]
+        assert space_info["group_mode_enabled"] is True
+        assert len(space_info["groups"]) == 2
+        assert space_info["groups"][0] == {
+            "id": "g1",
+            "name": "Home",
+            "security_state": "ARMED",
+        }
+        assert space_info["groups"][1] == {
+            "id": "g2",
+            "name": "Studio",
+            "security_state": "DISARMED",
+        }
+
+    @pytest.mark.asyncio
+    async def test_spaces_include_empty_groups_when_not_in_group_mode(
+        self, entry: MagicMock
+    ) -> None:
+        # When the space isn't in group mode, the block still emits the
+        # fields (with empty list / false) so a missing block reliably
+        # means "stale integration without the diagnostics fix" rather
+        # than "no groups configured".
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        space_info = result["spaces"]["space-1"]
+        assert space_info["group_mode_enabled"] is False
+        assert space_info["groups"] == []

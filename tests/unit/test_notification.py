@@ -847,6 +847,81 @@ class TestExtractEventCompiledProtos:
         assert event_type == "motion"
 
 
+class TestParseAndFireEventLogging:
+    """Push events now log `event_type / raw_tag / group_id` at DEBUG (#148).
+
+    Without this line the only way to confirm what the parser extracted from
+    a user's payload was to add ad-hoc logging mid-debugging — now the
+    standard debug log already shows it.
+    """
+
+    def _make_listener(self) -> AjaxNotificationListener:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        coordinator = MagicMock()
+        coordinator._space_ids = []
+        return AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+
+    def test_log_includes_event_type_raw_tag_and_group_id(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging as _logging
+
+        listener = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=(
+                    "arm",
+                    {"raw_tag": "space_group_armed", "group_id": "g7"},
+                ),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_extract_space_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.DEBUG, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        log_lines = [r.message for r in caplog.records]
+        assert any(
+            "Push event parsed" in m
+            and "event_type=arm" in m
+            and "raw_tag=space_group_armed" in m
+            and "group_id=g7" in m
+            for m in log_lines
+        ), f"missing expected debug line in {log_lines}"
+
+    def test_log_shows_none_group_id_for_non_group_events(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging as _logging
+
+        listener = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("arm", {"raw_tag": "space_armed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.DEBUG, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        assert any(
+            "Push event parsed" in r.message and "group_id=None" in r.message
+            for r in caplog.records
+        )
+
+
 class TestNotificationDedupe:
     """Issue #80: Ajax dispatches two FCM messages per security transition with
     identical notification_id; the second must not double-fire automations."""

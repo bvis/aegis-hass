@@ -40,6 +40,15 @@ async def async_get_config_entry_diagnostics(
                 "security_state": s.security_state.name,
                 "online": s.is_online,
                 "malfunctions": s.malfunctions_count,
+                "group_mode_enabled": s.group_mode_enabled,
+                "groups": [
+                    {
+                        "id": g.id,
+                        "name": g.name,
+                        "security_state": g.security_state.name,
+                    }
+                    for g in s.groups
+                ],
             }
             for sid, s in coordinator.spaces.items()
         },
