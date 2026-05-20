@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.6] - 2026-05-21
+
+Observability beta bump — purely additive, no runtime behaviour change. Driven by the `1.5.0-beta.5` data on #148: the parser identifies `space_group_disarmed` / `space_group_auto_disarmed` correctly, but `_extract_space_source_info` returns `group_id=None` on real wire payloads, so per-group alarm panels never refresh from FCM and only catch up on the next poll. We have no captured payload to diff against, so the source scan can't be fixed blind — this bump ships the diagnostic that hands us the bytes.
+
+### Internal
+- **WARNING + raw hex dump when a `space_group_*` push event lands without a resolvable `group_id`.** Fires only on the degraded path: `raw_tag` is in `RAW_TAG_TO_GROUP_SECURITY_STATE` but `_extract_space_source_info(raw)` returned `{}`. The log line includes the failing tag and the first 2048 bytes of the raw push as hex, so the actual `SpaceNotificationContent` / `SpaceNotificationSource` wire shape can be reverse-engineered from a single reproducer. WARNING is intentional — degraded user-visible behaviour follows the integration's "no WARNING line = healthy" rule. Counter-tested so healthy group pushes (group_id resolved) and whole-space `space_armed` events stay silent; the diagnostic must not become routine log noise once the underlying issue is fixed.
+- Test suite at **1302** unit tests (was 1299 in `1.5.0-beta.5`); coverage 86.21%. Three new tests in `tests/unit/test_notification.py::TestParseAndFireEventLogging` cover the WARNING path: hex dump appears when group event lacks `group_id`, no warning when `group_id` is resolved, no warning for non-group events.
+
 ## [1.5.0-beta.5] - 2026-05-20
 
 Beta bump fixing how the integration classifies push events when a sensor activates while the system is armed. Until now, a motion detector tripping or a door opening during night mode rendered in Home Assistant as `event_type: arm_night` — the same wording the integration uses when a user actively puts the system into night mode. That made the event entity ambiguous for automations: a doorbell ring, a motion detector tripping, and the user pressing the arm button all looked like the same event downstream of the FCM payload. After this bump, those events surface with the activity-level wording you'd expect (`motion`, `door_open`, `doorbell_pressed`, `tamper`, `alarm`, …), with the state context preserved on the `raw_tag` field for anyone whose automation keys off it.
