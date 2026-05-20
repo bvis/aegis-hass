@@ -647,10 +647,13 @@ class TestExtractEventCompiledProtos:
         assert event_type == "disarm"
         assert data["raw_tag"] == "space_disarmed"
 
-    def test_space_qualifier_preferred_over_hub_subincident(self) -> None:
-        # When both a SpaceEventQualifier (primary) and a HubEventQualifier
-        # (sub-incident, e.g. ext_contact_opened) are present in the same
-        # payload, the space-level transition wins.
+    def test_intrusion_alarm_beats_state_context(self) -> None:
+        # When a payload bundles a state-context tag (`space_night_mode_on`)
+        # together with a real incident (`intrusion_alarm`), the incident
+        # wins regardless of qualifier order — `TAG_PRIORITY` ranks
+        # confirmed incidents above state transitions. Previously the
+        # first SpaceEventQualifier match was returned unconditionally, so
+        # genuine alarms were rendered as `event_type=arm_night`.
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
             transition_pb2,
         )
@@ -679,8 +682,6 @@ class TestExtractEventCompiledProtos:
                 triggered=transition_pb2.EventTransition.Triggered()
             ),
         )
-        # Place the hub qualifier BEFORE the space one so the test would fail
-        # if we were still picking the first parseable HubEventQualifier.
         wrapped = self._wrap(hub_q.SerializeToString()) + self._wrap(space_q.SerializeToString())
 
         listener = self._make_listener()
@@ -688,8 +689,117 @@ class TestExtractEventCompiledProtos:
 
         assert result is not None
         event_type, data = result
-        assert event_type == "arm_night"
-        assert data["raw_tag"] == "space_night_mode_on"
+        assert event_type == "alarm"
+        assert data["raw_tag"] == "intrusion_alarm"
+
+    def test_priority_resolution_picks_highest_ranked_match(self) -> None:
+        # Direct unit test of the priority logic: given multiple candidate
+        # decodes across different qualifier types, the highest-ranked
+        # tag wins regardless of candidate scan order. Mocks the
+        # candidate-scan + per-qualifier-resolve helpers so the test
+        # doesn't depend on whether synthetic proto bytes happen to
+        # cross-decode (they sometimes do; real Ajax wire payloads — where
+        # each qualifier comes wrapped in its own typed
+        # `*NotificationContent` — do not).
+        listener = self._make_listener()
+        # Two candidates: first decodes as a state-context tag (priority
+        # 50), second decodes as a sensor tag (priority 80). Sensor wins
+        # by priority even though it's discovered second.
+        with (
+            patch.object(
+                listener,
+                "_find_embedded_messages",
+                return_value=[b"\x01", b"\x02"],
+            ),
+            patch.object(
+                listener,
+                "_resolve_qualifier",
+                side_effect=lambda c, *_: {
+                    b"\x01": ("arm_night", {"raw_tag": "space_night_mode_on"}),
+                    b"\x02": ("motion", {"raw_tag": "motion_detected"}),
+                }.get(c),
+            ),
+        ):
+            result = listener._extract_event_with_compiled_protos(b"")
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "motion"
+        assert data["raw_tag"] == "motion_detected"
+
+    def test_priority_resolution_state_context_alone_still_wins(self) -> None:
+        # When no higher-priority match is present, the state-context tag
+        # is correctly returned — the priority ladder only changes which
+        # match wins under contention, not what gets returned for a pure
+        # arm / disarm push.
+        listener = self._make_listener()
+        with (
+            patch.object(
+                listener,
+                "_find_embedded_messages",
+                return_value=[b"\x01"],
+            ),
+            patch.object(
+                listener,
+                "_resolve_qualifier",
+                side_effect=lambda c, *_: ("arm", {"raw_tag": "space_armed"}),
+            ),
+        ):
+            result = listener._extract_event_with_compiled_protos(b"")
+
+        assert result == ("arm", {"raw_tag": "space_armed"})
+
+    def test_priority_resolution_intrusion_alarm_beats_motion(self) -> None:
+        # Confirmed-incident tier (100) beats sensor-activity tier (80) —
+        # an intrusion in progress with concurrent motion pings should
+        # surface as `alarm`, not `motion`.
+        listener = self._make_listener()
+        with (
+            patch.object(
+                listener,
+                "_find_embedded_messages",
+                return_value=[b"\x01", b"\x02"],
+            ),
+            patch.object(
+                listener,
+                "_resolve_qualifier",
+                side_effect=lambda c, *_: {
+                    b"\x01": ("motion", {"raw_tag": "motion_detected"}),
+                    b"\x02": ("alarm", {"raw_tag": "intrusion_alarm"}),
+                }.get(c),
+            ),
+        ):
+            result = listener._extract_event_with_compiled_protos(b"")
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "alarm"
+        assert data["raw_tag"] == "intrusion_alarm"
+
+    def test_priority_resolution_ties_resolve_in_scan_order(self) -> None:
+        # When two candidates produce matches at the same tier, the first
+        # candidate (scan order) wins — preserving the legacy first-match
+        # behaviour for tags that share a tier and avoiding silent
+        # behaviour changes for state-only pushes.
+        listener = self._make_listener()
+        with (
+            patch.object(
+                listener,
+                "_find_embedded_messages",
+                return_value=[b"\x01", b"\x02"],
+            ),
+            patch.object(
+                listener,
+                "_resolve_qualifier",
+                side_effect=lambda c, *_: {
+                    b"\x01": ("arm", {"raw_tag": "space_armed"}),
+                    b"\x02": ("disarm", {"raw_tag": "space_disarmed"}),
+                }.get(c),
+            ),
+        ):
+            result = listener._extract_event_with_compiled_protos(b"")
+
+        assert result == ("arm", {"raw_tag": "space_armed"})
 
     def test_hub_qualifier_used_when_no_space_qualifier(self) -> None:
         # Hub-level events (alarm, tamper, …) still resolve through the

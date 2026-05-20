@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.5] - 2026-05-20
+
+Beta bump fixing how the integration classifies push events when a sensor activates while the system is armed. Until now, a motion detector tripping or a door opening during night mode rendered in Home Assistant as `event_type: arm_night` — the same wording the integration uses when a user actively puts the system into night mode. That made the event entity ambiguous for automations: a doorbell ring, a motion detector tripping, and the user pressing the arm button all looked like the same event downstream of the FCM payload. After this bump, those events surface with the activity-level wording you'd expect (`motion`, `door_open`, `doorbell_pressed`, `tamper`, `alarm`, …), with the state context preserved on the `raw_tag` field for anyone whose automation keys off it.
+
+### Fixed
+- **Event-entity classification now reflects what the sensor actually did, not just the surrounding space state.** When Ajax bundles a sensor-trip qualifier (`HubEventQualifier(motion_detected)`, `HubEventQualifier(door_opened)`, `HubEventQualifier(tamper_opened)`, etc.) together with a state-context qualifier (`SpaceEventQualifier(space_night_mode_on)`, `SpaceEventQualifier(space_armed_with_malfunctions)`, …) in the same FCM payload, the integration now picks the sensor-level event as the primary signal. The previous logic walked qualifier types in a fixed order and returned the first match, which let the state context shadow the activity. Real-world impact: motion / door / tamper / panic / fire automations now fire with the expected `event_type` regardless of whether the underlying push came in during armed-away, armed-night, partially-armed, or any other state. Confirmed-incident events (`intrusion_alarm`, `panic_button_pressed`) likewise take precedence over the surrounding state context.
+
+### Internal
+- Test suite at **1299** unit tests (was 1295 in `1.5.0-beta.4`); coverage 86.18%. Four new tests in `tests/unit/test_notification.py::TestExtractEventCompiledProtos` exercise the priority resolution directly (highest-tier match wins, single match still resolves, confirmed-incident beats sensor activity, ties resolve in candidate-scan order). One existing test (`test_space_qualifier_preferred_over_hub_subincident`) rewritten as `test_intrusion_alarm_beats_state_context` to assert the new — correct — semantics; the previous test was encoding the bug it was named to protect against.
+
 ## [1.5.0-beta.4] - 2026-05-20
 
 Observability beta bump — purely additive, no runtime behaviour change. Surfaces the data needed to triage in-flight reports on the `1.5.0` line (notably the per-group push debugging in #148) without having to ask reporters for ad-hoc custom logging.

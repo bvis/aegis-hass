@@ -19,6 +19,7 @@ from custom_components.aegis_ajax.const import (
     RAW_TAG_TO_SECURITY_STATE,
     SMARTLOCK_EVENT_TAG_MAP,
     SPACE_EVENT_TAG_MAP,
+    TAG_PRIORITY,
     VIDEO_EVENT_TAG_MAP,
 )
 from custom_components.aegis_ajax.repairs import (
@@ -524,14 +525,24 @@ class AjaxNotificationListener:
             return self._extract_event_raw(raw)
 
     def _extract_event_with_compiled_protos(self, raw: bytes) -> tuple[str, dict[str, Any]] | None:
-        """Parse event by finding a Hub or Space event qualifier in raw protobuf.
+        """Resolve a push payload to an HA `(event_type, data)` pair.
 
-        Arm/disarm pushes embed a `SpaceEventQualifier` (`SpaceNotificationContent.
-        qualifier`) — try those first (#68). The same payload often also carries
-        unrelated `HubEventQualifier` candidates describing zone-level
-        sub-incidents (`ext_contact_opened`, `roller_shutter_alarm`); they are
-        the legitimate primary tag for hub-level pushes (alarm, tamper, …) so
-        they remain the fallback.
+        Walks every embedded protobuf candidate, tries to decode it against
+        each of the four event qualifier types (Space / Hub / Video /
+        SmartLock), and collects every successful match. The highest-
+        priority match wins per `TAG_PRIORITY` — real incidents (alarm,
+        panic) outrank critical detectors (tamper, smoke), which outrank
+        sensor activity (motion, door open, doorbell), which outranks
+        user-driven state transitions (`space_armed`, `space_night_mode_
+        on`). This avoids misreading a payload like "PORTA opened during
+        night mode" — which carries both a `HubEventQualifier(door_opened)`
+        and a `SpaceEventQualifier(space_night_mode_on)` — as a state
+        transition rather than as the door-open event a user automation
+        actually wants to trigger on.
+
+        Tags absent from `TAG_PRIORITY` default to weight 0 so they still
+        participate but lose to anything ranked — preserving the previous
+        first-match-wins behaviour for the unranked long tail.
         """
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.hub import (  # noqa: PLC0415, E501
             qualifier_pb2 as hub_qualifier_pb2,
@@ -546,91 +557,70 @@ class AjaxNotificationListener:
             qualifier_pb2 as video_qualifier_pb2,
         )
 
-        candidates = self._find_embedded_messages(raw)
+        # (qualifier_proto_class, tag → ha_event_type map) pairs walked for
+        # every candidate. Order doesn't affect the result thanks to
+        # priority ranking, but matches the legacy pass numbering for grep.
+        qualifier_table: list[tuple[type, dict[str, str]]] = [
+            (space_qualifier_pb2.SpaceEventQualifier, SPACE_EVENT_TAG_MAP),
+            (hub_qualifier_pb2.HubEventQualifier, HUB_EVENT_TAG_MAP),
+            (video_qualifier_pb2.VideoEventQualifier, VIDEO_EVENT_TAG_MAP),
+            (smartlock_qualifier_pb2.SmartLockEventQualifier, SMARTLOCK_EVENT_TAG_MAP),
+        ]
 
-        # Pass 1 — SpaceEventQualifier (arm/disarm/night/panic at space level).
-        for candidate in candidates:
-            try:
-                space_q = space_qualifier_pb2.SpaceEventQualifier()
-                space_q.ParseFromString(candidate)
-            except Exception:
-                continue
-            if not space_q.HasField("tag"):
-                continue
-            tag_field = space_q.tag.WhichOneof("event_tag_case")
-            if tag_field and tag_field in SPACE_EVENT_TAG_MAP:
-                event_type = SPACE_EVENT_TAG_MAP[tag_field]
-                data: dict[str, Any] = {"raw_tag": tag_field}
-                if space_q.HasField("transition"):
-                    trans_field = space_q.transition.WhichOneof("transition")
-                    if trans_field:
-                        data["transition"] = trans_field
-                return event_type, data
+        matches: list[tuple[int, str, dict[str, Any]]] = []
+        for candidate in self._find_embedded_messages(raw):
+            # Within a single candidate, take only the first qualifier
+            # type that decodes — preserving the legacy Space > Hub >
+            # Video > SmartLock precedence so the same bytes don't get
+            # double-counted under two different interpretations (the
+            # protobuf wire format is permissive enough that a payload
+            # legitimately encoding `space_armed` can also parse as
+            # `HubEventQualifier(door_opened)` by sheer field-number
+            # coincidence). Priority then decides between *different*
+            # candidates, which is the case the refactor is for.
+            for qualifier_class, tag_map in qualifier_table:
+                resolved = self._resolve_qualifier(candidate, qualifier_class, tag_map)
+                if resolved is None:
+                    continue
+                event_type, data = resolved
+                matches.append((TAG_PRIORITY.get(data["raw_tag"], 0), event_type, data))
+                break
 
-        # Pass 2 — HubEventQualifier (zone-level events: alarm, tamper, …).
-        for candidate in candidates:
-            try:
-                qualifier = hub_qualifier_pb2.HubEventQualifier()
-                qualifier.ParseFromString(candidate)
-                if qualifier.HasField("tag"):
-                    tag = qualifier.tag
-                    tag_field = tag.WhichOneof("event_tag_case")
-                    if tag_field and tag_field in HUB_EVENT_TAG_MAP:
-                        event_type = HUB_EVENT_TAG_MAP[tag_field]
-                        data = {"raw_tag": tag_field}
-                        if qualifier.HasField("transition"):
-                            trans_field = qualifier.transition.WhichOneof("transition")
-                            if trans_field:
-                                data["transition"] = trans_field
-                        return event_type, data
-            except Exception:
-                continue
+        if not matches:
+            return None
 
-        # Pass 3 — VideoEventQualifier (#119: MotionCam Video Doorbell ring,
-        # plus motion / human detected from video devices). The video tag
-        # set is disjoint from HubEventTag so its own qualifier is needed.
-        for candidate in candidates:
-            try:
-                video_q = video_qualifier_pb2.VideoEventQualifier()
-                video_q.ParseFromString(candidate)
-            except Exception:
-                continue
-            if not video_q.HasField("tag"):
-                continue
-            tag_field = video_q.tag.WhichOneof("event_tag_case")
-            if tag_field and tag_field in VIDEO_EVENT_TAG_MAP:
-                event_type = VIDEO_EVENT_TAG_MAP[tag_field]
-                data = {"raw_tag": tag_field}
-                if video_q.HasField("transition"):
-                    trans_field = video_q.transition.WhichOneof("transition")
-                    if trans_field:
-                        data["transition"] = trans_field
-                return event_type, data
+        # `max` returns the first element at the maximum priority — i.e.
+        # ties resolve in candidate-scan order, which matches the previous
+        # first-match-wins behaviour for tags that share a tier.
+        _, event_type, data = max(matches, key=lambda m: m[0])
+        return event_type, data
 
-        # Pass 4 — SmartLockEventQualifier (#158: SmartLock / LockBridge Yale
-        # variants with an integrated ring button fire `doorbell_pressed`
-        # inside this qualifier — disjoint oneof from HubEventTag and
-        # VideoEventTag). The remaining SmartLock tags (locked_by_keypad, …)
-        # already surface via the `lock` entity's state so they stay
-        # unmapped here on purpose.
-        for candidate in candidates:
-            try:
-                smartlock_q = smartlock_qualifier_pb2.SmartLockEventQualifier()
-                smartlock_q.ParseFromString(candidate)
-            except Exception:
-                continue
-            if not smartlock_q.HasField("tag"):
-                continue
-            tag_field = smartlock_q.tag.WhichOneof("event_tag_case")
-            if tag_field and tag_field in SMARTLOCK_EVENT_TAG_MAP:
-                event_type = SMARTLOCK_EVENT_TAG_MAP[tag_field]
-                data = {"raw_tag": tag_field}
-                if smartlock_q.HasField("transition"):
-                    trans_field = smartlock_q.transition.WhichOneof("transition")
-                    if trans_field:
-                        data["transition"] = trans_field
-                return event_type, data
-        return None
+    @staticmethod
+    def _resolve_qualifier(
+        candidate: bytes,
+        qualifier_class: type,
+        tag_map: dict[str, str],
+    ) -> tuple[str, dict[str, Any]] | None:
+        """Try to decode `candidate` as `qualifier_class` and return its
+        `(event_type, data)` if its tag is in `tag_map`. Returns None on
+        parse failure, missing tag, or unmapped tag.
+        """
+        try:
+            qualifier = qualifier_class()
+            qualifier.ParseFromString(candidate)
+        except Exception:
+            return None
+        if not qualifier.HasField("tag"):
+            return None
+        tag_field = qualifier.tag.WhichOneof("event_tag_case")
+        if not tag_field or tag_field not in tag_map:
+            return None
+        data: dict[str, Any] = {"raw_tag": tag_field}
+        if qualifier.HasField("transition"):
+            trans_field = qualifier.transition.WhichOneof("transition")
+            if trans_field:
+                data["transition"] = trans_field
+        return tag_map[tag_field], data
 
     @staticmethod
     def _find_embedded_messages(raw: bytes) -> list[bytes]:

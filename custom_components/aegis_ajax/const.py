@@ -342,6 +342,86 @@ SMARTLOCK_EVENT_TAG_MAP: dict[str, str] = {
 }
 
 
+# Semantic weight of each push tag. Used by the parser to pick the right
+# match when a single FCM payload carries multiple valid qualifiers — most
+# notably "sensor tripped while system was armed", where Ajax bundles a
+# `SpaceEventQualifier` carrying the state context (e.g. `space_night_mode_
+# on`) together with a `HubEventQualifier` carrying the sensor activity
+# (e.g. `motion_detected`). Higher number wins; tags absent from this map
+# default to weight 0, which preserves the previous "first match wins"
+# fallback for anything not yet ranked.
+#
+# Tiers:
+#   100 — confirmed incident: someone needs to act now
+#    90 — critical detector: would normally trigger an alarm
+#    80 — sensor activity worth surfacing (motion, doorbell, door open)
+#    50 — space-level state change driven by a user action
+#    40 — HubEventTag legacy arm/disarm — Ajax mostly sends these as
+#         secondary context to the SpaceEventTag equivalents
+#    30 — informational health signals (battery, connection loss)
+TAG_PRIORITY: dict[str, int] = {
+    # Tier 100 — confirmed incidents
+    "intrusion_alarm": 100,
+    "intrusion_alarm_confirmed": 100,
+    "panic_button_pressed": 100,
+    "space_panic_button_pressed": 100,
+    # Tier 90 — critical detection
+    "tamper_opened": 90,
+    "front_tamper_opened": 90,
+    "back_tamper_opened": 90,
+    "smoke_detected": 90,
+    "high_co_level_detected": 90,
+    "leak_detected": 90,
+    "glass_break_detected": 90,
+    # Tier 80 — sensor / device activity
+    "motion_detected": 80,
+    "human_detected": 80,
+    "door_opened": 80,
+    "ring_button_pressed": 80,
+    "doorbell_pressed": 80,
+    # Tier 50 — user-driven space transitions
+    "space_armed": 50,
+    "space_armed_with_malfunctions": 50,
+    "space_auto_armed": 50,
+    "space_auto_armed_with_malfunctions": 50,
+    "space_disarmed": 50,
+    "space_auto_disarmed": 50,
+    "space_duress_disarmed": 50,
+    "space_night_mode_on": 50,
+    "space_night_mode_on_with_malfunctions": 50,
+    "space_night_mode_off": 50,
+    "space_duress_night_mode_off": 50,
+    "space_group_armed": 50,
+    "space_group_armed_with_malfunctions": 50,
+    "space_group_auto_armed": 50,
+    "space_group_auto_armed_with_malfunctions": 50,
+    "space_group_disarmed": 50,
+    "space_group_auto_disarmed": 50,
+    "space_group_duress_disarmed": 50,
+    # Tier 40 — HubEventTag legacy arm/disarm (Ajax sends these as
+    # secondary context; the SpaceEventTag variants above are the
+    # canonical signal for the user action).
+    "arm": 40,
+    "arm_attempt": 40,
+    "arm_with_malfunctions": 40,
+    "group_arm": 40,
+    "group_arm_with_malfunctions": 40,
+    "disarm": 40,
+    "duress_disarm": 40,
+    "group_disarm": 40,
+    "night_mode_on": 40,
+    "night_mode_off": 40,
+    "duress_night_mode_off": 40,
+    # Tier 30 — informational
+    "battery_low": 30,
+    "device_communication_loss": 30,
+    "server_connection_loss": 30,
+    "gsm_connection_loss": 30,
+    "ethernet_connection_loss": 30,
+    "malfunction": 30,
+}
+
+
 ALL_EVENT_TYPES: list[str] = sorted(
     set(HUB_EVENT_TAG_MAP.values())
     | set(SPACE_EVENT_TAG_MAP.values())
