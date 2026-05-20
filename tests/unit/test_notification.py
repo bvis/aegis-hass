@@ -1031,6 +1031,96 @@ class TestParseAndFireEventLogging:
             for r in caplog.records
         )
 
+    def test_group_event_without_group_id_logs_warning_with_hex(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When `space_group_*` is recognised but the source scan finds no
+        `group_id`, we WARN and dump the raw payload hex (#148 beta.6).
+
+        Without this signal the user's only clue is a panel that doesn't
+        update — and without the hex we can't reverse-engineer why the
+        SpaceNotificationSource heuristic missed.
+        """
+        import logging as _logging
+
+        listener = self._make_listener()
+        raw_bytes = b"\x0a\x05group\x12\x04test"
+        encoded = base64.b64encode(raw_bytes).decode()
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("disarm", {"raw_tag": "space_group_disarmed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_extract_space_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.WARNING, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert any(
+            "space_group_disarmed" in r.message and raw_bytes.hex() in r.message for r in warnings
+        ), f"missing expected WARNING with hex dump, got {[r.message for r in warnings]}"
+
+    def test_group_event_with_group_id_does_not_log_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Counter-test: when the source scan resolves a `group_id`, the
+        warning path must stay silent — otherwise every healthy group
+        push would spam the logs."""
+        import logging as _logging
+
+        listener = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("arm", {"raw_tag": "space_group_armed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(
+                listener,
+                "_extract_space_source_info",
+                return_value={"group_id": "g7", "group_name": "Studio"},
+            ),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.WARNING, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_non_group_event_without_source_does_not_log_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Counter-test: whole-space `space_armed` carries no
+        SpaceNotificationSource by design — must not trip the group
+        diagnostic warning."""
+        import logging as _logging
+
+        listener = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("arm", {"raw_tag": "space_armed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_extract_space_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.WARNING, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
 
 class TestNotificationDedupe:
     """Issue #80: Ajax dispatches two FCM messages per security transition with

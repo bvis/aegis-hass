@@ -450,6 +450,22 @@ class AjaxNotificationListener:
                     group_info = self._extract_space_source_info(raw)
                     if group_info:
                         event_data.update(group_info)
+                    else:
+                        # The parser confirmed a `space_group_*` event but
+                        # `_extract_space_source_info` could not locate the
+                        # SpaceNotificationSource that carries the group_id —
+                        # so the per-group panel cannot be updated from the
+                        # push and falls back on the next poll. Dump the raw
+                        # payload hex so the wire shape can be inspected and
+                        # the heuristic fixed (#148). WARNING is intentional:
+                        # this is a degraded path for the user.
+                        _LOGGER.warning(
+                            "Group push %s parsed without group_id; "
+                            "per-group panel will only update on next poll. "
+                            "Raw payload (hex, capped 2048 bytes): %s",
+                            event_data.get("raw_tag"),
+                            raw[:2048].hex(),
+                        )
                 _LOGGER.debug(
                     "Push event parsed: event_type=%s raw_tag=%s group_id=%s",
                     event_type,
