@@ -6,6 +6,7 @@ import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
 
 from custom_components.aegis_ajax.api.session import AuthenticationError, TwoFactorRequiredError
 from custom_components.aegis_ajax.config_flow import (
@@ -317,6 +318,91 @@ class TestAsyncStepSelectSpaces:
             await flow.async_step_select_spaces(None)
 
         flow.async_show_form.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_step_select_spaces_schema_starts_empty_with_dropdown_search(self) -> None:
+        """Installer UX (#166): the schema must default to no spaces selected
+        and render in dropdown mode (filterable chip input), not a checkbox
+        list. Without this an account with many customer spaces auto-selects
+        all of them and the installer can ship the wrong one by inertia.
+        """
+        from homeassistant.helpers.selector import SelectSelector, SelectSelectorMode
+
+        flow = AjaxCobrandedConfigFlow()
+        captured_schema: dict[str, object] = {}
+
+        def _capture(**kwargs: object) -> dict[str, str]:
+            captured_schema.update(kwargs)
+            return {"type": "form"}
+
+        flow.async_show_form = MagicMock(side_effect=_capture)
+
+        mock_space_a = MagicMock()
+        mock_space_a.id = "s1"
+        mock_space_a.name = "A"
+        mock_space_b = MagicMock()
+        mock_space_b.id = "s2"
+        mock_space_b.name = "B"
+        flow._client = MagicMock()
+        mock_spaces_api = MagicMock()
+        mock_spaces_api.list_spaces = AsyncMock(return_value=[mock_space_a, mock_space_b])
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.SpacesApi", return_value=mock_spaces_api
+        ):
+            await flow.async_step_select_spaces(None)
+
+        schema = captured_schema["data_schema"]
+        spaces_marker = next(k for k in schema.schema if getattr(k, "schema", k) == "spaces")
+        # `Required` with explicit empty default → nothing checked initially
+        assert spaces_marker.default() == [], (
+            "spaces selector must default to an empty list so the installer "
+            "is forced to make an explicit choice (#166)"
+        )
+        # The marker's value is `vol.All(SelectSelector, vol.Length(min=1))`.
+        # Pull the selector out so we can assert its config.
+        validator = schema.schema[spaces_marker]
+        selector = next(v for v in validator.validators if isinstance(v, SelectSelector))
+        assert selector.config["mode"] == SelectSelectorMode.DROPDOWN, (
+            "dropdown mode renders the chip input with the built-in name "
+            "filter, which is what makes long space lists tractable (#166)"
+        )
+        assert selector.config["multiple"] is True
+        assert selector.config["sort"] is True
+
+    @pytest.mark.asyncio
+    async def test_step_select_spaces_rejects_empty_selection(self) -> None:
+        """Counter-test for #166: starting empty must not let the user
+        submit *without* choosing a space — a config entry with zero
+        spaces is a do-nothing entry. The `default=[]` change weakens
+        the implicit `vol.Required` "missing key fails" guarantee, so
+        we re-establish it with an explicit `vol.Length(min=1)`.
+        """
+        flow = AjaxCobrandedConfigFlow()
+        captured_schema: dict[str, object] = {}
+
+        def _capture(**kwargs: object) -> dict[str, str]:
+            captured_schema.update(kwargs)
+            return {"type": "form"}
+
+        flow.async_show_form = MagicMock(side_effect=_capture)
+        flow._client = MagicMock()
+        mock_spaces_api = MagicMock()
+        mock_spaces_api.list_spaces = AsyncMock(return_value=[])
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.SpacesApi", return_value=mock_spaces_api
+        ):
+            await flow.async_step_select_spaces(None)
+
+        schema = captured_schema["data_schema"]
+        # Empty list explicitly — the path a user would hit by submitting
+        # the form with no chips selected.
+        with pytest.raises(vol.MultipleInvalid):
+            schema({"spaces": []})
+        # And the default-fill path (frontend ships nothing) must also fail.
+        with pytest.raises(vol.MultipleInvalid):
+            schema({})
 
 
 class TestAsyncStepReauth:

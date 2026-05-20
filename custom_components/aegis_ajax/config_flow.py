@@ -20,6 +20,7 @@ from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -201,11 +202,32 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="select_spaces",
             data_schema=vol.Schema(
                 {
-                    vol.Required("spaces"): SelectSelector(
-                        SelectSelectorConfig(
-                            options=space_options,
-                            multiple=True,
-                        )
+                    # `default=[]` is intentional: HA's frontend treats a
+                    # missing default on a `Required` multi-select as
+                    # "everything selected", which is dangerous for
+                    # installers who see many customer spaces in one
+                    # account and could accept the wrong one by inertia
+                    # (#166). Starting empty forces an explicit choice.
+                    # `mode=DROPDOWN` renders the chip-input with the
+                    # built-in name filter, replacing the linear checkbox
+                    # list that doesn't scale past a handful of spaces.
+                    vol.Required("spaces", default=[]): vol.All(
+                        SelectSelector(
+                            SelectSelectorConfig(
+                                options=space_options,
+                                multiple=True,
+                                mode=SelectSelectorMode.DROPDOWN,
+                                sort=True,
+                            )
+                        ),
+                        # The selector accepts an empty list once we add
+                        # `default=[]` (the marker no longer fails on a
+                        # missing key). Without this length check, a user
+                        # could submit with no space chosen and we'd
+                        # create a do-nothing entry. The frontend already
+                        # disables Submit while empty for `Required`, so
+                        # this is the belt-and-braces server-side guard.
+                        vol.Length(min=1),
                     ),
                 }
             ),
