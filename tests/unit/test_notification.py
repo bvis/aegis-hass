@@ -248,6 +248,64 @@ class TestNotificationListener:
         result = AjaxNotificationListener._extract_space_source_info(b"\x00\x01\x02\x03")
         assert result == {}
 
+    def test_extract_space_group_info_resolves_group_from_display_groups(self) -> None:
+        """Real production fix (#148): Ajax actually carries the group_id in
+        `additional_data.space_display_groups` → `DisplayGroups.Group`, not
+        in the `SpaceNotificationSource` the previous extractor scanned.
+        Confirmed against a wire capture from beta.6's WARNING dump.
+        """
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        group = display_groups_pb2.DisplayGroups.Group(
+            group_hex_id="00000001", group_name="Out House"
+        )
+        # Test against the inner-Group bytes (the wire shape we land on
+        # mid-payload after scanning).
+        raw = group.SerializeToString()
+        result = AjaxNotificationListener._extract_space_group_info(raw)
+        assert result == {"group_id": "00000001", "group_name": "Out House"}
+
+    def test_extract_space_group_info_resolves_from_wrapped_display_groups(self) -> None:
+        """The extractor must also work when the Group bytes are embedded
+        inside the parent `DisplayGroups`'s repeated `groups` field — that's
+        the actual wire shape in a real push payload."""
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        display = display_groups_pb2.DisplayGroups(
+            groups=[
+                display_groups_pb2.DisplayGroups.Group(
+                    group_hex_id="00000001", group_name="Out House"
+                ),
+                display_groups_pb2.DisplayGroups.Group(group_hex_id="00000002", group_name="Home"),
+            ]
+        )
+        # Pad with leading bytes so the scan also has to walk past noise.
+        raw = b"\x99\x88" + display.SerializeToString() + b"\x77"
+        result = AjaxNotificationListener._extract_space_group_info(raw)
+        # First populated group wins — that's the one Ajax pushes for the
+        # specific event (the others are context).
+        assert result == {"group_id": "00000001", "group_name": "Out House"}
+
+    def test_extract_space_group_info_returns_empty_for_no_match(self) -> None:
+        assert AjaxNotificationListener._extract_space_group_info(b"\x00\x01\x02\x03") == {}
+
+    def test_extract_space_group_info_rejects_binary_garbage_in_strings(self) -> None:
+        """If a `0x0a` lands somewhere that ParseFromString succeeds but
+        fills the strings with non-printable bytes (the OUTER
+        `DisplayGroups.groups` tag absorbs the entire Group as a binary
+        string), the printable-only check must reject it. Otherwise we'd
+        return junk as `group_id`."""
+        # 0x0a + length + Group-bytes starting with another 0x0a (binary):
+        binary_blob = b"\x0a\x12\x0a\x08aaaaaaaa\x12\x06xxxxxx"  # outer wrap
+        result = AjaxNotificationListener._extract_space_group_info(binary_blob)
+        # First 0x0a (outer): group_hex_id would contain `\x0a\x08aaaaaaaa…`
+        # which fails isprintable() — must skip and try inner 0x0a at index 2.
+        assert result == {"group_id": "aaaaaaaa", "group_name": "xxxxxx"}
+
     @pytest.mark.asyncio
     async def test_on_notification_extracts_notification_id(self) -> None:
         """ENCODED_DATA with a notification_id resolves pending notification_id futures."""
@@ -1034,17 +1092,14 @@ class TestParseAndFireEventLogging:
     def test_group_event_without_group_id_logs_warning_with_hex(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """When `space_group_*` is recognised but the source scan finds no
-        `group_id`, we WARN and dump the raw payload hex (#148 beta.6).
-
-        Without this signal the user's only clue is a panel that doesn't
-        update — and without the hex we can't reverse-engineer why the
-        SpaceNotificationSource heuristic missed.
-        """
+        """When `space_group_*` is recognised but neither extractor finds
+        a `group_id`, we WARN and dump the raw payload hex (#148 beta.6).
+        The hex dump survives even after the DisplayGroups fix — if Ajax
+        ever ships yet another wire shape, we'll still see the bytes."""
         import logging as _logging
 
         listener = self._make_listener()
-        raw_bytes = b"\x0a\x05group\x12\x04test"
+        raw_bytes = b"\xff\xfe\xfd\xfc\xfb"
         encoded = base64.b64encode(raw_bytes).decode()
         notif_logger = "custom_components.aegis_ajax.notification"
         with (
@@ -1054,6 +1109,7 @@ class TestParseAndFireEventLogging:
                 return_value=("disarm", {"raw_tag": "space_group_disarmed"}),
             ),
             patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_extract_space_group_info", return_value={}),
             patch.object(listener, "_extract_space_source_info", return_value={}),
             patch.object(listener, "_find_space_for_event", return_value="space-1"),
             caplog.at_level(_logging.WARNING, logger=notif_logger),
@@ -1064,6 +1120,63 @@ class TestParseAndFireEventLogging:
         assert any(
             "space_group_disarmed" in r.message and raw_bytes.hex() in r.message for r in warnings
         ), f"missing expected WARNING with hex dump, got {[r.message for r in warnings]}"
+
+    def test_group_event_from_display_groups_sets_group_id_silently(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """End-to-end (#148 fix): with a real `DisplayGroups.Group` in the
+        payload, the DisplayGroups extractor resolves `group_id` and the
+        WARNING path stays silent. Counter-test to ensure the new extractor
+        is actually wired into `_parse_and_fire_event`, not just defined."""
+        import logging as _logging
+
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        listener = self._make_listener()
+        # Build a payload with a real DisplayGroups embedded; padding before
+        # and after makes the scan walk past noise like a real push would.
+        display = display_groups_pb2.DisplayGroups(
+            groups=[
+                display_groups_pb2.DisplayGroups.Group(
+                    group_hex_id="00000001", group_name="Out House"
+                )
+            ]
+        )
+        raw_bytes = b"\x99\x88\x77" + display.SerializeToString() + b"\x66"
+        encoded = base64.b64encode(raw_bytes).decode()
+
+        # Capture event_data so we can assert group_id was routed through.
+        captured: dict[str, object] = {}
+
+        def _capture_fire(space_id: str, event_type: str, event_data: dict) -> None:
+            captured["space_id"] = space_id
+            captured["event_type"] = event_type
+            captured["event_data"] = dict(event_data)
+
+        listener._coordinator.fire_push_event = _capture_fire
+        notif_logger = "custom_components.aegis_ajax.notification"
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("disarm", {"raw_tag": "space_group_disarmed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+            caplog.at_level(_logging.WARNING, logger=notif_logger),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        # No diagnostic WARNING — the fix worked.
+        assert not [r for r in caplog.records if r.levelname == "WARNING"], (
+            "DisplayGroups extractor should resolve group_id and silence the warning path"
+        )
+        # And the group_id arrived in event_data so the coordinator can
+        # route to the right per-group alarm panel.
+        assert captured["event_data"]["group_id"] == "00000001"
+        assert captured["event_data"]["group_name"] == "Out House"
 
     def test_group_event_with_group_id_does_not_log_warning(
         self, caplog: pytest.LogCaptureFixture
