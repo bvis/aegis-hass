@@ -447,18 +447,25 @@ class AjaxNotificationListener:
                 if source_info:
                     event_data.update(source_info)
                 if event_data.get("raw_tag") in RAW_TAG_TO_GROUP_SECURITY_STATE:
-                    group_info = self._extract_space_source_info(raw)
+                    # Ajax actually encodes the group context in
+                    # `additional_data.space_display_groups` as a
+                    # `DisplayGroups.Group(group_hex_id, group_name)` —
+                    # not in the `SpaceNotificationSource` we used to scan
+                    # (#148 wire capture in beta.6). Try DisplayGroups
+                    # first; fall back to the legacy SpaceNotificationSource
+                    # path in case a future Ajax build also emits it there.
+                    group_info = self._extract_space_group_info(
+                        raw
+                    ) or self._extract_space_source_info(raw)
                     if group_info:
                         event_data.update(group_info)
                     else:
-                        # The parser confirmed a `space_group_*` event but
-                        # `_extract_space_source_info` could not locate the
-                        # SpaceNotificationSource that carries the group_id —
-                        # so the per-group panel cannot be updated from the
-                        # push and falls back on the next poll. Dump the raw
-                        # payload hex so the wire shape can be inspected and
-                        # the heuristic fixed (#148). WARNING is intentional:
-                        # this is a degraded path for the user.
+                        # Diagnostic path: parser confirmed a `space_group_*`
+                        # event but neither extractor located the group_id,
+                        # so the per-group panel only updates on next poll.
+                        # The hex dump survives in case Ajax ships yet another
+                        # wire shape down the road. WARNING is intentional —
+                        # degraded user-visible behaviour.
                         _LOGGER.warning(
                             "Group push %s parsed without group_id; "
                             "per-group panel will only update on next poll. "
@@ -758,6 +765,54 @@ class AjaxNotificationListener:
                 if not source.id or not source.name:
                     continue
                 return {"group_id": source.id, "group_name": source.name}
+        return {}
+
+    @staticmethod
+    def _extract_space_group_info(raw: bytes) -> dict[str, Any]:
+        """Extract group identifier from a `DisplayGroups.Group` (#148 fix).
+
+        Reverse-engineered from a real-install hex capture in `1.5.0-beta.6`:
+        Ajax encodes the group context of `space_group_*` push events inside
+        `additional_data.space_display_groups` (a `DisplayGroups` message),
+        not in the SpaceNotificationSource our previous extractor scanned —
+        so that scan always returned `{}` for group events in production.
+        The inner `DisplayGroups.Group` carries `group_hex_id` (field 1
+        string) and `group_name` (field 2 string).
+
+        Scan strategy: every `0x0a` byte (wire tag for field 1 length-delim,
+        i.e. the start of `group_hex_id`) is a candidate. Try parsing the
+        next 4–80 bytes as `DisplayGroups.Group` and accept the first match
+        with both string fields populated and printable. Other `0x0a` hits
+        either fail to parse or end up with non-printable bytes (e.g. when
+        the position is the OUTER `DisplayGroups.groups` wire tag and the
+        Group bytes are absorbed as a single binary string), which the
+        printable check filters out.
+        """
+        try:
+            from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: PLC0415, E501
+                display_groups_pb2,
+            )
+        except ImportError:
+            _LOGGER.debug("DisplayGroups proto not available")
+            return {}
+
+        group_class = display_groups_pb2.DisplayGroups.Group
+        for i in range(len(raw) - 5):
+            if raw[i] != 0x0A:
+                continue
+            for end in range(i + 4, min(i + 80, len(raw) + 1)):
+                try:
+                    group = group_class()
+                    group.ParseFromString(raw[i:end])
+                except Exception:
+                    continue
+                if not group.group_hex_id or not group.group_name:
+                    continue
+                if not group.group_hex_id.isprintable():
+                    continue
+                if not group.group_name.isprintable():
+                    continue
+                return {"group_id": group.group_hex_id, "group_name": group.group_name}
         return {}
 
     @staticmethod
