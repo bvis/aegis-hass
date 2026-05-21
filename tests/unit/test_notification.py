@@ -248,29 +248,13 @@ class TestNotificationListener:
         result = AjaxNotificationListener._extract_space_source_info(b"\x00\x01\x02\x03")
         assert result == {}
 
-    def test_extract_space_group_info_resolves_group_from_display_groups(self) -> None:
-        """Real production fix (#148): Ajax actually carries the group_id in
-        `additional_data.space_display_groups` → `DisplayGroups.Group`, not
-        in the `SpaceNotificationSource` the previous extractor scanned.
-        Confirmed against a wire capture from beta.6's WARNING dump.
+    def test_extract_space_group_info_resolves_from_display_groups(self) -> None:
+        """Real production fix (#148): Ajax carries the group_id in
+        `additional_data.space_display_groups` → `DisplayGroups`. Real
+        payloads always wrap the Group in the parent message (confirmed
+        from beta.6 + beta.8 wire captures), so the extractor parses the
+        parent — not the inner Group directly — to stay specific.
         """
-        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
-            display_groups_pb2,
-        )
-
-        group = display_groups_pb2.DisplayGroups.Group(
-            group_hex_id="00000001", group_name="Out House"
-        )
-        # Test against the inner-Group bytes (the wire shape we land on
-        # mid-payload after scanning).
-        raw = group.SerializeToString()
-        result = AjaxNotificationListener._extract_space_group_info(raw)
-        assert result == {"group_id": "00000001", "group_name": "Out House"}
-
-    def test_extract_space_group_info_resolves_from_wrapped_display_groups(self) -> None:
-        """The extractor must also work when the Group bytes are embedded
-        inside the parent `DisplayGroups`'s repeated `groups` field — that's
-        the actual wire shape in a real push payload."""
         from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
             display_groups_pb2,
         )
@@ -286,25 +270,73 @@ class TestNotificationListener:
         # Pad with leading bytes so the scan also has to walk past noise.
         raw = b"\x99\x88" + display.SerializeToString() + b"\x77"
         result = AjaxNotificationListener._extract_space_group_info(raw)
-        # First populated group wins — that's the one Ajax pushes for the
-        # specific event (the others are context).
+        # First valid group wins — that's the one Ajax pushes for the
+        # specific event (the others are context for the rest of the UI).
         assert result == {"group_id": "00000001", "group_name": "Out House"}
 
     def test_extract_space_group_info_returns_empty_for_no_match(self) -> None:
         assert AjaxNotificationListener._extract_space_group_info(b"\x00\x01\x02\x03") == {}
 
-    def test_extract_space_group_info_rejects_binary_garbage_in_strings(self) -> None:
-        """If a `0x0a` lands somewhere that ParseFromString succeeds but
-        fills the strings with non-printable bytes (the OUTER
-        `DisplayGroups.groups` tag absorbs the entire Group as a binary
-        string), the printable-only check must reject it. Otherwise we'd
-        return junk as `group_id`."""
-        # 0x0a + length + Group-bytes starting with another 0x0a (binary):
-        binary_blob = b"\x0a\x12\x0a\x08aaaaaaaa\x12\x06xxxxxx"  # outer wrap
-        result = AjaxNotificationListener._extract_space_group_info(binary_blob)
-        # First 0x0a (outer): group_hex_id would contain `\x0a\x08aaaaaaaa…`
-        # which fails isprintable() — must skip and try inner 0x0a at index 2.
-        assert result == {"group_id": "aaaaaaaa", "group_name": "xxxxxx"}
+    def test_extract_space_group_info_rejects_long_hex_id_like_space_id(self) -> None:
+        """Regression for #148 1.5.0-beta.8: the extractor used to latch
+        onto the 24-char `space_id` (also a hex string, encoded as field
+        1 string of some unrelated message) and return it as `group_id`,
+        which then failed to match any real Group in
+        `coordinator.spaces[].groups`. Length cap + parent-DisplayGroups
+        parse together reject that path. Reproducer: forge a Group with
+        a 24-char hex `group_hex_id` (looks exactly like a `space_id`)
+        and confirm the extractor refuses it.
+        """
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        display = display_groups_pb2.DisplayGroups(
+            groups=[
+                display_groups_pb2.DisplayGroups.Group(
+                    group_hex_id="68f94162415a39f8b8df2e5d",  # real space_id from #148 capture
+                    group_name="169 WA",
+                )
+            ]
+        )
+        result = AjaxNotificationListener._extract_space_group_info(display.SerializeToString())
+        assert result == {}, "must not surface a 24-char hex string as group_id"
+
+    def test_extract_space_group_info_rejects_non_hex_id(self) -> None:
+        """Ajax `group_hex_id` is always hex chars — letters g-z signal
+        we landed on an unrelated (string, string) pair and must skip."""
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        display = display_groups_pb2.DisplayGroups(
+            groups=[
+                display_groups_pb2.DisplayGroups.Group(group_hex_id="hello", group_name="world")
+            ]
+        )
+        assert AjaxNotificationListener._extract_space_group_info(display.SerializeToString()) == {}
+
+    def test_extract_space_group_info_picks_next_group_when_first_invalid(self) -> None:
+        """If the first Group in a DisplayGroups payload fails sanity
+        (e.g. a long hex_id), the extractor must check the next entry
+        rather than returning empty — defends against any payload that
+        leads with a context Group and follows with the real one."""
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: E501
+            display_groups_pb2,
+        )
+
+        display = display_groups_pb2.DisplayGroups(
+            groups=[
+                display_groups_pb2.DisplayGroups.Group(
+                    group_hex_id="68f94162415a39f8b8df2e5d", group_name="169 WA"
+                ),
+                display_groups_pb2.DisplayGroups.Group(
+                    group_hex_id="00000001", group_name="Out House"
+                ),
+            ]
+        )
+        result = AjaxNotificationListener._extract_space_group_info(display.SerializeToString())
+        assert result == {"group_id": "00000001", "group_name": "Out House"}
 
     @pytest.mark.asyncio
     async def test_on_notification_extracts_notification_id(self) -> None:
