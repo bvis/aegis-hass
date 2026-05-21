@@ -767,26 +767,34 @@ class AjaxNotificationListener:
                 return {"group_id": source.id, "group_name": source.name}
         return {}
 
+    # Ajax `group_hex_id` values observed in real installs are short hex
+    # strings (typically 8 chars like "00000001"). The cap and hex-only
+    # check filter out false matches where the scan happens to land on
+    # an unrelated (string, string) pair — most notably the 24-char
+    # `space_id` followed by some printable field, which is what beta.8's
+    # too-permissive scan picked up in #148.
+    _MAX_GROUP_HEX_ID_LEN = 16
+    _HEX_CHARS = frozenset("0123456789abcdefABCDEF")
+
     @staticmethod
     def _extract_space_group_info(raw: bytes) -> dict[str, Any]:
-        """Extract group identifier from a `DisplayGroups.Group` (#148 fix).
+        """Extract group identifier from `DisplayGroups.groups[0]` (#148).
 
-        Reverse-engineered from a real-install hex capture in `1.5.0-beta.6`:
-        Ajax encodes the group context of `space_group_*` push events inside
-        `additional_data.space_display_groups` (a `DisplayGroups` message),
-        not in the SpaceNotificationSource our previous extractor scanned —
-        so that scan always returned `{}` for group events in production.
-        The inner `DisplayGroups.Group` carries `group_hex_id` (field 1
-        string) and `group_name` (field 2 string).
+        Beta.8 extractor was too permissive: it parsed bytes as
+        `DisplayGroups.Group` directly, so any `(printable_string,
+        printable_string)` pair in the payload could be mistaken for a
+        group — and on a real install it latched onto the 24-char
+        `space_id` instead of the actual 8-char group id.
 
-        Scan strategy: every `0x0a` byte (wire tag for field 1 length-delim,
-        i.e. the start of `group_hex_id`) is a candidate. Try parsing the
-        next 4–80 bytes as `DisplayGroups.Group` and accept the first match
-        with both string fields populated and printable. Other `0x0a` hits
-        either fail to parse or end up with non-printable bytes (e.g. when
-        the position is the OUTER `DisplayGroups.groups` wire tag and the
-        Group bytes are absorbed as a single binary string), which the
-        printable check filters out.
+        Beta.9 tightens two ways:
+          * Parse as the PARENT `DisplayGroups` (not the inner `Group`).
+            That requires the bytes to look like a length-delimited list
+            of Group sub-messages, not just one matched pair.
+          * Sanity-check the resolved `group_hex_id` shape: short
+            (≤ 16 chars) and hex-only. Matches Ajax's actual id format
+            and excludes the `space_id` 24-char hex by length alone.
+
+        Returns the first valid `(group_id, group_name)` found, or `{}`.
         """
         try:
             from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.space.additional.data import (  # noqa: PLC0415, E501
@@ -796,23 +804,36 @@ class AjaxNotificationListener:
             _LOGGER.debug("DisplayGroups proto not available")
             return {}
 
-        group_class = display_groups_pb2.DisplayGroups.Group
+        display_class = display_groups_pb2.DisplayGroups
+        max_id_len = AjaxNotificationListener._MAX_GROUP_HEX_ID_LEN
+        hex_chars = AjaxNotificationListener._HEX_CHARS
+        # Scan for `0x0a` (DisplayGroups.groups wire tag, field 1
+        # length-delim). Window up to 200 bytes per candidate gives enough
+        # room for one Group entry plus the outer length prefix.
         for i in range(len(raw) - 5):
             if raw[i] != 0x0A:
                 continue
-            for end in range(i + 4, min(i + 80, len(raw) + 1)):
+            for end in range(i + 6, min(i + 200, len(raw) + 1)):
                 try:
-                    group = group_class()
-                    group.ParseFromString(raw[i:end])
+                    display = display_class()
+                    display.ParseFromString(raw[i:end])
                 except Exception:
                     continue
-                if not group.group_hex_id or not group.group_name:
+                if not display.groups:
                     continue
-                if not group.group_hex_id.isprintable():
-                    continue
-                if not group.group_name.isprintable():
-                    continue
-                return {"group_id": group.group_hex_id, "group_name": group.group_name}
+                for group in display.groups:
+                    if not group.group_hex_id or not group.group_name:
+                        continue
+                    if not group.group_name.isprintable():
+                        continue
+                    if len(group.group_hex_id) > max_id_len:
+                        continue
+                    if not all(c in hex_chars for c in group.group_hex_id):
+                        continue
+                    return {
+                        "group_id": group.group_hex_id,
+                        "group_name": group.group_name,
+                    }
         return {}
 
     @staticmethod
