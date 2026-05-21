@@ -239,6 +239,52 @@ class TestAsyncUpdateData:
         assert coordinator.last_update_success_time >= first_ts
 
     @pytest.mark.asyncio
+    async def test_update_data_converts_subcall_cancel_to_update_failed(self) -> None:
+        """Regression for #148: when the gRPC stub raises `CancelledError`
+        mid-flight (most common during a reload race), the coordinator
+        used to let it propagate — and `CancelledError` is a
+        `BaseException`, so HA's first-refresh path marked the entry as
+        permanently failed instead of retrying. Convert to `UpdateFailed`
+        so HA's standard retry-with-backoff applies."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(side_effect=asyncio.CancelledError())
+
+        with pytest.raises(UpdateFailed, match="cancelled mid-flight"):
+            await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
+    async def test_update_data_propagates_external_cancellation(self) -> None:
+        """Counter-test: when HA cancels OUR task (shutdown, options
+        listener reload, etc.) the `CancelledError` must propagate so
+        the coroutine actually exits. Eating it would leave dangling
+        coroutines and prevent HA from completing teardown.
+
+        Setup: run `_async_update_data` inside a separate task and
+        cancel that task before the loop runs it. The first await
+        inside the coroutine delivers `CancelledError` while
+        `cancelling()` is non-zero, hitting the re-raise branch.
+        """
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        task = asyncio.create_task(coordinator._async_update_data())
+        task.cancel()  # pre-cancel so cancelling() > 0 when the coro first awaits
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    @pytest.mark.asyncio
     async def test_update_data_does_not_set_timestamp_on_failure(self) -> None:
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True

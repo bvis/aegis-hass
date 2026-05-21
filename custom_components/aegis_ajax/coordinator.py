@@ -436,6 +436,28 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return {"spaces": self.spaces, "devices": self.devices}
         except ConfigEntryAuthFailed:
             raise
+        except asyncio.CancelledError:
+            # A `CancelledError` here typically comes from a sub-call (most
+            # often the gRPC stub) whose channel got closed mid-flight —
+            # e.g. when the user clicks Reload, the previous client's
+            # teardown can race with the new client's first refresh and
+            # the in-flight RPC gets cancelled. `CancelledError` is a
+            # `BaseException`, so the `except Exception` below would
+            # never see it; without this branch it bubbles through
+            # `async_config_entry_first_refresh` and leaves the entry in
+            # a permanent failed state until HA is restarted (#148).
+            #
+            # If OUR task is the one being cancelled (HA shutdown,
+            # reload interrupting us, etc.), we must let the cancellation
+            # propagate — eating it would prevent the coroutine from
+            # ever exiting cleanly. `Task.cancelling()` returns the
+            # pending cancel-request count; non-zero means HA wants us
+            # gone, zero means the cancellation originated below us and
+            # we can surface it as a retryable update failure.
+            current = asyncio.current_task()
+            if current is not None and current.cancelling() > 0:
+                raise
+            raise UpdateFailed("Ajax gRPC call was cancelled mid-flight") from None
         except Exception as err:
             raise UpdateFailed("Error fetching Ajax data") from err
 
