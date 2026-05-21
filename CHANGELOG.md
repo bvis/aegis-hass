@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.10] - 2026-05-21
+
+Reload-resilience bump driven by a side-effect surfaced in #148. When the user clicked **Reload** on the integration, the previous client's teardown could race with the new client's first refresh: the in-flight gRPC call got cancelled mid-flight, surfaced as `CancelledError` (a `BaseException`, not caught by the existing `except Exception` block), bubbled through `async_config_entry_first_refresh`, and left the integration in a **permanently failed** state. Recovery required a full Home Assistant restart.
+
+### Fixed
+- **Mid-flight `CancelledError` during refresh now triggers Home Assistant's standard retry instead of a permanent failure.** `_async_update_data` distinguishes the two cancellation paths: if our own task is being cancelled (`current_task().cancelling() > 0` — HA shutdown, options-listener reload interrupting us), the `CancelledError` re-raises so the coroutine can exit cleanly. If the cancellation came from a sub-call (the gRPC stub aborting on a torn-down channel during reload), we now surface it as `UpdateFailed` so HA retries the setup with backoff and the integration recovers on its own. Real-world impact: clicking Reload no longer leaves the integration unusable until you restart HA.
+
+### Internal
+- Test suite at **1312** unit tests (was 1310 in `1.5.0-beta.9`); coverage 86.17%. Two new tests in `tests/unit/test_coordinator.py::TestAsyncUpdateData`: positive case asserts sub-call `CancelledError` converts to `UpdateFailed`; counter-test asserts an externally-cancelled task re-raises `CancelledError`, run inside a child task so pytest-asyncio's runner doesn't trip on the test task itself being cancelled.
+
 ## [1.5.0-beta.9] - 2026-05-21
 
 Follow-up to `1.5.0-beta.8` on #148. The new DisplayGroups extractor was successfully reaching `event_data`, but on Arsh's real install it was returning the 24-char `space_id` (`68f94162415a39f8b8df2e5d`) as `group_id` instead of the actual 8-char Ajax group identifier (`00000001` / `00000002`). The wrong id never matched any real group in `coordinator.spaces[].groups`, so the per-group alarm panel still didn't update.
