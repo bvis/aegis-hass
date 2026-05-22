@@ -45,6 +45,18 @@ STORAGE_VERSION = 1
 # and refresh paths within this window. See #80.
 NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 
+# Issue #174: when the underlying TCP socket against `mtalk.google.com:5228`
+# (FCM's MCS endpoint) gets reset, Google replays any push that wasn't acked
+# before the disconnect — sometimes hours after Ajax originally sent it. The
+# notif_id dedupe above is bounded to 5 s, so a replay arriving minutes later
+# slips through and fires a stale `desarmada` (or other security event) on
+# the user's phone. The Notification proto carries a `server_timestamp` set
+# by Ajax cloud at dispatch time, so we drop anything older than this window.
+# 120 s is comfortably longer than the worst Ajax→FCM→client latency we've
+# measured (sub-second) but short enough that a replay from any prior session
+# is rejected.
+STALE_PUSH_THRESHOLD_SECONDS = 120.0
+
 
 def _classify_fcm_failure(exc: BaseException) -> str:
     """Return a user-actionable WARNING message for an FCM registration / push-client error.
@@ -296,6 +308,15 @@ class AjaxNotificationListener:
                 encoded_data = data_field.get("ENCODED_DATA")
             elif isinstance(data_field, str):
                 encoded_data = data_field
+
+        # Drop FCM replays of pushes Ajax dispatched in a prior session (#174).
+        # Done before any side effect — photo-URL futures and notif_id dedupe
+        # state must stay untouched by a stale replay. Fail-open: pushes whose
+        # `server_timestamp` we can't recover fall through unchanged so a
+        # parser miss never silences a real event.
+        if encoded_data and self._is_stale_push(encoded_data):
+            return
+
         if encoded_data:
             try:
                 raw = base64.b64decode(encoded_data)
@@ -371,6 +392,53 @@ class AjaxNotificationListener:
                 self._hass.async_create_task,
                 self._coordinator.async_request_refresh(),
             )
+
+    def _is_stale_push(self, encoded_data: str) -> bool:
+        """Return True when an FCM push carries a `Notification.server_timestamp`
+        older than `STALE_PUSH_THRESHOLD_SECONDS`.
+
+        Parses just the top-level `PushNotificationDispatchEvent` to recover
+        the timestamp Ajax stamped at dispatch time. Any decode error, a
+        non-`notification` oneof, or a missing `server_timestamp` returns
+        False — the caller treats the push as fresh so a parser miss never
+        silences a real event (#174 fail-open).
+        """
+        try:
+            from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.service.push_notification_dispatch import (  # noqa: PLC0415, E501
+                event_pb2,
+            )
+        except ImportError:
+            return False
+        try:
+            raw = base64.b64decode(encoded_data)
+        except Exception:
+            return False
+        try:
+            dispatch = event_pb2.PushNotificationDispatchEvent()
+            dispatch.ParseFromString(raw)
+        except Exception:
+            return False
+        if dispatch.WhichOneof("push") != "notification":
+            return False
+        if not dispatch.notification.HasField("server_timestamp"):
+            return False
+        ts = dispatch.notification.server_timestamp
+        # `Timestamp.seconds` + `.nanos` → POSIX seconds. Compare against
+        # `time.time()` (wall clock) — `time.monotonic` would be wrong here
+        # because the FCM timestamp is absolute.
+        push_unix = ts.seconds + ts.nanos / 1_000_000_000
+        age = time.time() - push_unix
+        if age > STALE_PUSH_THRESHOLD_SECONDS:
+            _LOGGER.warning(
+                "Dropping stale FCM push: server_timestamp is %.0fs old "
+                "(threshold %.0fs). Likely an FCM-server replay after a "
+                "reconnect (#174); the integration will resync on the next "
+                "snapshot refresh.",
+                age,
+                STALE_PUSH_THRESHOLD_SECONDS,
+            )
+            return True
+        return False
 
     def _is_duplicate_notification(self, notif_id: str) -> bool:
         """Return True if *notif_id* was seen within the dedupe window.

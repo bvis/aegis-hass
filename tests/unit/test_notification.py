@@ -34,6 +34,28 @@ _REAL_PUSH_ENCODED_DATA = (
 _EXPECTED_NOTIFICATION_ID = "4842536662915600AABB11223344556677889900A1B2C3D40000019D8857D89E"
 
 
+def _restamp_push(encoded: str, *, seconds_ago: float = 0.0) -> str:
+    """Re-serialize an ENCODED_DATA payload with `server_timestamp` set to
+    `now - seconds_ago` so the FCM-replay filter (#174) treats it as fresh
+    in test runs. The original capture is frozen in time; without this
+    helper every push older than `STALE_PUSH_THRESHOLD_SECONDS` (120 s)
+    would be dropped before the assertion under test runs.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from google.protobuf.timestamp_pb2 import Timestamp
+    from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.service.push_notification_dispatch import (  # noqa: E501
+        event_pb2,
+    )
+
+    dispatch = event_pb2.PushNotificationDispatchEvent()
+    dispatch.ParseFromString(base64.b64decode(encoded))
+    ts = Timestamp()
+    ts.FromDatetime(datetime.now(tz=UTC) - timedelta(seconds=seconds_ago))
+    dispatch.notification.server_timestamp.CopyFrom(ts)
+    return base64.b64encode(dispatch.SerializeToString()).decode()
+
+
 class TestNotificationListener:
     def test_init(self) -> None:
         hass = MagicMock()
@@ -355,7 +377,9 @@ class TestNotificationListener:
         listener._notification_id_callbacks["A1B2C3D4"] = future
 
         # Real encoded data containing a 64-char hex notification ID
-        listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "persistent-n1")
+        listener._on_notification(
+            {"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "persistent-n1"
+        )
 
         assert future.done()
         assert future.result() == _EXPECTED_NOTIFICATION_ID
@@ -1283,10 +1307,11 @@ class TestNotificationDedupe:
 
     def test_duplicate_notification_id_skips_second_fire(self) -> None:
         listener, hass, _ = self._make_listener()
+        fresh = _restamp_push(_REAL_PUSH_ENCODED_DATA)
 
         # Two pushes with the same encoded data → same notification_id.
-        listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-1")
-        listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-2")
+        listener._on_notification({"ENCODED_DATA": fresh}, "pid-1")
+        listener._on_notification({"ENCODED_DATA": fresh}, "pid-2")
 
         # First push triggered the refresh; second one short-circuited.
         assert hass.loop.call_soon_threadsafe.call_count == 1
@@ -1295,7 +1320,7 @@ class TestNotificationDedupe:
         listener, hass, _ = self._make_listener()
 
         # First push uses the canonical real payload (notif_id = …D89E).
-        listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-1")
+        listener._on_notification({"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "pid-1")
 
         # Second push has a different 64-char hex notification_id embedded in the
         # raw bytes — extract_notification_id picks the first 64-hex match.
@@ -1311,14 +1336,15 @@ class TestNotificationDedupe:
         )
 
         listener, hass, _ = self._make_listener()
+        fresh = _restamp_push(_REAL_PUSH_ENCODED_DATA)
 
         with patch("custom_components.aegis_ajax.notification.time.monotonic") as monotonic:
             monotonic.return_value = 1000.0
-            listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-1")
+            listener._on_notification({"ENCODED_DATA": fresh}, "pid-1")
 
             # Second push beyond the dedupe window — should fire again.
             monotonic.return_value = 1000.0 + NOTIFICATION_DEDUPE_WINDOW_SECONDS + 0.1
-            listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-2")
+            listener._on_notification({"ENCODED_DATA": fresh}, "pid-2")
 
         assert hass.loop.call_soon_threadsafe.call_count == 2
 
@@ -1344,7 +1370,9 @@ class TestNotificationDedupe:
 
         with patch("custom_components.aegis_ajax.notification.time.monotonic") as monotonic:
             monotonic.return_value = 1000.0
-            listener._on_notification({"ENCODED_DATA": _REAL_PUSH_ENCODED_DATA}, "pid-1")
+            listener._on_notification(
+                {"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "pid-1"
+            )
             assert _EXPECTED_NOTIFICATION_ID in listener._recent_notification_ids
 
             # A later, distinct push prunes the expired entry.
@@ -1357,3 +1385,53 @@ class TestNotificationDedupe:
 
         assert _EXPECTED_NOTIFICATION_ID not in listener._recent_notification_ids
         assert other in listener._recent_notification_ids
+
+
+class TestStalePushFilter:
+    """Issue #174: FCM redelivers pushes that were buffered server-side after
+    a reconnect, sometimes hours later. The Notification proto's
+    `server_timestamp` lets us drop the replay before it fires a stale
+    'desarmada' (or any other) event on the user's phone."""
+
+    def _make_listener(self) -> tuple[AjaxNotificationListener, MagicMock, MagicMock]:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        coordinator = MagicMock()
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator._space_ids = []
+        listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+        return listener, hass, coordinator
+
+    def test_stale_push_is_dropped(self) -> None:
+        """A push whose server_timestamp is older than the threshold must not
+        fire events nor trigger a coordinator refresh — that is precisely the
+        FCM-replay scenario from #174."""
+        listener, hass, _ = self._make_listener()
+        encoded = _restamp_push(_REAL_PUSH_ENCODED_DATA, seconds_ago=600)
+
+        listener._on_notification({"ENCODED_DATA": encoded}, "pid-stale")
+
+        assert hass.loop.call_soon_threadsafe.call_count == 0
+        assert listener._pushes_received == 0
+
+    def test_fresh_push_still_fires(self) -> None:
+        """A push with a current server_timestamp must keep firing normally."""
+        listener, hass, _ = self._make_listener()
+        encoded = _restamp_push(_REAL_PUSH_ENCODED_DATA, seconds_ago=0)
+
+        listener._on_notification({"ENCODED_DATA": encoded}, "pid-fresh")
+
+        assert hass.loop.call_soon_threadsafe.call_count == 1
+        assert listener._pushes_received == 1
+
+    def test_push_without_parseable_timestamp_falls_through(self) -> None:
+        """Fail-open: if the payload doesn't carry a parseable server_timestamp
+        we keep the previous behaviour rather than silently dropping pushes —
+        a parser miss must never silence a real event."""
+        listener, hass, _ = self._make_listener()
+        encoded = base64.b64encode(b"no proto here, just bytes").decode()
+
+        listener._on_notification({"ENCODED_DATA": encoded}, "pid-no-ts")
+
+        assert hass.loop.call_soon_threadsafe.call_count == 1

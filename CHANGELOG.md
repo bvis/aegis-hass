@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1-beta.1] - 2026-05-22
+
+### Fixed
+- **Stale security-event phone push after an FCM reconnect no longer fires** (#174). When the underlying TCP socket against Google's FCM MCS endpoint (`mtalk.google.com:5228`) gets reset — typically piggybacking on the same network blip that resets the gRPC device stream — Google replays any push that Ajax dispatched but never got acked by the previous session, sometimes hours after the original event. The existing `notification_id`-based dedupe is bounded to 5 s (there for Ajax's two-pushes-per-event pattern, #80) so a replay arriving minutes later slipped through and fired the matching `aegis_ajax_event` again, surfacing a phantom `desarmada` on the user's phone. The listener now reads `Notification.server_timestamp` (set by Ajax cloud at dispatch time) on every incoming push and drops anything older than 120 s before touching any side effect, logging the rejection at WARNING with the measured age so the path is visible in HA logs. Fail-open: a payload we can't recover a timestamp from falls through unchanged so a parser miss never silences a real event. The integration resyncs from the next snapshot regardless.
+
 ## [1.5.0] - 2026-05-21
 
 MINOR release. Three independent threads of work converge here: a new "what doorbell got rung / who armed which group / what sensor actually tripped" surface for event-driven automations; the long-missing per-group push routing for spaces with Ajax groups (zones), which used to lag up to an hour after arming a single group from the mobile app; and a regression fix on the CRA-company diagnostic sensor that had silently been returning empty since `1.2.3`. Plus quality-of-life cleanups in setup flow, a new Photo on Demand service, and resilience fixes for the Reload flow.
