@@ -62,6 +62,24 @@ AUTH_TIMEOUT = 20
 MAX_CONSECUTIVE_READ_TIMEOUTS = 3
 
 
+def _format_non_hub_kv_summary(
+    non_hub: list[tuple[bytes, dict[int, bytes]]],
+) -> str:
+    """Render a STATUS/SETTINGS body or per-device push as a one-line DEBUG
+    string with the raw hex value of every sub-key.
+
+    Format: `DEVICE_ID=[0x37=00112233,0x73=deadbeef…]`. Before #179 the line
+    only showed sub-key sizes; mapping an unknown device family then
+    required a second user round-trip with bespoke tracing. Logging the
+    values directly lets a single capture under a known load pin every
+    reading to its sub-key.
+    """
+    return ", ".join(
+        f"{did.hex().upper()}=[" + ",".join(f"0x{k:02x}={kvs[k].hex()}" for k in sorted(kvs)) + "]"
+        for did, kvs in non_hub
+    )
+
+
 class HtsConnectionError(Exception):
     """Raised when the TCP/TLS connection fails."""
 
@@ -608,17 +626,11 @@ class HtsClient:
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 body_label = "SETTINGS_BODY" if sub_key == 5 else "STATUS_BODY"
                 if non_hub:
-                    summary = ", ".join(
-                        f"{did.hex().upper()}=["
-                        + ",".join(f"0x{k:02x}({len(kvs[k])}b)" for k in sorted(kvs))
-                        + "]"
-                        for did, kvs in non_hub
-                    )
                     _LOGGER.debug(
                         "Hub %s: %s non-hub devices (#123 probe): %s",
                         hub_id,
                         body_label,
-                        summary,
+                        _format_non_hub_kv_summary(non_hub),
                     )
             if kv:
                 _LOGGER.debug(
@@ -692,17 +704,11 @@ class HtsClient:
                         )
             if _LOGGER.isEnabledFor(logging.DEBUG) and non_hub:
                 update_label = "STATUS_UPDATE" if sub_key == 11 else "SETTINGS_UPDATE"
-                summary = ", ".join(
-                    f"{did.hex().upper()}=["
-                    + ",".join(f"0x{k:02x}({len(kvs[k])}b)" for k in sorted(kvs))
-                    + "]"
-                    for did, kvs in non_hub
-                )
                 _LOGGER.debug(
                     "Hub %s: %s push (#123): %s",
                     hub_id,
                     update_label,
-                    summary,
+                    _format_non_hub_kv_summary(non_hub),
                 )
             return
 

@@ -627,6 +627,54 @@ class TestHandleUpdateNonHubProbe:
         assert "0x43" in text
 
     @pytest.mark.asyncio
+    async def test_non_hub_device_subkeys_log_includes_hex_values(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#179: the per-device DEBUG probe must include the raw hex VALUE of
+        each sub-key, not just its size. Without values, mapping an unknown
+        device family (Outlet Type E etc.) requires another round-trip with
+        the user; with values, a single capture under a known load pins
+        every reading to its sub-key."""
+        import logging
+
+        caplog.set_level(logging.DEBUG, logger="custom_components.aegis_ajax.api.hts.client")
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x09",
+                    bytes.fromhex("12345678"),
+                    b"\x48",
+                    b"\x02",
+                    bytes.fromhex("30537E4C"),
+                    b"\x37",
+                    b"\x00\x11\x22\x33",  # candidate energy/power 4-byte
+                    b"\x73",
+                    b"\xde\xad\xbe\xef\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        probe_lines = [r for r in caplog.records if "#123 probe" in r.getMessage()]
+        assert probe_lines, "expected one #123 probe DEBUG line"
+        text = probe_lines[0].getMessage()
+        # Hex value of 0x37 must surface so we can correlate it with a
+        # known load on the Outlet (#179).
+        assert "0x37=00112233" in text
+        # Long blob value must surface too — that's where energy
+        # accumulators live on the Outlet.
+        assert "0x73=deadbeef0102030405060708090a0b0c" in text
+
+    @pytest.mark.asyncio
     async def test_on_device_kv_fires_once_per_non_hub_device(self) -> None:
         client = _make_client()
         client._hubs = [MagicMock(hub_id="12345678")]

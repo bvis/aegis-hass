@@ -172,9 +172,18 @@ ELECTRICAL_DEVICE_TYPES: frozenset[str] = frozenset(
         "socket",
         "socket_b",
         "socket_g",
-        "socket_outlet_type_e",
-        "socket_outlet_type_f",
         "socket_type_g_plus",
+        # `socket_outlet_type_e` and `socket_outlet_type_f` are deliberately
+        # excluded (#179). Their STATUS_BODY uses a different sub-key
+        # layout: `0x35` is a 1-byte field (not the 2-byte signed-short
+        # voltage the WallSwitch family ships), `0x42`/`0x43` are absent,
+        # and the actual readings live in `0x37(4b)`, `0x73(16b)`,
+        # `0x74(16b)` which we haven't load-calibrated yet. Until a
+        # capture under known loads identifies which key carries voltage
+        # / current / power / energy, parsing them off the WallSwitch
+        # constants produces nonsense (0 V + a fake ~55 W from the
+        # `current × nominal-voltage` fallback). Re-add the moment we
+        # have a verified mapping.
     }
 )
 

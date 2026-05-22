@@ -454,6 +454,10 @@ class TestParseDeviceReadings:
         # Sanity-check: every type the switch platform treats as a
         # power-controllable relay that *should* emit readings is in
         # ELECTRICAL_DEVICE_TYPES.
+        # `socket_outlet_type_e` and `socket_outlet_type_f` are deliberately
+        # absent — their actual electrical sub-key map is unknown (#179) so
+        # the parser must not produce numbers off the WallSwitch mapping.
+        # Re-add once a load-calibrated capture lands.
         for dt in (
             "wall_switch",
             "relay",
@@ -461,8 +465,25 @@ class TestParseDeviceReadings:
             "socket",
             "socket_b",
             "socket_g",
-            "socket_outlet_type_e",
-            "socket_outlet_type_f",
             "socket_type_g_plus",
         ):
             assert dt in ELECTRICAL_DEVICE_TYPES, dt
+
+    def test_socket_outlet_type_e_returns_none_pending_mapping(self) -> None:
+        """Outlet Type E uses a different electrical sub-key layout than the
+        WallSwitch family (#179): `0x35` is 1 byte (not 2-byte voltage),
+        `0x42`/`0x43` are absent, and the real readings live in `0x37(4b)`,
+        `0x73(16b)`, `0x74(16b)` which we haven't load-calibrated yet.
+        Until then `parse_device_readings` returns None so the four
+        electrical sensors render `unknown` instead of garbage values."""
+        kv_outlet_shape = {
+            0x35: b"\x00",  # 1-byte field misread as voltage before #179
+            0x37: b"\x00\x11\x22\x33",
+            0x73: b"\x00" * 16,
+            0x74: b"\x00" * 16,
+        }
+        assert parse_device_readings("socket_outlet_type_e", kv_outlet_shape) is None
+
+    def test_socket_outlet_type_f_returns_none_pending_mapping(self) -> None:
+        """Symmetric to type E: same EU-socket family, same unknown layout."""
+        assert parse_device_readings("socket_outlet_type_f", {0x35: b"\x00"}) is None
