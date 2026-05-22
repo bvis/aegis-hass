@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2-beta.1] - 2026-05-22
+
+### Fixed
+- **MotionCam Video Doorbell no longer appears twice in the device list** (#173, reported by @brunovdw68). On some Ajax cloud builds (`ajax_pro` PRO 2.47 confirmed) the same physical doorbell is sent in the `StreamLightDevices` snapshot under TWO `LightDevice` oneofs simultaneously — once as a `hub_device` with `object_type=motion_cam_video_doorbell` (Jeweller-side ghost, single status, `malfunctions=1`) and once as a `video_edge_channel` with `video_edge_type=DOORBELL` (the canonical surface, full sensor set, MAC-style id). The hub_device twin's spurious `malfunctions=1` bubbled up to the space-level malfunction counter — the "something wrong with my space" symptom Bruno's logs showed — and surfaced a duplicate device card in HA with the warning indicator. Snapshot consolidation now drops any `motion_cam_video_*` hub_device whose name matches (case-insensitive) a `video_edge_*` sibling in the same snapshot. The unbalanced case from #119 (only the hub_device branch present, no video_edge_channel) is unchanged so that setup keeps its doorbell. Existing HA device cards for the ghost will become orphaned and can be removed via the Devices UI.
+
 ## [1.5.1-beta.1] - 2026-05-22
 
 ### Fixed
