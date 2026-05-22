@@ -675,6 +675,62 @@ class TestHandleUpdateNonHubProbe:
         assert "0x73=deadbeef0102030405060708090a0b0c" in text
 
     @pytest.mark.asyncio
+    async def test_text_looking_values_are_redacted(self, caplog: pytest.LogCaptureFixture) -> None:
+        """#179 follow-up: PII (device names, user emails, phone numbers)
+        live in SETTINGS sub-keys as raw text bytes. When a user shares a
+        DEBUG log publicly to help debug an unmapped device family, those
+        values must NOT surface as easily-decodable hex. Replace anything
+        that looks like ASCII text with a length-preserving placeholder
+        so the byte shape stays visible but the content does not."""
+        import logging
+
+        caplog.set_level(logging.DEBUG, logger="custom_components.aegis_ajax.api.hts.client")
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x05",  # sub-key 5 = SETTINGS_BODY
+                    bytes.fromhex("12345678"),
+                    b"\x48",
+                    b"\x02",
+                    bytes.fromhex("AABBCCDD"),
+                    b"\x09",
+                    b"FIN HAB",  # 7-byte device name = text → redact
+                    b"\x02",
+                    b"alice@example.com",  # email = text → redact
+                    b"\x37",
+                    b"\x00\x11\x22\x33",  # numeric, 0x00 NUL not printable → keep hex
+                    b"\x73",
+                    b"\x00" * 16,  # all-zero counter → keep hex
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        probe_lines = [r for r in caplog.records if "#123 probe" in r.getMessage()]
+        assert probe_lines, "expected one #123 probe DEBUG line"
+        text = probe_lines[0].getMessage()
+        # Text values redacted, length preserved.
+        assert "0x09=<text:7b>" in text
+        assert "0x02=<text:17b>" in text
+        # And the raw text bytes are NOT in the log under any encoding.
+        assert "FIN HAB" not in text
+        assert "alice" not in text
+        assert b"FIN HAB".hex() not in text
+        assert b"alice@example.com".hex() not in text
+        # Numeric / blob values still visible (these are the #179 readings).
+        assert "0x37=00112233" in text
+        assert "0x73=00000000000000000000000000000000" in text
+
+    @pytest.mark.asyncio
     async def test_on_device_kv_fires_once_per_non_hub_device(self) -> None:
         client = _make_client()
         client._hubs = [MagicMock(hub_id="12345678")]
