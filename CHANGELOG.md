@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.2] - 2026-05-23
+
+### Internal
+- **HTS DEBUG probe redacts ASCII-text sub-keys** (#179 follow-up). The value-logging introduced in `1.5.3-beta.1` made device names (`0x09`), user emails / phone numbers (`0x01`–`0x03` on user records) trivially decodable hex in the log line — risky the moment a user pastes a DEBUG capture into a public issue. Values whose bytes are ≥3 long and all printable ASCII now render as `0x09=<text:8b>` (length preserved, content masked); numeric readings (electrical counters, flag bytes) keep their full hex value because they always contain at least one non-printable byte. Net effect: a bug report can be pasted as-is without leaking the user's device names or contact info, but every electrical sub-key needed for #179 mapping stays visible.
+
 ## [1.5.3-beta.1] - 2026-05-23
 
 ### Fixed

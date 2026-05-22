@@ -62,20 +62,46 @@ AUTH_TIMEOUT = 20
 MAX_CONSECUTIVE_READ_TIMEOUTS = 3
 
 
+def _redact_if_text(value: bytes) -> str:
+    """Return `value.hex()` unless the bytes look like printable ASCII text,
+    in which case return a length-preserving redacted marker.
+
+    SETTINGS sub-keys carry PII as raw text: device names (`0x09`), user
+    names / emails / phones (`0x01`/`0x02`/`0x03` on user records). The
+    previous size-only DEBUG format (`0x09(8b)`) hid that content
+    incidentally; the post-#179 value format would surface it as trivially
+    decodable hex (`0x09=46494e20484142` = "FIN HAB") and end up in
+    publicly-pasted bug reports. Detecting text by "all bytes printable
+    ASCII, length ≥ 3" replaces values like that with `<text:8b>` so the
+    byte-shape information remains useful for protocol analysis while
+    the contents stay private. Numeric readings (electrical counters,
+    flag bytes) always contain at least one non-printable byte (0x00
+    being the most common) so they keep their hex value — exactly what
+    we need to map the unknown Outlet sub-keys.
+    """
+    if len(value) >= 3 and all(0x20 <= b <= 0x7E for b in value):
+        return f"<text:{len(value)}b>"
+    return value.hex()
+
+
 def _format_non_hub_kv_summary(
     non_hub: list[tuple[bytes, dict[int, bytes]]],
 ) -> str:
     """Render a STATUS/SETTINGS body or per-device push as a one-line DEBUG
-    string with the raw hex value of every sub-key.
+    string with the raw hex value of every sub-key (PII redacted, see
+    `_redact_if_text`).
 
-    Format: `DEVICE_ID=[0x37=00112233,0x73=deadbeef…]`. Before #179 the line
-    only showed sub-key sizes; mapping an unknown device family then
-    required a second user round-trip with bespoke tracing. Logging the
-    values directly lets a single capture under a known load pin every
-    reading to its sub-key.
+    Format: `DEVICE_ID=[0x37=00112233,0x09=<text:8b>,0x73=deadbeef…]`.
+    Before #179 the line only showed sub-key sizes; mapping an unknown
+    device family then required a second user round-trip with bespoke
+    tracing. Logging the values directly lets a single capture under a
+    known load pin every reading to its sub-key without leaking the
+    user's device names / contact info.
     """
     return ", ".join(
-        f"{did.hex().upper()}=[" + ",".join(f"0x{k:02x}={kvs[k].hex()}" for k in sorted(kvs)) + "]"
+        f"{did.hex().upper()}=["
+        + ",".join(f"0x{k:02x}={_redact_if_text(kvs[k])}" for k in sorted(kvs))
+        + "]"
         for did, kvs in non_hub
     )
 
