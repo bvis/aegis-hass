@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.1] - 2026-05-23
+
+### Fixed
+- **Outlet Type E / Type F sockets no longer surface garbage voltage / current / power / energy readings** (#179, reported by @SaetanSaDiablo). Their STATUS body uses a different electrical sub-key layout than the WallSwitch family — `0x35` is a 1-byte field (not the 2-byte signed-short voltage), `0x42` and `0x43` are absent, and the real readings live in `0x37(4b)`, `0x73(16b)`, `0x74(16b)` which we haven't load-calibrated yet. Parsing them off the WallSwitch constants produced a constant 0 V plus a fabricated ~55 W from the `current × nominal-voltage` derived-power fallback. Until a calibrated capture lands, the four electrical sensors render `unknown` instead of fake values. The switch entity (turn outlet on/off) is unaffected.
+
+### Internal
+- **HTS DEBUG probe now logs the raw hex value of every per-device sub-key**, not just its size. The previous `0x37(4b)` format made mapping an unfamiliar device family a guessing game; the new `0x37=00112233` format lets one capture under a known load pin every reading to its sub-key. Default-level installs still pay nothing — the line only renders at DEBUG.
+
 ## [1.5.2-beta.1] - 2026-05-22
 
 ### Fixed
