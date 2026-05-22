@@ -436,6 +436,52 @@ class DevicesApi:
         _LOGGER.debug("Skipping unsupported device type: %s", device_kind)
         return None
 
+    # MotionCam Video Doorbell / Indoor / Base hardware can arrive in a
+    # snapshot under TWO LightDevice oneofs simultaneously — a Jeweller-side
+    # `hub_device` with `object_type=motion_cam_video_*` and a `video_edge_
+    # channel` with `video_edge_type=DOORBELL|INDOOR|...`. The hub_device
+    # twin carries a spurious `malfunctions=1` that bubbles up to the
+    # space-level counter and shows the user a "problem" indicator on the
+    # device card. The video_edge_channel side is the richer, canonical
+    # representation. When both arrive in the same snapshot we drop the
+    # hub_device twin; when only the hub_device arrives (Permudious's setup
+    # in #119) we leave it alone so the doorbell still appears in HA. See
+    # `_dedupe_video_doorbells` below.
+    _MOTION_CAM_VIDEO_HUB_PREFIX = "motion_cam_video_"
+    _VIDEO_EDGE_PREFIX = "video_edge_"
+
+    @staticmethod
+    def _dedupe_video_doorbells(devices: list[Device]) -> list[Device]:
+        """Drop `motion_cam_video_*` hub_device twins that have a
+        `video_edge_*` sibling with a matching name in the same snapshot.
+
+        Name match is case-insensitive (Ajax sometimes capitalises the same
+        product differently on the two oneofs). Names are the only stable
+        discriminator across the two LightDevice cases — the IDs are
+        unrelated (Jeweller short id vs MAC-style `aa:bb:cc:dd:ee:ff-0`)
+        and we don't have a serial-number bridge between them. See #173.
+        """
+        video_edge_names = {
+            d.name.casefold()
+            for d in devices
+            if d.device_type.startswith(DevicesApi._VIDEO_EDGE_PREFIX)
+        }
+        result: list[Device] = []
+        for d in devices:
+            if (
+                d.device_type.startswith(DevicesApi._MOTION_CAM_VIDEO_HUB_PREFIX)
+                and d.name.casefold() in video_edge_names
+            ):
+                _LOGGER.debug(
+                    "Dropping duplicate hub_device twin %s (%s) — same name "
+                    "as a video_edge sibling in this snapshot (#173)",
+                    d.id,
+                    d.device_type,
+                )
+                continue
+            result.append(d)
+        return result
+
     @staticmethod
     def _parse_hub_device(hub_dev: Any) -> Device | None:  # noqa: ANN401
         common = hub_dev.common_device
@@ -529,7 +575,7 @@ class DevicesApi:
                 _LOGGER.error("Device stream failed: %s", msg.failure)
                 break
 
-        return devices
+        return self._dedupe_video_doorbells(devices)
 
     def _handle_update(
         self,
@@ -675,7 +721,7 @@ class DevicesApi:
                                         continue
                                     if device is not None:
                                         devices.append(device)
-                                on_devices_snapshot(devices)
+                                on_devices_snapshot(self._dedupe_video_doorbells(devices))
                                 # Reset backoff after successful snapshot
                                 backoff = 5.0
                             elif which == "updates":

@@ -807,6 +807,87 @@ class TestStatusParser:
         assert result.get("nfc_enabled") is False
 
 
+class TestDeduplicateVideoDoorbells:
+    """Issue #173: Ajax cloud delivers some MotionCam Video Doorbell hardware
+    as BOTH a `hub_device` (`motion_cam_video_doorbell` ObjectType) AND a
+    `video_edge_channel` (`video_edge_doorbell` About.Type) in the same
+    snapshot. The `video_edge_channel` branch is the richer one (wifi_signal,
+    channel id, no malfunctions noise) and is the canonical surface; the
+    `hub_device` ghost shows up as a duplicate HA device card carrying a
+    spurious `malfunctions=1` that bubbles up to the space-level malfunction
+    counter. Drop the hub_device twin when its `video_edge_*` sibling is in
+    the same snapshot. Permudious's setup (#119) — only the hub_device
+    branch present — is unchanged."""
+
+    @staticmethod
+    def _make(
+        device_id: str,
+        name: str,
+        device_type: str,
+        *,
+        malfunctions: int = 0,
+    ) -> Device:
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name=name,
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=malfunctions,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+
+    def test_drops_hub_device_when_video_edge_twin_present(self) -> None:
+        """Same-name pair → hub_device representation gets dropped."""
+        twin_video_edge = self._make("9c756e2bca39-0", "Deurbel", "video_edge_doorbell")
+        twin_hub_device = self._make(
+            "310A8DF4", "Deurbel", "motion_cam_video_doorbell", malfunctions=1
+        )
+        deduped = DevicesApi._dedupe_video_doorbells([twin_video_edge, twin_hub_device])
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+
+    def test_keeps_hub_device_when_no_video_edge_present(self) -> None:
+        """Permudious's case: only the hub_device representation arrives — keep it.
+        Removing it would make the doorbell disappear from HA entirely (#119)."""
+        only_hub_device = self._make("310A8DF4", "Deurbel", "motion_cam_video_doorbell")
+        deduped = DevicesApi._dedupe_video_doorbells([only_hub_device])
+        assert [d.id for d in deduped] == ["310A8DF4"]
+
+    def test_keeps_video_edge_when_no_hub_device_present(self) -> None:
+        only_video_edge = self._make("9c756e2bca39-0", "Deurbel", "video_edge_doorbell")
+        deduped = DevicesApi._dedupe_video_doorbells([only_video_edge])
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+
+    def test_different_names_keep_both(self) -> None:
+        """A standalone hub_device with a different name is a different
+        physical product — never dedupe across names."""
+        hallway = self._make("9c756e2bca39-0", "Hallway", "video_edge_doorbell")
+        garage = self._make("310A8DF4", "Garage", "motion_cam_video_doorbell")
+        deduped = DevicesApi._dedupe_video_doorbells([hallway, garage])
+        assert {d.id for d in deduped} == {"9c756e2bca39-0", "310A8DF4"}
+
+    def test_name_match_is_case_insensitive(self) -> None:
+        """Ajax sometimes stores the same product with differing case across
+        the two oneofs (`Deurbel` vs `deurbel`). Treat them as the same."""
+        video = self._make("9c756e2bca39-0", "Deurbel", "video_edge_doorbell")
+        hub = self._make("310A8DF4", "deurbel", "motion_cam_video_doorbell")
+        deduped = DevicesApi._dedupe_video_doorbells([video, hub])
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+
+    def test_indoor_and_base_siblings_also_deduped(self) -> None:
+        """`motion_cam_video_indoor` and `motion_cam_video_base` are the
+        other two members of the streaming-camera family (#121); they also
+        appear on the video_edge_channel side as `video_edge_indoor` etc."""
+        video_indoor = self._make("9c-ind-0", "Salon Cam", "video_edge_indoor")
+        hub_indoor = self._make("31AABB01", "Salon Cam", "motion_cam_video_indoor")
+        deduped = DevicesApi._dedupe_video_doorbells([video_indoor, hub_indoor])
+        assert [d.id for d in deduped] == ["9c-ind-0"]
+
+
 class TestDevicesApiInit:
     def test_init(self) -> None:
         client = MagicMock()
