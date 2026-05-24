@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.7] - 2026-05-24
+
+### Fixed
+- **`fcm_app_id` shape validator no longer false-positives against the official Ajax Play Store APK** (#182 follow-up, reported by @zwagerzaken on `1.5.3-beta.5`). The pre-flight check added in `1.5.3-beta.4` rejected `fcm_app_id` values whose hex tail was outside a 30..64-char range, but that range was inferred from a single data point and isn't part of Firebase's actual spec — Firebase's own example in [the init-options troubleshooting guide](https://firebase.google.com/support/guides/init-options) is `1:1234567890:android:321abc456def7890` (a 16-char tail), and the iOS SDK's [historical validator](https://github.com/firebase/firebase-ios-sdk/pull/2529) used `^\d+:ios:[a-f0-9]+$` with no length constraint. The current Ajax build ships a 16-char hex tail and was getting blocked from registering with the `fcm_app_id hash chunk is 16 chars; expected ~40` Repair card. The validator now mirrors Firebase: shape `1:<digits>:android:<hex>` with `[0-9a-fA-F]+` on the tail (any length ≥ 1 char), `sender_id` matches the digit chunk byte-for-byte, `api_key` matches `AIza` + 35 chars (Google's standard API key format), `project_id` non-empty. The extreme paste-truncation cases (zero-char tail, or a tail with non-hex characters) are still caught and surface a Repair naming `fcm_app_id`; subtler truncations that leave a 1+ char hex tail now fall through to Google's 403 like before #182 — the right trade-off given that false-positives block legit users entirely.
+
 ## [1.5.3-beta.6] - 2026-05-24
 
 ### Internal

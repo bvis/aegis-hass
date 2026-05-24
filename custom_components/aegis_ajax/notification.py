@@ -60,15 +60,16 @@ NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 STALE_PUSH_THRESHOLD_SECONDS = 120.0
 
 
+# Shape regex mirrors Firebase's own iOS-SDK validator (`^\\d+:ios:[a-f0-9]+$`,
+# https://github.com/firebase/firebase-ios-sdk/pull/2529): one-or-more hex
+# chars on the tail with NO length constraint. Firebase docs canonical example
+# is `1:1234567890:android:321abc456def7890` (a 16-char tail), and real Ajax
+# co-branded builds ship the same length — earlier shipping `_validate_fcm_shape`
+# enforced a 30..64-char range that false-positived against the official Ajax
+# Play Store APK (#182 follow-up, @zwagerzaken). We accept both upper- and
+# lower-case hex to be lenient against transcripts that uppercase content.
 _FCM_APP_ID_RE = re.compile(r"^1:(\d+):android:([0-9a-fA-F]+)$")
 _FCM_API_KEY_RE = re.compile(r"^AIza[0-9A-Za-z_-]{35}$")
-# Firebase emits Android app_ids whose hash tail is 40 hex characters. We
-# accept anything in [30, 64] to leave a paranoia-margin for future Firebase
-# format tweaks while still catching the half-pasted values that cause
-# `androidPackage: <empty>` 403s server-side. Tail shorter than this is the
-# truncation pattern observed in #155 and #182.
-_FCM_APP_ID_HASH_MIN = 30
-_FCM_APP_ID_HASH_MAX = 64
 
 
 def _validate_fcm_shape(
@@ -86,6 +87,14 @@ def _validate_fcm_shape(
     / `androidPackage: <empty>` from Google — accurate but unactionable,
     because the API key isn't actually the problem (#155, #182).
 
+    Validation rules mirror Firebase's own client-side checks; we don't
+    add tighter constraints because doing so false-positived against the
+    real Ajax Play Store APK in 1.5.3-beta.4 (#182 follow-up). What we
+    keep: shape (`1:<digits>:android:<hex>` for app_id, `AIza` + 35 for
+    api_key), digit-chunk consistency between sender_id and app_id, and
+    a non-empty project_id. What we dropped: a hash-length range, which
+    Firebase itself doesn't enforce.
+
     Returns a short English description of the first problem found
     (suitable for a Repair card `{problem}` placeholder), or `None`
     when every shape is coherent. We surface one problem at a time so
@@ -98,15 +107,7 @@ def _validate_fcm_shape(
     app_id_match = _FCM_APP_ID_RE.match(fcm_app_id)
     if app_id_match is None:
         return 'fcm_app_id does not match the expected shape "1:<digits>:android:<hex>"'
-    app_id_sender, app_id_hash = app_id_match.group(1), app_id_match.group(2)
-    if len(app_id_hash) < _FCM_APP_ID_HASH_MIN:
-        return (
-            f"fcm_app_id hash chunk is {len(app_id_hash)} chars; expected ~40 (truncated on paste?)"
-        )
-    if len(app_id_hash) > _FCM_APP_ID_HASH_MAX:
-        return (
-            f"fcm_app_id hash chunk is {len(app_id_hash)} chars; expected ~40 (extra characters?)"
-        )
+    app_id_sender = app_id_match.group(1)
 
     if not _FCM_API_KEY_RE.match(fcm_api_key):
         return (

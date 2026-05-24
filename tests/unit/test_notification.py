@@ -516,21 +516,40 @@ class TestValidateFcmShape:
         assert problem is not None
         assert "fcm_app_id" in problem
 
-    def test_app_id_truncated_hex_tail_is_rejected(self) -> None:
-        # ~half the canonical hash length — the user's paste was cut.
-        problem = _validate_fcm_shape(
-            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:android:" + "a" * 18},
+    def test_app_id_canonical_16_char_hash_passes(self) -> None:
+        # Firebase docs example is `1:1234567890:android:321abc456def7890`
+        # — a 16-char hex tail. Real Ajax Play Store APK ships the same
+        # length. An earlier version of this validator enforced a 30..64
+        # char range and false-positived against the official Ajax APK
+        # (#182 follow-up, @zwagerzaken). We mirror Firebase's own iOS
+        # SDK validator (`^\\d+:ios:[a-f0-9]+$` — no length constraint;
+        # firebase-ios-sdk PR #2529).
+        assert (
+            _validate_fcm_shape(
+                **{
+                    **_VALID_FCM_SHAPES,
+                    "fcm_app_id": "1:991608156148:android:1be5b6c08d8fc6d7",
+                }
+            )
+            is None
         )
-        assert problem is not None
-        assert "fcm_app_id" in problem
-        # The hint should name the truncated chunk so the next-action
-        # is "re-paste the app_id", not "check the api_key".
-        lower = problem.lower()
-        assert "hash" in lower or "truncat" in lower or "short" in lower
 
     def test_app_id_non_hex_tail_is_rejected(self) -> None:
         problem = _validate_fcm_shape(
             **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:android:" + "G" * 40},
+        )
+        assert problem is not None
+        assert "fcm_app_id" in problem
+
+    def test_app_id_empty_hex_tail_is_rejected(self) -> None:
+        # The regex's `+` quantifier rejects a zero-char tail — the most
+        # extreme paste truncation (where the user clipped right after
+        # the `:android:` separator). Any other length ≥ 1 hex char
+        # passes shape validation by design (Firebase itself doesn't
+        # enforce a length range); paste truncations that leave 1+ hex
+        # chars still fall through to Google's 403 like before #182.
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:android:"},
         )
         assert problem is not None
         assert "fcm_app_id" in problem
