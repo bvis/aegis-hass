@@ -181,6 +181,26 @@
             "title": "Notifications push desactivees - identifiants FCM rejetes",
             "description": "L'enregistrement Firebase Cloud Messaging a echoue pour ce compte. Les valeurs FCM Project ID / App ID / API Key / Sender ID configurees ne correspondent probablement pas a votre application Ajax co-brandee, ou la cle API a ete revoquee. Les fonctions dependantes du push (etat instantane d'armement/desarmement, entite security_event, URLs de photos de MotionCam) basculent vers un polling plus lent jusqu'a correction. Ouvrez le menu Configurer de l'integration pour ressaisir les identifiants FCM - voir la section 'How to obtain FCM credentials' du README."
         },
+        "fcm_credentials_malformed": {
+            "title": "Notifications push desactivees — identifiants FCM mal formes ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Reparer les identifiants FCM d'Aegis",
+                        "description": "Aegis a detecte un probleme structurel dans les identifiants FCM configures avant de contacter Google : {problem}. Les quatre valeurs doivent provenir du meme projet Firebase. Re-extrais-les de ton application Ajax co-branded selon la section 'Where the values live' du README, puis ressaisis les quatre ci-dessous. L'integration se rechargera, la verification sera relancee et le Repair se fermera des que les valeurs seront coherentes.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Le compte Aegis pour lequel ce Repair a ete leve n'est plus configure. Rien a reparer."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Notifications push non configurees — evenements temps reel desactives",
             "fix_flow": {

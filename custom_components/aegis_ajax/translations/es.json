@@ -193,6 +193,26 @@
                 }
             }
         },
+        "fcm_credentials_malformed": {
+            "title": "Notificaciones push desactivadas: credenciales FCM mal formadas ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Reparar credenciales FCM de Aegis",
+                        "description": "Aegis ha detectado un problema estructural en las credenciales FCM configuradas antes de contactar con Google: {problem}. Los cuatro valores deben venir del mismo proyecto Firebase. Vuelve a extraerlos de tu app Ajax co-branded segun la seccion 'Where the values live' del README y reintroduce los cuatro abajo. La integracion se recargara, la comprobacion se ejecutara de nuevo y el Repair se cerrara cuando los valores sean coherentes.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "La cuenta de Aegis para la que se levanto este Repair ya no esta configurada. No hay nada que reparar."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Notificaciones push sin configurar: eventos en tiempo real desactivados",
             "fix_flow": {

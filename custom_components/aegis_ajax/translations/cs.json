@@ -181,6 +181,26 @@
             "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",
             "description": "Registrace Firebase Cloud Messaging selhala pro tento ucet. Konfigurovane hodnoty FCM Project ID / App ID / API Key / Sender ID pravdepodobne neodpovidaji vasi co-brandove aplikaci Ajax, nebo byl API klic zneplatnen. Funkce zavisle na pushi (okamzity stav armed/disarmed, entita security_event, URL fotek z MotionCam) prejdou na pomalejsi polling, dokud to nenapravite. Otevrete nabidku Konfigurovat integrace a zadejte znovu prihlasovaci udaje FCM - viz sekce 'How to obtain FCM credentials' v README."
         },
+        "fcm_credentials_malformed": {
+            "title": "Push oznameni vypnuta — udaje FCM jsou poskozene ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Oprava udaju FCM pro Aegis",
+                        "description": "Aegis zjistil strukturalni problem v nakonfigurovanych udajich FCM jeste pred kontaktem na Google: {problem}. Vsechny ctyri hodnoty musi pochazet ze stejneho projektu Firebase. Znovu je extrahuj ze sve co-branded Ajax aplikace podle sekce 'Where the values live' v README a opet zadej vsechny ctyri nize. Integrace se znovu nacte, kontrola se zopakuje a Repair se uzavre, jakmile budou hodnoty konzistentni.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Ucet Aegis, pro ktery byl tento Repair vytvoren, jiz neni nakonfigurovan. Neni co opravovat."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Push notifikace nejsou nakonfigurovany — udalosti v realnem case zakazany",
             "fix_flow": {

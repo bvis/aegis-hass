@@ -193,6 +193,26 @@
                 }
             }
         },
+        "fcm_credentials_malformed": {
+            "title": "Push notifications disabled — FCM credentials malformed ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Fix Aegis FCM credentials",
+                        "description": "Aegis caught a structural problem with the configured FCM credentials before contacting Google: {problem}. The four values must come from the same Firebase project — re-extract them from your co-branded Ajax app per the README's 'Where the values live' section, then re-enter all four below. The integration will reload, the shape check will re-run, and the Repair clears once the values are coherent.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "The Aegis account this Repair was raised for is no longer configured. Nothing to fix."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Push notifications not configured — real-time events disabled",
             "fix_flow": {

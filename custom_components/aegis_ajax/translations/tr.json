@@ -181,6 +181,26 @@
             "title": "Push bildirimleri devre disi - FCM kimlik bilgileri reddedildi",
             "description": "Bu hesap icin Firebase Cloud Messaging kaydi basarisiz oldu. Yapilandirilmis FCM Project ID / App ID / API Key / Sender ID degerleri buyuk olasilikla co-branded Ajax uygulamaniza karsilik gelmiyor veya API anahtari iptal edilmis. Push'a bagimli ozellikler (anlik armed/disarmed durumu, security_event varligi, MotionCam'den foto URL'leri) bu duzeltilene kadar daha yavas polling'e dusecektir. FCM kimlik bilgilerini yeniden girmek icin entegrasyonun Yapilandir menusunu acin - README'deki 'How to obtain FCM credentials' bolumune bakin."
         },
+        "fcm_credentials_malformed": {
+            "title": "Push bildirimleri kapatildi — FCM kimlik bilgileri bozuk ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Aegis FCM kimlik bilgilerini onar",
+                        "description": "Aegis, Google ile iletisime gecmeden once yapilandirilmis FCM kimlik bilgilerinde yapisal bir sorun tespit etti: {problem}. Dort degerin de ayni Firebase projesinden gelmesi gerekir. README'deki 'Where the values live' bolumune gore co-branded Ajax uygulamandan tekrar cikar ve dordunu de asagiya yeniden gir. Entegrasyon yeniden yuklenecek, kontrol tekrar calisacak ve degerler tutarli oldugunda Repair kapanacak.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Bu Repair'in olusturuldugu Aegis hesabi artik yapilandirilmis degil. Onarilacak bir sey yok."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Push bildirimleri yapilandirilmadi — gercek zamanli olaylar devre disi",
             "fix_flow": {

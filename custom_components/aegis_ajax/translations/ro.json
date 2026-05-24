@@ -181,6 +181,26 @@
             "title": "Notificarile push dezactivate - credentiale FCM respinse",
             "description": "Inregistrarea Firebase Cloud Messaging a esuat pentru acest cont. Valorile configurate FCM Project ID / App ID / API Key / Sender ID probabil nu corespund aplicatiei tale Ajax co-branded, sau cheia API a fost revocata. Functionalitatile bazate pe push (stare instantanee armat/dezarmat, entitatea security_event, URL-uri de fotografii de la MotionCam) vor cadea pe polling mai lent pana la corectare. Deschide meniul Configureaza al integrarii pentru a reintroduce credentialele FCM - consulta sectiunea 'How to obtain FCM credentials' din README."
         },
+        "fcm_credentials_malformed": {
+            "title": "Notificarile push dezactivate — credentiale FCM malformate ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Reparare credentiale FCM Aegis",
+                        "description": "Aegis a detectat o problema structurala in credentialele FCM configurate inainte de a contacta Google: {problem}. Cele patru valori trebuie sa provina din acelasi proiect Firebase. Extrage-le din nou din aplicatia ta Ajax co-branded conform sectiunii 'Where the values live' din README si reintroduce toate patru mai jos. Integrarea se va reincarca, verificarea va rula din nou si Repair-ul se inchide cand valorile sunt coerente.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Contul Aegis pentru care a fost ridicat acest Repair nu mai este configurat. Nimic de reparat."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Notificarile push nu sunt configurate — evenimente in timp real dezactivate",
             "fix_flow": {

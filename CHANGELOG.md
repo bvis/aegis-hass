@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.4] - 2026-05-24
+
+### Changed
+- **FCM credentials now get a structural pre-flight check before the integration calls Google** (#182, follow-up to #155 reported by @alt-BadBatch and @aitrus22). A truncated `fcm_app_id` hash tail (the canonical paste error — the `1:<digits>:android:<hex>` form is ~60 chars and easy to clip on the trailing hex) used to surface from Google as `API_KEY_ANDROID_APP_BLOCKED` with `androidPackage: <empty>` — accurate (Google can't decode the package identity from a half-hashed app_id) but unactionable, because the API key isn't actually the problem. The integration now validates the four FCM values offline before contacting Firebase: `fcm_app_id` parses as `1:<digits>:android:<hex>` with a 30..64-char hex tail, `fcm_api_key` matches `AIza` + 35 chars, `fcm_sender_id` is digits and equals the digit chunk in `fcm_app_id`, and `fcm_project_id` is non-empty. If any shape is off, a dedicated `fcm_credentials_malformed` Repair card names the specific field (e.g. "fcm_app_id hash chunk is 18 chars; expected ~40") instead of leaving the user to read Google's 403 in the logs. Same fix-flow as the existing runtime-rejection Repair — re-enter the four values, integration reloads, the check re-runs. Mutually exclusive with `fcm_credentials_invalid` (shapes-bad OR Firebase-rejected, never both). Translations land in all 14 locales.
+
 ## [1.5.3-beta.3] - 2026-05-24
 
 ### Fixed

@@ -24,8 +24,10 @@ from custom_components.aegis_ajax.const import (
 )
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
+    async_clear_fcm_credentials_malformed,
     async_clear_fcm_not_configured,
     async_register_fcm_credentials_invalid,
+    async_register_fcm_credentials_malformed,
     async_register_fcm_not_configured,
 )
 
@@ -56,6 +58,71 @@ NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 # measured (sub-second) but short enough that a replay from any prior session
 # is rejected.
 STALE_PUSH_THRESHOLD_SECONDS = 120.0
+
+
+_FCM_APP_ID_RE = re.compile(r"^1:(\d+):android:([0-9a-fA-F]+)$")
+_FCM_API_KEY_RE = re.compile(r"^AIza[0-9A-Za-z_-]{35}$")
+# Firebase emits Android app_ids whose hash tail is 40 hex characters. We
+# accept anything in [30, 64] to leave a paranoia-margin for future Firebase
+# format tweaks while still catching the half-pasted values that cause
+# `androidPackage: <empty>` 403s server-side. Tail shorter than this is the
+# truncation pattern observed in #155 and #182.
+_FCM_APP_ID_HASH_MIN = 30
+_FCM_APP_ID_HASH_MAX = 64
+
+
+def _validate_fcm_shape(
+    *,
+    fcm_project_id: str,
+    fcm_app_id: str,
+    fcm_api_key: str,
+    fcm_sender_id: str,
+) -> str | None:
+    """Pre-flight structural check on the four FCM values.
+
+    Catches paste-truncation and mixed-projects errors offline, before
+    `firebase_messaging` hits Firebase Installations. Without this, a
+    half-pasted `fcm_app_id` surfaces as `API_KEY_ANDROID_APP_BLOCKED`
+    / `androidPackage: <empty>` from Google — accurate but unactionable,
+    because the API key isn't actually the problem (#155, #182).
+
+    Returns a short English description of the first problem found
+    (suitable for a Repair card `{problem}` placeholder), or `None`
+    when every shape is coherent. We surface one problem at a time so
+    the Repair card has a single concrete next-action; the user
+    re-enters all four values regardless.
+    """
+    if not fcm_project_id:
+        return "fcm_project_id is empty"
+
+    app_id_match = _FCM_APP_ID_RE.match(fcm_app_id)
+    if app_id_match is None:
+        return 'fcm_app_id does not match the expected shape "1:<digits>:android:<hex>"'
+    app_id_sender, app_id_hash = app_id_match.group(1), app_id_match.group(2)
+    if len(app_id_hash) < _FCM_APP_ID_HASH_MIN:
+        return (
+            f"fcm_app_id hash chunk is {len(app_id_hash)} chars; expected ~40 (truncated on paste?)"
+        )
+    if len(app_id_hash) > _FCM_APP_ID_HASH_MAX:
+        return (
+            f"fcm_app_id hash chunk is {len(app_id_hash)} chars; expected ~40 (extra characters?)"
+        )
+
+    if not _FCM_API_KEY_RE.match(fcm_api_key):
+        return (
+            'fcm_api_key does not match the expected shape (starts with "AIza", exactly 39 chars)'
+        )
+
+    if not fcm_sender_id.isdigit():
+        return "fcm_sender_id must contain only digits"
+    if fcm_sender_id != app_id_sender:
+        return (
+            f"fcm_sender_id ({fcm_sender_id}) does not match the digit "
+            f"chunk inside fcm_app_id ({app_id_sender}) — values come "
+            f"from two different Firebase projects"
+        )
+
+    return None
 
 
 def _classify_fcm_failure(exc: BaseException) -> str:
@@ -171,6 +238,7 @@ class AjaxNotificationListener:
         # credentials roundtrip can re-raise it from a clean slate.
         if self._entry_id:
             async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
+            async_clear_fcm_credentials_malformed(self._hass, entry_id=self._entry_id)
             async_clear_fcm_not_configured(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
             _LOGGER.warning(
@@ -181,6 +249,33 @@ class AjaxNotificationListener:
             )
             if self._entry_id:
                 async_register_fcm_not_configured(self._hass, entry_id=self._entry_id)
+            return
+
+        # Pre-flight shape check on the four values. A malformed
+        # `fcm_app_id` (truncated hash tail) surfaces server-side as
+        # `API_KEY_ANDROID_APP_BLOCKED` / `androidPackage: <empty>`,
+        # which accurately reports the symptom but hides the culprit —
+        # the user concludes the API key is wrong and keeps re-pasting
+        # it (#155, #182). Catching it offline lets the Repair card
+        # name `fcm_app_id` directly.
+        shape_problem = _validate_fcm_shape(
+            fcm_project_id=self._fcm_project_id,
+            fcm_app_id=self._fcm_app_id,
+            fcm_api_key=self._fcm_api_key,
+            fcm_sender_id=self._fcm_sender_id,
+        )
+        if shape_problem is not None:
+            _LOGGER.warning(
+                "FCM credentials malformed — push notifications disabled. %s. "
+                "Re-extract per the README's 'Where the values live' section "
+                "and re-enter all four values via the Repair card under "
+                "Settings → Repairs.",
+                shape_problem,
+            )
+            if self._entry_id:
+                async_register_fcm_credentials_malformed(
+                    self._hass, entry_id=self._entry_id, problem=shape_problem
+                )
             return
 
         try:

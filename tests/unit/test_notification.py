@@ -11,14 +11,29 @@ import pytest
 from custom_components.aegis_ajax.notification import (
     AjaxNotificationListener,
     _classify_fcm_failure,
+    _validate_fcm_shape,
 )
 
-_FCM_KWARGS = {
-    "fcm_project_id": "test-project",
-    "fcm_app_id": "test-app",
-    "fcm_api_key": "test-key",
-    "fcm_sender_id": "12345",
+# A coherent four-value FCM set whose shapes pass every validator check:
+# app_id matches `1:<digits>:android:<40 hex>`, sender_id equals the digit
+# chunk byte-for-byte, api_key is `AIza` + 35 chars (39 total). Real values
+# would round-trip to a real Firebase project; these don't, which is fine
+# because shape validation is offline.
+_VALID_FCM_SHAPES = {
+    "fcm_project_id": "mws-mobile-client---2",
+    "fcm_app_id": "1:991608156148:android:" + "a" * 40,
+    "fcm_api_key": "AIza" + "x" * 35,
+    "fcm_sender_id": "991608156148",
 }
+
+# Alias kept for the dozens of listener tests that don't exercise FCM
+# shape validation (notification parsing, photo-on-demand, etc) — they
+# just need any four-tuple that satisfies the constructor. Pre-#182 this
+# was a separate dict with placeholder strings ("test-app", etc.) that
+# would have failed the new shape check the moment any of them invoked
+# `async_start`, so pointing it at the validated set keeps them
+# bulletproof without per-test edits.
+_FCM_KWARGS = _VALID_FCM_SHAPES
 
 # Real ENCODED_DATA from a photo capture push notification (base64)
 _REAL_PUSH_ENCODED_DATA = (
@@ -470,6 +485,217 @@ class TestAsyncStartFcmRepairs:
             await listener.async_start()
 
         reg.assert_called_once_with(hass, entry_id="entry-x")
+
+
+class TestValidateFcmShape:
+    """Pure-function shape checks on the four FCM credentials.
+
+    The validator runs offline (no Firebase round-trip) and returns a
+    short English description of the first shape problem it finds, or
+    `None` when every value is structurally coherent. The point is to
+    catch paste-truncation / mismatched-projects errors BEFORE Google's
+    403 — same error class that surfaced in #155 and #182 with the
+    cryptic `API_KEY_ANDROID_APP_BLOCKED` / `androidPackage: <empty>`
+    message that doesn't name `fcm_app_id` as the culprit.
+    """
+
+    def test_all_valid_returns_none(self) -> None:
+        assert _validate_fcm_shape(**_VALID_FCM_SHAPES) is None
+
+    def test_app_id_missing_android_segment_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:ios:" + "a" * 40},
+        )
+        assert problem is not None
+        assert "fcm_app_id" in problem
+
+    def test_app_id_missing_sender_chunk_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1::android:" + "a" * 40},
+        )
+        assert problem is not None
+        assert "fcm_app_id" in problem
+
+    def test_app_id_truncated_hex_tail_is_rejected(self) -> None:
+        # ~half the canonical hash length — the user's paste was cut.
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:android:" + "a" * 18},
+        )
+        assert problem is not None
+        assert "fcm_app_id" in problem
+        # The hint should name the truncated chunk so the next-action
+        # is "re-paste the app_id", not "check the api_key".
+        lower = problem.lower()
+        assert "hash" in lower or "truncat" in lower or "short" in lower
+
+    def test_app_id_non_hex_tail_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_app_id": "1:991608156148:android:" + "G" * 40},
+        )
+        assert problem is not None
+        assert "fcm_app_id" in problem
+
+    def test_sender_id_mismatch_with_app_id_is_rejected(self) -> None:
+        # The sender chunk inside fcm_app_id is `991608156148`, but
+        # fcm_sender_id was pasted as a different project's id.
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_sender_id": "123456789012"},
+        )
+        assert problem is not None
+        assert "fcm_sender_id" in problem
+
+    def test_sender_id_with_non_digit_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_sender_id": "99160815614X"},
+        )
+        assert problem is not None
+        assert "fcm_sender_id" in problem
+
+    def test_api_key_wrong_prefix_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_api_key": "Bzzz" + "x" * 35},
+        )
+        assert problem is not None
+        assert "fcm_api_key" in problem
+
+    def test_api_key_wrong_length_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_api_key": "AIza" + "x" * 20},
+        )
+        assert problem is not None
+        assert "fcm_api_key" in problem
+
+    def test_project_id_empty_is_rejected(self) -> None:
+        problem = _validate_fcm_shape(
+            **{**_VALID_FCM_SHAPES, "fcm_project_id": ""},
+        )
+        assert problem is not None
+        assert "fcm_project_id" in problem
+
+    def test_returns_first_problem_when_multiple_fields_bad(self) -> None:
+        # Both app_id and api_key are bad; the validator returns one
+        # message (the caller surfaces one Repair at a time, not a
+        # bulk diff). The exact field surfaced is deterministic so
+        # the message is stable across runs.
+        problem = _validate_fcm_shape(
+            fcm_project_id="",
+            fcm_app_id="garbage",
+            fcm_api_key="garbage",
+            fcm_sender_id="garbage",
+        )
+        assert problem is not None
+
+
+class TestAsyncStartFcmShapePreflight:
+    """`async_start` runs shape validation BEFORE invoking firebase_messaging.
+
+    When shapes are malformed we raise the dedicated
+    `fcm_credentials_malformed` Repair (one click → re-enter the four
+    values) and skip the Firebase round-trip, so the user gets a
+    precise diagnosis instead of Google's opaque 403. Counterpart of
+    `test_register_failure_raises_repair`, which only fires once the
+    library has been called.
+    """
+
+    @pytest.mark.asyncio
+    async def test_malformed_app_id_short_circuits_firebase_call(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock()
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass,
+            coordinator=coordinator,
+            fcm_project_id="proj",
+            fcm_app_id="1:991608156148:android:short",  # truncated
+            fcm_api_key="AIza" + "x" * 35,
+            fcm_sender_id="991608156148",
+            entry_id="entry-x",
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+
+        register_cls = MagicMock()
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_malformed"
+            ) as reg_malformed,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_malformed"
+            ) as clr_malformed,
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ) as reg_invalid,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"
+            ) as clr_invalid,
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        # The malformed Repair is raised exactly once with the problem
+        # description as a translation placeholder so the Repair card
+        # names `fcm_app_id` instead of leaving the user to read logs.
+        assert reg_malformed.call_count == 1
+        kwargs = reg_malformed.call_args.kwargs
+        assert kwargs["entry_id"] == "entry-x"
+        assert "fcm_app_id" in kwargs["problem"]
+
+        # Firebase never gets called — shape check happens first.
+        register_cls.assert_not_called()
+
+        # The runtime-rejection Repair stays cleared (mutually
+        # exclusive: shapes-bad OR Google-rejected, never both visible).
+        reg_invalid.assert_not_called()
+        clr_invalid.assert_called_once_with(hass, entry_id="entry-x")
+        # The malformed Repair is also cleared at the top of the
+        # method, then re-registered after the shape check. Mirrors
+        # the existing pattern for `_invalid` / `_not_configured`.
+        clr_malformed.assert_called_once_with(hass, entry_id="entry-x")
+
+    @pytest.mark.asyncio
+    async def test_valid_shapes_skip_malformed_repair_and_call_firebase(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock()
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass, coordinator=coordinator, **_VALID_FCM_SHAPES, entry_id="entry-x"
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+
+        register_cls = MagicMock()
+        instance = MagicMock()
+        # Library raises after the shape check — we don't care about
+        # the rest of the pipeline here, just that the shape check
+        # didn't short-circuit before the library was reached.
+        instance.register = MagicMock(side_effect=RuntimeError("boom"))
+        register_cls.return_value = instance
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_malformed"
+            ) as reg_malformed,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_malformed"
+            ) as clr_malformed,
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        # Shape check passed → no malformed Repair raised, only the
+        # standard top-of-method clear fired.
+        reg_malformed.assert_not_called()
+        clr_malformed.assert_called_once_with(hass, entry_id="entry-x")
+
+        # Library was reached.
+        register_cls.assert_called_once()
 
 
 class TestClassifyFcmFailure:

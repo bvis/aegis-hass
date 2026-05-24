@@ -181,6 +181,26 @@
             "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",
             "description": "Die Firebase-Cloud-Messaging-Registrierung ist fuer dieses Konto fehlgeschlagen. Die konfigurierten Werte FCM Project ID / App ID / API Key / Sender ID passen vermutlich nicht zu Ihrer Co-Branding-Ajax-App oder der API-Schluessel wurde widerrufen. Push-basierte Funktionen (sofortiger Arm/Disarm-Status, security_event-Entitaet, Foto-URLs von MotionCam) fallen auf langsameres Polling zurueck, bis dies behoben ist. Oeffnen Sie das Konfigurationsmenue der Integration und geben Sie die FCM-Anmeldedaten erneut ein - siehe Abschnitt 'How to obtain FCM credentials' in der README."
         },
+        "fcm_credentials_malformed": {
+            "title": "Push-Benachrichtigungen deaktiviert — FCM-Anmeldedaten fehlerhaft ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Aegis FCM-Anmeldedaten reparieren",
+                        "description": "Aegis hat ein strukturelles Problem mit den konfigurierten FCM-Anmeldedaten festgestellt, bevor Google kontaktiert wurde: {problem}. Die vier Werte muessen aus demselben Firebase-Projekt stammen. Extrahiere sie erneut aus deiner co-branded Ajax-App gemaess dem Abschnitt 'Where the values live' der README und gib alle vier unten erneut ein. Die Integration wird neu geladen, die Pruefung erneut ausgefuehrt, und der Repair schliesst sich, sobald die Werte stimmig sind.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Das Aegis-Konto, fuer das dieser Repair erstellt wurde, ist nicht mehr konfiguriert. Nichts zu reparieren."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Push-Benachrichtigungen nicht konfiguriert — Echtzeit-Ereignisse deaktiviert",
             "fix_flow": {

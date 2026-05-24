@@ -181,6 +181,26 @@
             "title": "Notificacoes push desativadas - credenciais FCM rejeitadas",
             "description": "O registo no Firebase Cloud Messaging falhou para esta conta. Os valores configurados de FCM Project ID / App ID / API Key / Sender ID provavelmente nao correspondem a sua aplicacao Ajax co-branded, ou a chave da API foi revogada. As funcionalidades baseadas em push (estado instantaneo de armar/desarmar, entidade security_event, URLs de fotos do MotionCam) caem para polling mais lento ate a correcao. Abra o menu Configurar da integracao para introduzir novamente as credenciais FCM - consulte a seccao 'How to obtain FCM credentials' do README."
         },
+        "fcm_credentials_malformed": {
+            "title": "Notificacoes push desativadas — credenciais FCM mal formadas ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Reparar credenciais FCM do Aegis",
+                        "description": "O Aegis detetou um problema estrutural nas credenciais FCM configuradas antes de contactar a Google: {problem}. Os quatro valores tem de vir do mesmo projeto Firebase. Volta a extrai-los da tua app Ajax co-branded segundo a seccao 'Where the values live' do README e reintroduz os quatro abaixo. A integracao sera recarregada, a verificacao volta a correr e o Repair fecha quando os valores forem coerentes.",
+                        "data": {
+                            "fcm_project_id": "FCM Project ID",
+                            "fcm_app_id": "FCM App ID",
+                            "fcm_api_key": "FCM API Key",
+                            "fcm_sender_id": "FCM Sender ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "A conta Aegis para a qual este Repair foi criado ja nao esta configurada. Nada para reparar."
+                }
+            }
+        },
         "fcm_not_configured": {
             "title": "Notificacoes push nao configuradas — eventos em tempo real desativados",
             "fix_flow": {
