@@ -756,6 +756,33 @@ class DevicesApi:
             status = update.status_update.status
             status_name = status.WhichOneof("status")
             if status_name is None:
+                # The proto carried a `status` oneof case our compiled
+                # `.proto` doesn't know — the same pattern as the
+                # unknown-LightDevice oneof case `parse_device` probes
+                # (#179, beta.6). When DEBUG is on, surface the inner
+                # `status` proto's wire-shape + bytes so the new field
+                # number is identifiable from a capture. Tiny protos
+                # bypass redaction for the same reason as `parse_device`:
+                # a ≤ 16-byte envelope has no room for PII.
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    try:
+                        raw = status.SerializeToString()
+                    except Exception:  # noqa: BLE001
+                        return
+                    if raw:
+                        bytes_str = (
+                            raw.hex()
+                            if len(raw) <= _TINY_PROTO_THRESHOLD
+                            else _redact_proto_bytes_to_hex(raw)
+                        )
+                        _LOGGER.debug(
+                            "Unsupported LightDeviceStatus on device %s (%db) "
+                            "wire-shape: %s, bytes: %s",
+                            device_id,
+                            len(raw),
+                            _decode_proto_wire_shape(raw),
+                            bytes_str,
+                        )
                 return
 
             op = int(update.status_update.update_type)

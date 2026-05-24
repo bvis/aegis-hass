@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.9] - 2026-05-24
+
+### Internal
+- **Probe added for unknown `LightDeviceStatus.status` oneof cases** (#179 follow-up). @SaetanSaDiablo's beta.8 capture confirmed the `1.5.3-beta.6` LightDevice probe was firing on a *constant* 7-byte protocol marker (decoded payload: literal `"5_0"` repeated across every event regardless of load state), not the Outlet's live electrical readings. The readings must be riding a different channel; the next strongest candidate is a NEW `LightDeviceStatus.status` oneof case at a higher field number than the ones we compile against (the proto reserves 45/46/49/81/84/85/86/87 — strong hint Ajax has been adding cases over time). Previously, when `status.WhichOneof("status")` returned None, `api/devices.py:_handle_update` silently returned, dropping the message without trace. The new DEBUG-gated probe logs a single line carrying `device_id`, `wire-shape`, and `bytes` (with the same tiny-proto-unredact behaviour as the LightDevice probe — protos ≤ 16 bytes total render as raw hex, larger payloads pass through the ≥ 3-byte ASCII redaction). Default-level installs pay nothing. One more capture on beta.9 should surface whether the Outlet pushes status updates with an unknown oneof case, and if so, what its field number and payload shape are.
+
 ## [1.5.3-beta.8] - 2026-05-24
 
 ### Internal

@@ -161,6 +161,60 @@ class TestParseDevice:
         assert "Living Room Outlet" not in bytes_line
         assert f"<text:{len(device_name)}b>" in bytes_line
 
+    def test_handle_update_unknown_status_oneof_logs_probe(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When `LightDeviceStatus.WhichOneof("status") is None` (the cloud
+        emitted a status oneof case our compiled `.proto` doesn't know),
+        a DEBUG probe surfaces device_id + wire-shape + bytes (#179
+        follow-up). Same shape as the LightDevice-level probe added in
+        beta.6, one level deeper — the suspect channel for the Outlet
+        Type E live readings that doesn't ride any current `status.*`
+        case (gsm_status, signal_strength, sim_status, etc.) we handle.
+        """
+        import logging as _logging  # noqa: PLC0415
+
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        # Synthetic LightDeviceStatus carrying an unknown oneof case at
+        # field=200 — well beyond the highest known field (95) and far
+        # from any reserved range — with a 4-byte payload, mirroring
+        # the small-envelope shape seen in the actual #179 capture.
+        # Varint tag for (200<<3)|2 = 1602 encodes as 0xC2 0x0C; then
+        # length 0x04; then the 4 payload bytes.
+        unknown_status_bytes = bytes([0xC2, 0x0C, 0x04, 0xDE, 0xAD, 0xBE, 0xEF])
+        unknown_status = light_device_status_pb2.LightDeviceStatus()
+        unknown_status.MergeFromString(unknown_status_bytes)
+        assert unknown_status.WhichOneof("status") is None
+
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "30427616"
+        update.status_update.status.CopyFrom(unknown_status)
+        update.status_update.update_type = 2  # UPDATE
+
+        api = DevicesApi(MagicMock())
+
+        with caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"):
+            api._handle_update(
+                update,
+                on_devices_snapshot=lambda _: None,
+                on_status_update=lambda _d, _s, _p: None,
+            )
+
+        # The probe line names the device id, the field number, and the
+        # bytes so a single capture identifies the new status oneof case.
+        probe_lines = [
+            r.message for r in caplog.records if "Unsupported LightDeviceStatus" in r.message
+        ]
+        assert len(probe_lines) == 1
+        assert "30427616" in probe_lines[0]
+        assert "deadbeef" in probe_lines[0]
+
     def test_parse_unsupported_oneof_with_empty_proto_logs_nothing(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
