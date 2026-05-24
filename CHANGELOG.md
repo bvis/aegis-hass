@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.8] - 2026-05-24
+
+### Internal
+- **Unsupported-LightDevice probe now skips ASCII redaction on tiny protos (≤ 16 bytes total)** so short protocol codes come through (#179 follow-up). @SaetanSaDiablo's `1.5.3-beta.6` capture validated the probe added in beta.6 — 18 events fired during the load-toggle test window, all 7 bytes long with the shape `f5={f2:<3 ASCII chars>}`, lining up temporally with `off → load start` transitions but not with sustained-load periods. The 3-byte inner string is exactly what we need to identify (status code like `OFF`/`ON`? hub-id suffix? device-type tag?), but the redaction threshold of ≥ 3 ASCII chars introduced in `1.5.3-beta.2` for the HTS probe masked it as `<text:3b>`. A 7-byte proto has no room for a user-set device name / room name / email anyway, so raw hex is privacy-safe at this size. Larger LightDevices (real device records that CAN carry user-set names) keep the original redaction unchanged. The hypothesis from beta.6 (a new `LightDevice.device` oneof case carrying Outlet live readings) doesn't fit the data — these tiny events aren't carrying load values, more likely state-change notifications. A new capture on beta.8 will surface the actual 3-char content and let us decide where to look next.
+
 ## [1.5.3-beta.7] - 2026-05-24
 
 ### Fixed

@@ -76,6 +76,43 @@ class TestParseDevice:
         proto_device.WhichOneof.return_value = "video_edge"
         assert DevicesApi.parse_device(proto_device) is None
 
+    def test_parse_unsupported_oneof_tiny_proto_logs_raw_hex(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Tiny protos (≤16 bytes total) bypass redaction so 3-char protocol
+        codes come through (#179 follow-up).
+
+        The original probe in beta.6 redacted any printable-ASCII run ≥3
+        chars, which hid exactly the 3-char strings we needed to identify
+        whether SaetanSaDiablo's 18 unsupported LightDevice events were
+        encoding state codes (`OFF`/`ON`/etc) or just a device-id reference.
+        A 7-byte proto has no room for a user-set name / room / email
+        anyway, so raw hex is privacy-safe at this size.
+        """
+        import logging as _logging  # noqa: PLC0415
+
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_pb2,
+        )
+
+        # 7-byte proto mimicking the actual capture shape: field=5
+        # length-delimited (5 bytes) → field=2 length-delimited (3 ASCII
+        # bytes 'O', 'F', 'F').
+        unknown_field = bytes([0x2A, 0x05, 0x12, 0x03, 0x4F, 0x46, 0x46])
+        proto_device = light_device_pb2.LightDevice()
+        proto_device.MergeFromString(unknown_field)
+        assert proto_device.WhichOneof("device") is None
+
+        with caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"):
+            DevicesApi.parse_device(proto_device)
+
+        bytes_line = next(record.message for record in caplog.records if "bytes:" in record.message)
+        # Full raw hex must be visible — no `<text:Nb>` masking on a tiny
+        # protocol-state envelope.
+        assert "2a051203" in bytes_line
+        assert "4f4646" in bytes_line  # 'OFF' in ASCII bytes
+        assert "<text:" not in bytes_line
+
     def test_parse_unsupported_oneof_with_unknown_field_logs_probe(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
