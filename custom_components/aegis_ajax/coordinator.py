@@ -819,6 +819,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fcm_api_key: str = "",
         fcm_sender_id: str = "",
         entry_id: str = "",
+        app_label: str = "",
     ) -> None:
         """Start FCM push notification listener."""
         from custom_components.aegis_ajax.notification import (
@@ -833,6 +834,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             fcm_api_key=fcm_api_key,
             fcm_sender_id=fcm_sender_id,
             entry_id=entry_id,
+            app_label=app_label,
         )
         await self._notification_listener.async_start()
 

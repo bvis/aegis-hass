@@ -194,6 +194,7 @@ class AjaxNotificationListener:
         fcm_api_key: str,
         fcm_sender_id: str,
         entry_id: str = "",
+        app_label: str = "",
     ) -> None:
         self._hass = hass
         self._coordinator = coordinator
@@ -202,6 +203,7 @@ class AjaxNotificationListener:
         self._fcm_api_key = fcm_api_key
         self._fcm_sender_id = fcm_sender_id
         self._entry_id = entry_id
+        self._app_label = app_label
         self._push_client: Any = None
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._credentials: dict[str, Any] | None = None
@@ -305,8 +307,37 @@ class AjaxNotificationListener:
 
         if not self._credentials:
             _LOGGER.debug("Registering with FCM...")
+            # Inject `X-Android-Package` on Firebase Installations calls when
+            # we know the user's co-branded Android package. The Ajax co-brand
+            # api-key on Project B has Google package restriction enabled, so
+            # the default `firebase_messaging` request (no package header)
+            # gets refused with `API_KEY_ANDROID_APP_BLOCKED` /
+            # `androidPackage: <empty>` (#155, #182). We attach the header as
+            # a default on a session passed via `http_client_session` —
+            # aiohttp merges per-request headers on top, so the library's own
+            # `x-firebase-client` / `x-goog-api-key` keys are untouched and
+            # every request we initiate (`fcm_install`, refresh, register)
+            # carries the package id. Co-brands without a mapping fall back
+            # to the pre-1.5.3-beta.10 behaviour (no header, no session).
+            import aiohttp  # noqa: PLC0415
+
+            from custom_components.aegis_ajax.const import (  # noqa: PLC0415
+                APP_LABEL_TO_ANDROID_PACKAGE,
+            )
+
+            android_package = APP_LABEL_TO_ANDROID_PACKAGE.get(self._app_label)
+            fcm_session: aiohttp.ClientSession | None = None
+            if android_package:
+                fcm_session = aiohttp.ClientSession(headers={"X-Android-Package": android_package})
+                _LOGGER.debug(
+                    "FCM registration will carry X-Android-Package: %s",
+                    android_package,
+                )
             try:
-                registerer = FcmRegister(config=fcm_config)
+                if fcm_session is not None:
+                    registerer = FcmRegister(config=fcm_config, http_client_session=fcm_session)
+                else:
+                    registerer = FcmRegister(config=fcm_config)
                 # register() may be sync or async depending on library version
                 if asyncio.iscoroutinefunction(registerer.register):
                     raw_result: Any = await registerer.register()  # noqa: ANN401
@@ -320,6 +351,9 @@ class AjaxNotificationListener:
                 if self._entry_id:
                     async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
                 return
+            finally:
+                if fcm_session is not None:
+                    await fcm_session.close()
 
         # Extract FCM token and register with Ajax servers
         fcm_data = self._credentials.get("fcm", {})

@@ -605,6 +605,121 @@ class TestValidateFcmShape:
         assert problem is not None
 
 
+class TestAsyncStartFcmAndroidPackageHeader:
+    """`async_start` injects `X-Android-Package` on Firebase Installations
+    calls for known co-brands so Google's api-key package restriction
+    doesn't refuse the request with `API_KEY_ANDROID_APP_BLOCKED` /
+    `androidPackage: <empty>` (#155, #182). The header rides as a
+    default on a session passed to `FcmRegister` via
+    `http_client_session`; aiohttp merges per-request headers on top so
+    the library's own `x-firebase-client` / `x-goog-api-key` stay
+    untouched.
+    """
+
+    @pytest.mark.asyncio
+    async def test_ajax_cobrand_passes_custom_session_with_package_header(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(return_value={})
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass,
+            coordinator=coordinator,
+            **_VALID_FCM_SHAPES,
+            entry_id="entry-x",
+            app_label="Ajax",
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+        listener._register_push_token = AsyncMock()
+
+        register_cls = MagicMock()
+        instance = MagicMock()
+        instance.register = MagicMock(side_effect=RuntimeError("boom"))  # bail before push start
+        register_cls.return_value = instance
+
+        with (
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_malformed"
+            ),
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_malformed"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+        ):
+            await listener.async_start()
+
+        # FcmRegister must be constructed with a session whose default
+        # headers include `X-Android-Package: com.ajaxsystems` so
+        # Firebase Installations sees the package id and the api-key
+        # restriction passes.
+        assert register_cls.call_count == 1
+        kwargs = register_cls.call_args.kwargs
+        session = kwargs["http_client_session"]
+        assert session is not None
+        # aiohttp.ClientSession exposes default headers via its `headers`
+        # property — accept either dict-like (`["X-Android-Package"]`)
+        # or attr-style depending on the aiohttp version.
+        header_value = (
+            session.headers.get("X-Android-Package")
+            if hasattr(session.headers, "get")
+            else session.headers["X-Android-Package"]
+        )
+        assert header_value == "com.ajaxsystems"
+
+    @pytest.mark.asyncio
+    async def test_unknown_cobrand_passes_no_session(self) -> None:
+        """Co-brand labels without a known Android package mapping fall
+        back to the pre-1.5.3-beta.10 behaviour: FcmRegister gets the
+        default constructor (no `http_client_session`), so we don't
+        emit an empty / unrelated session that would never satisfy
+        Google's restriction anyway.
+        """
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(return_value={})
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass,
+            coordinator=coordinator,
+            **_VALID_FCM_SHAPES,
+            entry_id="entry-x",
+            app_label="some_brand_we_dont_map_yet",
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+        listener._register_push_token = AsyncMock()
+
+        register_cls = MagicMock()
+        instance = MagicMock()
+        instance.register = MagicMock(side_effect=RuntimeError("boom"))
+        register_cls.return_value = instance
+
+        with (
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_malformed"
+            ),
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_malformed"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+        ):
+            await listener.async_start()
+
+        # FcmRegister called without `http_client_session` — kwargs
+        # dict must not carry that key.
+        assert register_cls.call_count == 1
+        assert "http_client_session" not in register_cls.call_args.kwargs
+
+
 class TestAsyncStartFcmShapePreflight:
     """`async_start` runs shape validation BEFORE invoking firebase_messaging.
 

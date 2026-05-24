@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.10] - 2026-05-24
+
+### Fixed
+- **FCM registration now sends the `X-Android-Package` header on Firebase Installations calls** (#155, #182, reported by @aitrus22, @alt-BadBatch, and @zwagerzaken — independently in three separate threads over three weeks). The Ajax co-branded api-key on Project B has Google's Android-app package restriction enabled: requests without an `X-Android-Package` header come through with `androidPackage: <empty>` on Google's side and get refused with `API_KEY_ANDROID_APP_BLOCKED`. The `firebase_messaging` Python library doesn't send the header at all (it works for api-keys without that restriction — Tesla, Roomba, etc. — but loses for restricted ones), so Ajax co-brand users were stuck behind a 403 that the validator added in `1.5.3-beta.4` couldn't fix because the credentials were structurally fine to begin with. @alt-BadBatch's original report identified this root cause on day one; I dismissed it back then because I'd seen the library work for other integrations and assumed the api-key restriction wasn't in play, then went down a long paste-truncation path that produced a validator (beta.4 / beta.5 / beta.7) which improves the error-reporting surface but never addressed the actual cause. Apologies to all three reporters for the runaround.
+
+The integration now maps `app_label` to the matching Android package id via a new `APP_LABEL_TO_ANDROID_PACKAGE` constant in `const.py` and threads the value through `coordinator.async_start_push_notifications` to the notification listener. When the app_label has a known package mapping, the listener creates an `aiohttp.ClientSession` with `X-Android-Package` as a default header and passes it to `FcmRegister` via the library's existing `http_client_session` parameter. aiohttp merges per-request headers on top, so `firebase_messaging`'s own `x-firebase-client` / `x-goog-api-key` stay untouched, and every Firebase Installations call (registration + refresh) carries the package id. Co-brands without a mapping fall back to the pre-`1.5.3-beta.10` behaviour (no session passed, no header), so the change is no-op for any user who was already working.
+
+The mapping ships with the entries verified end-to-end against the catalogue documented in our cobranded-firebase project memory: `Ajax → com.ajaxsystems`, `ajax_pro → com.ajaxsystems.pro`, `AIKO → com.ajaxsystems.aiko`, `Protegim_alarma → com.ajaxsystems.protegim`. Other co-brands will be added as users confirm — leaving the mapping fail-open preserves the existing working setups while the table fills in.
+
 ## [1.5.3-beta.9] - 2026-05-24
 
 ### Internal

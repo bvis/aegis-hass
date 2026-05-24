@@ -348,6 +348,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
             fcm_api_key=_get_fcm("fcm_api_key"),
             fcm_sender_id=_get_fcm("fcm_sender_id"),
             entry_id=entry.entry_id,
+            app_label=str(entry.data.get("app_label", "")),
         ),
         name=f"aegis_ajax_fcm_start_{entry.entry_id}",
     )

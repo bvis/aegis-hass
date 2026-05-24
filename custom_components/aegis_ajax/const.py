@@ -96,6 +96,32 @@ KNOWN_APP_LABELS = [
     "Protecta",
     "ajax_pro",
 ]
+# Maps `app_label` (the gRPC `application-label` header value the user
+# picked in the config flow) to the Android package id of the
+# corresponding co-branded APK. Used as the `X-Android-Package` header
+# the integration sends on Firebase Installations calls so Google's
+# api-key package restriction doesn't refuse the request with
+# `API_KEY_ANDROID_APP_BLOCKED` + `androidPackage: <empty>` (#155,
+# #182). The `firebase_messaging` library doesn't send that header
+# itself — for api-keys without restriction it works fine, but the
+# Ajax co-branded key on Project B (`elite-dreamer-676`,
+# `mws-mobile-client---2` for some variants) has package restriction
+# enabled and blocks blank-package requests outright.
+#
+# Verified end-to-end: only "Ajax" → `com.ajaxsystems` (zwagerzaken's
+# beta.8 capture in #182, alt-BadBatch's original). The other entries
+# are best-effort derived from the libnative-lib.so catalogue
+# documented in the cobranded-firebase project memory. Add an entry
+# only after confirming with the user that their `strings.xml` is in
+# the actual APK named here. Missing entries fall back to no header,
+# i.e. the pre-1.5.3-beta.10 behaviour.
+APP_LABEL_TO_ANDROID_PACKAGE: dict[str, str] = {
+    "Ajax": "com.ajaxsystems",
+    "ajax_pro": "com.ajaxsystems.pro",
+    "AIKO": "com.ajaxsystems.aiko",
+    "Protegim_alarma": "com.ajaxsystems.protegim",
+}
+
 CLIENT_DEVICE_MODEL = "SM-A536B"  # Galaxy A53 — paired with CLIENT_VERSION="3.30"
 CLIENT_DEVICE_TYPE = "MOBILE"
 CLIENT_APP_TYPE = "USER"
