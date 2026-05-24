@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.3] - 2026-05-24
+
+### Fixed
+- **Live electrical readings (current / power / energy) now update from per-device HTS deltas, not only the boot-time snapshot** (#179 follow-up). The hub-network-state delta heuristic was over-matching: it ran `_extract_direct_kv` against any non-body `UPDATES` message and any kv dict it produced was tested against `KEY_HUB_POWERED` (`0x03`) and four other hub-level keys. For a per-device payload (`[sub_key, device_id_4b, k, v, k, v, …]`) `_extract_direct_kv` happily pairs up downstream bytes — and the operational state byte `0x03` is so common as a value across Ajax devices that the heuristic fired on essentially every per-device delta, dropping it into the hub-network-state parser instead of the per-device handler. `device_readings` then never received the live update, electrical sensors stayed at whatever the initial STATUS_BODY snapshot had set, and `RestoreSensor` made the stale values look "live" after a restart — masking the bug entirely. The router now classifies by payload shape: a 4-byte `params[1]` means per-device and skips the network-state heuristic completely. WallSwitches and the EU socket family on multi-device hubs (#123 cohort) are the visible beneficiaries.
+
 ## [1.5.3-beta.2] - 2026-05-23
 
 ### Internal

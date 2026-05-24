@@ -675,20 +675,37 @@ class HtsClient:
         if not hub_id:
             return
 
-        kv = self._extract_direct_kv(params[1:])
-        if kv and self._is_network_state_delta(kv):
-            _LOGGER.debug(
-                "Hub %s: parsed %d keys from delta sub-key %d",
-                hub_id,
-                len(kv),
-                sub_key,
-            )
-            existing = self._hub_states.get(hub_id)
-            new_state = parse_hub_params(kv, existing)
-            self._hub_states[hub_id] = new_state
-            if self._on_state_update:
-                self._on_state_update(hub_id, new_state)
-            return
+        # Discriminate per-device deltas from hub-network-state deltas by
+        # payload shape (#179 follow-up). Network-state deltas carry a
+        # 1-byte key at params[1]; per-device deltas carry a 4-byte
+        # device_id there. Without this guard, `_extract_direct_kv`
+        # happily pairs up later bytes of the per-device payload and
+        # frequently produces a kv dict whose keys contain `0x03`
+        # (`KEY_HUB_POWERED`) because a downstream value byte equals
+        # `0x03` — the operational state byte common to many Ajax
+        # devices. `_is_network_state_delta` then misclassifies every
+        # per-device live reading as a network-state delta, silently
+        # dropping the update before it reaches `_on_device_kv` and
+        # leaving electrical sensors stuck on whatever STATUS_BODY
+        # snapshot last seeded them (`RestoreSensor` then makes the
+        # values look "live" after a restart, masking the bug entirely).
+        is_per_device_shape = len(params) >= 2 and len(params[1]) == 4
+
+        if not is_per_device_shape:
+            kv = self._extract_direct_kv(params[1:])
+            if kv and self._is_network_state_delta(kv):
+                _LOGGER.debug(
+                    "Hub %s: parsed %d keys from delta sub-key %d",
+                    hub_id,
+                    len(kv),
+                    sub_key,
+                )
+                existing = self._hub_states.get(hub_id)
+                new_state = parse_hub_params(kv, existing)
+                self._hub_states[hub_id] = new_state
+                if self._on_state_update:
+                    self._on_state_update(hub_id, new_state)
+                return
 
         # Sub-keys 11 (STATUS_UPDATE) and 12 (SETTINGS_UPDATE) are the
         # hub's per-device push channels: the hub emits one of these

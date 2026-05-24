@@ -362,6 +362,60 @@ class TestHandleUpdate:
         client._on_state_update.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_per_device_delta_with_state_byte_routes_to_device_path(self) -> None:
+        """#179 follow-up: STATUS_UPDATE deltas for an individual device
+        must reach `_on_device_kv`, not the hub-network-state parser.
+
+        The bug: `_extract_direct_kv(params[1:])` was being run on every
+        non-body delta to test for the hub-network shape. For a per-device
+        payload `[sub_key, device_id_4b, k1, v1, k2, v2, …]`, the 4-byte
+        device_id at `params[1]` doesn't qualify as a key (length != 1),
+        so the helper happily pairs up later bytes — frequently producing
+        a kv dict whose keys contain `0x03` (`KEY_HUB_POWERED`) because
+        a value byte downstream happens to be `0x03` (the operational
+        state byte common to many Ajax devices). `_is_network_state_delta`
+        then fires the wrong path and every per-device live reading is
+        silently dropped, leaving `device_readings` to only ever be
+        seeded by the initial STATUS_BODY snapshot. The fix routes by
+        payload shape (a 4-byte `params[1]` means per-device) before
+        running the heuristic.
+        """
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._on_state_update = MagicMock()
+        captured: list[tuple[str, str, dict[int, bytes]]] = []
+        client._on_device_kv = lambda hub_id, did, kv: captured.append((hub_id, did, kv))
+
+        # Mimics a real Outlet STATUS_UPDATE: 4-byte device_id, then
+        # multiple (k1=byte, v1=byte) pairs where v1 happens to be 0x03 —
+        # the byte that triggered the misroute on SaetanSaDiablo's hub.
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode(
+                [
+                    b"\x0b",  # sub_key 11 = STATUS_UPDATE
+                    bytes.fromhex("30537E4C"),
+                    b"\x02",
+                    b"\x03",  # value byte = 0x03 = KEY_HUB_POWERED
+                    b"\x05",
+                    b"\x07",
+                ]
+            ),
+        )
+
+        await client._handle_update(msg)
+
+        # Per-device path must fire with the real kv from the payload.
+        assert captured == [("12345678", "30537E4C", {0x02: b"\x03", 0x05: b"\x07"})]
+        # Network-state parser must NOT have been called.
+        client._on_state_update.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_unknown_hub_update_requests_refresh_once(self) -> None:
         client = _make_client()
         client._hubs = [MagicMock(hub_id="12345678")]
