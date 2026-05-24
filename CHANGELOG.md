@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.6] - 2026-05-24
+
+### Internal
+- **`parse_device` now logs the wire-shape + PII-redacted bytes of LightDevice protos that don't match any known `device` oneof case** (#179 follow-up, @SaetanSaDiablo's load-calibrated Outlet Type E capture). The capture showed zero per-device HTS deltas during a 10-minute toggle window (where WallSwitches push their live electrical readings) but 18 gRPC `LightDevice` pushes arriving with `WhichOneof("device") = None` — i.e. the proto had unknown-field bytes the cloud emitted under a field number not present in our compiled `.proto`. Strong hypothesis: Ajax cloud started emitting Outlet Type E live readings via a NEW oneof case (likely field 5+, beyond our current `hub_device`/`video_edge`/`video_edge_channel`/`smart_lock` set) and our parser silently drops them. The new DEBUG probe emits two lines per unsupported LightDevice: `wire-shape: f<N>=bytes(<len>),…` (structural only, no values — safe to paste anywhere) and `bytes: <hex>` with printable-ASCII runs ≥3 chars masked as `<text:Nb>` (same 3-byte threshold as the HTS probe from `1.5.3-beta.2`, so device names / ids stay private while numeric readings stay visible). Default-level installs pay nothing — both lines are gated on DEBUG. The pair lets a single capture under known load identify the new field number AND the structure of its payload, so the next mapping iteration can land without another user round-trip.
+
 ## [1.5.3-beta.5] - 2026-05-24
 
 ### Fixed

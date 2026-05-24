@@ -17,6 +17,109 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def _decode_proto_wire_shape(data: bytes) -> str:
+    """Render a one-line structural summary of protobuf wire-format bytes.
+
+    Walks the top-level fields, emitting `field=<num>,wt=<wire>,len=<n>`
+    (or `=varint`/`=i32`/`=i64` for fixed-size cases) for each one. No
+    values are surfaced — only field numbers and shapes — so this output
+    is safe to paste even when the original proto carries device names
+    or other PII. Used to spot a new oneof case (e.g. `field=5`) on a
+    `LightDevice` that our compiled `.proto` doesn't yet know about (#179
+    Outlet Type E hypothesis).
+    """
+    parts: list[str] = []
+    i = 0
+    while i < len(data):
+        try:
+            tag, i = _decode_varint(data, i)
+        except ValueError:
+            parts.append("<truncated>")
+            break
+        field = tag >> 3
+        wire = tag & 0x07
+        if wire == 0:
+            try:
+                _, i = _decode_varint(data, i)
+            except ValueError:
+                parts.append(f"f{field}=varint<truncated>")
+                break
+            parts.append(f"f{field}=varint")
+        elif wire == 1:
+            i += 8
+            parts.append(f"f{field}=i64")
+        elif wire == 2:
+            try:
+                length, i = _decode_varint(data, i)
+            except ValueError:
+                parts.append(f"f{field}=bytes<truncated>")
+                break
+            i += length
+            parts.append(f"f{field}=bytes({length})")
+        elif wire == 5:
+            i += 4
+            parts.append(f"f{field}=i32")
+        else:
+            parts.append(f"f{field}=wt{wire}?")
+            break
+    return ",".join(parts) if parts else "<empty>"
+
+
+def _decode_varint(data: bytes, i: int) -> tuple[int, int]:
+    """Read a protobuf varint at offset `i`, returning `(value, next_offset)`.
+
+    Raises `ValueError` on truncation or an unreasonably long encoding —
+    the caller surfaces this as a `<truncated>` marker in the wire-shape
+    summary so a partial / corrupt buffer doesn't blow up the log line.
+    """
+    value = 0
+    shift = 0
+    while i < len(data):
+        b = data[i]
+        i += 1
+        value |= (b & 0x7F) << shift
+        if not (b & 0x80):
+            return value, i
+        shift += 7
+        if shift >= 64:
+            msg = "varint too long"
+            raise ValueError(msg)
+    msg = "truncated varint"
+    raise ValueError(msg)
+
+
+def _redact_proto_bytes_to_hex(data: bytes) -> str:
+    """Render protobuf bytes as hex with printable-ASCII runs masked.
+
+    Scans `data` for contiguous runs of printable ASCII bytes (length ≥ 3)
+    and replaces each run with `<text:Nb>`; everything else renders as
+    its two-character hex value. The chosen 3-byte threshold mirrors the
+    HTS DEBUG probe (`_redact_if_text` in api/hts/client.py) — short
+    incidental ASCII bytes (e.g. a single 0x41 byte that happens to be
+    `'A'`) still come through as hex, while real text fields (device
+    names, ids, emails) are length-preserving redacted. Numeric values
+    almost always contain at least one non-printable byte (`0x00` is the
+    most common), so electrical readings stay fully visible — exactly
+    what we need to map an unknown LightDevice oneof case (#179) from a
+    public bug-report log.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(data)
+    while i < n:
+        j = i
+        while j < n and 0x20 <= data[j] <= 0x7E:
+            j += 1
+        run_len = j - i
+        if run_len >= 3:
+            out.append(f"<text:{run_len}b>")
+            i = j
+        else:
+            out.append(f"{data[i]:02x}")
+            i += 1
+    return "".join(out)
+
+
 class SmartLockError(Exception):
     """Raised when a SwitchSmartLockService call fails."""
 
@@ -434,6 +537,33 @@ class DevicesApi:
         if device_kind == "video_edge_channel":
             return DevicesApi._parse_video_edge_channel(proto_light_device.video_edge_channel)
         _LOGGER.debug("Skipping unsupported device type: %s", device_kind)
+        # `device_kind is None` means the LightDevice proto's `device`
+        # oneof didn't match any case we know (`hub_device`,
+        # `video_edge`, `video_edge_channel`, `smart_lock`). The bytes
+        # are preserved as protobuf unknown fields — most likely a NEW
+        # oneof case the cloud started emitting for a device family
+        # we haven't pulled into the local `.proto` yet (#179 Outlet
+        # Type E hypothesis: 18 of these landed during a load-toggle
+        # capture with zero matching HTS deltas). Surface enough
+        # structure to identify the new field number AND the redacted
+        # contents so the case can be reconstructed from a single
+        # capture without another user round-trip.
+        if device_kind is None and _LOGGER.isEnabledFor(logging.DEBUG):
+            try:
+                raw = proto_light_device.SerializeToString()
+            except Exception:  # noqa: BLE001
+                return None
+            if raw:
+                _LOGGER.debug(
+                    "Unsupported LightDevice (%db) wire-shape: %s",
+                    len(raw),
+                    _decode_proto_wire_shape(raw),
+                )
+                _LOGGER.debug(
+                    "Unsupported LightDevice (%db) bytes: %s",
+                    len(raw),
+                    _redact_proto_bytes_to_hex(raw),
+                )
         return None
 
     # MotionCam Video Doorbell / Indoor / Base hardware can arrive in a

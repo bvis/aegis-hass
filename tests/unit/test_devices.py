@@ -15,8 +15,10 @@ import pytest
 
 from custom_components.aegis_ajax.api.devices import (
     DevicesApi,
+    _decode_proto_wire_shape,
     _encode_string_field,
     _encode_varint_field,
+    _redact_proto_bytes_to_hex,
 )
 from custom_components.aegis_ajax.api.models import Device, DeviceCommand
 from custom_components.aegis_ajax.const import DeviceState
@@ -73,6 +75,151 @@ class TestParseDevice:
         proto_device = MagicMock()
         proto_device.WhichOneof.return_value = "video_edge"
         assert DevicesApi.parse_device(proto_device) is None
+
+    def test_parse_unsupported_oneof_with_unknown_field_logs_probe(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When `device_kind is None` and the proto has unknown-field bytes
+        (a NEW oneof case the cloud emits but our `.proto` doesn't know),
+        a DEBUG probe surfaces the wire-shape AND a PII-redacted hex dump
+        so the new field number can be identified from a single capture.
+
+        Hypothesis behind #179 (SaetanSaDiablo's Outlet Type E): the cloud
+        is pushing live readings via a NEW `LightDevice.device` oneof
+        case at e.g. field 5+, which protobuf silently drops because we
+        only have fields 1-4 in the compiled proto. The probe stays at
+        DEBUG so a default-level install pays nothing.
+        """
+        import logging as _logging  # noqa: PLC0415
+
+        # A real LightDevice with a synthetic field-5 bytes payload that
+        # carries the user's device name in ASCII to verify the redaction
+        # path. Built via raw wire-format encoding so the proto class
+        # doesn't need to know about field 5.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_pb2,
+        )
+
+        device_name = b"Living Room Outlet"
+        # Tag for field=5, wire_type=2 (length-delimited) is (5<<3)|2 = 42 = 0x2A
+        # Followed by varint length and the bytes.
+        unknown_field = bytes([0x2A, len(device_name), *device_name])
+        proto_device = light_device_pb2.LightDevice()
+        proto_device.MergeFromString(unknown_field)
+        # Confirm WhichOneof returns None even though raw bytes were merged.
+        assert proto_device.WhichOneof("device") is None
+
+        with caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"):
+            result = DevicesApi.parse_device(proto_device)
+
+        assert result is None
+        # Wire-shape line names the new field number with no contents.
+        assert any(
+            "wire-shape" in record.message and "f5=bytes" in record.message
+            for record in caplog.records
+        )
+        # Bytes line includes the redaction marker — the device name
+        # MUST NOT appear in cleartext, only the length stays visible.
+        bytes_line = next(record.message for record in caplog.records if "bytes:" in record.message)
+        assert "Living Room Outlet" not in bytes_line
+        assert f"<text:{len(device_name)}b>" in bytes_line
+
+    def test_parse_unsupported_oneof_with_empty_proto_logs_nothing(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An empty `LightDevice` (oneof unset, no unknown fields either)
+        skips the byte probe — there's nothing to surface and we don't
+        want to clutter DEBUG with `<empty>` lines for genuine heartbeats.
+        """
+        import logging as _logging  # noqa: PLC0415
+
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_pb2,
+        )
+
+        proto_device = light_device_pb2.LightDevice()
+        with caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"):
+            result = DevicesApi.parse_device(proto_device)
+
+        assert result is None
+        # The "Skipping unsupported" line is always emitted; the byte
+        # probe lines are not, because the serialized form is empty.
+        assert any("Skipping unsupported device type" in r.message for r in caplog.records)
+        assert not any("wire-shape" in r.message for r in caplog.records)
+        assert not any("bytes:" in r.message for r in caplog.records)
+
+
+class TestDecodeProtoWireShape:
+    """Structural decoder used by the `parse_device` probe (#179)."""
+
+    def test_single_length_delimited_field(self) -> None:
+        # field=5, wire_type=2 (length-delimited), 4-byte payload.
+        # Tag byte = (5<<3)|2 = 0x2A.
+        assert _decode_proto_wire_shape(bytes([0x2A, 0x04, 0xDE, 0xAD, 0xBE, 0xEF])) == (
+            "f5=bytes(4)"
+        )
+
+    def test_varint_field(self) -> None:
+        # field=1, wire_type=0 (varint), value=42 (single byte).
+        assert _decode_proto_wire_shape(bytes([0x08, 0x2A])) == "f1=varint"
+
+    def test_i32_field(self) -> None:
+        # field=2, wire_type=5 (i32), 4 bytes payload.
+        assert _decode_proto_wire_shape(bytes([0x15, 0x00, 0x00, 0x00, 0x00])) == "f2=i32"
+
+    def test_i64_field(self) -> None:
+        # field=3, wire_type=1 (i64), 8 bytes payload.
+        assert _decode_proto_wire_shape(bytes([0x19] + [0x00] * 8)) == "f3=i64"
+
+    def test_multiple_fields(self) -> None:
+        # field=1 varint=1, then field=5 length-delimited 2-byte payload.
+        # Used to discriminate a known-oneof message (e.g. hub_device=1)
+        # from a brand-new oneof case (field=5+) appearing alongside it.
+        encoded = bytes([0x08, 0x01, 0x2A, 0x02, 0xAA, 0xBB])
+        assert _decode_proto_wire_shape(encoded) == "f1=varint,f5=bytes(2)"
+
+    def test_truncated_input_does_not_raise(self) -> None:
+        # Truncation in the middle of a varint length must surface as a
+        # marker rather than blowing up the DEBUG log line.
+        # 0x2A = tag (field=5, wire=2); next varint length missing.
+        assert "truncated" in _decode_proto_wire_shape(bytes([0x2A])).lower()
+
+    def test_empty_input(self) -> None:
+        assert _decode_proto_wire_shape(b"") == "<empty>"
+
+
+class TestRedactProtoBytesToHex:
+    """ASCII-aware hex renderer used by the `parse_device` probe (#179)."""
+
+    def test_short_ascii_run_stays_hex(self) -> None:
+        # 2-byte ASCII ("AB") is below the redaction threshold (3) and
+        # comes through as hex — the 3-byte threshold mirrors the HTS
+        # probe so incidental ASCII bytes (a single 0x41 inside a numeric
+        # field) don't get masked.
+        assert _redact_proto_bytes_to_hex(b"\x01AB\x00") == "014142" + "00"
+
+    def test_long_ascii_run_is_masked_with_length(self) -> None:
+        # A device-name field "Living Room Outlet" (18 chars printable
+        # ASCII) is replaced by a length-preserving marker. The byte
+        # offset of the surrounding bytes (here: an empty surround) stays
+        # readable so the redaction doesn't break structural analysis.
+        assert _redact_proto_bytes_to_hex(b"Living Room Outlet") == "<text:18b>"
+
+    def test_mixed_binary_and_ascii(self) -> None:
+        # 4-byte numeric prefix (one printable byte, three non-printable)
+        # + protobuf string header (`\n` + length) + 5-byte ASCII tail.
+        # The numeric prefix stays hex, the ASCII tail gets redacted.
+        data = b"\xde\xad\xbe\xef\n\x05Hello"
+        result = _redact_proto_bytes_to_hex(data)
+        assert "<text:5b>" in result
+        assert "deadbeef" in result
+        assert "Hello" not in result
+
+    def test_all_non_printable(self) -> None:
+        assert _redact_proto_bytes_to_hex(bytes([0x00, 0x01, 0xFF])) == "0001ff"
+
+    def test_empty(self) -> None:
+        assert _redact_proto_bytes_to_hex(b"") == ""
 
     def test_parse_video_edge_channel_doorbell(self) -> None:
         # @Permudious in #119: MotionCam Video Doorbell arrives as a
