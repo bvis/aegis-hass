@@ -17,6 +17,14 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+# Protos under this byte threshold are considered protocol-level state
+# messages (no room for user-set names, rooms, or other PII inside a
+# ≤16-byte envelope) and are logged as raw hex in `parse_device`'s
+# unsupported-LightDevice probe so short ASCII codes come through.
+# Larger protos go through `_redact_proto_bytes_to_hex` unchanged.
+_TINY_PROTO_THRESHOLD = 16
+
+
 def _decode_proto_wire_shape(data: bytes) -> str:
     """Render a one-line structural summary of protobuf wire-format bytes.
 
@@ -559,10 +567,28 @@ class DevicesApi:
                     len(raw),
                     _decode_proto_wire_shape(raw),
                 )
+                # Tiny protos (≤ TINY_PROTO_THRESHOLD bytes total) are
+                # protocol-level state messages, not user-data payloads —
+                # there's no room for a device name / room / email inside
+                # that envelope. Render them with raw hex so short ASCII
+                # codes (3-char status strings like `OFF`/`ON`, hub-id
+                # suffixes, device-type tags) come through directly.
+                # Larger protos (real device records that DO carry
+                # user-set names) keep the ≥3-byte ASCII redaction. From
+                # #179: beta.6 capture showed 18 events with the shape
+                # `f5={f2:<3 ASCII chars>}` lining up with Outlet load
+                # transitions — but redaction hid exactly the 3 chars
+                # needed to identify whether they encode state or just
+                # a device-id reference.
+                bytes_str = (
+                    raw.hex()
+                    if len(raw) <= _TINY_PROTO_THRESHOLD
+                    else _redact_proto_bytes_to_hex(raw)
+                )
                 _LOGGER.debug(
                     "Unsupported LightDevice (%db) bytes: %s",
                     len(raw),
-                    _redact_proto_bytes_to_hex(raw),
+                    bytes_str,
                 )
         return None
 
