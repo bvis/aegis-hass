@@ -374,13 +374,17 @@ Configured in the integration's Options flow (Settings → Devices & Services �
 
 All four belong to the **same Firebase project** — the one your Ajax mobile app uses for its own push notifications. The integration registers with that project as an additional FCM client, so it needs the same four values the app already carries.
 
+These four values are **app-wide identifiers**, not per-user secrets — every installation of the same Ajax build (or co-branded variant) uses the same four values, and they identify the Firebase project the app talks to rather than any individual account. The project still doesn't ship them for you because (a) the values differ per co-branded variant — Ajax, Protegim, AIKO, etc. each have their own — and (b) project policy keeps third-party identifiers out of our repository regardless.
+
 ### Where the values live
 
-Three of the four are plain strings in the Android APK's resources at `res/values/strings.xml`:
+Three of the four are stored in the Android APK's resource file at `res/values/strings.xml`. Note that Android compiles resource XML to a binary format before packaging, so simply renaming the APK to `.zip` and extracting it will give you unreadable bytes for that file — you'll want a standard Android resource viewer like [`apktool`](https://apktool.org/) to read it back into plain text.
+
+Once readable, three of the four values appear as named entries:
 
 - `project_id` — short slug, e.g. `my-firebase-project-id` (kebab-case, no spaces)
 - `gcm_defaultSenderId` — pure digit string (~12 digits, no prefix); the same digits that appear between the first two colons of `google_app_id`
-- `google_app_id` — `1:<sender_id>:android:<long hex hash>` (starts with `1:`, ends with a ~40-char hex blob)
+- `google_app_id` — `1:<sender_id>:android:<hex tail>` (starts with `1:`, followed by the sender digits, the literal `:android:`, and a hex string whose length varies by Firebase project — current Ajax builds ship a 16-char tail; Firebase's [own canonical example](https://firebase.google.com/support/guides/init-options) is also 16)
 
 The fourth, `google_api_key`, is **not** in `strings.xml` (the entry there is a placeholder string); it ships inside the native library bundled with the APK at `lib/<arch>/libnative-lib.so`. The value starts with `AIza` and is exactly 39 characters long, so it's easy to spot when scanning printable strings out of the binary.
 
