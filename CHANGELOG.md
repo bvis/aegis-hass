@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.5] - 2026-05-24
+
+### Fixed
+- **Saved FCM API Key no longer gets wiped by a benign re-submit of the Options form** (#183, reported by @raven2k24). When the user re-opened **Configure → Options** for any reason — verifying values, tweaking the poll interval, toggling `Force arm` — HA's frontend left the `FCM API Key` field blank because password TextSelectors never display saved secrets, even masked. Clicking Submit then sent an empty string for `fcm_api_key`, which the options handler interpreted as "clear this field" and popped the saved key out of `entry.data`. The other three FCM fields survived (text TextSelectors round-trip their saved values via `suggested_value`) so the integration ended up with three of four values and warned `FCM credentials not configured` on the next reload, with no obvious way for the user to tell which value had been wiped. An empty submission on `fcm_api_key` is now treated as "leave alone" — only the explicit `Delete FCM credentials` toggle wipes the key. The other three fields keep their existing clear-via-empty-string behavior because they DO round-trip their values, so an empty submission there reflects an actual user intent (#138 preserved). Symmetric companion to #138's no-can-delete bug: now you can keep what's there AND still delete via the toggle, without the password-selector blind spot biting either way.
+
 ## [1.5.3-beta.4] - 2026-05-24
 
 ### Changed

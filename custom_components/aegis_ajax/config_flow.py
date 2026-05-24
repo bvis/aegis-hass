@@ -465,11 +465,17 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
             #      four keys unconditionally — the unambiguous deletion
             #      path, immune to selector-default round-trips.
             #   2. Otherwise, any non-empty value in a FCM field updates
-            #      that key. An empty string also clears the key, but
-            #      only if the field was actually submitted as empty —
-            #      the password selector tends to round-trip its prior
-            #      value, so the toggle above is the recommended way to
-            #      clear credentials (issue #138).
+            #      that key. An empty `fcm_api_key` submission is treated
+            #      as "leave alone" because that field is a password
+            #      TextSelector — HA's frontend never displays a saved
+            #      secret, so re-opening Options shows the API Key blank
+            #      regardless of what was persisted. Without this guard
+            #      a benign re-submit (e.g. to update the poll interval)
+            #      wiped the saved key (#183). The explicit toggle is
+            #      the only path that clears the API Key. The other
+            #      three FCM fields DO round-trip their saved values
+            #      via `suggested_value`, so an empty submission there
+            #      is a deliberate clear and still pops the key (#138).
             clear_fcm = user_input.pop("clear_fcm_credentials", False)
             fcm_input = {k: user_input.pop(k) for k in _FCM_KEYS if k in user_input}
             new_data = {**self._entry.data}
@@ -480,6 +486,8 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                 for k, v in fcm_input.items():
                     if v:
                         new_data[k] = v
+                    elif k == "fcm_api_key":
+                        continue
                     else:
                         new_data.pop(k, None)
             if new_data != self._entry.data:

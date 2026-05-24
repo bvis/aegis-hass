@@ -669,8 +669,16 @@ class TestOptionsFlow:
             assert k not in stored_options
 
     @pytest.mark.asyncio
-    async def test_options_flow_clearing_all_fcm_fields_removes_from_data(self) -> None:
-        """Empty strings for every FCM field remove them from entry.data (issue #138)."""
+    async def test_options_flow_clearing_three_text_fcm_fields_removes_them(self) -> None:
+        """Empty strings for the three text FCM fields remove them (#138).
+
+        `fcm_api_key` is the password TextSelector — see
+        `test_options_flow_empty_api_key_preserves_saved_value` for
+        why an empty submission there is intentionally a no-op (#183).
+        Only the three text fields (project_id, app_id, sender_id)
+        round-trip their saved values via `suggested_value`, so a user
+        actively emptying one of them is a deliberate clear.
+        """
         flow, entry = self._make_flow(
             data={
                 "email": "x@y",
@@ -696,19 +704,67 @@ class TestOptionsFlow:
 
         flow.hass.config_entries.async_update_entry.assert_called_once()
         new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
-        for k in ("fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"):
+        for k in ("fcm_project_id", "fcm_app_id", "fcm_sender_id"):
             assert k not in new_data, f"{k} should be removed when cleared"
+        # fcm_api_key sticks (use the explicit toggle to wipe it).
+        assert new_data["fcm_api_key"] == "old_key"
         assert new_data["email"] == "x@y"
 
     @pytest.mark.asyncio
-    async def test_options_flow_clearing_one_fcm_field_keeps_others(self) -> None:
-        """Clearing only one FCM field removes that key while keeping the rest."""
+    async def test_options_flow_empty_api_key_preserves_saved_value(self) -> None:
+        """Empty `fcm_api_key` on resubmit must NOT wipe the saved key (#183).
+
+        Reproduces the bug raven2k24 hit on `1.5.1`: HA's frontend
+        leaves password TextSelectors blank when re-opening a form
+        (it won't display saved secrets, even masked), so a benign
+        re-submit — e.g. changing the poll interval — used to wipe the
+        previously-saved API key because the empty submission ran
+        through the `else: pop` branch. After this fix, only the
+        explicit `Delete FCM credentials` toggle wipes the key.
+        """
         flow, entry = self._make_flow(
             data={
-                "fcm_project_id": "old_proj",
-                "fcm_app_id": "old_app",
-                "fcm_api_key": "old_key",
-                "fcm_sender_id": "old_sender",
+                "fcm_project_id": "proj",
+                "fcm_app_id": "1:99:android:abc",
+                "fcm_api_key": "AIza-saved-secret",
+                "fcm_sender_id": "99",
+            }
+        )
+        flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        flow.hass.config_entries.async_update_entry = MagicMock()
+
+        await flow.async_step_init(
+            {
+                "poll_interval": 90,  # the change the user actually came for
+                "use_pin_code": False,
+                "fcm_project_id": "proj",
+                "fcm_app_id": "1:99:android:abc",
+                "fcm_api_key": "",  # password field: blank on re-open
+                "fcm_sender_id": "99",
+            }
+        )
+
+        # async_update_entry only fires when new_data != entry.data.
+        # If we wipe api_key we mutate data and trigger a reload; if we
+        # leave it alone, data is unchanged and no save happens. Either
+        # branch must end with the saved api_key intact, so check both.
+        if flow.hass.config_entries.async_update_entry.called:
+            new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
+            assert new_data["fcm_api_key"] == "AIza-saved-secret"
+        else:
+            assert entry.data["fcm_api_key"] == "AIza-saved-secret"
+
+    @pytest.mark.asyncio
+    async def test_options_flow_typed_api_key_still_overwrites_saved_value(self) -> None:
+        """The no-op-on-empty guard only fires for empty submissions —
+        if the user actually re-types the API key, the new value wins.
+        """
+        flow, entry = self._make_flow(
+            data={
+                "fcm_project_id": "proj",
+                "fcm_app_id": "1:99:android:abc",
+                "fcm_api_key": "AIza-old",
+                "fcm_sender_id": "99",
             }
         )
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
@@ -718,18 +774,15 @@ class TestOptionsFlow:
             {
                 "poll_interval": 60,
                 "use_pin_code": False,
-                "fcm_project_id": "new_proj",
-                "fcm_app_id": "new_app",
-                "fcm_api_key": "",
-                "fcm_sender_id": "new_sender",
+                "fcm_project_id": "proj",
+                "fcm_app_id": "1:99:android:abc",
+                "fcm_api_key": "AIza-new",
+                "fcm_sender_id": "99",
             }
         )
 
         new_data = flow.hass.config_entries.async_update_entry.call_args[1]["data"]
-        assert new_data["fcm_project_id"] == "new_proj"
-        assert new_data["fcm_app_id"] == "new_app"
-        assert "fcm_api_key" not in new_data
-        assert new_data["fcm_sender_id"] == "new_sender"
+        assert new_data["fcm_api_key"] == "AIza-new"
 
     @pytest.mark.asyncio
     async def test_options_flow_clear_fcm_toggle_removes_all_keys(self) -> None:
