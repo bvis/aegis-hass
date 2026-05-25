@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Capturați fotografie"
+            },
+            "refresh_hub": {
+                "name": "Reîmprospătează hub-ul"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Firmware"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Conexiunea de rețea a hub-ului (HTS) nu este activă acum; reîmprospătarea manuală nu poate rula."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Reîmprospătarea hub-ului tocmai a fost cerută; așteaptă încă {seconds} secunde și încearcă din nou."
         }
     }
 }

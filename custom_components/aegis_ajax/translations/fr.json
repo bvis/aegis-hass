@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Prendre une photo"
+            },
+            "refresh_hub": {
+                "name": "Actualiser le hub"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Micrologiciel"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "La connexion réseau du hub (HTS) n'est pas active pour le moment ; l'actualisation manuelle ne peut pas s'exécuter."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Une actualisation du hub vient d'être demandée ; attendez encore {seconds} secondes et réessayez."
         }
     }
 }

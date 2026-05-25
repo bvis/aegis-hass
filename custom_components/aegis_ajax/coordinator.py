@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -60,6 +60,15 @@ _LOGGER = logging.getLogger(__name__)
 # expected to take action (check hub power, firewall, etc).
 _HUB_OFFLINE_THRESHOLD_HOURS = 24
 _HTS_CHRONIC_FAILURE_SECONDS = 30 * 60
+
+# Minimum seconds between two user-triggered STATUS_BODY refresh requests
+# on the same hub. The periodic refresh loop already runs every 60 s
+# (`STATUS_REFRESH_INTERVAL` in `hts/client.py`), so a manual press more
+# often than that surfaces no fresher data — the next periodic tick
+# would have caught any change anyway. Capping at the same cadence
+# stops a misbehaving automation from hammering the hub while letting
+# users still bypass the wait once per minute when needed.
+MANUAL_REFRESH_INTERVAL = 60
 
 # Map proto status field name to internal key used by binary_sensor/sensor.
 # Module-level constant to avoid recreating on every status update.
@@ -136,6 +145,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
+        # Monotonic timestamp of the last user-triggered STATUS_BODY
+        # refresh per hub. Read by `async_request_manual_refresh` to
+        # rate-limit successive presses to `MANUAL_REFRESH_INTERVAL`.
+        self._last_manual_refresh: dict[str, float] = {}
         self.hub_network: dict[str, HubNetworkState] = {}
         # Per-device electrical readings (current_ma / power_consumed_wh)
         # populated from HTS STATUS_BODY rows of WallSwitch / Socket
@@ -611,6 +624,40 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cached value until the next delta refreshes it.
         """
         return self._hts_client is not None
+
+    async def async_request_manual_refresh(self, hub_id: str) -> None:
+        """Trigger a one-shot STATUS_BODY refresh for `hub_id`, rate-limited.
+
+        Backs the per-hub refresh button. The integration already runs a
+        periodic refresh per hub every `STATUS_REFRESH_INTERVAL` seconds,
+        so the button exists to bridge that gap when a user wants fresh
+        readings *now* (e.g. immediately after switching an appliance
+        on). To stop an automation looped on `button.press` from
+        hammering the hub, two presses on the same hub within
+        `MANUAL_REFRESH_INTERVAL` seconds raise `HomeAssistantError`
+        with a translated message telling the user how long to wait.
+
+        Raises:
+            HomeAssistantError: HTS isn't connected, or another manual
+                refresh is still inside the rate-limit window.
+        """
+        if self._hts_client is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="manual_refresh_hts_unavailable",
+            )
+        now = time.monotonic()
+        last = self._last_manual_refresh.get(hub_id, 0.0)
+        elapsed = now - last
+        if elapsed < MANUAL_REFRESH_INTERVAL:
+            wait = max(1, int(MANUAL_REFRESH_INTERVAL - elapsed))
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="manual_refresh_rate_limited",
+                translation_placeholders={"seconds": str(wait)},
+            )
+        self._last_manual_refresh[hub_id] = now
+        await self._hts_client.request_full_status(hub_id)
 
     def _handle_hts_disconnect(self, *, reconnect: bool = True) -> None:
         """Drop the live HTS client; preserve cached snapshots (#146).

@@ -493,6 +493,15 @@ class HtsClient:
         """REQUEST_FULL_STATUS (sub-key=7) — lighter, ~2.7 KB response with live readings."""
         await self._send_request_payload(hub_id, sub_key=7, label="REQUEST_FULL_STATUS")
 
+    async def request_full_status(self, hub_id: str) -> None:
+        """Public wrapper for one-shot STATUS_BODY refresh requests.
+
+        Same wire shape as the periodic refresh loop, exposed so the
+        coordinator can drive a user-triggered manual refresh through
+        the button entity without reaching into a private method.
+        """
+        await self._send_request_full_status(hub_id)
+
     async def _send_request_payload(self, hub_id: str, *, sub_key: int, label: str) -> None:
         """Generic 3-param REQUEST sender shared by SETTINGS and STATUS variants."""
         if self._writer is None:

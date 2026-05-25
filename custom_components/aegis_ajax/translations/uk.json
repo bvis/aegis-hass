@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Зробити фото"
+            },
+            "refresh_hub": {
+                "name": "Оновити хаб"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Прошивка"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Мережеве з'єднання хаба (HTS) зараз не активне; ручне оновлення не може бути виконане."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Оновлення хаба щойно було запитано; зачекайте ще {seconds} секунд і спробуйте знову."
         }
     }
 }

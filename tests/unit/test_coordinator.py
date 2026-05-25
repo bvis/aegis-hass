@@ -1675,3 +1675,76 @@ class TestOnHtsDeviceKv:
         assert coordinator.is_hts_alive is True
         coordinator._hts_client = None
         assert coordinator.is_hts_alive is False
+
+
+class TestManualHubRefresh:
+    """Coordinator-level guard for the per-hub manual refresh button (#179)."""
+
+    @pytest.mark.asyncio
+    async def test_raises_when_hts_not_connected(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _make_coordinator()
+        # Default `_hts_client` is None — HTS has never connected.
+        with pytest.raises(HomeAssistantError) as exc:
+            await coordinator.async_request_manual_refresh("hub-1")
+        assert exc.value.translation_key == "manual_refresh_hts_unavailable"
+
+    @pytest.mark.asyncio
+    async def test_first_call_dispatches(self) -> None:
+        coordinator = _make_coordinator()
+        hts = MagicMock()
+        hts.request_full_status = AsyncMock()
+        coordinator._hts_client = hts
+
+        await coordinator.async_request_manual_refresh("hub-1")
+
+        hts.request_full_status.assert_awaited_once_with("hub-1")
+        assert "hub-1" in coordinator._last_manual_refresh
+
+    @pytest.mark.asyncio
+    async def test_second_call_within_window_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _make_coordinator()
+        hts = MagicMock()
+        hts.request_full_status = AsyncMock()
+        coordinator._hts_client = hts
+
+        await coordinator.async_request_manual_refresh("hub-1")
+        with pytest.raises(HomeAssistantError) as exc:
+            await coordinator.async_request_manual_refresh("hub-1")
+
+        assert exc.value.translation_key == "manual_refresh_rate_limited"
+        assert exc.value.translation_placeholders is not None
+        assert "seconds" in exc.value.translation_placeholders
+        hts.request_full_status.assert_awaited_once()  # second call did NOT dispatch
+
+    @pytest.mark.asyncio
+    async def test_second_call_after_window_dispatches(self) -> None:
+        coordinator = _make_coordinator()
+        hts = MagicMock()
+        hts.request_full_status = AsyncMock()
+        coordinator._hts_client = hts
+
+        with patch("custom_components.aegis_ajax.coordinator.time") as time_mod:
+            time_mod.monotonic.side_effect = [1000.0, 1061.0]
+            await coordinator.async_request_manual_refresh("hub-1")
+            await coordinator.async_request_manual_refresh("hub-1")
+
+        assert hts.request_full_status.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_is_per_hub(self) -> None:
+        coordinator = _make_coordinator()
+        hts = MagicMock()
+        hts.request_full_status = AsyncMock()
+        coordinator._hts_client = hts
+
+        await coordinator.async_request_manual_refresh("hub-1")
+        # Different hub on the same tick — independent budget, must dispatch.
+        await coordinator.async_request_manual_refresh("hub-2")
+
+        assert hts.request_full_status.await_count == 2
+        hts.request_full_status.assert_any_await("hub-1")
+        hts.request_full_status.assert_any_await("hub-2")

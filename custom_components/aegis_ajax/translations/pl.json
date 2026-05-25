@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Zrób zdjęcie"
+            },
+            "refresh_hub": {
+                "name": "Odśwież hub"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Oprogramowanie"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Połączenie sieciowe huba (HTS) nie jest obecnie aktywne; ręczne odświeżanie nie może zostać wykonane."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Odświeżenie huba właśnie zostało zlecone; poczekaj jeszcze {seconds} sekund i spróbuj ponownie."
         }
     }
 }

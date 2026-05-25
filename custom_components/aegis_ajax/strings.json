@@ -217,10 +217,21 @@
             "description": "Aegis depends on `grpcio` for the gRPC channel that talks to the Ajax cloud, and your Home Assistant install ships `grpcio` {current}. Login can fail with cryptic HTTP/2 errors below {required}. On Home Assistant Core or Container the integration manifest pins the version on install, but on Home Assistant OS the runtime ships system-wide grpcio that this manifest cannot influence — you'll typically need to upgrade Home Assistant OS to a build that includes a newer grpcio. The Repair clears automatically on the next reload once the version crosses {required}."
         }
     },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "The hub network (HTS) connection is not active right now; the manual refresh cannot run."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Hub refresh was just requested; wait {seconds} more seconds and try again."
+        }
+    },
     "entity": {
         "button": {
             "capture_photo": {
                 "name": "Capture photo"
+            },
+            "refresh_hub": {
+                "name": "Refresh hub"
             }
         },
         "event": {

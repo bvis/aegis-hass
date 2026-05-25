@@ -242,6 +242,9 @@
         "button": {
             "capture_photo": {
                 "name": "Capture photo"
+            },
+            "refresh_hub": {
+                "name": "Refresh hub"
             }
         },
         "event": {
@@ -411,6 +414,14 @@
             "hub_firmware": {
                 "name": "Firmware"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "The hub network (HTS) connection is not active right now; the manual refresh cannot run."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Hub refresh was just requested; wait {seconds} more seconds and try again."
         }
     }
 }

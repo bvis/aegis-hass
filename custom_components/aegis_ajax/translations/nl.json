@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Foto maken"
+            },
+            "refresh_hub": {
+                "name": "Hub vernieuwen"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Firmware"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "De netwerkverbinding van de hub (HTS) is momenteel niet actief; de handmatige verversing kan niet worden uitgevoerd."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "De hub-verversing is net aangevraagd; wacht nog {seconds} seconden en probeer het opnieuw."
         }
     }
 }

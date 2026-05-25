@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Pořídit fotografii"
+            },
+            "refresh_hub": {
+                "name": "Aktualizovat hub"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Firmware"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Síťové spojení huba (HTS) momentálně není aktivní; ruční aktualizaci nelze spustit."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Aktualizace huba byla právě vyžádána; počkejte ještě {seconds} sekund a zkuste to znovu."
         }
     }
 }

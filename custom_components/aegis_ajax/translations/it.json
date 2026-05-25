@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Scatta foto"
+            },
+            "refresh_hub": {
+                "name": "Aggiorna hub"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Firmware"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "La connessione di rete del hub (HTS) non è attiva al momento; l'aggiornamento manuale non può essere eseguito."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "L'aggiornamento del hub è stato appena richiesto; attendi altri {seconds} secondi e riprova."
         }
     }
 }

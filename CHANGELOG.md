@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3-beta.15] - 2026-05-25
+
+### Added
+- **Manual hub refresh button** (#179, follow-up to @SaetanSaDiablo's beta.13 confirmation). One `button.<hub>_refresh_hub` entity per configured hub, diagnostic category. Pressing it dispatches a one-shot HTS `REQUEST_FULL_STATUS` for that hub — the same wire request the new periodic loop in beta.13 fires every 60 seconds — so live readings catch up to the Ajax mobile app within seconds instead of waiting for the next periodic tick. The mobile app polls at roughly 30-35 seconds; the periodic refresh stays at 60 seconds for now (we have no direct capture of the mobile-app traffic to confirm the cadence is a polling cadence rather than a server push to its session). The button is the bridge between those two — automations can trigger a refresh after toggling an appliance, dashboards can show a "Refresh now" action.
+- **Per-hub 60 s rate-limit on the refresh button.** Two presses within 60 seconds on the same hub raise a translated `HomeAssistantError` naming the wait time. Below 60 s a manual refresh surfaces no fresher data anyway — the periodic loop already covers that window — so the cap matches the periodic cadence (`MANUAL_REFRESH_INTERVAL` in `coordinator.py` lines up with `STATUS_REFRESH_INTERVAL` in `api/hts/client.py`). Rate-limit is independent per hub. The button also goes `unavailable` while HTS is disconnected so the UI is consistent with `mains_power` and the other HTS-gated entities.
+- **Translations land in all 14 locales** for the button name (`Refresh hub` and equivalents) and the two new error messages (`manual_refresh_hts_unavailable` / `manual_refresh_rate_limited` under the new `exceptions` top-level key in `strings.json`).
+
 ## [1.5.3-beta.14] - 2026-05-25
 
 ### Internal — refactors only, no functional change

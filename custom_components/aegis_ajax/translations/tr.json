@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Fotoğraf çek"
+            },
+            "refresh_hub": {
+                "name": "Hub'ı yenile"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Donanım yazılımı"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Hub ağ bağlantısı (HTS) şu anda etkin değil; manuel yenileme çalıştırılamaz."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Hub yenilemesi az önce istendi; {seconds} saniye daha bekleyin ve tekrar deneyin."
         }
     }
 }

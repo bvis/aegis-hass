@@ -226,6 +226,9 @@
         "button": {
             "capture_photo": {
                 "name": "Capturar foto"
+            },
+            "refresh_hub": {
+                "name": "Actualitza el hub"
             }
         },
         "event": {
@@ -395,6 +398,14 @@
             "hub_firmware": {
                 "name": "Microprogramari"
             }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "La connexió de xarxa del hub (HTS) no està activa ara mateix; l'actualització manual no es pot executar."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "L'actualització del hub s'acaba de demanar; espera {seconds} segons més i torna-ho a provar."
         }
     }
 }
