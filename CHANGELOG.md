@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.2] - 2026-05-26
+## [1.6.2-beta.1] - 2026-05-27
 
 ### Fixed
 - **Duplicate MotionCam Video Doorbell card no longer survives restarts** (#173, follow-up — diagnostics from @brunovdw68 on `ajax_pro`). The `1.5.2` dedup drops the `motion_cam_video_*` Jeweller-side twin when its `video_edge_*` sibling is in the same snapshot, but the coordinator *merges* each stream snapshot into its device set rather than replacing it (so multi-space installs don't wipe each other). A ghost that had been persisted to the warm-start cache before its sibling appeared was therefore never removed by the merge — it reloaded from cache on every restart, kept its spurious `malfunctions=1` bubbling up to the space malfunction counter, and couldn't be deleted by the user because the integration was still providing it. The dedup now re-runs across the full merged device set (on cache load and after every stream snapshot), and any dropped ghost is also evicted from Home Assistant's device registry so its card and entities disappear automatically — no manual deletion needed. The unbalanced #119 case (only the hub_device twin present, no `video_edge_*` sibling) is unchanged: that doorbell is kept. (Note: the separate report in this thread that doorbell and motion events don't arrive is being tracked independently — it's an event-routing question, not the duplicate.)
