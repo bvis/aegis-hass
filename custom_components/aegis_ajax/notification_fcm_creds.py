@@ -113,12 +113,16 @@ def _classify_fcm_failure(exc: BaseException) -> str:
         )
     if "unable to register with fcm" in lower:
         return (
-            "Firebase Installations refused the api-key for this Android package "
-            "(HTTP 403 API_KEY_ANDROID_APP_BLOCKED). The Ajax APK's native library "
-            "usually contains several `AIza…` strings — one for FCM and one or more "
-            "for Google Maps / ML Kit. Only the FCM-scoped key is accepted here. "
-            "If you extracted just the first `AIza…` you found, try the others via "
-            "the Repair card under Settings → Repairs. See "
+            "Firebase Installations refused the api-key (HTTP 403 — "
+            "API_KEY_ANDROID_APP_BLOCKED or API_KEY_SERVICE_BLOCKED). Both point "
+            "at the wrong `AIza…` key: the Ajax APK's native library ships several "
+            "`AIza…` strings — one for FCM and one or more for other Google "
+            "services (Maps / ML Kit), and `strings.xml`'s `google_maps_key` is a "
+            "real `AIza…` that is NOT the FCM key. Only the FCM-scoped key from "
+            "`libnative-lib.so` is accepted here; a Maps-scoped key surfaces as "
+            "API_KEY_SERVICE_BLOCKED, a package-restricted one as "
+            "API_KEY_ANDROID_APP_BLOCKED. If you extracted the wrong `AIza…`, try "
+            "the others via the Repair card under Settings → Repairs. See "
             "https://github.com/bvis/aegis-hass#where-the-values-live for the "
             "extraction guide."
         )

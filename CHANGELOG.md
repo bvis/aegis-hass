@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2-beta.2] - 2026-05-27
+
+### Changed
+- **FCM 403 warning now names `API_KEY_SERVICE_BLOCKED` alongside `API_KEY_ANDROID_APP_BLOCKED`** (#194, reported by @raven2k24). Both 403 sub-codes from Firebase Installations share the same cause — the wrong `AIza…` key — and the same fix: use the FCM-scoped key from `libnative-lib.so`, not the `google_maps_key` in `strings.xml` (which is a real `AIza…` but scoped to Maps and surfaces as `SERVICE_BLOCKED`). The classifier message now explains both so a user hitting `SERVICE_BLOCKED` recognises it's the same wrong-key situation. Confirmed against @raven2k24's extracted values: project / app_id / sender all correct for `com.ajaxsystems` (Project B, `elite-dreamer-676`), only the api_key was a non-FCM `AIza…`.
+
 ## [1.6.2-beta.1] - 2026-05-27
 
 ### Fixed

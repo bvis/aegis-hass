@@ -865,7 +865,11 @@ class TestClassifyFcmFailure:
         # (Maps / ML Kit). Surface that explanation so future users
         # don't go down the paste-truncation rabbit hole.
         msg = _classify_fcm_failure(RuntimeError("Unable to register with fcm"))
+        # Both 403 sub-codes share the same cause (wrong AIza key) and remedy,
+        # so the message names both: ANDROID_APP_BLOCKED (package-restricted
+        # key) and SERVICE_BLOCKED (Maps/other-service key — raven2k24's #194).
         assert "API_KEY_ANDROID_APP_BLOCKED" in msg
+        assert "API_KEY_SERVICE_BLOCKED" in msg
         assert "AIza" in msg  # the wrong-string explanation
         assert "Repair card" in msg
 
