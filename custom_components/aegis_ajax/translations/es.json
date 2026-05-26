@@ -422,6 +422,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Acabas de pedir una actualización del hub; espera {seconds} segundos más e inténtalo de nuevo."
+        },
+        "photo_capture_failed": {
+            "message": "La captura de la foto no se completó. El hub puede haber rechazado la solicitud o no devolvió ninguna imagen; consulta los registros para más detalles."
+        },
+        "photo_no_push": {
+            "message": "La foto bajo demanda requiere notificaciones push FCM, que no están configuradas para esta integración."
+        },
+        "photo_capture_timeout": {
+            "message": "Se agotó el tiempo de espera para que la cámara entregara la foto capturada. Inténtalo de nuevo y comprueba que la cámara esté en línea."
         }
     }
 }

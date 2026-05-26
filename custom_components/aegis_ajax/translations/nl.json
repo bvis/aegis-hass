@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "De hub-verversing is net aangevraagd; wacht nog {seconds} seconden en probeer het opnieuw."
+        },
+        "photo_capture_failed": {
+            "message": "De foto-opname is niet voltooid. De hub heeft het verzoek mogelijk geweigerd of geen afbeelding teruggegeven; bekijk de logboeken voor details."
+        },
+        "photo_no_push": {
+            "message": "Foto op aanvraag vereist FCM-pushmeldingen, die niet zijn geconfigureerd voor deze integratie."
+        },
+        "photo_capture_timeout": {
+            "message": "Time-out tijdens het wachten tot de camera de gemaakte foto levert. Probeer het opnieuw en controleer of de camera online is."
         }
     }
 }

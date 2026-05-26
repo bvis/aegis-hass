@@ -203,3 +203,88 @@ class TestRefreshHubButtonPress:
     def test_unique_id_is_per_hub(self) -> None:
         button, _ = self._make_button()
         assert button.unique_id == "aegis_ajax_hub-1_refresh_hub"
+
+
+class TestCapturePhotoButtonFailures:
+    """A photo capture that doesn't complete must surface to the user (#193)."""
+
+    def _make_button(self) -> tuple[object, object]:
+        from custom_components.aegis_ajax.button import AjaxCapturePhotoButton
+
+        coordinator = _make_coordinator()
+        coordinator.devices = {
+            "cam-1": Device(
+                id="cam-1",
+                hub_id="hub-1",
+                name="Hallway Cam",
+                device_type="motion_cam_phod",
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={},
+                battery=None,
+            )
+        }
+        coordinator.rooms = {}
+        coordinator.last_photo_urls = {}
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.capture_photo = AsyncMock(return_value=True)
+        coordinator._media_api = MagicMock()
+        coordinator._media_api.get_photo_url = AsyncMock(return_value="http://x/p.jpg")
+        listener = MagicMock()
+        listener.wait_for_notification_id = AsyncMock(return_value="notif-1")
+        coordinator._notification_listener = listener
+        button = AjaxCapturePhotoButton(
+            coordinator=coordinator,
+            device_id="cam-1",
+            hub_id="hub-1",
+            device_type="motion_cam_phod",
+        )
+        button.hass = MagicMock()
+        return button, coordinator
+
+    @pytest.mark.asyncio
+    async def test_capture_not_accepted_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, coordinator = self._make_button()
+        coordinator._devices_api.capture_photo = AsyncMock(return_value=False)
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "photo_capture_failed"
+
+    @pytest.mark.asyncio
+    async def test_no_push_listener_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, coordinator = self._make_button()
+        coordinator._notification_listener = None
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "photo_no_push"
+
+    @pytest.mark.asyncio
+    async def test_notification_timeout_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, coordinator = self._make_button()
+        coordinator._notification_listener.wait_for_notification_id = AsyncMock(return_value=None)
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "photo_capture_timeout"
+
+    @pytest.mark.asyncio
+    async def test_no_url_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, coordinator = self._make_button()
+        coordinator._media_api.get_photo_url = AsyncMock(return_value=None)
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "photo_capture_failed"

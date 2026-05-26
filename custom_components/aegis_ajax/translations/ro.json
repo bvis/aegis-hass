@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Reîmprospătarea hub-ului tocmai a fost cerută; așteaptă încă {seconds} secunde și încearcă din nou."
+        },
+        "photo_capture_failed": {
+            "message": "Capturarea fotografiei nu s-a finalizat. Hub-ul ar fi putut respinge cererea sau nu a returnat nicio imagine; verifică jurnalele pentru detalii."
+        },
+        "photo_no_push": {
+            "message": "Fotografia la cerere necesită notificări push FCM, care nu sunt configurate pentru această integrare."
+        },
+        "photo_capture_timeout": {
+            "message": "Timpul de așteptare a expirat în timp ce camera livra fotografia capturată. Încearcă din nou și verifică dacă camera este online."
         }
     }
 }

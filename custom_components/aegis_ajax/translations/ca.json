@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "L'actualització del hub s'acaba de demanar; espera {seconds} segons més i torna-ho a provar."
+        },
+        "photo_capture_failed": {
+            "message": "La captura de la foto no s'ha completat. El hub pot haver rebutjat la sol·licitud o no ha retornat cap imatge; consulta els registres per a més detalls."
+        },
+        "photo_no_push": {
+            "message": "La foto sota demanda requereix notificacions push FCM, que no estan configurades per a aquesta integració."
+        },
+        "photo_capture_timeout": {
+            "message": "S'ha esgotat el temps d'espera perquè la càmera lliuri la foto capturada. Torna-ho a provar i comprova que la càmera estigui en línia."
         }
     }
 }

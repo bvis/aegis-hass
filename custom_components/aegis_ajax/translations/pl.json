@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Odświeżenie huba właśnie zostało zlecone; poczekaj jeszcze {seconds} sekund i spróbuj ponownie."
+        },
+        "photo_capture_failed": {
+            "message": "Przechwytywanie zdjęcia nie zostało ukończone. Hub mógł odrzucić żądanie lub nie zwrócił obrazu; szczegóły znajdziesz w logach."
+        },
+        "photo_no_push": {
+            "message": "Zdjęcie na żądanie wymaga powiadomień push FCM, które nie są skonfigurowane dla tej integracji."
+        },
+        "photo_capture_timeout": {
+            "message": "Upłynął limit czasu oczekiwania na dostarczenie zrobionego zdjęcia przez kamerę. Spróbuj ponownie i sprawdź, czy kamera jest online."
         }
     }
 }

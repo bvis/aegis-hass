@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-05-26
+
+### Changed
+- **The "Capture photo" button now reports failures in the UI instead of doing nothing** (#193, reported by @runnermhr). A photo capture runs through several asynchronous steps (request accepted by the hub → wait for the FCM photo notification → fetch the image URL → download → save), and any of them can fail on some camera firmwares or when FCM isn't configured. Previously every failure path logged at DEBUG and returned silently, so a user who pressed the button just found an empty media folder with nothing in the default-level log to explain why. Each step now raises a translated `HomeAssistantError` — surfaced as a UI notification — and logs at WARNING: a rejected capture or missing image URL ("the photo capture did not complete"), no FCM configured ("photo on demand requires FCM push notifications"), or a timeout waiting for the camera ("timed out waiting for the camera to deliver the captured photo"). Translations land in all 14 locales. Note: captured photos are saved under a per-device subfolder, `media/ajax_photos/<device name>/`, not directly in `media/ajax_photos/`.
+
 ## [1.6.0] - 2026-05-26
 
 MINOR release. New live-reading surface for the Outlet Type E / F socket family (power, voltage, current, energy), a one-shot manual hub refresh button usable from both the UI and automations, and a periodic STATUS_BODY refresh loop so live device readings stay current without waiting for the hub's own sparse delta pushes. Plus a chain of FCM-registration fixes for co-branded users (Ajax's co-brand Firebase api-key has Google's Android-app package restriction enabled; the upstream Python library wasn't sending `X-Android-Package`), an Options-form bug that wiped users' saved FCM API key on a benign re-submit, the doorbell-duplicate fix from the parked `1.5.2-beta.1`, and a sizeable internal refactor pass collapsing several hand-rolled duplicated classes.

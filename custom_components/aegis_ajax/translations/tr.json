@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Hub yenilemesi az önce istendi; {seconds} saniye daha bekleyin ve tekrar deneyin."
+        },
+        "photo_capture_failed": {
+            "message": "Fotoğraf çekimi tamamlanmadı. Hub isteği reddetmiş veya hiç görüntü döndürmemiş olabilir; ayrıntılar için günlükleri kontrol edin."
+        },
+        "photo_no_push": {
+            "message": "İstek üzerine fotoğraf, bu entegrasyon için yapılandırılmamış olan FCM anlık bildirimlerini gerektirir."
+        },
+        "photo_capture_timeout": {
+            "message": "Kameranın çekilen fotoğrafı teslim etmesi beklenirken zaman aşımına uğradı. Tekrar deneyin ve kameranın çevrimiçi olduğunu kontrol edin."
         }
     }
 }

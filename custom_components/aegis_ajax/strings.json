@@ -223,6 +223,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Hub refresh was just requested; wait {seconds} more seconds and try again."
+        },
+        "photo_capture_failed": {
+            "message": "The photo capture did not complete. The hub may have rejected the request or returned no image; check the logs for details."
+        },
+        "photo_no_push": {
+            "message": "Photo on demand requires FCM push notifications, which are not configured for this integration."
+        },
+        "photo_capture_timeout": {
+            "message": "Timed out waiting for the camera to deliver the captured photo. Try again, and check the camera is online."
         }
     },
     "entity": {

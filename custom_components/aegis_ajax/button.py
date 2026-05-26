@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.camera import PHOD_DEVICE_TYPES
+from custom_components.aegis_ajax.const import DOMAIN
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
 
@@ -107,53 +109,83 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
             self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     async def async_press(self) -> None:
-        """Trigger photo capture and retrieve the photo URL."""
+        """Trigger photo capture, retrieve the URL, download and save it.
+
+        A button press is an explicit user action, so every failure path
+        raises `HomeAssistantError` (surfaced as a UI notification) instead
+        of returning silently. Before this, a capture that the hub never
+        completed — common on some camera firmwares where the on-demand
+        request is rejected, or when FCM isn't configured so the photo
+        notification never arrives — left the user staring at an empty
+        media folder with nothing in the default-level log to explain why.
+        """
         _LOGGER.debug("Capture photo button pressed for %s", self._device_id)
         result = await self.coordinator.devices_api.capture_photo(
             self._hub_id, self._device_id, self._device_type
         )
         if not result:
-            _LOGGER.debug("Photo capture failed for %s", self._device_id)
-            return
+            _LOGGER.warning("Photo capture request not accepted by hub for %s", self._device_id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="photo_capture_failed"
+            )
 
         listener = self.coordinator.notification_listener
         if not listener:
-            return
+            _LOGGER.warning(
+                "Photo capture for %s needs FCM push notifications, which are not configured",
+                self._device_id,
+            )
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="photo_no_push")
 
-        # Wait for notification_id from FCM push
+        # The hub delivers the captured photo's id asynchronously via an FCM push.
         notification_id = await listener.wait_for_notification_id(self._device_id, timeout=15.0)
         if not notification_id:
-            _LOGGER.debug("No notification_id received for %s", self._device_id)
-            return
+            _LOGGER.warning(
+                "No photo notification arrived for %s within the timeout", self._device_id
+            )
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="photo_capture_timeout"
+            )
 
-        # Get photo URL via media stream
         url = await self.coordinator.media_api.get_photo_url(
             notification_id, self._hub_id, timeout=60.0
         )
-        if url:
-            _LOGGER.debug("Photo URL retrieved for %s: %s", self._device_id, url[:80])
-            # Download and save the photo
-            import aiohttp  # noqa: PLC0415
-            from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
-                async_get_clientsession,
+        if not url:
+            _LOGGER.warning("No photo URL returned by the hub for %s", self._device_id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="photo_capture_failed"
             )
 
-            from custom_components.aegis_ajax.photo_storage import (  # noqa: PLC0415
-                save_photo,
-            )
+        _LOGGER.debug("Photo URL retrieved for %s: %s", self._device_id, url[:80])
+        import aiohttp  # noqa: PLC0415
+        from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
+            async_get_clientsession,
+        )
 
-            session = async_get_clientsession(self.hass)
-            try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 200:
-                        image_bytes = await resp.read()
-                        # Save with timestamp overlay
-                        device = self.coordinator.devices.get(self._device_id)
-                        device_name = device.name if device else self._device_id
-                        await save_photo(self.hass, image_bytes, self._device_id, device_name)
-                        # Store for camera entity
-                        self.coordinator.last_photo_urls[self._device_id] = url
-            except Exception:
-                _LOGGER.exception("Failed to download photo for %s", self._device_id)
-        else:
-            _LOGGER.debug("No photo URL from media stream for %s", self._device_id)
+        from custom_components.aegis_ajax.photo_storage import (  # noqa: PLC0415
+            save_photo,
+        )
+
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning(
+                        "Photo download for %s returned HTTP %s", self._device_id, resp.status
+                    )
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN, translation_key="photo_capture_failed"
+                    )
+                image_bytes = await resp.read()
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            _LOGGER.exception("Failed to download photo for %s", self._device_id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="photo_capture_failed"
+            ) from err
+
+        device = self.coordinator.devices.get(self._device_id)
+        device_name = device.name if device else self._device_id
+        await save_photo(self.hass, image_bytes, self._device_id, device_name)
+        self.coordinator.last_photo_urls[self._device_id] = url

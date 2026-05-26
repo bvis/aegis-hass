@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Eine Hub-Aktualisierung wurde gerade angefordert; warte noch {seconds} Sekunden und versuche es erneut."
+        },
+        "photo_capture_failed": {
+            "message": "Die Fotoaufnahme wurde nicht abgeschlossen. Der Hub hat die Anfrage möglicherweise abgelehnt oder kein Bild zurückgegeben; Details findest du in den Protokollen."
+        },
+        "photo_no_push": {
+            "message": "Foto auf Anfrage erfordert FCM-Push-Benachrichtigungen, die für diese Integration nicht konfiguriert sind."
+        },
+        "photo_capture_timeout": {
+            "message": "Zeitüberschreitung beim Warten darauf, dass die Kamera das aufgenommene Foto liefert. Versuche es erneut und prüfe, ob die Kamera online ist."
         }
     }
 }

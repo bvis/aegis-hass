@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Une actualisation du hub vient d'être demandée ; attendez encore {seconds} secondes et réessayez."
+        },
+        "photo_capture_failed": {
+            "message": "La capture de la photo ne s'est pas terminée. Le hub a peut-être rejeté la demande ou n'a renvoyé aucune image ; consultez les journaux pour plus de détails."
+        },
+        "photo_no_push": {
+            "message": "La photo à la demande nécessite les notifications push FCM, qui ne sont pas configurées pour cette intégration."
+        },
+        "photo_capture_timeout": {
+            "message": "Délai dépassé en attendant que la caméra livre la photo capturée. Réessayez et vérifiez que la caméra est en ligne."
         }
     }
 }

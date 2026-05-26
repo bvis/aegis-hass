@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "L'aggiornamento del hub è stato appena richiesto; attendi altri {seconds} secondi e riprova."
+        },
+        "photo_capture_failed": {
+            "message": "L'acquisizione della foto non è stata completata. L'hub potrebbe aver rifiutato la richiesta o non aver restituito alcuna immagine; controlla i log per i dettagli."
+        },
+        "photo_no_push": {
+            "message": "La foto su richiesta richiede le notifiche push FCM, che non sono configurate per questa integrazione."
+        },
+        "photo_capture_timeout": {
+            "message": "Tempo scaduto in attesa che la telecamera fornisse la foto acquisita. Riprova e verifica che la telecamera sia online."
         }
     }
 }

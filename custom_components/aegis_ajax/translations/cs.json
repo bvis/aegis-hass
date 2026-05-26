@@ -406,6 +406,15 @@
         },
         "manual_refresh_rate_limited": {
             "message": "Aktualizace huba byla právě vyžádána; počkejte ještě {seconds} sekund a zkuste to znovu."
+        },
+        "photo_capture_failed": {
+            "message": "Pořízení fotografie nebylo dokončeno. Hub mohl požadavek odmítnout nebo nevrátil žádný snímek; podrobnosti najdete v protokolech."
+        },
+        "photo_no_push": {
+            "message": "Fotografie na vyžádání vyžaduje FCM push oznámení, která nejsou pro tuto integraci nakonfigurována."
+        },
+        "photo_capture_timeout": {
+            "message": "Vypršel časový limit při čekání, až kamera doručí pořízenou fotografii. Zkuste to znovu a zkontrolujte, zda je kamera online."
         }
     }
 }
