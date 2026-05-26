@@ -678,6 +678,75 @@ class TestStreamHandlers:
         coordinator._handle_devices_snapshot([updated])
         assert coordinator.devices["d1"] is updated
 
+    @staticmethod
+    def _make_doorbell(device_id: str, device_type: str, name: str = "Deurbel") -> Device:
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name=name,
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=1 if device_type.startswith("motion_cam_video") else 0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+
+    def test_snapshot_evicts_cached_ghost_when_sibling_arrives(self) -> None:
+        """#173 — a motion_cam_video ghost warm-started from cache is dropped
+        once the video_edge sibling arrives in a later snapshot, and removed
+        from the device registry so its card disappears."""
+        coordinator = self._make_coordinator_with_stream()
+        # Ghost was warm-started from the cache; sibling not present yet.
+        coordinator.devices["310A8DF4"] = self._make_doorbell(
+            "310A8DF4", "motion_cam_video_doorbell"
+        )
+
+        reg_device = MagicMock()
+        reg_device.id = "reg-ghost"
+        device_reg = MagicMock()
+        device_reg.async_get_device.return_value = reg_device
+
+        sibling = self._make_doorbell("9c756e2bca39-0", "video_edge_doorbell")
+        with patch(
+            "custom_components.aegis_ajax.coordinator.dr.async_get", return_value=device_reg
+        ):
+            coordinator._handle_devices_snapshot([sibling])
+
+        assert "310A8DF4" not in coordinator.devices
+        assert "9c756e2bca39-0" in coordinator.devices
+        device_reg.async_remove_device.assert_called_once_with("reg-ghost")
+
+    def test_snapshot_keeps_ghost_when_no_sibling(self) -> None:
+        """Unbalanced #119 case: only the hub_device twin exists — keep it."""
+        coordinator = self._make_coordinator_with_stream()
+        ghost = self._make_doorbell("310A8DF4", "motion_cam_video_doorbell")
+
+        with patch("custom_components.aegis_ajax.coordinator.dr.async_get") as mock_get:
+            coordinator._handle_devices_snapshot([ghost])
+
+        assert "310A8DF4" in coordinator.devices
+        mock_get.assert_not_called()
+
+    def test_snapshot_skips_registry_when_ghost_not_registered(self) -> None:
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.devices["310A8DF4"] = self._make_doorbell(
+            "310A8DF4", "motion_cam_video_doorbell"
+        )
+        device_reg = MagicMock()
+        device_reg.async_get_device.return_value = None
+
+        sibling = self._make_doorbell("9c756e2bca39-0", "video_edge_doorbell")
+        with patch(
+            "custom_components.aegis_ajax.coordinator.dr.async_get", return_value=device_reg
+        ):
+            coordinator._handle_devices_snapshot([sibling])
+
+        assert "310A8DF4" not in coordinator.devices
+        device_reg.async_remove_device.assert_not_called()
+
     def test_handle_status_update_add_sets_status_true(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         coordinator.devices["d1"] = _make_device("d1")

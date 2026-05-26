@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -442,6 +443,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.debug("Failed to load devices cache", exc_info=True)
         if cached_devices:
             self.devices = cached_devices
+            # A cache written before the #173 dedup (or before the
+            # video_edge sibling first appeared) can carry a stale
+            # motion_cam_video_* ghost. Drop it on load if the sibling is
+            # also cached; otherwise the first stream snapshot resolves it.
+            self._dedupe_video_doorbells()
         else:
             initial_devices: dict[str, Device] = {}
             for space_id in self.spaces:
@@ -799,12 +805,52 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Handle initial snapshot or full device snapshot update from stream."""
         for device in devices:
             self.devices[device.id] = device
+        # `DevicesApi` dedups video-doorbell twins per snapshot, but the merge
+        # above only ever *adds* keys — a `motion_cam_video_*` ghost that was
+        # warm-started from the cache before its `video_edge_*` sibling
+        # appeared would never be removed, so it survives every restart and
+        # keeps bubbling its `malfunctions=1` to the space counter (#173).
+        # Re-run the dedup across the whole device set now that this snapshot
+        # may have brought the sibling in.
+        self._dedupe_video_doorbells()
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         # Refresh the persisted cache so the next restart can warm-start
         # from real data instead of the previous boot's snapshot (#114).
         # Debounced — bursts of stream snapshots coalesce into one write.
         if self._devices_cache is not None:
             self._devices_cache.async_schedule_save(self.devices)
+
+    def _dedupe_video_doorbells(self) -> None:
+        """Re-apply the video-doorbell dedup across `self.devices` and evict
+        any dropped ghost from HA's device registry.
+
+        `DevicesApi._dedupe_video_doorbells` is the source of truth for which
+        twin to drop; here we apply it to the merged device set (not a single
+        snapshot) so a ghost that entered `self.devices` via the warm-start
+        cache is removed once its `video_edge_*` sibling shows up. Devices the
+        dedup drops are also removed from the device registry so their card
+        and entities disappear without the user having to delete them by hand
+        (the original #173 complaint — HA won't let you delete a device an
+        active integration still provides).
+        """
+        current = list(self.devices.values())
+        deduped = DevicesApi._dedupe_video_doorbells(current)
+        if len(deduped) == len(current):
+            return
+        kept_ids = {d.id for d in deduped}
+        dropped = [d for d in current if d.id not in kept_ids]
+        self.devices = {d.id: d for d in deduped}
+        device_reg = dr.async_get(self.hass)
+        for ghost in dropped:
+            reg_device = device_reg.async_get_device(identifiers={(DOMAIN, ghost.id)})
+            if reg_device is not None:
+                _LOGGER.info(
+                    "Removing duplicate video-doorbell ghost %s (%s) from the "
+                    "device registry — a video_edge sibling now represents it (#173)",
+                    ghost.id,
+                    ghost.device_type,
+                )
+                device_reg.async_remove_device(reg_device.id)
 
     def _handle_status_update(self, device_id: str, status_name: str, data: dict[str, Any]) -> None:
         """Handle real-time status update from the persistent stream.
