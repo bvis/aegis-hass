@@ -107,6 +107,22 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         return await self.async_step_user()
 
+    async def _async_close_client(self) -> None:
+        """Close and drop the in-flight gRPC client after a failed login.
+
+        Each retry of async_step_user builds a fresh client, so the failed
+        attempt's channel must be closed or it leaks until garbage collection.
+        Close errors are swallowed — we're already on an error path.
+        """
+        if self._client is None:
+            return
+        try:
+            await self._client.close()
+        except Exception:  # noqa: BLE001 - best-effort cleanup
+            _LOGGER.debug("Ignoring error while closing config-flow client", exc_info=True)
+        finally:
+            self._client = None
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -126,20 +142,28 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 await asyncio.wait_for(self._client.login(), timeout=30)
                 return await self.async_step_select_spaces()
             except TwoFactorRequiredError as e:
+                # Channel must stay open: async_step_2fa reuses this client.
                 self._request_id = e.request_id
                 return await self.async_step_2fa()
+            except asyncio.CancelledError:
+                # Re-raise so HA shutdown/reload cancels cleanly (it's a
+                # BaseException, not a user-facing error), but close the channel
+                # we just opened on the way out.
+                _LOGGER.debug("Login cancelled during config flow")
+                await self._async_close_client()
+                raise
             except AuthenticationError as e:
                 _LOGGER.error("Authentication failed: %s", e)
                 errors["base"] = "invalid_auth"
+                await self._async_close_client()
             except (ConnectionError, OSError) as e:
                 _LOGGER.error("Connection failed: %s", e)
                 errors["base"] = "cannot_connect"
+                await self._async_close_client()
             except TimeoutError:
                 _LOGGER.error("Login timed out")
                 errors["base"] = "cannot_connect"
-            except asyncio.CancelledError:
-                _LOGGER.error("Login was cancelled")
-                errors["base"] = "unknown"
+                await self._async_close_client()
             except Exception as e:
                 _LOGGER.error(
                     "Unexpected error during login: %s: %s",
@@ -148,6 +172,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                     exc_info=True,
                 )
                 errors["base"] = "unknown"
+                await self._async_close_client()
         return self.async_show_form(step_id="user", data_schema=USER_SCHEMA, errors=errors)
 
     async def async_step_2fa(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

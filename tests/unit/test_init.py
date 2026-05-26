@@ -93,6 +93,48 @@ class TestAsyncSetupEntry:
         assert "password" not in call_kwargs or call_kwargs.get("password") is None
 
     @pytest.mark.asyncio
+    async def test_setup_entry_closes_client_when_first_refresh_fails(self) -> None:
+        """A failed first refresh must close the gRPC channel before propagating.
+
+        HA retries setup after ConfigEntryNotReady, creating a fresh client each
+        time. Leaving the previous channel open leaks one channel per retry.
+        """
+        from homeassistant.exceptions import ConfigEntryNotReady
+
+        from custom_components.aegis_ajax import async_setup_entry
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.data = {"email": "x@y", "password_hash": "h", "spaces": ["s1"]}
+        entry.options = {}
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.close = AsyncMock()
+        mock_client.session = MagicMock()
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=ConfigEntryNotReady("server unreachable")
+        )
+
+        with (
+            patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client),
+            patch(
+                "custom_components.aegis_ajax.AjaxCobrandedCoordinator",
+                return_value=mock_coordinator,
+            ),
+            pytest.raises(ConfigEntryNotReady),
+        ):
+            await async_setup_entry(hass, entry)
+
+        mock_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_setup_entry_with_legacy_password(self) -> None:
         """Test backward compatibility: legacy entries with plaintext password still work."""
         from custom_components.aegis_ajax import async_setup_entry
