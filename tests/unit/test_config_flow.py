@@ -162,6 +162,73 @@ class TestAsyncStepUser:
         assert flow.async_show_form.call_args[1]["errors"]["base"] == "unknown"
 
     @pytest.mark.asyncio
+    async def test_step_user_closes_client_on_login_failure(self) -> None:
+        """A failed login must close the channel; each retry creates a new client."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.login = AsyncMock(side_effect=AuthenticationError("invalid"))
+        mock_client.close = AsyncMock()
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_user({"email": "a@b.com", "password": "bad"})
+
+        assert flow.async_show_form.call_args[1]["errors"]["base"] == "invalid_auth"
+        mock_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_step_user_reraises_cancelled_error(self) -> None:
+        """CancelledError must propagate so HA shutdown/reload cancels cleanly."""
+        import asyncio
+
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.login = AsyncMock(side_effect=asyncio.CancelledError())
+        mock_client.close = AsyncMock()
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+            ),
+            pytest.raises(asyncio.CancelledError),
+        ):
+            await flow.async_step_user({"email": "a@b.com", "password": "pass"})
+
+        mock_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_step_user_keeps_client_open_for_2fa(self) -> None:
+        """The 2FA path reuses the same client, so it must NOT be closed."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.login = AsyncMock(side_effect=TwoFactorRequiredError("req-123"))
+        mock_client.close = AsyncMock()
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_user({"email": "a@b.com", "password": "pass"})
+
+        assert flow._request_id == "req-123"
+        mock_client.close.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_step_user_2fa_required(self) -> None:
         flow = AjaxCobrandedConfigFlow()
         flow.async_show_form = MagicMock(return_value={"type": "form"})

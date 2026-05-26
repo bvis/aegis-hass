@@ -109,12 +109,14 @@ class TestServiceRegistration:
             result = await async_setup_entry(hass, entry)
 
         assert result is True
-        # Verify both services were registered
+        # Verify all four custom services were registered
         register_calls = {
             call_args[0][1] for call_args in hass.services.async_register.call_args_list
         }
         assert "force_arm" in register_calls
         assert "force_arm_night" in register_calls
+        assert "press_panic_button" in register_calls
+        assert "set_photo_on_demand_mode" in register_calls
 
     @pytest.mark.asyncio
     async def test_services_removed_on_unload(self) -> None:
@@ -136,5 +138,8 @@ class TestServiceRegistration:
 
         assert result is True
         remove_calls = {call_args[0][1] for call_args in hass.services.async_remove.call_args_list}
+        # Every service registered in async_setup_entry must be removed on unload
         assert "force_arm" in remove_calls
         assert "force_arm_night" in remove_calls
+        assert "press_panic_button" in remove_calls
+        assert "set_photo_on_demand_mode" in remove_calls

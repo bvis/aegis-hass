@@ -92,6 +92,17 @@ PLATFORMS = [
 
 type AjaxCobrandedConfigEntry = ConfigEntry[AjaxCobrandedCoordinator]
 
+# Single source of truth for the domain-level custom services. Registration
+# (async_setup_entry) and teardown (async_unload_entry) both derive from this
+# tuple so the two lists cannot drift — adding a service in one place without
+# the other previously leaked a registered service on unload.
+_CUSTOM_SERVICE_NAMES = (
+    "force_arm",
+    "force_arm_night",
+    "press_panic_button",
+    "set_photo_on_demand_mode",
+)
+
 
 def _resolve_target_space_ids(
     hass: HomeAssistant, call: ServiceCall
@@ -328,7 +339,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         on_session_persist=_persist_session,
         entry_id=entry.entry_id,
     )
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except BaseException:
+        # HA retries setup after ConfigEntryNotReady, building a fresh client
+        # each attempt. Close this attempt's channel so retries don't leak one
+        # gRPC channel per failure (also covers cancellation during refresh).
+        await client.close()
+        raise
     entry.runtime_data = coordinator
 
     # Start FCM push notifications if configured (credentials live in data since v2).
@@ -398,12 +416,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         await _async_handle_set_photo_on_demand_mode(hass, call)
 
     if not hass.services.has_service(DOMAIN, "force_arm"):
-        hass.services.async_register(DOMAIN, "force_arm", _force_arm_handler)
-        hass.services.async_register(DOMAIN, "force_arm_night", _force_arm_night_handler)
-        hass.services.async_register(DOMAIN, "press_panic_button", _press_panic_button_handler)
-        hass.services.async_register(
-            DOMAIN, "set_photo_on_demand_mode", _set_photo_on_demand_mode_handler
-        )
+        service_handlers = {
+            "force_arm": _force_arm_handler,
+            "force_arm_night": _force_arm_night_handler,
+            "press_panic_button": _press_panic_button_handler,
+            "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
+        }
+        # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
+        # handler — fail loudly at setup rather than silently skipping it.
+        for name in _CUSTOM_SERVICE_NAMES:
+            hass.services.async_register(DOMAIN, name, service_handlers[name])
 
     # Reload integration when options change (e.g. FCM credentials)
     entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))
@@ -511,9 +533,8 @@ async def _async_options_update_listener(
 async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:
     remaining = hass.config_entries.async_entries(DOMAIN)
     if not any(e.entry_id != entry.entry_id for e in remaining):
-        hass.services.async_remove(DOMAIN, "force_arm")
-        hass.services.async_remove(DOMAIN, "force_arm_night")
-        hass.services.async_remove(DOMAIN, "press_panic_button")
+        for name in _CUSTOM_SERVICE_NAMES:
+            hass.services.async_remove(DOMAIN, name)
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
