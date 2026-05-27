@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Deurbel",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Bel ingedrukt"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

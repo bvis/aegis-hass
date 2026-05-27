@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Türklingel",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Klingel gedrückt"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

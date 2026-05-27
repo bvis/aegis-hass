@@ -137,6 +137,10 @@ STREAM_RECONNECT_MAX_BACKOFF = 60  # seconds
 MIN_POLL_INTERVAL = 60  # seconds
 MAX_POLL_INTERVAL = 300  # seconds
 DEFAULT_POLL_INTERVAL = 300  # seconds fallback (stream handles real-time updates)
+# Auto-off window for a device `motion_detected` status set from an FCM motion
+# push (#173). Video-edge devices only report motion over FCM, so the binary
+# sensor has no "cleared" event — we self-clear it like a PIR detector.
+MOTION_PUSH_AUTO_OFF_SECONDS = 30
 GRPC_TIMEOUT = 10.0  # seconds
 GRPC_STREAM_TIMEOUT = 30.0  # seconds
 MAX_RETRIES = 3
@@ -454,3 +458,18 @@ ALL_EVENT_TYPES: list[str] = sorted(
     | set(VIDEO_EVENT_TAG_MAP.values())
     | set(SMARTLOCK_EVENT_TAG_MAP.values())
 )
+
+# Device types that get their own per-device doorbell `event` entity on their
+# device card (#173). The ring event is also fired on the hub-level event
+# entity for backwards compatibility; this surfaces it where users look first.
+DOORBELL_DEVICE_TYPES: frozenset[str] = frozenset(
+    {
+        "video_edge_doorbell",
+        "motion_cam_video_doorbell",
+    }
+)
+
+# HA event_type fired by the per-device doorbell event entity (#173).
+DOORBELL_EVENT_TYPE = "doorbell_pressed"
+# HA event_type for motion pushes; used to flip a device's motion sensor (#173).
+MOTION_EVENT_TYPE = "motion"

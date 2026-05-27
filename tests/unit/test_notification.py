@@ -1648,6 +1648,129 @@ class TestParseAndFireEventLogging:
         assert not [r for r in caplog.records if r.levelname == "WARNING"]
 
 
+class TestRedactPrintable:
+    """`_redact_printable` masks ASCII text runs in a hex dump (#173, PII)."""
+
+    def test_replaces_long_printable_run_with_marker(self) -> None:
+        from custom_components.aegis_ajax.notification import _redact_printable
+
+        out = _redact_printable(b"Deurbel")
+        assert "Deurbel" not in out
+        assert "<text:7b>" in out
+
+    def test_keeps_binary_bytes_as_hex(self) -> None:
+        from custom_components.aegis_ajax.notification import _redact_printable
+
+        out = _redact_printable(b"\x00\x01\x02")
+        assert out == "000102"
+
+    def test_short_printable_run_not_masked(self) -> None:
+        from custom_components.aegis_ajax.notification import _redact_printable
+
+        # 2 printable bytes stay as hex (too short to be meaningful PII)
+        out = _redact_printable(b"\x00AB\x00")
+        assert "<text:" not in out
+        assert out == "004142" + "00"
+
+    def test_mixed_binary_and_text(self) -> None:
+        from custom_components.aegis_ajax.notification import _redact_printable
+
+        out = _redact_printable(b"\xff\xfeHELLO\x00")
+        assert out == "fffe" + "<text:5b>" + "00"
+
+
+class TestParseAndFireEventDeviceRouting:
+    """A doorbell/motion push is surfaced on the source device's own card (#173).
+
+    The hub-level event entity still fires for every event; on top of that,
+    when the push carries (or resolves to) a device id, the ring is mirrored
+    onto a per-device doorbell event entity and motion flips the device's
+    motion binary_sensor.
+    """
+
+    def _make_listener(self, devices: dict) -> tuple[AjaxNotificationListener, MagicMock]:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        coordinator = MagicMock()
+        coordinator._space_ids = []
+        coordinator.devices = devices
+        coordinator.fire_push_device_event = MagicMock(return_value=True)
+        coordinator.apply_push_device_motion = MagicMock()
+        listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+        return listener, coordinator
+
+    def _doorbell_device(self, device_id: str = "310A8DF4") -> MagicMock:
+        dev = MagicMock()
+        dev.id = device_id
+        dev.device_type = "video_edge_doorbell"
+        return dev
+
+    def _fire(self, listener: AjaxNotificationListener, event_type: str, source: dict) -> None:
+        encoded = base64.b64encode(b"any-payload").decode()
+        raw_tag = {
+            "doorbell_pressed": "ring_button_pressed",
+            "motion": "human_detected",
+            "alarm": "intrusion_alarm",
+        }[event_type]
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=(event_type, {"raw_tag": raw_tag}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value=source),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+    def test_doorbell_with_matching_device_id_fires_device_event(self) -> None:
+        listener, coordinator = self._make_listener({"310A8DF4": self._doorbell_device()})
+
+        self._fire(
+            listener, "doorbell_pressed", {"device_id": "310A8DF4", "device_name": "Deurbel"}
+        )
+
+        coordinator.fire_push_device_event.assert_called_once()
+        args = coordinator.fire_push_device_event.call_args[0]
+        assert args[0] == "310A8DF4"
+        assert args[1] == "doorbell_pressed"
+
+    def test_motion_with_matching_device_id_schedules_device_motion(self) -> None:
+        listener, coordinator = self._make_listener({"310A8DF4": self._doorbell_device()})
+
+        self._fire(listener, "motion", {"device_id": "310A8DF4", "device_name": "Deurbel"})
+
+        listener._hass.loop.call_soon_threadsafe.assert_any_call(
+            coordinator.apply_push_device_motion, "310A8DF4"
+        )
+
+    def test_doorbell_without_device_id_falls_back_to_single_doorbell(self) -> None:
+        listener, coordinator = self._make_listener({"310A8DF4": self._doorbell_device()})
+
+        self._fire(listener, "doorbell_pressed", {})
+
+        coordinator.fire_push_device_event.assert_called_once()
+        assert coordinator.fire_push_device_event.call_args[0][0] == "310A8DF4"
+
+    def test_motion_without_device_id_does_not_schedule_motion(self) -> None:
+        listener, coordinator = self._make_listener({"310A8DF4": self._doorbell_device()})
+
+        self._fire(listener, "motion", {})
+
+        for call in listener._hass.loop.call_soon_threadsafe.call_args_list:
+            assert call[0][0] is not coordinator.apply_push_device_motion
+
+    def test_unrelated_event_does_not_dispatch_to_device(self) -> None:
+        listener, coordinator = self._make_listener({"310A8DF4": self._doorbell_device()})
+
+        self._fire(listener, "alarm", {"device_id": "310A8DF4"})
+
+        coordinator.fire_push_device_event.assert_not_called()
+        for call in listener._hass.loop.call_soon_threadsafe.call_args_list:
+            assert call[0][0] is not coordinator.apply_push_device_motion
+
+
 class TestNotificationDedupe:
     """Issue #80: Ajax dispatches two FCM messages per security transition with
     identical notification_id; the second must not double-fire automations."""

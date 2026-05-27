@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Timbre",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Timbre premut"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

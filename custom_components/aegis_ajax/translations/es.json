@@ -273,6 +273,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Timbre",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Timbre pulsado"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

@@ -273,6 +273,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Doorbell",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Doorbell pressed"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

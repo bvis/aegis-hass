@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Campainha",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Campainha tocada"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

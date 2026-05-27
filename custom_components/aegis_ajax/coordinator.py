@@ -31,6 +31,7 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
+    MOTION_PUSH_AUTO_OFF_SECONDS,
     ConnectionStatus,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
@@ -135,6 +136,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._stream_tasks: list[asyncio.Task[None]] = []
         self._streams_started: bool = False
         self._event_entities: dict[str, Any] = {}
+        # device_id -> per-device doorbell event entity (#173)
+        self._device_event_entities: dict[str, Any] = {}
+        # device_id -> cancel handle for a pending motion auto-off timer (#173)
+        self._motion_off_cancels: dict[str, Any] = {}
         self.last_photo_urls: dict[str, str] = {}
         # space_id -> (expiry_time, security_state)
         self._optimistic_space_states: dict[str, tuple[float, Any]] = {}
@@ -920,6 +925,70 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entity.handle_event(event_type, data)
         else:
             _LOGGER.debug("No event entity for space %s", space_id)
+
+    def register_device_event_entity(self, device_id: str, entity: object) -> None:
+        """Register a per-device doorbell event entity (#173)."""
+        self._device_event_entities[device_id] = entity
+
+    def fire_push_device_event(self, device_id: str, event_type: str, data: dict[str, Any]) -> bool:
+        """Dispatch a push event to a per-device event entity (#173).
+
+        Returns True when a matching device entity handled it, so the caller
+        can tell whether the event landed on the device card (vs only the
+        hub-level event entity).
+        """
+        entity = self._device_event_entities.get(device_id)
+        if entity is None:
+            return False
+        entity.handle_event(event_type, data)
+        return True
+
+    def apply_push_device_motion(self, device_id: str) -> None:
+        """Flip a device's `motion_detected` status on from an FCM motion push.
+
+        Video doorbells (and other video-edge devices) only report motion over
+        FCM — never in the gRPC snapshot — so their `motion` binary_sensor
+        stayed `off` forever. This sets `motion_detected=True` immediately,
+        records the detection time, and schedules an auto-off after
+        `MOTION_PUSH_AUTO_OFF_SECONDS` so the sensor self-clears like a PIR
+        detector. No-ops for unknown devices. (#173)
+        """
+        import time  # noqa: PLC0415
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        from homeassistant.helpers.event import async_call_later  # noqa: PLC0415
+
+        device = self.devices.get(device_id)
+        if device is None:
+            return
+        new_statuses = dict(device.statuses)
+        new_statuses["motion_detected"] = True
+        new_statuses["motion_detected_at"] = int(time.time())
+        self.devices[device_id] = dc_replace(device, statuses=new_statuses)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+        # Re-trigger extends the window: cancel a pending auto-off first.
+        cancel = self._motion_off_cancels.pop(device_id, None)
+        if cancel is not None:
+            cancel()
+        self._motion_off_cancels[device_id] = async_call_later(
+            self.hass,
+            MOTION_PUSH_AUTO_OFF_SECONDS,
+            lambda _now: self._clear_device_motion(device_id),
+        )
+
+    def _clear_device_motion(self, device_id: str) -> None:
+        """Reset a device's `motion_detected` status to off (auto-off). (#173)"""
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        self._motion_off_cancels.pop(device_id, None)
+        device = self.devices.get(device_id)
+        if device is None or not device.statuses.get("motion_detected"):
+            return
+        new_statuses = dict(device.statuses)
+        new_statuses["motion_detected"] = False
+        self.devices[device_id] = dc_replace(device, statuses=new_statuses)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     async def async_start_push_notifications(
         self,

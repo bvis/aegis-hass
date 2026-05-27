@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Sonnette",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Sonnette appuyée"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Sonerie",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Sonerie apăsată"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

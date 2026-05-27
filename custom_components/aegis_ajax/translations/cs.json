@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Zvonek",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Stisknutí zvonku"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

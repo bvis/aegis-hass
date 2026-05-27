@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Campanello",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Campanello premuto"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Kapı zili",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Zile basıldı"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

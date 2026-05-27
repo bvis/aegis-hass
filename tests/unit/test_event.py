@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from custom_components.aegis_ajax.const import ALL_EVENT_TYPES, HUB_EVENT_TAG_MAP
-from custom_components.aegis_ajax.event import AjaxSecurityEvent
+from custom_components.aegis_ajax.event import AjaxDoorbellEvent, AjaxSecurityEvent
 
 
 class TestAjaxSecurityEvent:
@@ -84,6 +84,98 @@ class TestAjaxSecurityEvent:
         entity = self._make_event_entity()
         assert entity._attr_device_info is not None
         assert ("aegis_ajax", "hub-1") in entity._attr_device_info["identifiers"]
+
+
+class TestAjaxDoorbellEvent:
+    """Per-device doorbell event entity living on the doorbell card (#173)."""
+
+    def _make_doorbell_entity(self) -> AjaxDoorbellEvent:
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        coordinator.devices = {
+            "doorbell-1": MagicMock(
+                id="doorbell-1",
+                name="Deurbel",
+                device_type="video_edge_doorbell",
+                room_id=None,
+            ),
+        }
+        return AjaxDoorbellEvent(coordinator=coordinator, device_id="doorbell-1")
+
+    def test_unique_id(self) -> None:
+        entity = self._make_doorbell_entity()
+        assert entity.unique_id == "aegis_ajax_doorbell-1_doorbell_event"
+
+    def test_has_entity_name(self) -> None:
+        entity = self._make_doorbell_entity()
+        assert entity._attr_has_entity_name is True
+
+    def test_device_class_is_doorbell(self) -> None:
+        from homeassistant.components.event import EventDeviceClass
+
+        entity = self._make_doorbell_entity()
+        assert entity._attr_device_class == EventDeviceClass.DOORBELL
+
+    def test_event_types_contains_doorbell_pressed(self) -> None:
+        entity = self._make_doorbell_entity()
+        assert "doorbell_pressed" in entity.event_types
+
+    def test_handle_event_triggers_and_writes(self) -> None:
+        entity = self._make_doorbell_entity()
+        entity._trigger_event = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.hass = MagicMock()
+
+        entity.handle_event("doorbell_pressed", {"raw_tag": "ring_button_pressed"})
+
+        entity._trigger_event.assert_called_once_with(
+            "doorbell_pressed", {"raw_tag": "ring_button_pressed"}
+        )
+        entity.async_write_ha_state.assert_called_once()
+
+    def test_handle_event_ignores_non_doorbell_type(self) -> None:
+        entity = self._make_doorbell_entity()
+        entity._trigger_event = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+
+        entity.handle_event("motion", {})
+
+        entity._trigger_event.assert_not_called()
+
+    def test_device_info_targets_doorbell_device(self) -> None:
+        entity = self._make_doorbell_entity()
+        assert entity._attr_device_info is not None
+        assert ("aegis_ajax", "doorbell-1") in entity._attr_device_info["identifiers"]
+
+
+class TestDeviceEventDispatch:
+    def test_register_and_fire_device_event(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        coordinator._device_event_entities = {}
+
+        AjaxCobrandedCoordinator.register_device_event_entity(
+            coordinator, "doorbell-1", MagicMock()
+        )
+        entity = coordinator._device_event_entities["doorbell-1"]
+
+        handled = AjaxCobrandedCoordinator.fire_push_device_event(
+            coordinator, "doorbell-1", "doorbell_pressed", {"x": 1}
+        )
+        assert handled is True
+        entity.handle_event.assert_called_once_with("doorbell_pressed", {"x": 1})
+
+    def test_fire_device_event_no_entity_returns_false(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        coordinator._device_event_entities = {}
+
+        handled = AjaxCobrandedCoordinator.fire_push_device_event(
+            coordinator, "unknown", "doorbell_pressed", {}
+        )
+        assert handled is False
 
 
 class TestEventConstants:

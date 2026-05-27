@@ -15,6 +15,9 @@ from homeassistant.helpers.storage import Store
 from custom_components.aegis_ajax import notification_event_parser
 from custom_components.aegis_ajax.const import (
     DOMAIN,
+    DOORBELL_DEVICE_TYPES,
+    DOORBELL_EVENT_TYPE,
+    MOTION_EVENT_TYPE,
     RAW_TAG_TO_GROUP_SECURITY_STATE,
     RAW_TAG_TO_SECURITY_STATE,
 )
@@ -54,6 +57,39 @@ NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
 # measured (sub-second) but short enough that a replay from any prior session
 # is rejected.
 STALE_PUSH_THRESHOLD_SECONDS = 120.0
+
+# A run of this many consecutive printable-ASCII bytes in a redacted hex dump
+# is treated as text (likely a device name / label) and masked. Shorter runs
+# stay as hex — too short to leak meaningful PII, and often coincidental.
+_MIN_PRINTABLE_RUN = 3
+
+
+def _redact_printable(data: bytes) -> str:
+    """Hex-encode `data`, masking runs of >=3 printable-ASCII bytes as
+    `<text:Nb>` (#173). Debug payload dumps can carry user device labels;
+    this keeps the binary shape visible for diagnosis without leaking PII
+    when a user pastes the log publicly. See [[feedback_pii_in_debug_logs]].
+    """
+    out: list[str] = []
+    run: list[int] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        if len(run) >= _MIN_PRINTABLE_RUN:
+            out.append(f"<text:{len(run)}b>")
+        else:
+            out.append(bytes(run).hex())
+        run.clear()
+
+    for byte in data:
+        if 0x20 <= byte <= 0x7E:
+            run.append(byte)
+        else:
+            flush()
+            out.append(f"{byte:02x}")
+    flush()
+    return "".join(out)
 
 
 # FCM credentials validation + library-error classifier extracted to
@@ -561,8 +597,75 @@ class AjaxNotificationListener:
                     for space_id in self._coordinator._space_ids:
                         self._coordinator.fire_push_event(space_id, event_type, event_data)
                         self._apply_security_state_from_event(space_id, event_data)
+                # Surface doorbell ring / motion on the source device's own
+                # card, in addition to the hub-level event entity (#173).
+                self._dispatch_event_to_device(event_type, event_data, raw)
         except Exception:
             _LOGGER.debug("Failed to parse event from push notification", exc_info=True)
+
+    def _dispatch_event_to_device(
+        self, event_type: str, event_data: dict[str, Any], raw: bytes
+    ) -> None:
+        """Mirror a doorbell ring / motion push onto the source device (#173).
+
+        Resolves the source device from the `device_id` carried in the push
+        (`_extract_source_info`). For doorbell rings, when no usable device id
+        is present we fall back to the sole doorbell device in the install —
+        the common single-doorbell case — so users still see the ring on the
+        doorbell card. Motion has no such fallback: the `motion` event_type is
+        shared with PIR detectors, so an unattributed motion push must not be
+        guessed onto an arbitrary device.
+
+        The instrumentation log below is intentional: it records exactly what
+        device attribution the parser resolved (or failed to), so if a user's
+        firmware turns out to ship a source shape we don't decode, the next
+        debug capture shows it without another code round-trip.
+        """
+        if event_type not in (DOORBELL_EVENT_TYPE, MOTION_EVENT_TYPE):
+            return
+
+        devices = getattr(self._coordinator, "devices", {}) or {}
+        device_id = event_data.get("device_id")
+        resolved = device_id if device_id in devices else None
+
+        if resolved is None and event_type == DOORBELL_EVENT_TYPE:
+            doorbells = [
+                dev_id
+                for dev_id, dev in devices.items()
+                if getattr(dev, "device_type", None) in DOORBELL_DEVICE_TYPES
+            ]
+            if len(doorbells) == 1:
+                resolved = doorbells[0]
+
+        # device_name is intentionally omitted — it's a user label (PII) and
+        # debug logs get pasted publicly. The hardware id + type are enough to
+        # confirm attribution.
+        _LOGGER.debug(
+            "Push device attribution: event_type=%s extracted_device_id=%s "
+            "device_type=%s resolved=%s",
+            event_type,
+            device_id,
+            event_data.get("device_type"),
+            resolved,
+        )
+
+        if resolved is None:
+            # Capped, PII-redacted hex of the payload so an unattributed
+            # doorbell/motion push can still be diagnosed from a debug log.
+            _LOGGER.debug(
+                "Push %s not attributed to a device; source missing or unknown. "
+                "Payload (hex, redacted, capped 512b): %s",
+                event_type,
+                _redact_printable(raw[:512]),
+            )
+            return
+
+        if event_type == DOORBELL_EVENT_TYPE:
+            self._coordinator.fire_push_device_event(resolved, event_type, event_data)
+        elif event_type == MOTION_EVENT_TYPE and self._hass.loop and self._hass.loop.is_running():
+            self._hass.loop.call_soon_threadsafe(
+                self._coordinator.apply_push_device_motion, resolved
+            )
 
     def _apply_security_state_from_event(self, space_id: str, event_data: dict[str, Any]) -> None:
         """If the push event implies a new security_state, push it now (#68 / #148).

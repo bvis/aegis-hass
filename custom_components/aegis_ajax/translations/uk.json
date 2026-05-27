@@ -257,6 +257,16 @@
                         }
                     }
                 }
+            },
+            "doorbell": {
+                "name": "Дзвінок",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "doorbell_pressed": "Натиснуто дзвінок"
+                        }
+                    }
+                }
             }
         },
         "binary_sensor": {

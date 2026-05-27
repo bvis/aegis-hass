@@ -1319,6 +1319,99 @@ class TestApplyPushSecurityState:
         coordinator.async_set_updated_data.assert_called_once()
 
 
+class TestApplyPushDeviceMotion:
+    """Per-device motion flips from FCM motion pushes (#173).
+
+    Video doorbells (and other video-edge devices) only report motion over
+    FCM, never in the gRPC snapshot, so their `motion` binary_sensor never
+    turned on. `apply_push_device_motion` flips it on immediately and
+    schedules an auto-off so it self-clears like a PIR sensor.
+    """
+
+    def _make_coordinator_with_device(
+        self, device_type: str = "video_edge_doorbell"
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=client, space_ids=["s1"], poll_interval=300
+            )
+        coordinator.hass = hass
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.devices = {
+            "doorbell-1": Device(
+                id="doorbell-1",
+                hub_id="hub-1",
+                name="Deurbel",
+                device_type=device_type,
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={"signal_strength": 3},
+                battery=None,
+            )
+        }
+        return coordinator
+
+    def test_motion_push_sets_motion_detected_true(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later"):
+            coordinator.apply_push_device_motion("doorbell-1")
+
+        assert coordinator.devices["doorbell-1"].statuses["motion_detected"] is True
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_motion_push_records_detected_at(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later"):
+            coordinator.apply_push_device_motion("doorbell-1")
+
+        assert "motion_detected_at" in coordinator.devices["doorbell-1"].statuses
+
+    def test_motion_push_preserves_other_statuses(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later"):
+            coordinator.apply_push_device_motion("doorbell-1")
+
+        assert coordinator.devices["doorbell-1"].statuses["signal_strength"] == 3
+
+    def test_motion_push_unknown_device_no_op(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later"):
+            coordinator.apply_push_device_motion("nonexistent")
+
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_auto_off_clears_motion_detected(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later"):
+            coordinator.apply_push_device_motion("doorbell-1")
+        coordinator._clear_device_motion("doorbell-1")
+
+        assert coordinator.devices["doorbell-1"].statuses["motion_detected"] is False
+
+    def test_motion_push_schedules_auto_off(self) -> None:
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later") as call_later:
+            coordinator.apply_push_device_motion("doorbell-1")
+
+        call_later.assert_called_once()
+
+
 class TestApplyPushGroupSecurityState:
     """Per-group arm/disarm push updates (#148): only the matching Group is
     refreshed instantly, the space-level state stays put until the next poll
