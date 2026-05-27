@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Час очікування доставки зробленого фото від камери вичерпано. Спробуйте ще раз і перевірте, чи камера онлайн."
+        },
+        "command_permission_denied": {
+            "message": "Ваш обліковий запис Ajax не має дозволу виконати цю дію."
+        },
+        "command_hub_offline": {
+            "message": "Хаб офлайн, тому команду не вдалося надіслати."
+        },
+        "command_hub_wrong_state": {
+            "message": "Хаб зараз не в стані, який дозволяє цю дію."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Активну тривогу потрібно скинути перед виконанням цієї дії."
+        },
+        "command_not_performed": {
+            "message": "Хаб не виконав команду."
+        },
+        "command_unknown": {
+            "message": "Хаб не розпізнав команду."
+        },
+        "command_failed": {
+            "message": "Не вдалося завершити команду. Хаб повернув: {reason}."
         }
     },
     "device_automation": {

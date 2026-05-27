@@ -33,7 +33,17 @@ class SmartLockError(Exception):
 
 
 class DeviceCommandError(Exception):
-    """Raised when a DeviceCommand* gRPC call fails or is not supported."""
+    """Raised when a DeviceCommand* gRPC call fails or is not supported.
+
+    `reason` carries the server's failure-oneof case (e.g. `permission_denied`,
+    `hub_offline`) when the hub rejected an otherwise well-formed command, so
+    callers can map it to a clear, user-facing message. It is `None` for
+    client-side failures (unsupported device type, etc.).
+    """
+
+    def __init__(self, message: str, *, reason: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 _STREAM_LIGHT_DEVICES = (
@@ -437,7 +447,7 @@ class DevicesApi:
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
-            raise DeviceCommandError(f"bypass: {error}")
+            raise DeviceCommandError(f"bypass: {error}", reason=error)
         _LOGGER.debug("Device %s bypass=%s OK", command.device_id, bool(command.bypass_enable))
 
     async def _device_on(self, command: DeviceCommand) -> None:
@@ -458,7 +468,7 @@ class DevicesApi:
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
-            raise DeviceCommandError(f"on: {error}")
+            raise DeviceCommandError(f"on: {error}", reason=error)
         _LOGGER.debug("Device %s on (channels=%s) OK", command.device_id, command.channels)
 
     async def _device_off(self, command: DeviceCommand) -> None:
@@ -479,7 +489,7 @@ class DevicesApi:
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
-            raise DeviceCommandError(f"off: {error}")
+            raise DeviceCommandError(f"off: {error}", reason=error)
         _LOGGER.debug("Device %s off (channels=%s) OK", command.device_id, command.channels)
 
     async def _device_brightness(self, command: DeviceCommand) -> None:
@@ -508,7 +518,7 @@ class DevicesApi:
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
-            raise DeviceCommandError(f"brightness: {error}")
+            raise DeviceCommandError(f"brightness: {error}", reason=error)
         _LOGGER.debug(
             "Device %s brightness=%s%% (channels=%s) OK",
             command.device_id,

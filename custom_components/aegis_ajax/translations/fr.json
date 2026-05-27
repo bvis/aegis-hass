@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Délai dépassé en attendant que la caméra livre la photo capturée. Réessayez et vérifiez que la caméra est en ligne."
+        },
+        "command_permission_denied": {
+            "message": "Votre compte Ajax n'a pas l'autorisation d'effectuer cette action."
+        },
+        "command_hub_offline": {
+            "message": "Le hub est hors ligne, la commande n'a pas pu être envoyée."
+        },
+        "command_hub_wrong_state": {
+            "message": "Le hub n'est pas dans un état permettant cette action pour le moment."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Une alarme active doit être réinitialisée avant de pouvoir effectuer cette action."
+        },
+        "command_not_performed": {
+            "message": "Le hub n'a pas exécuté la commande."
+        },
+        "command_unknown": {
+            "message": "Le hub n'a pas reconnu la commande."
+        },
+        "command_failed": {
+            "message": "La commande n'a pas pu être terminée. Le hub a renvoyé : {reason}."
         }
     },
     "device_automation": {

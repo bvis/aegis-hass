@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Time-out tijdens het wachten tot de camera de gemaakte foto levert. Probeer het opnieuw en controleer of de camera online is."
+        },
+        "command_permission_denied": {
+            "message": "Je Ajax-account heeft geen toestemming voor deze actie."
+        },
+        "command_hub_offline": {
+            "message": "De hub is offline, dus de opdracht kon niet worden verzonden."
+        },
+        "command_hub_wrong_state": {
+            "message": "De hub is momenteel niet in een staat die deze actie toestaat."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Een actief alarm moet worden gereset voordat deze actie kan worden uitgevoerd."
+        },
+        "command_not_performed": {
+            "message": "De hub heeft de opdracht niet uitgevoerd."
+        },
+        "command_unknown": {
+            "message": "De hub heeft de opdracht niet herkend."
+        },
+        "command_failed": {
+            "message": "De opdracht kon niet worden voltooid. De hub gaf terug: {reason}."
         }
     },
     "device_automation": {

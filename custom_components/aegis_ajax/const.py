@@ -473,3 +473,16 @@ DOORBELL_DEVICE_TYPES: frozenset[str] = frozenset(
 DOORBELL_EVENT_TYPE = "doorbell_pressed"
 # HA event_type for motion pushes; used to flip a device's motion sensor (#173).
 MOTION_EVENT_TYPE = "motion"
+
+# Maps a DeviceCommand failure-oneof case (what the hub returned) to a
+# translated `exceptions.*` message key. Unmapped reasons fall back to
+# `command_failed`, which echoes the raw reason. Messages stay factual —
+# they state what the hub reported, without guessing the cause or remedy.
+COMMAND_ERROR_TRANSLATION_KEYS: dict[str, str] = {
+    "permission_denied": "command_permission_denied",
+    "hub_offline": "command_hub_offline",
+    "hub_wrong_state": "command_hub_wrong_state",
+    "alarm_reset_needed": "command_alarm_reset_needed",
+    "command_not_performed": "command_not_performed",
+    "unknown_command": "command_unknown",
+}

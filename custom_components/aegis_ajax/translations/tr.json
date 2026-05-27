@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Kameranın çekilen fotoğrafı teslim etmesi beklenirken zaman aşımına uğradı. Tekrar deneyin ve kameranın çevrimiçi olduğunu kontrol edin."
+        },
+        "command_permission_denied": {
+            "message": "Ajax hesabının bu işlemi gerçekleştirme izni yok."
+        },
+        "command_hub_offline": {
+            "message": "Hub çevrimdışı, bu yüzden komut gönderilemedi."
+        },
+        "command_hub_wrong_state": {
+            "message": "Hub şu anda bu işleme izin veren bir durumda değil."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Bu işlem yapılmadan önce etkin bir alarmın sıfırlanması gerekiyor."
+        },
+        "command_not_performed": {
+            "message": "Hub komutu gerçekleştirmedi."
+        },
+        "command_unknown": {
+            "message": "Hub komutu tanımadı."
+        },
+        "command_failed": {
+            "message": "Komut tamamlanamadı. Hub şunu döndürdü: {reason}."
         }
     },
     "device_automation": {

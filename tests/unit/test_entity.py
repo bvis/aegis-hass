@@ -68,3 +68,68 @@ class TestBuildDeviceInfo:
     def test_model_humanized_from_device_type(self) -> None:
         info = build_device_info(_make_device(device_type="motion_protect_outdoor"))
         assert info["model"] == "Motion Protect Outdoor"
+
+
+class TestAsyncSendDeviceCommand:
+    """Maps Ajax command failures to clear, translated HomeAssistantErrors."""
+
+    def _coordinator(self) -> object:
+        from unittest.mock import AsyncMock, MagicMock
+
+        coordinator = MagicMock()
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        return coordinator
+
+    async def test_success_sends_and_refreshes(self) -> None:
+        from custom_components.aegis_ajax.entity import async_send_device_command
+
+        coordinator = self._coordinator()
+        cmd = object()
+
+        await async_send_device_command(coordinator, cmd)
+
+        coordinator.devices_api.send_command.assert_awaited_once_with(cmd)
+        coordinator.async_request_refresh.assert_awaited_once()
+
+    async def test_permission_denied_maps_to_translation_key(self) -> None:
+        from unittest.mock import AsyncMock
+
+        import pytest  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+        from custom_components.aegis_ajax.entity import async_send_device_command
+
+        coordinator = self._coordinator()
+        coordinator.devices_api.send_command = AsyncMock(
+            side_effect=DeviceCommandError("bypass: permission_denied", reason="permission_denied")
+        )
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await async_send_device_command(coordinator, object())
+
+        assert exc.value.translation_key == "command_permission_denied"
+        assert exc.value.translation_domain == DOMAIN
+        # No refresh on failure
+        coordinator.async_request_refresh.assert_not_called()
+
+    async def test_unknown_reason_falls_back_with_placeholder(self) -> None:
+        from unittest.mock import AsyncMock
+
+        import pytest  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+        from custom_components.aegis_ajax.entity import async_send_device_command
+
+        coordinator = self._coordinator()
+        coordinator.devices_api.send_command = AsyncMock(
+            side_effect=DeviceCommandError("on: weird_new_code", reason="weird_new_code")
+        )
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await async_send_device_command(coordinator, object())
+
+        assert exc.value.translation_key == "command_failed"
+        assert exc.value.translation_placeholders == {"reason": "weird_new_code"}

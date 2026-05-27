@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Zeitüberschreitung beim Warten darauf, dass die Kamera das aufgenommene Foto liefert. Versuche es erneut und prüfe, ob die Kamera online ist."
+        },
+        "command_permission_denied": {
+            "message": "Dein Ajax-Konto hat keine Berechtigung für diese Aktion."
+        },
+        "command_hub_offline": {
+            "message": "Der Hub ist offline, daher konnte der Befehl nicht gesendet werden."
+        },
+        "command_hub_wrong_state": {
+            "message": "Der Hub ist derzeit nicht in einem Zustand, der diese Aktion zulässt."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Ein aktiver Alarm muss zurückgesetzt werden, bevor diese Aktion ausgeführt werden kann."
+        },
+        "command_not_performed": {
+            "message": "Der Hub hat den Befehl nicht ausgeführt."
+        },
+        "command_unknown": {
+            "message": "Der Hub hat den Befehl nicht erkannt."
+        },
+        "command_failed": {
+            "message": "Der Befehl konnte nicht abgeschlossen werden. Der Hub meldete: {reason}."
         }
     },
     "device_automation": {

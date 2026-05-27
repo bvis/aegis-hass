@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
-from custom_components.aegis_ajax.entity import build_device_info
+from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -107,8 +107,7 @@ class AjaxLight(CoordinatorEntity[AjaxCobrandedCoordinator], LightEntity):
             brightness=brightness_pct,
             channels=[self._channel],
         )
-        await self.coordinator.devices_api.send_command(cmd)
-        await self.coordinator.async_request_refresh()
+        await async_send_device_command(self.coordinator, cmd)
 
     async def async_turn_off(self, **kwargs: object) -> None:
         cmd = DeviceCommand.set_brightness(
@@ -118,5 +117,4 @@ class AjaxLight(CoordinatorEntity[AjaxCobrandedCoordinator], LightEntity):
             brightness=0,
             channels=[self._channel],
         )
-        await self.coordinator.devices_api.send_command(cmd)
-        await self.coordinator.async_request_refresh()
+        await async_send_device_command(self.coordinator, cmd)

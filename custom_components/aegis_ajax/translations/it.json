@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Tempo scaduto in attesa che la telecamera fornisse la foto acquisita. Riprova e verifica che la telecamera sia online."
+        },
+        "command_permission_denied": {
+            "message": "Il tuo account Ajax non ha il permesso di eseguire questa azione."
+        },
+        "command_hub_offline": {
+            "message": "L'hub è offline, quindi il comando non è stato inviato."
+        },
+        "command_hub_wrong_state": {
+            "message": "L'hub non è in uno stato che consente questa azione al momento."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Un allarme attivo deve essere ripristinato prima di poter eseguire questa azione."
+        },
+        "command_not_performed": {
+            "message": "L'hub non ha eseguito il comando."
+        },
+        "command_unknown": {
+            "message": "L'hub non ha riconosciuto il comando."
+        },
+        "command_failed": {
+            "message": "Impossibile completare il comando. L'hub ha restituito: {reason}."
         }
     },
     "device_automation": {

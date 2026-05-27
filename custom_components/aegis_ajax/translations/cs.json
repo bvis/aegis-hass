@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Vypršel časový limit při čekání, až kamera doručí pořízenou fotografii. Zkuste to znovu a zkontrolujte, zda je kamera online."
+        },
+        "command_permission_denied": {
+            "message": "Tvůj účet Ajax nemá oprávnění k provedení této akce."
+        },
+        "command_hub_offline": {
+            "message": "Hub je offline, proto nebylo možné příkaz odeslat."
+        },
+        "command_hub_wrong_state": {
+            "message": "Hub momentálně není ve stavu, který tuto akci umožňuje."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Aktivní alarm musí být resetován, než bude možné tuto akci provést."
+        },
+        "command_not_performed": {
+            "message": "Hub příkaz neprovedl."
+        },
+        "command_unknown": {
+            "message": "Hub příkaz nerozpoznal."
+        },
+        "command_failed": {
+            "message": "Příkaz se nepodařilo dokončit. Hub vrátil: {reason}."
         }
     },
     "device_automation": {

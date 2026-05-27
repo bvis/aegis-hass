@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "S'ha esgotat el temps d'espera perquè la càmera lliuri la foto capturada. Torna-ho a provar i comprova que la càmera estigui en línia."
+        },
+        "command_permission_denied": {
+            "message": "El teu compte d'Ajax no té permís per fer aquesta acció."
+        },
+        "command_hub_offline": {
+            "message": "El hub està desconnectat, així que l'ordre no s'ha pogut enviar."
+        },
+        "command_hub_wrong_state": {
+            "message": "El hub no està en un estat que permeti aquesta acció ara mateix."
+        },
+        "command_alarm_reset_needed": {
+            "message": "Cal restablir una alarma activa abans de poder fer aquesta acció."
+        },
+        "command_not_performed": {
+            "message": "El hub no ha executat l'ordre."
+        },
+        "command_unknown": {
+            "message": "El hub no ha reconegut l'ordre."
+        },
+        "command_failed": {
+            "message": "No s'ha pogut completar l'ordre. El hub ha retornat: {reason}."
         }
     },
     "device_automation": {

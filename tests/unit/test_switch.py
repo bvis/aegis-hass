@@ -244,6 +244,23 @@ class TestAjaxBypassSwitch:
         coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_permission_denied_surfaces_homeassistant_error(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        sw, coordinator = self._make()
+        coordinator.devices_api.send_command = AsyncMock(
+            side_effect=DeviceCommandError("bypass: permission_denied", reason="permission_denied")
+        )
+        coordinator.async_request_refresh = AsyncMock()
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await sw.async_turn_on()
+
+        assert exc.value.translation_key == "command_permission_denied"
+
+    @pytest.mark.asyncio
     async def test_turn_off_sends_bypass_disable(self) -> None:
         sw, coordinator = self._make(bypassed=True)
         coordinator.devices_api.send_command = AsyncMock()

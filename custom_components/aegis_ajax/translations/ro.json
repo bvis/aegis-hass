@@ -428,6 +428,27 @@
         },
         "photo_capture_timeout": {
             "message": "Timpul de așteptare a expirat în timp ce camera livra fotografia capturată. Încearcă din nou și verifică dacă camera este online."
+        },
+        "command_permission_denied": {
+            "message": "Contul tău Ajax nu are permisiunea de a efectua această acțiune."
+        },
+        "command_hub_offline": {
+            "message": "Hub-ul este offline, așa că comanda nu a putut fi trimisă."
+        },
+        "command_hub_wrong_state": {
+            "message": "Hub-ul nu se află într-o stare care permite această acțiune momentan."
+        },
+        "command_alarm_reset_needed": {
+            "message": "O alarmă activă trebuie resetată înainte de a efectua această acțiune."
+        },
+        "command_not_performed": {
+            "message": "Hub-ul nu a executat comanda."
+        },
+        "command_unknown": {
+            "message": "Hub-ul nu a recunoscut comanda."
+        },
+        "command_failed": {
+            "message": "Comanda nu a putut fi finalizată. Hub-ul a returnat: {reason}."
         }
     },
     "device_automation": {
