@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2-beta.4] - 2026-05-27
+
+Internal refactor only — no user-facing behaviour change.
+
+### Internal
+- **Proto-to-`Device` parsers extracted from `devices.py` into a new `api/devices_parser.py`.** The eight pure parsers (`parse_device`, `_parse_statuses`, `_parse_device_state`, `_parse_battery`, `_parse_spread_properties`, `_parse_hub_device`, `_parse_video_edge_channel`, `_dedupe_video_doorbells`), their lookup maps, and the wire-shape/redaction helpers now live in one side-effect-free module that's testable without a gRPC client. `DevicesApi` keeps thin `@staticmethod` delegators forwarding to it, so the existing call surface (coordinator + tests) is unchanged; the parser module pins its logger name to `api.devices` so DEBUG output is byte-for-byte identical. `devices.py` drops from 1194 to ~590 lines. No entity, unique_id, or behaviour change.
+
 ## [1.6.2-beta.3] - 2026-05-27
 
 Resource-cleanup and correctness fixes from a code-review pass — no user-facing behaviour change in normal operation.
