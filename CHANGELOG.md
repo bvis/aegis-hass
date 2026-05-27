@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0-beta.3] - 2026-05-28
+
+Graceful handling of device-command permission denials, especially for bypass.
+
+### Added
+- **`bypass_switches` option (auto / always / never).** Controls whether per-device bypass switches are created. `auto` (default) only creates them if the logged-in user has the `DEVICE_EDIT` Ajax permission — so accounts that can't deactivate devices aren't left with a bypass switch on every device that only ever errors. `always` keeps the previous behaviour; `never` disables them. Configurable in the integration options; translated across all 14 locales.
+
+### Fixed
+- **Clear, translated errors when the hub rejects a device command.** A rejection (no permission, hub offline, wrong state, …) now surfaces as a factual `HomeAssistantError` keyed off the server's reason, instead of the raw generic service failure. Applies to switch on/off, device bypass, and light brightness.
+
 ## [1.7.0-beta.2] - 2026-05-28
 
 Device automation triggers and a per-device bypass switch.
