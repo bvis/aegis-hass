@@ -1185,14 +1185,12 @@ class TestExtractEventCompiledProtos:
         # 50), second decodes as a sensor tag (priority 80). Sensor wins
         # by priority even though it's discovered second.
         with (
-            patch.object(
-                listener,
-                "_find_embedded_messages",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._find_embedded_messages",
                 return_value=[b"\x01", b"\x02"],
             ),
-            patch.object(
-                listener,
-                "_resolve_qualifier",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._resolve_qualifier",
                 side_effect=lambda c, *_: {
                     b"\x01": ("arm_night", {"raw_tag": "space_night_mode_on"}),
                     b"\x02": ("motion", {"raw_tag": "motion_detected"}),
@@ -1213,14 +1211,12 @@ class TestExtractEventCompiledProtos:
         # arm / disarm push.
         listener = self._make_listener()
         with (
-            patch.object(
-                listener,
-                "_find_embedded_messages",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._find_embedded_messages",
                 return_value=[b"\x01"],
             ),
-            patch.object(
-                listener,
-                "_resolve_qualifier",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._resolve_qualifier",
                 side_effect=lambda c, *_: ("arm", {"raw_tag": "space_armed"}),
             ),
         ):
@@ -1234,14 +1230,12 @@ class TestExtractEventCompiledProtos:
         # surface as `alarm`, not `motion`.
         listener = self._make_listener()
         with (
-            patch.object(
-                listener,
-                "_find_embedded_messages",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._find_embedded_messages",
                 return_value=[b"\x01", b"\x02"],
             ),
-            patch.object(
-                listener,
-                "_resolve_qualifier",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._resolve_qualifier",
                 side_effect=lambda c, *_: {
                     b"\x01": ("motion", {"raw_tag": "motion_detected"}),
                     b"\x02": ("alarm", {"raw_tag": "intrusion_alarm"}),
@@ -1262,14 +1256,12 @@ class TestExtractEventCompiledProtos:
         # behaviour changes for state-only pushes.
         listener = self._make_listener()
         with (
-            patch.object(
-                listener,
-                "_find_embedded_messages",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._find_embedded_messages",
                 return_value=[b"\x01", b"\x02"],
             ),
-            patch.object(
-                listener,
-                "_resolve_qualifier",
+            patch(
+                "custom_components.aegis_ajax.notification_event_parser._resolve_qualifier",
                 side_effect=lambda c, *_: {
                     b"\x01": ("arm", {"raw_tag": "space_armed"}),
                     b"\x02": ("disarm", {"raw_tag": "space_disarmed"}),
