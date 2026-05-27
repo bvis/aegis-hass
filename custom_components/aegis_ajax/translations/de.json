@@ -402,6 +402,9 @@
             },
             "channel_2": {
                 "name": "Kanal 2"
+            },
+            "bypass": {
+                "name": "Überbrückung"
             }
         },
         "update": {

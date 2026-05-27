@@ -402,6 +402,9 @@
             },
             "channel_2": {
                 "name": "Kanál 2"
+            },
+            "bypass": {
+                "name": "Vyřazení"
             }
         },
         "update": {

@@ -166,6 +166,9 @@ class DeviceCommand:
     device_type: str
     channels: list[int] = field(default_factory=list)
     brightness: int | None = None
+    # True = deactivate (bypass) the device, False = reactivate it. Only set
+    # for action="bypass".
+    bypass_enable: bool | None = None
 
     @classmethod
     def on(
@@ -207,4 +210,15 @@ class DeviceCommand:
             device_type=device_type,
             channels=channels or [],
             brightness=brightness,
+        )
+
+    @classmethod
+    def bypass(cls, hub_id: str, device_id: str, device_type: str, enable: bool) -> DeviceCommand:
+        """Deactivate (`enable=True`) or reactivate (`enable=False`) a device."""
+        return cls(
+            action="bypass",
+            hub_id=hub_id,
+            device_id=device_id,
+            device_type=device_type,
+            bypass_enable=enable,
         )

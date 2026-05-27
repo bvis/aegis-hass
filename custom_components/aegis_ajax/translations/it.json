@@ -402,6 +402,9 @@
             },
             "channel_2": {
                 "name": "Canale 2"
+            },
+            "bypass": {
+                "name": "Esclusione"
             }
         },
         "update": {

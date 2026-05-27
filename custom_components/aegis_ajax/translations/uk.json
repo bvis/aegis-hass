@@ -402,6 +402,9 @@
             },
             "channel_2": {
                 "name": "Канал 2"
+            },
+            "bypass": {
+                "name": "Обхід"
             }
         },
         "update": {

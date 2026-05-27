@@ -402,6 +402,9 @@
             },
             "channel_2": {
                 "name": "Kanaal 2"
+            },
+            "bypass": {
+                "name": "Overbruggen"
             }
         },
         "update": {

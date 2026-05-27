@@ -403,8 +403,42 @@ class DevicesApi:
             await self._device_off(command)
         elif command.action == "brightness":
             await self._device_brightness(command)
+        elif command.action == "bypass":
+            await self._device_bypass(command)
         else:
             raise DeviceCommandError(f"Unknown device command action: {command.action}")
+
+    async def _device_bypass(self, command: DeviceCommand) -> None:
+        """Deactivate (bypass) or reactivate a device via DeviceCommandDeviceBypass.
+
+        `bypass_enable=True` → permanent (engineering) whole-device
+        deactivation, matching the `bypassed` flag the snapshot reports;
+        `False` → clear the bypass (`BYPASS_UNSPECIFIED`).
+        """
+        from v3.mobilegwsvc.service.device_command_device_bypass import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        bypass_type = (
+            request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_ENGINEERING_DISABLE
+            if command.bypass_enable
+            else request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_UNSPECIFIED
+        )
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandDeviceBypassServiceStub(channel)
+        request = request_pb2.DeviceCommandDeviceBypassRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            object_type=_build_object_type(command.device_type),
+            bypass_type=bypass_type,
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"bypass: {error}")
+        _LOGGER.debug("Device %s bypass=%s OK", command.device_id, bool(command.bypass_enable))
 
     async def _device_on(self, command: DeviceCommand) -> None:
         from v3.mobilegwsvc.service.device_command_device_on import (  # noqa: PLC0415

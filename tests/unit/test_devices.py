@@ -1200,6 +1200,146 @@ class TestSendCommand:
         with pytest.raises(DeviceCommandError):
             await api.send_command(cmd)
 
+    @pytest.mark.asyncio
+    async def test_send_command_dispatches_bypass(self) -> None:
+        api = DevicesApi(MagicMock())
+        api._device_on = AsyncMock()
+        api._device_bypass = AsyncMock()
+        cmd = DeviceCommand.bypass(
+            hub_id="h1", device_id="d1", device_type="door_protect", enable=True
+        )
+
+        await api.send_command(cmd)
+
+        api._device_bypass.assert_awaited_once_with(cmd)
+        api._device_on.assert_not_called()
+
+
+class TestDeviceBypassCommand:
+    """`device_command_device_bypass` — deactivate/reactivate a device (#bypass)."""
+
+    def test_bypass_factory_enable(self) -> None:
+        cmd = DeviceCommand.bypass(
+            hub_id="h1", device_id="d1", device_type="motion_protect", enable=True
+        )
+        assert cmd.action == "bypass"
+        assert cmd.bypass_enable is True
+
+    def test_bypass_factory_disable(self) -> None:
+        cmd = DeviceCommand.bypass(
+            hub_id="h1", device_id="d1", device_type="motion_protect", enable=False
+        )
+        assert cmd.action == "bypass"
+        assert cmd.bypass_enable is False
+
+    def _make_api(self) -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_enable_sends_engineering_disable(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_device_bypass import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ok = response_pb2.DeviceCommandDeviceBypassResponse(success=common_response_pb2.Success())
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return ok
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(endpoint_pb2_grpc, "DeviceCommandDeviceBypassServiceStub", _StubFactory):
+            await api.send_command(
+                DeviceCommand.bypass(
+                    hub_id="hub-1", device_id="dev-1", device_type="door_protect", enable=True
+                )
+            )
+
+        assert len(captured) == 1
+        req = captured[0]
+        assert req.hub_id == "hub-1"
+        assert req.device_id == "dev-1"
+        assert req.object_type.WhichOneof("type") == "door_protect"
+        assert (
+            req.bypass_type
+            == request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_ENGINEERING_DISABLE
+        )
+
+    @pytest.mark.asyncio
+    async def test_disable_sends_unspecified(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_device_bypass import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ok = response_pb2.DeviceCommandDeviceBypassResponse(success=common_response_pb2.Success())
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return ok
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(endpoint_pb2_grpc, "DeviceCommandDeviceBypassServiceStub", _StubFactory):
+            await api.send_command(
+                DeviceCommand.bypass(
+                    hub_id="hub-1", device_id="dev-1", device_type="door_protect", enable=False
+                )
+            )
+
+        assert (
+            captured[0].bypass_type
+            == request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_UNSPECIFIED
+        )
+
+    @pytest.mark.asyncio
+    async def test_bypass_failure_raises(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_device_bypass import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        failure = response_pb2.DeviceCommandDeviceBypassResponse(
+            failure=response_pb2.DeviceCommandDeviceBypassResponse.Failure(
+                permission_denied=common_response_pb2.Error(),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(return_value=failure)
+
+        with (
+            patch.object(endpoint_pb2_grpc, "DeviceCommandDeviceBypassServiceStub", _StubFactory),
+            pytest.raises(DeviceCommandError, match="permission_denied"),
+        ):
+            await api.send_command(
+                DeviceCommand.bypass(
+                    hub_id="hub-1", device_id="dev-1", device_type="door_protect", enable=True
+                )
+            )
+
 
 class TestBuildObjectType:
     """`_build_object_type` must mark the right ObjectType.type oneof case."""

@@ -418,6 +418,9 @@
             },
             "channel_2": {
                 "name": "Channel 2"
+            },
+            "bypass": {
+                "name": "Bypass"
             }
         },
         "update": {

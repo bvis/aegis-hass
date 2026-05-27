@@ -186,3 +186,105 @@ class TestAjaxSwitch:
         coordinator.devices_api.send_command.assert_called_once()
         cmd = coordinator.devices_api.send_command.call_args[0][0]
         assert cmd.action == "off"
+
+
+class TestAjaxBypassSwitch:
+    """Per-device bypass (deactivation) switch (#bypass)."""
+
+    def _make(
+        self, device_type: str = "door_protect", bypassed: bool = False
+    ) -> tuple[object, MagicMock]:
+        from custom_components.aegis_ajax.switch import AjaxBypassSwitch
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        device = MagicMock()
+        device.device_type = device_type
+        device.bypassed = bypassed
+        device.is_online = True
+        coordinator.devices = {"d1": device}
+        sw = AjaxBypassSwitch(
+            coordinator=coordinator, device_id="d1", hub_id="h1", device_type=device_type
+        )
+        return sw, coordinator
+
+    def test_unique_id(self) -> None:
+        sw, _ = self._make()
+        assert sw.unique_id == "aegis_ajax_d1_bypass"
+
+    def test_translation_key(self) -> None:
+        sw, _ = self._make()
+        assert sw._attr_translation_key == "bypass"
+
+    def test_is_config_entity(self) -> None:
+        from homeassistant.helpers.entity import EntityCategory
+
+        sw, _ = self._make()
+        assert sw._attr_entity_category == EntityCategory.CONFIG
+
+    def test_is_on_reflects_bypassed_true(self) -> None:
+        sw, _ = self._make(bypassed=True)
+        assert sw.is_on is True
+
+    def test_is_on_reflects_bypassed_false(self) -> None:
+        sw, _ = self._make(bypassed=False)
+        assert sw.is_on is False
+
+    @pytest.mark.asyncio
+    async def test_turn_on_sends_bypass_enable(self) -> None:
+        sw, coordinator = self._make()
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_turn_on()
+
+        cmd = coordinator.devices_api.send_command.call_args[0][0]
+        assert cmd.action == "bypass"
+        assert cmd.bypass_enable is True
+        coordinator.async_request_refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_sends_bypass_disable(self) -> None:
+        sw, coordinator = self._make(bypassed=True)
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_turn_off()
+
+        cmd = coordinator.devices_api.send_command.call_args[0][0]
+        assert cmd.action == "bypass"
+        assert cmd.bypass_enable is False
+
+
+class TestBypassSwitchSetup:
+    """`async_setup_entry` adds a bypass switch to every non-hub device."""
+
+    @pytest.mark.asyncio
+    async def test_creates_bypass_for_non_hub_not_hub(self) -> None:
+        from custom_components.aegis_ajax.switch import AjaxBypassSwitch, async_setup_entry
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        hub = MagicMock()
+        hub.device_type = "hub_two_plus"
+        hub.hub_id = "hub-1"
+        sensor = MagicMock()
+        sensor.device_type = "door_protect"
+        sensor.hub_id = "hub-1"
+        coordinator.devices = {"hub-1": hub, "d1": sensor}
+        space = MagicMock()
+        space.hub_id = "hub-1"
+        coordinator.spaces = {"s1": space}
+
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            added.extend(entities)
+
+        await async_setup_entry(MagicMock(), entry, _add)
+
+        bypass = [e for e in added if isinstance(e, AjaxBypassSwitch)]
+        device_ids = {e._device_id for e in bypass}
+        assert device_ids == {"d1"}  # sensor gets one, hub does not

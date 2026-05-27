@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
@@ -47,7 +48,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
-    entities: list[AjaxSwitch] = []
+    hub_ids = {space.hub_id for space in coordinator.spaces.values() if space.hub_id}
+    entities: list[SwitchEntity] = []
     for device_id, device in coordinator.devices.items():
         num_channels = SWITCH_DEVICE_TYPES.get(device.device_type, 0)
         for ch in range(1, num_channels + 1):
@@ -58,6 +60,16 @@ async def async_setup_entry(
                     hub_id=device.hub_id,
                     device_type=device.device_type,
                     channel=ch,
+                )
+            )
+        # Every non-hub device can be deactivated (bypassed) before arming.
+        if device_id not in hub_ids:
+            entities.append(
+                AjaxBypassSwitch(
+                    coordinator=coordinator,
+                    device_id=device_id,
+                    hub_id=device.hub_id,
+                    device_type=device.device_type,
                 )
             )
     async_add_entities(entities)
@@ -121,6 +133,66 @@ class AjaxSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
             device_id=self._device_id,
             device_type=self._device_type,
             channels=[self._channel],
+        )
+        await self.coordinator.devices_api.send_command(cmd)
+        await self.coordinator.async_request_refresh()
+
+
+class AjaxBypassSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
+    """Deactivate (bypass) a device so it's excluded while the system is armed.
+
+    `on` = device bypassed/deactivated (permanent, "engineering"), `off` =
+    active. Mirrors the `bypassed` flag the snapshot reports.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "bypass"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxCobrandedCoordinator,
+        device_id: str,
+        hub_id: str,
+        device_type: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._hub_id = hub_id
+        self._device_type = device_type
+        self._attr_unique_id = f"aegis_ajax_{device_id}_bypass"
+        device = coordinator.devices.get(device_id)
+        if device:
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
+
+    @property
+    def _device(self) -> Device | None:
+        return self.coordinator.devices.get(self._device_id)
+
+    @property
+    def available(self) -> bool:
+        device = self._device
+        return device is not None and device.is_online
+
+    @property
+    def is_on(self) -> bool | None:
+        device = self._device
+        if device is None:
+            return None
+        return bool(device.bypassed)
+
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await self._set_bypass(enable=True)
+
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await self._set_bypass(enable=False)
+
+    async def _set_bypass(self, *, enable: bool) -> None:
+        cmd = DeviceCommand.bypass(
+            hub_id=self._hub_id,
+            device_id=self._device_id,
+            device_type=self._device_type,
+            enable=enable,
         )
         await self.coordinator.devices_api.send_command(cmd)
         await self.coordinator.async_request_refresh()
