@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Usuń poświadczenia FCM (czyści wszystkie cztery pola)",
                     "photo_retention_days": "Przechowywanie zdjęć (dni)",
                     "photo_max_per_device": "Maks. zdjęć na urządzenie (0 = bez limitu)",
-                    "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji"
+                    "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji",
+                    "bypass_switches": "Twórz przełączniki pomijania urządzeń"
+                },
+                "data_description": {
+                    "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Ruch",
             "panic": "Panika",
             "tamper": "Sabotaż"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (tylko jeśli Twoje konto może dezaktywować urządzenia)",
+                "always": "Zawsze",
+                "never": "Nigdy"
+            }
         }
     }
 }

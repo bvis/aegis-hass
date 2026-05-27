@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "FCM-Anmeldedaten löschen (alle vier Felder leeren)",
                     "photo_retention_days": "Foto-Aufbewahrung (Tage)",
                     "photo_max_per_device": "Max. Fotos pro Gerät (0 = unbegrenzt)",
-                    "auto_create_labels": "Aegis-Labels automatisch erstellen und Entitäten zuweisen"
+                    "auto_create_labels": "Aegis-Labels automatisch erstellen und Entitäten zuweisen",
+                    "bypass_switches": "Geräte-Überbrückungsschalter erstellen"
+                },
+                "data_description": {
+                    "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Bewegung",
             "panic": "Panik",
             "tamper": "Sabotage"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (nur wenn dein Konto Geräte deaktivieren darf)",
+                "always": "Immer",
+                "never": "Nie"
+            }
         }
     }
 }

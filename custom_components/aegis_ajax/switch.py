@@ -10,6 +10,13 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
+from custom_components.aegis_ajax.const import (
+    BYPASS_REQUIRED_PERMISSION,
+    BYPASS_SWITCHES_ALWAYS,
+    BYPASS_SWITCHES_NEVER,
+    CONF_BYPASS_SWITCHES,
+    DEFAULT_BYPASS_SWITCHES,
+)
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
@@ -44,11 +51,47 @@ SWITCH_DEVICE_TYPES: dict[str, int] = {
 }
 
 
+async def _resolve_bypass_hubs(
+    coordinator: AjaxCobrandedCoordinator, entry: ConfigEntry, mode: str
+) -> set[str] | None:
+    """Which hubs should get per-device bypass switches, per the option (#bypass).
+
+    Returns a set of hub ids to create switches for, or `None` meaning "all"
+    (`always` mode). `never` → empty set. `auto` → only hubs whose space the
+    logged-in user has `DEVICE_EDIT` on (a read-only permission lookup);
+    failing the lookup is fail-open (the hub is included) so we never silently
+    hide a capability the user actually has — the next bypass attempt would
+    surface a clear error if they don't.
+    """
+    if mode == BYPASS_SWITCHES_NEVER:
+        return set()
+    if mode == BYPASS_SWITCHES_ALWAYS:
+        return None
+    # auto
+    user_hex = entry.data.get("user_hex_id", "")
+    allowed: set[str] = set()
+    for space in coordinator.spaces.values():
+        if not space.hub_id:
+            continue
+        perms = await coordinator.spaces_api.get_member_space_permissions(space.id, user_hex)
+        if perms is None or BYPASS_REQUIRED_PERMISSION in perms:
+            allowed.add(space.hub_id)
+        else:
+            _LOGGER.debug(
+                "Skipping bypass switches for hub %s: user lacks %s",
+                space.hub_id,
+                BYPASS_REQUIRED_PERMISSION,
+            )
+    return allowed
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
     hub_ids = {space.hub_id for space in coordinator.spaces.values() if space.hub_id}
+    bypass_mode = entry.options.get(CONF_BYPASS_SWITCHES, DEFAULT_BYPASS_SWITCHES)
+    bypass_hubs = await _resolve_bypass_hubs(coordinator, entry, bypass_mode)
     entities: list[SwitchEntity] = []
     for device_id, device in coordinator.devices.items():
         num_channels = SWITCH_DEVICE_TYPES.get(device.device_type, 0)
@@ -62,8 +105,9 @@ async def async_setup_entry(
                     channel=ch,
                 )
             )
-        # Every non-hub device can be deactivated (bypassed) before arming.
-        if device_id not in hub_ids:
+        # Every non-hub device can be deactivated (bypassed) before arming,
+        # subject to the `bypass_switches` option (None = create for all hubs).
+        if device_id not in hub_ids and (bypass_hubs is None or device.hub_id in bypass_hubs):
             entities.append(
                 AjaxBypassSwitch(
                     coordinator=coordinator,

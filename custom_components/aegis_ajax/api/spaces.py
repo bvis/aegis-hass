@@ -340,3 +340,74 @@ class SpacesApi:
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
             raise RuntimeError(f"Panic button request rejected by Ajax: {error}")
+
+    async def get_member_space_permissions(
+        self, space_id: str, user_hex_id: str
+    ) -> set[str] | None:
+        """Return the current user's space-permission names, or None.
+
+        Read-only. Lists lite members to resolve the user's member id (matched
+        by `hex_id`), then fetches the full SpaceMember and returns its
+        `space_permissions.permissions` as enum-name strings (e.g.
+        `{"ARM", "DISARM", "DEVICE_EDIT"}`). Returns None when the user can't be
+        matched, the server denies the members call, or anything goes wrong —
+        callers treat None as "unknown / can't determine". (#bypass auto)
+        """
+        from systems.ajax.api.mobile.v2.common.space.member import (  # noqa: PLC0415
+            space_permission_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_lite_space_members import (  # noqa: PLC0415
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            request_pb2 as lite_req,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (  # noqa: PLC0415
+            endpoint_pb2_grpc as full_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (
+            request_pb2 as full_req,
+        )
+
+        try:
+            channel = self._client._get_channel()
+            metadata = self._client._session.get_call_metadata()
+
+            member_id: str | None = None
+            lite_stub = lite_grpc.StreamLiteSpaceMembersServiceStub(channel)
+            async for msg in lite_stub.execute(
+                lite_req.StreamLiteSpaceMembersRequest(space_id=space_id),
+                metadata=metadata,
+                timeout=15,
+            ):
+                if msg.HasField("success") and msg.success.HasField("snapshot"):
+                    for member in msg.success.snapshot.lite_space_members.lite_space_members:
+                        if member.hex_id == user_hex_id:
+                            member_id = member.id
+                            break
+                    break
+                if msg.HasField("failure"):
+                    return None
+            if not member_id:
+                return None
+
+            perm_names = {
+                v.number: v.name for v in space_permission_pb2.SpacePermission.DESCRIPTOR.values
+            }
+            full_stub = full_grpc.StreamSpaceMemberServiceStub(channel)
+            async for msg in full_stub.execute(
+                full_req.StreamSpaceMemberRequest(space_id=space_id, space_member_id=member_id),
+                metadata=metadata,
+                timeout=15,
+            ):
+                if msg.HasField("success") and msg.success.HasField("snapshot"):
+                    member = msg.success.snapshot.space_member
+                    return {perm_names.get(p, str(p)) for p in member.space_permissions.permissions}
+                if msg.HasField("failure"):
+                    return None
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "Could not fetch member permissions for space %s", space_id, exc_info=True
+            )
+            return None
+        return None

@@ -193,6 +193,20 @@ class DeviceState(StrEnum):
     UNKNOWN = "unknown"
 
 
+# Controls whether per-device bypass switches are created (#bypass).
+# `auto` only creates them if the logged-in user has the DEVICE_EDIT space
+# permission (deactivating a device requires it server-side); `always` and
+# `never` skip the permission check.
+CONF_BYPASS_SWITCHES = "bypass_switches"
+BYPASS_SWITCHES_AUTO = "auto"
+BYPASS_SWITCHES_ALWAYS = "always"
+BYPASS_SWITCHES_NEVER = "never"
+DEFAULT_BYPASS_SWITCHES = BYPASS_SWITCHES_AUTO
+# The SpacePermission the Ajax server requires to deactivate (bypass) a device.
+# Confirmed empirically: an account lacking exactly this permission gets
+# `permission_denied` on the bypass command.
+BYPASS_REQUIRED_PERMISSION = "DEVICE_EDIT"
+
 CONF_FORCE_ARM = "force_arm"
 CONF_PHOTO_RETENTION_DAYS = "photo_retention_days"
 CONF_PHOTO_MAX_PER_DEVICE = "photo_max_per_device"

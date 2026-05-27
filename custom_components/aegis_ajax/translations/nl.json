@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "FCM-inloggegevens verwijderen (wist alle vier velden)",
                     "photo_retention_days": "Foto bewaarperiode (dagen)",
                     "photo_max_per_device": "Max foto's per apparaat (0 = onbeperkt)",
-                    "auto_create_labels": "Aegis-labels automatisch aanmaken en aan entiteiten toewijzen"
+                    "auto_create_labels": "Aegis-labels automatisch aanmaken en aan entiteiten toewijzen",
+                    "bypass_switches": "Apparaat-overbrugschakelaars aanmaken"
+                },
+                "data_description": {
+                    "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Beweging",
             "panic": "Paniek",
             "tamper": "Sabotage"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (alleen als je account apparaten kan deactiveren)",
+                "always": "Altijd",
+                "never": "Nooit"
+            }
         }
     }
 }

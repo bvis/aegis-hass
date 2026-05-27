@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "FCM kimlik bilgilerini sil (dört alanı da temizler)",
                     "photo_retention_days": "Fotoğraf saklama süresi (gün)",
                     "photo_max_per_device": "Cihaz başına maks. fotoğraf (0 = sınırsız)",
-                    "auto_create_labels": "Aegis etiketlerini otomatik olarak oluştur ve varlıklara ata"
+                    "auto_create_labels": "Aegis etiketlerini otomatik olarak oluştur ve varlıklara ata",
+                    "bypass_switches": "Cihaz atlama anahtarları oluştur"
+                },
+                "data_description": {
+                    "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Hareket",
             "panic": "Panik",
             "tamper": "Müdahale"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Otomatik (yalnızca hesabın cihazları devre dışı bırakabiliyorsa)",
+                "always": "Her zaman",
+                "never": "Asla"
+            }
         }
     }
 }

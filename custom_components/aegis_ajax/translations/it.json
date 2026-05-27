@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Elimina credenziali FCM (cancella tutti e quattro i campi)",
                     "photo_retention_days": "Conservazione foto (giorni)",
                     "photo_max_per_device": "Max foto per dispositivo (0 = illimitato)",
-                    "auto_create_labels": "Crea e assegna automaticamente etichette Aegis alle entità"
+                    "auto_create_labels": "Crea e assegna automaticamente etichette Aegis alle entità",
+                    "bypass_switches": "Crea interruttori di esclusione dispositivo"
+                },
+                "data_description": {
+                    "bypass_switches": "Gli interruttori di esclusione permettono di disattivare un dispositivo prima di inserire l'allarme. 'Auto' li crea solo se il tuo account Ajax ha il permesso di disattivare i dispositivi."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Movimento",
             "panic": "Panico",
             "tamper": "Manomissione"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (solo se il tuo account può disattivare i dispositivi)",
+                "always": "Sempre",
+                "never": "Mai"
+            }
         }
     }
 }

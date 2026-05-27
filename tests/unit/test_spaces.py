@@ -881,3 +881,97 @@ class TestGetSpaceSnapshotResolvesMissingNames:
         assert snapshot.monitoring_companies[0].name == ""
         assert snapshot.monitoring_companies[0].hex_id == "DEADBEEF"
         assert snapshot.monitoring_companies[0].status == MonitoringCompanyStatus.PENDING_APPROVAL
+
+
+class TestGetMemberSpacePermissions:
+    """Read-only fetch of the current user's space permissions (#bypass auto)."""
+
+    def _make_api(self) -> SpacesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return SpacesApi(client)
+
+    @staticmethod
+    async def _aiter(items: list) -> object:
+        for it in items:
+            yield it
+
+    def _lite_response(self, members: list) -> object:
+        from v3.mobilegwsvc.service.stream_lite_space_members import response_pb2 as r
+
+        resp = r.StreamLiteSpaceMembersResponse()
+        for mid, hexid in members:
+            m = resp.success.snapshot.lite_space_members.lite_space_members.add()
+            m.id = mid
+            m.hex_id = hexid
+        return resp
+
+    def _full_response(self, permission_numbers: list) -> object:
+        from v3.mobilegwsvc.service.stream_space_member import response_pb2 as r
+
+        resp = r.StreamSpaceMemberResponse()
+        mem = resp.success.snapshot.space_member
+        for p in permission_numbers:
+            mem.space_permissions.permissions.append(p)
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_returns_permission_names_for_matched_user(self) -> None:
+        from systems.ajax.api.mobile.v2.common.space.member import space_permission_pb2 as sp
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (
+            endpoint_pb2_grpc as full_grpc,
+        )
+
+        api = self._make_api()
+        lite = self._lite_response([("mid-1", "AAAA1111"), ("mid-2", "BBBB2222")])
+        full = self._full_response([sp.SpacePermission.ARM, sp.SpacePermission.DEVICE_EDIT])
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([lite])
+
+        class _FullStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([full])
+
+        with (
+            patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub),
+            patch.object(full_grpc, "StreamSpaceMemberServiceStub", _FullStub),
+        ):
+            perms = await api.get_member_space_permissions("space-1", "BBBB2222")
+
+        assert perms == {"ARM", "DEVICE_EDIT"}
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_user_not_a_member(self) -> None:
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+
+        api = self._make_api()
+        lite = self._lite_response([("mid-1", "AAAA1111")])
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([lite])
+
+        with patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub):
+            perms = await api.get_member_space_permissions("space-1", "NOPE9999")
+
+        assert perms is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_exception(self) -> None:
+        api = self._make_api()
+        api._client._get_channel.side_effect = RuntimeError("boom")
+
+        perms = await api.get_member_space_permissions("space-1", "AAAA1111")
+
+        assert perms is None

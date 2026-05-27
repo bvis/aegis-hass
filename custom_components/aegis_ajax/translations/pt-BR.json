@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Excluir credenciais FCM (limpa todos os quatro campos)",
                     "photo_retention_days": "Retenção de fotos (dias)",
                     "photo_max_per_device": "Máx. fotos por dispositivo (0 = ilimitado)",
-                    "auto_create_labels": "Criar e atribuir automaticamente etiquetas Aegis às entidades"
+                    "auto_create_labels": "Criar e atribuir automaticamente etiquetas Aegis às entidades",
+                    "bypass_switches": "Criar interruptores de bypass de dispositivos"
+                },
+                "data_description": {
+                    "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Movimento",
             "panic": "Pânico",
             "tamper": "Violação"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (apenas se sua conta puder desativar dispositivos)",
+                "always": "Sempre",
+                "never": "Nunca"
+            }
         }
     }
 }

@@ -35,11 +35,16 @@ from custom_components.aegis_ajax.api.session import (
 from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import (
     APPLICATION_LABEL,
+    BYPASS_SWITCHES_ALWAYS,
+    BYPASS_SWITCHES_AUTO,
+    BYPASS_SWITCHES_NEVER,
     CONF_AUTO_CREATE_LABELS,
+    CONF_BYPASS_SWITCHES,
     CONF_FORCE_ARM,
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
     DEFAULT_AUTO_CREATE_LABELS,
+    DEFAULT_BYPASS_SWITCHES,
     DEFAULT_PHOTO_MAX_PER_DEVICE,
     DEFAULT_PHOTO_RETENTION_DAYS,
     DEFAULT_POLL_INTERVAL,
@@ -586,6 +591,22 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                             CONF_AUTO_CREATE_LABELS, DEFAULT_AUTO_CREATE_LABELS
                         ),
                     ): bool,
+                    vol.Optional(
+                        CONF_BYPASS_SWITCHES,
+                        default=self._entry.options.get(
+                            CONF_BYPASS_SWITCHES, DEFAULT_BYPASS_SWITCHES
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                BYPASS_SWITCHES_AUTO,
+                                BYPASS_SWITCHES_ALWAYS,
+                                BYPASS_SWITCHES_NEVER,
+                            ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key="bypass_switches",
+                        )
+                    ),
                 }
             ),
         )

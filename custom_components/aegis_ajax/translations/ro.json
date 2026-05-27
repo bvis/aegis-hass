@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Șterge acreditările FCM (golește toate cele patru câmpuri)",
                     "photo_retention_days": "Reținere fotografii (zile)",
                     "photo_max_per_device": "Max fotografii per dispozitiv (0 = nelimitat)",
-                    "auto_create_labels": "Creează și atribuie automat etichete Aegis entităților"
+                    "auto_create_labels": "Creează și atribuie automat etichete Aegis entităților",
+                    "bypass_switches": "Creează comutatoare de excludere dispozitiv"
+                },
+                "data_description": {
+                    "bypass_switches": "Comutatoarele de excludere permit dezactivarea unui dispozitiv înainte de armare. „Auto” le creează doar dacă contul tău Ajax are permisiunea de a dezactiva dispozitive."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Miscare",
             "panic": "Panica",
             "tamper": "Sabotaj"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (doar dacă contul tău poate dezactiva dispozitive)",
+                "always": "Întotdeauna",
+                "never": "Niciodată"
+            }
         }
     }
 }

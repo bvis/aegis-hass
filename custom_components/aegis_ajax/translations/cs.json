@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Smazat FCM přihlašovací údaje (vymaže všechna čtyři pole)",
                     "photo_retention_days": "Uchovávání fotografií (dny)",
                     "photo_max_per_device": "Max fotografií na zařízení (0 = neomezeno)",
-                    "auto_create_labels": "Automaticky vytvářet a přiřazovat štítky Aegis entitám"
+                    "auto_create_labels": "Automaticky vytvářet a přiřazovat štítky Aegis entitám",
+                    "bypass_switches": "Vytvořit přepínače vyřazení zařízení"
+                },
+                "data_description": {
+                    "bypass_switches": "Přepínače vyřazení umožňují deaktivovat zařízení před zastřežením. 'Auto' je vytvoří jen tehdy, má-li tvůj účet Ajax oprávnění deaktivovat zařízení."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Pohyb",
             "panic": "Panika",
             "tamper": "Sabotáž"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (jen pokud tvůj účet může deaktivovat zařízení)",
+                "always": "Vždy",
+                "never": "Nikdy"
+            }
         }
     }
 }

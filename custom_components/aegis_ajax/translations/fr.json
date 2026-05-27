@@ -85,7 +85,11 @@
                     "clear_fcm_credentials": "Supprimer les identifiants FCM (efface les quatre champs)",
                     "photo_retention_days": "Rétention des photos (jours)",
                     "photo_max_per_device": "Max photos par appareil (0 = illimité)",
-                    "auto_create_labels": "Créer et attribuer automatiquement des étiquettes Aegis aux entités"
+                    "auto_create_labels": "Créer et attribuer automatiquement des étiquettes Aegis aux entités",
+                    "bypass_switches": "Créer des interrupteurs de contournement"
+                },
+                "data_description": {
+                    "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils."
                 }
             }
         }
@@ -470,6 +474,15 @@
             "motion": "Mouvement",
             "panic": "Panique",
             "tamper": "Sabotage"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (seulement si votre compte peut désactiver des appareils)",
+                "always": "Toujours",
+                "never": "Jamais"
+            }
         }
     }
 }

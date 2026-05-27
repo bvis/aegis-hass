@@ -274,34 +274,59 @@ class TestAjaxBypassSwitch:
 
 
 class TestBypassSwitchSetup:
-    """`async_setup_entry` adds a bypass switch to every non-hub device."""
+    """`async_setup_entry` gates bypass switches by the `bypass_switches` option."""
 
-    @pytest.mark.asyncio
-    async def test_creates_bypass_for_non_hub_not_hub(self) -> None:
+    async def _run(self, *, mode: str | None, perms: set | None) -> set[str]:
         from custom_components.aegis_ajax.switch import AjaxBypassSwitch, async_setup_entry
 
         coordinator = MagicMock()
         coordinator.rooms = {}
-        hub = MagicMock()
-        hub.device_type = "hub_two_plus"
-        hub.hub_id = "hub-1"
-        sensor = MagicMock()
-        sensor.device_type = "door_protect"
-        sensor.hub_id = "hub-1"
+        hub = MagicMock(device_type="hub_two_plus", hub_id="hub-1")
+        sensor = MagicMock(device_type="door_protect", hub_id="hub-1")
         coordinator.devices = {"hub-1": hub, "d1": sensor}
-        space = MagicMock()
-        space.hub_id = "hub-1"
+        space = MagicMock(id="s1", hub_id="hub-1")
         coordinator.spaces = {"s1": space}
+        coordinator.spaces_api.get_member_space_permissions = AsyncMock(return_value=perms)
 
         entry = MagicMock()
         entry.runtime_data = coordinator
+        entry.data = {"user_hex_id": "ABCD1234"}
+        entry.options = {} if mode is None else {"bypass_switches": mode}
         added: list = []
 
         def _add(entities: list, *a: object, **k: object) -> None:
             added.extend(entities)
 
         await async_setup_entry(MagicMock(), entry, _add)
+        return {e._device_id for e in added if isinstance(e, AjaxBypassSwitch)}
 
-        bypass = [e for e in added if isinstance(e, AjaxBypassSwitch)]
-        device_ids = {e._device_id for e in bypass}
-        assert device_ids == {"d1"}  # sensor gets one, hub does not
+    @pytest.mark.asyncio
+    async def test_always_creates_for_non_hub(self) -> None:
+        ids = await self._run(mode="always", perms=None)
+        assert ids == {"d1"}
+
+    @pytest.mark.asyncio
+    async def test_never_creates_none(self) -> None:
+        ids = await self._run(mode="never", perms={"DEVICE_EDIT"})
+        assert ids == set()
+
+    @pytest.mark.asyncio
+    async def test_auto_creates_when_user_has_device_edit(self) -> None:
+        ids = await self._run(mode="auto", perms={"ARM", "DEVICE_EDIT"})
+        assert ids == {"d1"}
+
+    @pytest.mark.asyncio
+    async def test_auto_skips_when_user_lacks_device_edit(self) -> None:
+        ids = await self._run(mode="auto", perms={"ARM", "DISARM"})
+        assert ids == set()
+
+    @pytest.mark.asyncio
+    async def test_auto_fail_open_when_permissions_unknown(self) -> None:
+        ids = await self._run(mode="auto", perms=None)
+        assert ids == {"d1"}
+
+    @pytest.mark.asyncio
+    async def test_default_is_auto(self) -> None:
+        # No option set → default (auto); user lacks DEVICE_EDIT → no switches.
+        ids = await self._run(mode=None, perms={"ARM"})
+        assert ids == set()

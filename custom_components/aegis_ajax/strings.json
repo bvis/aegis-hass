@@ -84,7 +84,11 @@
                     "fcm_sender_id": "FCM Sender ID",
                     "photo_retention_days": "Photo retention (days)",
                     "photo_max_per_device": "Max photos per device (0 = unlimited)",
-                    "auto_create_labels": "Auto-create and assign Aegis labels to entities"
+                    "auto_create_labels": "Auto-create and assign Aegis labels to entities",
+                    "bypass_switches": "Create device bypass switches"
+                },
+                "data_description": {
+                    "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices."
                 }
             }
         }
@@ -448,6 +452,15 @@
             "motion": "Motion",
             "panic": "Panic",
             "tamper": "Tamper"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (only if your account can deactivate devices)",
+                "always": "Always",
+                "never": "Never"
+            }
         }
     }
 }
