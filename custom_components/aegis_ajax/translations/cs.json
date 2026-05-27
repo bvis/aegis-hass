@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Vypršel časový limit při čekání, až kamera doručí pořízenou fotografii. Zkuste to znovu a zkontrolujte, zda je kamera online."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Zastřeženo",
+            "arm_night": "Noční režim zapnut",
+            "battery_low": "Nízká baterie",
+            "co_alarm": "Alarm CO",
+            "connection_lost": "Spojení ztraceno",
+            "disarm": "Odstřeženo",
+            "disarm_night": "Noční režim vypnut",
+            "door_open": "Dveře otevřeny",
+            "doorbell_pressed": "Stisknutí zvonku",
+            "fire": "Požár",
+            "flood": "Záplava",
+            "glass_break": "Rozbití skla",
+            "malfunction": "Porucha",
+            "motion": "Pohyb",
+            "panic": "Panika",
+            "tamper": "Sabotáž"
+        }
     }
 }

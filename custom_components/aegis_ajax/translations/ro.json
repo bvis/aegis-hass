@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Timpul de așteptare a expirat în timp ce camera livra fotografia capturată. Încearcă din nou și verifică dacă camera este online."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarma",
+            "arm": "Armat",
+            "arm_night": "Mod noapte activat",
+            "battery_low": "Baterie slaba",
+            "co_alarm": "Alarma CO",
+            "connection_lost": "Conexiune pierduta",
+            "disarm": "Dezarmat",
+            "disarm_night": "Mod noapte dezactivat",
+            "door_open": "Usa deschisa",
+            "doorbell_pressed": "Sonerie apăsată",
+            "fire": "Incendiu",
+            "flood": "Inundatie",
+            "glass_break": "Spargere geam",
+            "malfunction": "Defectiune",
+            "motion": "Miscare",
+            "panic": "Panica",
+            "tamper": "Sabotaj"
+        }
     }
 }

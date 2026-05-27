@@ -404,5 +404,26 @@
                 "name": "Channel 2"
             }
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Armed",
+            "arm_night": "Armed night",
+            "battery_low": "Battery low",
+            "co_alarm": "CO alarm",
+            "connection_lost": "Connection lost",
+            "disarm": "Disarmed",
+            "disarm_night": "Disarmed night",
+            "door_open": "Door opened",
+            "doorbell_pressed": "Doorbell pressed",
+            "fire": "Fire",
+            "flood": "Flood",
+            "glass_break": "Glass break",
+            "malfunction": "Malfunction",
+            "motion": "Motion",
+            "panic": "Panic",
+            "tamper": "Tamper"
+        }
     }
 }

@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Délai dépassé en attendant que la caméra livre la photo capturée. Réessayez et vérifiez que la caméra est en ligne."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarme",
+            "arm": "Armé",
+            "arm_night": "Mode nuit activé",
+            "battery_low": "Batterie faible",
+            "co_alarm": "Alarme CO",
+            "connection_lost": "Connexion perdue",
+            "disarm": "Désarmé",
+            "disarm_night": "Mode nuit désactivé",
+            "door_open": "Porte ouverte",
+            "doorbell_pressed": "Sonnette appuyée",
+            "fire": "Incendie",
+            "flood": "Inondation",
+            "glass_break": "Bris de verre",
+            "malfunction": "Dysfonctionnement",
+            "motion": "Mouvement",
+            "panic": "Panique",
+            "tamper": "Sabotage"
+        }
     }
 }

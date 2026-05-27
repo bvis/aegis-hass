@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Zeitüberschreitung beim Warten darauf, dass die Kamera das aufgenommene Foto liefert. Versuche es erneut und prüfe, ob die Kamera online ist."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Scharfgeschaltet",
+            "arm_night": "Nachtmodus aktiviert",
+            "battery_low": "Batterie schwach",
+            "co_alarm": "CO-Alarm",
+            "connection_lost": "Verbindung verloren",
+            "disarm": "Unscharfgeschaltet",
+            "disarm_night": "Nachtmodus deaktiviert",
+            "door_open": "Tür geöffnet",
+            "doorbell_pressed": "Klingel gedrückt",
+            "fire": "Feuer",
+            "flood": "Überflutung",
+            "glass_break": "Glasbruch",
+            "malfunction": "Fehlfunktion",
+            "motion": "Bewegung",
+            "panic": "Panik",
+            "tamper": "Sabotage"
+        }
     }
 }

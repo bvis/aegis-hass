@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "S'ha esgotat el temps d'espera perquè la càmera lliuri la foto capturada. Torna-ho a provar i comprova que la càmera estigui en línia."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarma",
+            "arm": "Armat",
+            "arm_night": "Armat nocturn",
+            "battery_low": "Bateria baixa",
+            "co_alarm": "Alarma CO",
+            "connection_lost": "Connexio perduda",
+            "disarm": "Desarmat",
+            "disarm_night": "Desarmat nocturn",
+            "door_open": "Porta oberta",
+            "doorbell_pressed": "Timbre premut",
+            "fire": "Foc",
+            "flood": "Inundacio",
+            "glass_break": "Trencament de vidre",
+            "malfunction": "Avaria",
+            "motion": "Moviment",
+            "panic": "Panic",
+            "tamper": "Manipulacio"
+        }
     }
 }

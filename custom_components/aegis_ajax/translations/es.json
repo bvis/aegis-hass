@@ -442,5 +442,26 @@
         "photo_capture_timeout": {
             "message": "Se agotó el tiempo de espera para que la cámara entregara la foto capturada. Inténtalo de nuevo y comprueba que la cámara esté en línea."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarma",
+            "arm": "Armado",
+            "arm_night": "Armado nocturno",
+            "battery_low": "Bateria baja",
+            "co_alarm": "Alarma CO",
+            "connection_lost": "Conexion perdida",
+            "disarm": "Desarmado",
+            "disarm_night": "Desarmado nocturno",
+            "door_open": "Puerta abierta",
+            "doorbell_pressed": "Timbre pulsado",
+            "fire": "Fuego",
+            "flood": "Inundacion",
+            "glass_break": "Rotura de cristal",
+            "malfunction": "Averia",
+            "motion": "Movimiento",
+            "panic": "Panico",
+            "tamper": "Manipulacion"
+        }
     }
 }

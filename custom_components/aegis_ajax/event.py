@@ -129,12 +129,14 @@ class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         await super().async_will_remove_from_hass()
 
     def handle_event(self, event_type: str, data: dict[str, Any]) -> None:
-        """Called by coordinator when a doorbell push for this device arrives."""
+        """Called by coordinator when a doorbell push for this device arrives.
+
+        Updates this entity's own state only. The shared `aegis_ajax_event`
+        bus event (logbook + automation triggers) is fired once by the
+        hub-level `AjaxSecurityEvent`; firing it here too would double-trigger
+        every doorbell press (#173 follow-up).
+        """
         if event_type != DOORBELL_EVENT_TYPE:
             return
         self._trigger_event(event_type, data)
         self.async_write_ha_state()
-        self.hass.bus.async_fire(
-            f"{DOMAIN}_event",
-            {"event_type": event_type, **data},
-        )
