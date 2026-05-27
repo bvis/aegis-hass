@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Tempo scaduto in attesa che la telecamera fornisse la foto acquisita. Riprova e verifica che la telecamera sia online."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Allarme",
+            "arm": "Inserito",
+            "arm_night": "Modo notte attivato",
+            "battery_low": "Batteria scarica",
+            "co_alarm": "Allarme CO",
+            "connection_lost": "Connessione persa",
+            "disarm": "Disinserito",
+            "disarm_night": "Modo notte disattivato",
+            "door_open": "Porta aperta",
+            "doorbell_pressed": "Campanello premuto",
+            "fire": "Incendio",
+            "flood": "Allagamento",
+            "glass_break": "Rottura vetro",
+            "malfunction": "Malfunzionamento",
+            "motion": "Movimento",
+            "panic": "Panico",
+            "tamper": "Manomissione"
+        }
     }
 }

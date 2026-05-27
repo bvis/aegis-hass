@@ -133,6 +133,19 @@ class TestAjaxDoorbellEvent:
         )
         entity.async_write_ha_state.assert_called_once()
 
+    def test_handle_event_does_not_fire_bus_event(self) -> None:
+        # The hub-level AjaxSecurityEvent already fires `aegis_ajax_event` for
+        # the logbook + automations. The per-device entity must NOT fire it
+        # again, or every doorbell press would double-trigger (#173 follow-up).
+        entity = self._make_doorbell_entity()
+        entity._trigger_event = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.hass = MagicMock()
+
+        entity.handle_event("doorbell_pressed", {"raw_tag": "ring_button_pressed"})
+
+        entity.hass.bus.async_fire.assert_not_called()
+
     def test_handle_event_ignores_non_doorbell_type(self) -> None:
         entity = self._make_doorbell_entity()
         entity._trigger_event = MagicMock()

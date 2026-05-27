@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Tempo esgotado aguardando a câmera entregar a foto capturada. Tente novamente e verifique se a câmera está online."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarme",
+            "arm": "Armado",
+            "arm_night": "Modo noturno ativado",
+            "battery_low": "Bateria fraca",
+            "co_alarm": "Alarme CO",
+            "connection_lost": "Conexão perdida",
+            "disarm": "Desarmado",
+            "disarm_night": "Modo noturno desativado",
+            "door_open": "Porta aberta",
+            "doorbell_pressed": "Campainha tocada",
+            "fire": "Incêndio",
+            "flood": "Inundação",
+            "glass_break": "Quebra de vidro",
+            "malfunction": "Falha",
+            "motion": "Movimento",
+            "panic": "Pânico",
+            "tamper": "Violação"
+        }
     }
 }

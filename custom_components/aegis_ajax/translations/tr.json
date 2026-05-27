@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Kameranın çekilen fotoğrafı teslim etmesi beklenirken zaman aşımına uğradı. Tekrar deneyin ve kameranın çevrimiçi olduğunu kontrol edin."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Kuruldu",
+            "arm_night": "Gece modu etkin",
+            "battery_low": "Düşük pil",
+            "co_alarm": "CO alarmı",
+            "connection_lost": "Bağlantı kesildi",
+            "disarm": "Devre dışı",
+            "disarm_night": "Gece modu devre dışı",
+            "door_open": "Kapı açıldı",
+            "doorbell_pressed": "Zile basıldı",
+            "fire": "Yangın",
+            "flood": "Su baskını",
+            "glass_break": "Cam kırılması",
+            "malfunction": "Arıza",
+            "motion": "Hareket",
+            "panic": "Panik",
+            "tamper": "Müdahale"
+        }
     }
 }

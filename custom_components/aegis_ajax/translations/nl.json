@@ -426,5 +426,26 @@
         "photo_capture_timeout": {
             "message": "Time-out tijdens het wachten tot de camera de gemaakte foto levert. Probeer het opnieuw en controleer of de camera online is."
         }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Ingeschakeld",
+            "arm_night": "Nachtmodus ingeschakeld",
+            "battery_low": "Batterij laag",
+            "co_alarm": "CO-alarm",
+            "connection_lost": "Verbinding verloren",
+            "disarm": "Uitgeschakeld",
+            "disarm_night": "Nachtmodus uitgeschakeld",
+            "door_open": "Deur geopend",
+            "doorbell_pressed": "Bel ingedrukt",
+            "fire": "Brand",
+            "flood": "Overstroming",
+            "glass_break": "Glasbreuk",
+            "malfunction": "Storing",
+            "motion": "Beweging",
+            "panic": "Paniek",
+            "tamper": "Sabotage"
+        }
     }
 }
