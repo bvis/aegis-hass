@@ -12,11 +12,17 @@ from custom_components.aegis_ajax.api.hts.client import (
     HTS_HOST,
     HTS_PORT,
     MAX_CONSECUTIVE_READ_TIMEOUTS,
+    HtsAuthError,
     HtsClient,
     HtsConnectionError,
 )
 from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
-from custom_components.aegis_ajax.api.hts.messages import HtsMessage, MsgType, tlv_encode
+from custom_components.aegis_ajax.api.hts.messages import (
+    AUTH_KEY_AUTHENTICATION_REQUEST,
+    HtsMessage,
+    MsgType,
+    tlv_encode,
+)
 from custom_components.aegis_ajax.api.hts.protocol import ETX, STX
 
 # ---------------------------------------------------------------------------
@@ -1135,3 +1141,208 @@ class TestStatusRefreshLoop:
 
         # Both hubs called in cycle 1 — broken one didn't abort the cycle.
         assert client._send_request_full_status.await_count == 2
+
+
+# ---------------------------------------------------------------------------
+# _authenticate handshake (was excluded from coverage — see #bypass review)
+# ---------------------------------------------------------------------------
+
+
+def _msg(msg_type: MsgType, payload: bytes, seq: int = 0) -> HtsMessage:
+    return HtsMessage(
+        sender=1,
+        receiver=0,
+        seq_num=seq,
+        link=0,
+        flags=0,
+        msg_type=msg_type,
+        payload=payload,
+    )
+
+
+def _challenge_msg(a: int = 0x12, b: int = 0x34) -> HtsMessage:
+    payload = tlv_encode([bytes([AUTH_KEY_AUTHENTICATION_REQUEST]), bytes([a, b])])
+    return _msg(MsgType.AUTHENTICATION, payload, seq=10)
+
+
+def _connected_msg(seq: int = 20) -> HtsMessage:
+    return _msg(MsgType.USER_REGISTRATION, tlv_encode([b"\x00"]), seq=seq)
+
+
+def _ack_msg() -> HtsMessage:
+    return _msg(MsgType.ACK, b"", seq=5)
+
+
+def _auth_client() -> HtsClient:
+    """A client wired so `_authenticate` exercises real crypto on the response
+    write path while the message exchange is scripted via `_receive_message`."""
+    client = _make_client()
+    writer = MagicMock()
+    writer.drain = AsyncMock()
+    client._writer = writer
+    client._send_message = AsyncMock()  # type: ignore[method-assign]
+    client._send_ack = AsyncMock()  # type: ignore[method-assign]
+    return client
+
+
+class TestAuthenticate:
+    @pytest.mark.asyncio
+    async def test_happy_path_sets_connected_state(self) -> None:
+        client = _auth_client()
+        # Leading ACKs before each real reply exercise both skip loops.
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[_ack_msg(), _challenge_msg(), _ack_msg(), _connected_msg()]
+        )
+        fake = MagicMock()
+        fake.token = b"\xaa\xbb\xcc\xdd"
+        fake.hubs = []
+        with patch(
+            "custom_components.aegis_ajax.api.hts.client.parse_connected_response",
+            return_value=fake,
+        ):
+            result = await client._authenticate()
+
+        assert result is fake
+        assert client._connected is True
+        assert client._connection_token == b"\xaa\xbb\xcc\xdd"
+        client._send_message.assert_awaited_once()  # USER_REGISTRATION sent
+        client._writer.drain.assert_awaited_once()  # challenge response flushed
+
+    @pytest.mark.asyncio
+    async def test_adopts_server_seq_range(self) -> None:
+        client = _auth_client()
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[_challenge_msg(), _connected_msg(seq=100)]
+        )
+        fake = MagicMock(token=b"\x00\x01\x02\x03", hubs=[])
+        with patch(
+            "custom_components.aegis_ajax.api.hts.client.parse_connected_response",
+            return_value=fake,
+        ):
+            await client._authenticate()
+        assert client._seq_num == (100 + 2) & 0xFFFFFF
+
+    @pytest.mark.asyncio
+    async def test_non_authentication_reply_raises(self) -> None:
+        client = _auth_client()
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[_connected_msg()]  # USER_REGISTRATION, not AUTHENTICATION
+        )
+        with pytest.raises(HtsAuthError, match="Expected AUTHENTICATION"):
+            await client._authenticate()
+
+    @pytest.mark.asyncio
+    async def test_unexpected_auth_key_raises(self) -> None:
+        client = _auth_client()
+        bad = _msg(MsgType.AUTHENTICATION, tlv_encode([bytes([0x09]), bytes([0x12, 0x34])]))
+        client._receive_message = AsyncMock(side_effect=[bad])  # type: ignore[method-assign]
+        with pytest.raises(HtsAuthError, match="Unexpected auth request"):
+            await client._authenticate()
+
+    @pytest.mark.asyncio
+    async def test_short_challenge_raises(self) -> None:
+        client = _auth_client()
+        short = _msg(
+            MsgType.AUTHENTICATION,
+            tlv_encode([bytes([AUTH_KEY_AUTHENTICATION_REQUEST]), bytes([0x12])]),
+        )
+        client._receive_message = AsyncMock(side_effect=[short])  # type: ignore[method-assign]
+        with pytest.raises(HtsAuthError, match="Challenge too short"):
+            await client._authenticate()
+
+    @pytest.mark.asyncio
+    async def test_writer_gone_before_response_raises(self) -> None:
+        client = _auth_client()
+        client._writer = None
+        client._receive_message = AsyncMock(side_effect=[_challenge_msg()])  # type: ignore[method-assign]
+        with pytest.raises(HtsConnectionError, match="Not connected"):
+            await client._authenticate()
+
+    @pytest.mark.asyncio
+    async def test_connected_parse_failure_raises(self) -> None:
+        client = _auth_client()
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[_challenge_msg(), _connected_msg()]
+        )
+        with (
+            patch(
+                "custom_components.aegis_ajax.api.hts.client.parse_connected_response",
+                side_effect=ValueError("garbage"),
+            ),
+            pytest.raises(HtsAuthError, match="Failed to parse CONNECTED"),
+        ):
+            await client._authenticate()
+
+    @pytest.mark.asyncio
+    async def test_connected_wrong_type_raises(self) -> None:
+        client = _auth_client()
+        # Second reply is AUTHENTICATION again (not USER_REGISTRATION).
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[_challenge_msg(), _challenge_msg()]
+        )
+        with pytest.raises(HtsAuthError, match="Expected USER_REGISTRATION"):
+            await client._authenticate()
+
+
+# ---------------------------------------------------------------------------
+# _read_frame buffer extraction + connect() (mockable asyncio I/O)
+# ---------------------------------------------------------------------------
+
+
+class TestReadFrame:
+    @pytest.mark.asyncio
+    async def test_extracts_frame_across_chunks(self) -> None:
+        client = _make_client()
+        reader = MagicMock()
+        # Frame split across two reads; trailing bytes stay buffered.
+        reader.read = AsyncMock(
+            side_effect=[bytes([STX]) + b"AB", b"CD" + bytes([ETX]) + b"leftover"]
+        )
+        client._reader = reader
+        frame = await client._read_frame()
+        assert frame == bytes([STX]) + b"ABCD" + bytes([ETX])
+        assert bytes(client._read_buf) == b"leftover"
+
+    @pytest.mark.asyncio
+    async def test_no_reader_raises(self) -> None:
+        client = _make_client()
+        client._reader = None
+        with pytest.raises(HtsConnectionError, match="Not connected"):
+            await client._read_frame()
+
+    @pytest.mark.asyncio
+    async def test_remote_close_raises_connection_error(self) -> None:
+        client = _make_client()
+        reader = MagicMock()
+        reader.read = AsyncMock(return_value=b"")  # EOF
+        client._reader = reader
+        with pytest.raises(ConnectionError, match="closed by remote"):
+            await client._read_frame()
+
+
+class TestConnect:
+    @pytest.mark.asyncio
+    async def test_connect_failure_wrapped(self) -> None:
+        client = _make_client()
+        with (
+            patch(
+                "custom_components.aegis_ajax.api.hts.client.asyncio.open_connection",
+                side_effect=OSError("refused"),
+            ),
+            pytest.raises(HtsConnectionError, match="Cannot connect"),
+        ):
+            await client.connect()
+
+    @pytest.mark.asyncio
+    async def test_connect_runs_authenticate_on_success(self) -> None:
+        client = _make_client()
+        fake = MagicMock(token=b"\x00\x01\x02\x03", hubs=[])
+        with (
+            patch(
+                "custom_components.aegis_ajax.api.hts.client.asyncio.open_connection",
+                return_value=(MagicMock(), MagicMock()),
+            ),
+            patch.object(client, "_authenticate", AsyncMock(return_value=fake)),
+        ):
+            result = await client.connect()
+        assert result is fake

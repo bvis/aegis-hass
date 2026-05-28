@@ -53,7 +53,6 @@ exclude = ["custom_components/aegis_ajax/proto/"]
 [tool.coverage.run]
 omit = [
     "custom_components/aegis_ajax/proto/*",
-    "custom_components/aegis_ajax/api/hts/client.py",
 ]
 
 [tool.vulture]
