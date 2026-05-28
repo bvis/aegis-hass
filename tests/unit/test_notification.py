@@ -1440,6 +1440,9 @@ class TestParseAndFireEventLogging:
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.loop.is_running.return_value = True
+        # Event dispatch is now marshaled via call_soon_threadsafe; invoke the
+        # callback inline so these tests observe the downstream fire/state-write.
+        hass.loop.call_soon_threadsafe.side_effect = lambda cb, *a: cb(*a)
         coordinator = MagicMock()
         coordinator._space_ids = []
         return AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
@@ -1692,6 +1695,9 @@ class TestParseAndFireEventDeviceRouting:
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.loop.is_running.return_value = True
+        # Marshaled dispatch: run the scheduled callback inline so the existing
+        # assertions on fire_push_device_event still observe the call.
+        hass.loop.call_soon_threadsafe.side_effect = lambda cb, *a: cb(*a)
         coordinator = MagicMock()
         coordinator._space_ids = []
         coordinator.devices = devices
@@ -1769,6 +1775,87 @@ class TestParseAndFireEventDeviceRouting:
         coordinator.fire_push_device_event.assert_not_called()
         for call in listener._hass.loop.call_soon_threadsafe.call_args_list:
             assert call[0][0] is not coordinator.apply_push_device_motion
+
+
+class TestParseAndFireEventThreadSafety:
+    """The FCM callback runs on the firebase_messaging worker thread, so every
+    event-entity dispatch (which calls async_write_ha_state / bus.async_fire,
+    both loop-only) MUST be marshaled to the loop via call_soon_threadsafe and
+    never invoked directly on the worker thread (audit fix)."""
+
+    def _make_listener(self) -> tuple[AjaxNotificationListener, MagicMock]:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        coordinator = MagicMock()
+        coordinator._space_ids = []
+        coordinator.fire_push_event = MagicMock()
+        coordinator.fire_push_device_event = MagicMock(return_value=True)
+        coordinator.devices = {}
+        listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+        return listener, coordinator
+
+    @staticmethod
+    def _scheduled(listener: AjaxNotificationListener) -> list:
+        return [c[0][0] for c in listener._hass.loop.call_soon_threadsafe.call_args_list]
+
+    def test_hub_event_marshaled_to_loop_not_called_directly(self) -> None:
+        listener, coordinator = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("arm", {"raw_tag": "space_armed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        # Never called directly on the worker thread …
+        coordinator.fire_push_event.assert_not_called()
+        # … always scheduled onto the loop instead.
+        assert coordinator.fire_push_event in self._scheduled(listener)
+
+    def test_doorbell_device_event_marshaled_to_loop_not_called_directly(self) -> None:
+        listener, coordinator = self._make_listener()
+        dev = MagicMock()
+        dev.id = "310A8DF4"
+        dev.device_type = "video_edge_doorbell"
+        coordinator.devices = {"310A8DF4": dev}
+        encoded = base64.b64encode(b"any-payload").decode()
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("doorbell_pressed", {"raw_tag": "ring_button_pressed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={"device_id": "310A8DF4"}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        coordinator.fire_push_device_event.assert_not_called()
+        assert coordinator.fire_push_device_event in self._scheduled(listener)
+
+    def test_no_dispatch_when_loop_not_running(self) -> None:
+        listener, coordinator = self._make_listener()
+        listener._hass.loop.is_running.return_value = False
+        encoded = base64.b64encode(b"any-payload").decode()
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("arm", {"raw_tag": "space_armed"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+        coordinator.fire_push_event.assert_not_called()
+        listener._hass.loop.call_soon_threadsafe.assert_not_called()
 
 
 class TestNotificationDedupe:

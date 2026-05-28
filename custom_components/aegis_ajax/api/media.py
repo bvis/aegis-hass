@@ -95,9 +95,17 @@ class MediaApi:
                         parsed = urlparse(url)
                         hostname = parsed.hostname or ""
                         is_ajax = hostname.endswith(".ajax.systems")
-                        is_s3 = "hubs-uploaded-resources" in hostname
+                        # Anchor the S3 branch to the real bucket host — a bare
+                        # `in` substring would also accept e.g.
+                        # `hubs-uploaded-resources.attacker.com` (SSRF).
+                        is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(
+                            ".amazonaws.com"
+                        )
                         if is_ajax or is_s3:
-                            _LOGGER.debug("Photo URL from media stream: %s", url[:80])
+                            # Host + path only — the query string holds the S3 signature.
+                            _LOGGER.debug(
+                                "Photo URL from media stream: %s%s", hostname, parsed.path
+                            )
                             return url
                     _LOGGER.debug(
                         "Media stream: %d bytes, no URL yet, retrying in %.0fs",

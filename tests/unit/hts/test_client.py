@@ -557,6 +557,32 @@ class TestHandleUpdate:
         assert client._receive_message.await_count == MAX_CONSECUTIVE_READ_TIMEOUTS
         assert client._consecutive_read_timeouts == MAX_CONSECUTIVE_READ_TIMEOUTS
 
+    @pytest.mark.asyncio
+    async def test_listen_skips_malformed_frame_and_keeps_listening(self) -> None:
+        """A ValueError from frame decode/decrypt/parse must not propagate out
+        of listen() and tear down the connection — skip the bad frame and keep
+        reading (audit fix)."""
+        client = _make_client()
+        client._connected = True
+        ack = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.ACK,
+            payload=b"",
+        )
+        client._receive_message = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[ValueError("bad CRC"), ack, ConnectionError("closed")]
+        )
+
+        # Must NOT raise — the ValueError is swallowed and the loop continues.
+        await client.listen()
+
+        # All three reads happened: bad frame skipped, ack handled, then close.
+        assert client._receive_message.await_count == 3
+
 
 class TestExtractAllDevicesKv:
     """Per-device kv extraction for the #123 probe.
@@ -1318,6 +1344,45 @@ class TestReadFrame:
         client._reader = reader
         with pytest.raises(ConnectionError, match="closed by remote"):
             await client._read_frame()
+
+    @pytest.mark.asyncio
+    async def test_caps_buffer_on_runaway_stream(self) -> None:
+        """Bytes keep arriving but no STX…ETX ever completes — the buffer must
+        be capped and a reconnect forced, not grown without bound (audit fix)."""
+        from custom_components.aegis_ajax.api.hts.client import MAX_FRAME_BUFFER_BYTES
+
+        client = _make_client()
+        reader = MagicMock()
+        reader.read = AsyncMock(return_value=b"\x00" * 4096)  # never STX/ETX
+        client._reader = reader
+        with pytest.raises(ConnectionError, match="exceeded"):
+            await client._read_frame()
+        # Buffer was cleared on the way out, not left to leak.
+        assert len(client._read_buf) == 0
+        assert MAX_FRAME_BUFFER_BYTES > 0
+
+
+class TestRedactPayloadHex:
+    """`_redact_payload_hex` masks printable-ASCII runs inside a binary dump."""
+
+    def test_masks_embedded_text_run(self) -> None:
+        from custom_components.aegis_ajax.api.hts.client import _redact_payload_hex
+
+        out = _redact_payload_hex(b"\x00\x01Deurbel\x02")
+        assert "Deurbel" not in out
+        assert "<text:7b>" in out
+        assert out.startswith("0001")
+
+    def test_pure_binary_stays_hex(self) -> None:
+        from custom_components.aegis_ajax.api.hts.client import _redact_payload_hex
+
+        assert _redact_payload_hex(b"\x00\x01\x02") == "000102"
+
+    def test_short_printable_run_not_masked(self) -> None:
+        from custom_components.aegis_ajax.api.hts.client import _redact_payload_hex
+
+        out = _redact_payload_hex(b"\x00AB\x00")
+        assert "<text:" not in out
 
 
 class TestConnect:
