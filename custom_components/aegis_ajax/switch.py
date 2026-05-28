@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
@@ -116,7 +117,44 @@ async def async_setup_entry(
                     device_type=device.device_type,
                 )
             )
+    _evict_orphan_bypass_switches(
+        hass,
+        entry,
+        provided={
+            e.unique_id
+            for e in entities
+            if isinstance(e, AjaxBypassSwitch) and e.unique_id is not None
+        },
+    )
     async_add_entities(entities)
+
+
+def _evict_orphan_bypass_switches(
+    hass: HomeAssistant, entry: ConfigEntry, *, provided: set[str]
+) -> None:
+    """Remove bypass-switch entities the current option no longer provides.
+
+    When `bypass_switches` flips to `never`, or `auto` loses `DEVICE_EDIT` on a
+    hub, this run stops creating the corresponding `AjaxBypassSwitch`. HA does
+    NOT evict an entity its platform stopped providing — it lingers in the
+    registry as `unavailable` until the user deletes it by hand. Mirror the
+    video-doorbell device eviction (#173) at the entity-registry level so a
+    stale bypass switch disappears on the reload that drops it (#bypass).
+    """
+    entity_reg = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(entity_reg, entry.entry_id):
+        unique_id = reg_entry.unique_id
+        if (
+            reg_entry.domain == "switch"
+            and unique_id.endswith("_bypass")
+            and unique_id not in provided
+        ):
+            _LOGGER.info(
+                "Removing orphaned bypass switch %s — the bypass_switches option "
+                "no longer provides it (#bypass)",
+                reg_entry.entity_id,
+            )
+            entity_reg.async_remove(reg_entry.entity_id)
 
 
 class AjaxSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):

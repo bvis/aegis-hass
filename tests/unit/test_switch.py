@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -330,3 +330,107 @@ class TestBypassSwitchSetup:
         # No option set → default (auto); user lacks DEVICE_EDIT → no switches.
         ids = await self._run(mode=None, perms={"ARM"})
         assert ids == set()
+
+
+def _reg_entry(entity_id: str, unique_id: str, domain: str = "switch") -> MagicMock:
+    e = MagicMock()
+    e.entity_id = entity_id
+    e.unique_id = unique_id
+    e.domain = domain
+    return e
+
+
+class TestBypassOrphanEviction:
+    """`async_setup_entry` removes bypass-switch entities the current
+    `bypass_switches` option no longer provides — HA doesn't self-heal orphans
+    (#bypass)."""
+
+    async def _run(
+        self, *, mode: str | None, perms: set | None, registry_entries: list
+    ) -> list[str]:
+        from custom_components.aegis_ajax.switch import async_setup_entry
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        hub = MagicMock(device_type="hub_two_plus", hub_id="hub-1")
+        sensor = MagicMock(device_type="door_protect", hub_id="hub-1")
+        coordinator.devices = {"hub-1": hub, "d1": sensor}
+        space = MagicMock(id="s1", hub_id="hub-1")
+        coordinator.spaces = {"s1": space}
+        coordinator.spaces_api.get_member_space_permissions = AsyncMock(return_value=perms)
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.runtime_data = coordinator
+        entry.data = {"user_hex_id": "ABCD1234"}
+        entry.options = {} if mode is None else {"bypass_switches": mode}
+
+        removed: list[str] = []
+        entity_reg = MagicMock()
+        entity_reg.async_remove.side_effect = removed.append
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            pass
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.switch.er.async_get",
+                return_value=entity_reg,
+            ),
+            patch(
+                "custom_components.aegis_ajax.switch.er.async_entries_for_config_entry",
+                return_value=registry_entries,
+            ),
+        ):
+            await async_setup_entry(MagicMock(), entry, _add)
+        return removed
+
+    @pytest.mark.asyncio
+    async def test_never_evicts_existing_bypass(self) -> None:
+        removed = await self._run(
+            mode="never",
+            perms={"DEVICE_EDIT"},
+            registry_entries=[_reg_entry("switch.d1_bypass", "aegis_ajax_d1_bypass")],
+        )
+        assert removed == ["switch.d1_bypass"]
+
+    @pytest.mark.asyncio
+    async def test_always_keeps_provided_bypass(self) -> None:
+        removed = await self._run(
+            mode="always",
+            perms=None,
+            registry_entries=[_reg_entry("switch.d1_bypass", "aegis_ajax_d1_bypass")],
+        )
+        assert removed == []
+
+    @pytest.mark.asyncio
+    async def test_auto_evicts_when_permission_lost(self) -> None:
+        removed = await self._run(
+            mode="auto",
+            perms={"ARM"},
+            registry_entries=[_reg_entry("switch.d1_bypass", "aegis_ajax_d1_bypass")],
+        )
+        assert removed == ["switch.d1_bypass"]
+
+    @pytest.mark.asyncio
+    async def test_channel_switches_are_never_evicted(self) -> None:
+        removed = await self._run(
+            mode="never",
+            perms={"DEVICE_EDIT"},
+            registry_entries=[
+                _reg_entry("switch.relay_1", "aegis_ajax_relay1_switch_1"),
+                _reg_entry("switch.d1_bypass", "aegis_ajax_d1_bypass"),
+            ],
+        )
+        assert removed == ["switch.d1_bypass"]
+
+    @pytest.mark.asyncio
+    async def test_non_switch_domain_ignored(self) -> None:
+        removed = await self._run(
+            mode="never",
+            perms={"DEVICE_EDIT"},
+            registry_entries=[
+                _reg_entry("sensor.d1_bypass", "aegis_ajax_d1_bypass", domain="sensor"),
+            ],
+        )
+        assert removed == []
