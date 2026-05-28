@@ -113,14 +113,22 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         from urllib.parse import urlparse  # noqa: PLC0415
 
         hostname = urlparse(url).hostname or ""
-        return hostname.endswith(".ajax.systems") or "hubs-uploaded-resources" in hostname
+        # S3 branch anchored to the real bucket host so a substring match can't
+        # accept `hubs-uploaded-resources.attacker.com` (SSRF).
+        is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(".amazonaws.com")
+        return hostname.endswith(".ajax.systems") or is_s3
 
     async def _download_image(self, url: str) -> bytes | None:
         """Download image from URL and cache it."""
         import aiohttp  # noqa: PLC0415
 
         if not self._is_valid_photo_url(url):
-            _LOGGER.warning("Rejected photo URL with unexpected domain: %s", url[:80])
+            # Log host only — never the query string (carries the S3 signature).
+            from urllib.parse import urlparse  # noqa: PLC0415
+
+            _LOGGER.warning(
+                "Rejected photo URL with unexpected domain: %s", urlparse(url).hostname or "?"
+            )
             return self._last_image
         self._last_image_url = url
         session = async_get_clientsession(self.hass)

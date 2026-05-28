@@ -31,6 +31,8 @@ from custom_components.aegis_ajax.repairs import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from homeassistant.core import HomeAssistant
 
     from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -378,11 +380,21 @@ class AjaxNotificationListener:
                     photo_url = raw_url.decode("utf-8", errors="ignore")
                     parsed = urlparse(photo_url)
                     is_ajax = parsed.hostname and parsed.hostname.endswith(".ajax.systems")
-                    is_s3 = parsed.hostname and "hubs-uploaded-resources" in parsed.hostname
+                    # Anchor S3 to the real bucket host (SSRF — a substring would
+                    # also accept `hubs-uploaded-resources.attacker.com`).
+                    is_s3 = (
+                        parsed.hostname
+                        and "hubs-uploaded-resources" in parsed.hostname
+                        and parsed.hostname.endswith(".amazonaws.com")
+                    )
                     if not is_ajax and not is_s3:
                         _LOGGER.debug("Rejected photo URL from unexpected domain")
                         continue
-                    _LOGGER.debug("Extracted photo URL from push: %s", photo_url[:60])
+                    # Log host + path only — the query string carries the S3
+                    # signature (X-Amz-Signature, …) which grants object read.
+                    _LOGGER.debug(
+                        "Extracted photo URL from push: %s%s", parsed.hostname or "?", parsed.path
+                    )
                     # Resolve the photo future for the matching device
                     resolved = False
                     for device_id, future in list(self._photo_callbacks.items()):
@@ -590,12 +602,16 @@ class AjaxNotificationListener:
                 # Try to route to the correct space by matching hub_id from raw bytes
                 target_space = self._find_space_for_event(raw)
                 if target_space:
-                    self._coordinator.fire_push_event(target_space, event_type, event_data)
+                    self._dispatch_to_loop(
+                        self._coordinator.fire_push_event, target_space, event_type, event_data
+                    )
                     self._apply_security_state_from_event(target_space, event_data)
                 else:
                     # Fallback: single-space installations or unknown hub
                     for space_id in self._coordinator._space_ids:
-                        self._coordinator.fire_push_event(space_id, event_type, event_data)
+                        self._dispatch_to_loop(
+                            self._coordinator.fire_push_event, space_id, event_type, event_data
+                        )
                         self._apply_security_state_from_event(space_id, event_data)
                 # Surface doorbell ring / motion on the source device's own
                 # card, in addition to the hub-level event entity (#173).
@@ -661,11 +677,24 @@ class AjaxNotificationListener:
             return
 
         if event_type == DOORBELL_EVENT_TYPE:
-            self._coordinator.fire_push_device_event(resolved, event_type, event_data)
-        elif event_type == MOTION_EVENT_TYPE and self._hass.loop and self._hass.loop.is_running():
-            self._hass.loop.call_soon_threadsafe(
-                self._coordinator.apply_push_device_motion, resolved
+            self._dispatch_to_loop(
+                self._coordinator.fire_push_device_event, resolved, event_type, event_data
             )
+        elif event_type == MOTION_EVENT_TYPE:
+            self._dispatch_to_loop(self._coordinator.apply_push_device_motion, resolved)
+
+    def _dispatch_to_loop(self, func: Callable[..., object], *args: object) -> None:
+        """Marshal a coordinator state-write from the FCM worker thread onto the
+        HA event loop.
+
+        `_on_notification` runs on the firebase_messaging worker thread; the
+        coordinator handlers it calls touch `async_write_ha_state` /
+        `bus.async_fire`, which are loop-only and not thread-safe. Schedule them
+        on the loop instead of calling them inline. No-op if the loop isn't
+        running (shutdown / teardown) — dropping a push beats an off-loop write.
+        """
+        if self._hass.loop and self._hass.loop.is_running():
+            self._hass.loop.call_soon_threadsafe(func, *args)
 
     def _apply_security_state_from_event(self, space_id: str, event_data: dict[str, Any]) -> None:
         """If the push event implies a new security_state, push it now (#68 / #148).
