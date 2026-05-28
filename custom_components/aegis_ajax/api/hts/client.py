@@ -68,6 +68,40 @@ AUTH_TIMEOUT = 20
 # quiet beyond READ_TIMEOUT, so we only close the connection after this many
 # back-to-back read timeouts with no inbound data (#76).
 MAX_CONSECUTIVE_READ_TIMEOUTS = 3
+# Hard cap on the inbound frame buffer. A well-formed HTS frame is a few KB;
+# if STX…ETX never completes while bytes keep arriving (a misbehaving or
+# malicious peer), READ_TIMEOUT never fires because data is flowing, so the
+# buffer would grow without bound. Force a reconnect past this size instead.
+MAX_FRAME_BUFFER_BYTES = 256 * 1024
+
+
+def _redact_payload_hex(data: bytes) -> str:
+    """Hex-encode `data`, masking runs of >=3 printable-ASCII bytes as
+    `<text:Nb>`.
+
+    Mixed-content frame/UPDATES payload dumps can embed device names / user
+    PII as text runs inside otherwise-binary bytes. Unlike `_redact_if_text`
+    (which only redacts a value that is wholly printable), this masks the text
+    runs *within* a binary buffer so a publicly-pasted debug log keeps the
+    byte shape without leaking PII. See [[feedback_pii_in_debug_logs]].
+    """
+    out: list[str] = []
+    run: list[int] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        out.append(f"<text:{len(run)}b>" if len(run) >= 3 else bytes(run).hex())
+        run.clear()
+
+    for byte in data:
+        if 0x20 <= byte <= 0x7E:
+            run.append(byte)
+        else:
+            flush()
+            out.append(f"{byte:02x}")
+    flush()
+    return "".join(out)
 
 
 def _redact_if_text(value: bytes) -> str:
@@ -468,6 +502,14 @@ class HtsClient:
             if not chunk:
                 raise ConnectionError("Connection closed by remote")
             self._read_buf.extend(chunk)
+            if len(self._read_buf) > MAX_FRAME_BUFFER_BYTES:
+                # No complete frame within a sane bound — treat as a broken
+                # stream and force a reconnect rather than grow unboundedly.
+                self._read_buf.clear()
+                raise ConnectionError(
+                    f"HTS frame buffer exceeded {MAX_FRAME_BUFFER_BYTES} bytes "
+                    "without a complete frame"
+                )
 
     # ------------------------------------------------------------------
     # Listen loop
@@ -581,6 +623,17 @@ class HtsClient:
                 except ConnectionError as exc:
                     _LOGGER.warning("HTS connection error in listen: %s", exc)
                     break
+                except ValueError as exc:
+                    # A single corrupt/undecodable frame (bad framing, CRC,
+                    # decrypt, or short header) must not tear down the whole HTS
+                    # connection and blank every hub-network sensor until the
+                    # next poll. The AES layer is per-frame (fixed IV, no
+                    # chaining), so a bad frame doesn't desync later ones —
+                    # skip it and keep listening, mirroring the per-update
+                    # guard in `_handle_update`.
+                    _LOGGER.warning("HTS: skipping undecodable frame: %s", exc)
+                    self._consecutive_read_timeouts = 0
+                    continue
                 self._consecutive_read_timeouts = 0
 
                 if not msg.is_no_ack and msg.msg_type != MsgType.ACK:
@@ -603,7 +656,7 @@ class HtsClient:
                 elif msg.msg_type == MsgType.ACK:
                     pass  # expected
                 else:
-                    _LOGGER.debug("  payload hex: %s", msg.payload[:80].hex())
+                    _LOGGER.debug("  payload hex: %s", _redact_payload_hex(msg.payload[:80]))
         finally:
             await self.close()
 
@@ -624,7 +677,7 @@ class HtsClient:
         except Exception:
             _LOGGER.debug(
                 "Failed to decode UPDATES payload (first 80 bytes: %s) — dropping message",
-                msg.payload[:80].hex(),
+                _redact_payload_hex(msg.payload[:80]),
                 exc_info=True,
             )
             return
