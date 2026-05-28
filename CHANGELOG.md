@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0-beta.5] - 2026-05-29
+
+Security & robustness audit remediation. No behaviour change for healthy installs.
+
+### Fixed
+- **FCM push events are now dispatched on the event loop (thread-safety).** The push callback runs on a worker thread; the hub-level and per-device (doorbell) event entities were updated directly from it, calling `async_write_ha_state` / `bus.async_fire` off-loop. They are now marshalled to the loop like the security-state and motion paths already were. Affected every security-event and doorbell push.
+- **HTS connection survives a malformed frame.** A single corrupt/undecodable frame previously tore down the whole HTS connection (blanking hub-network sensors until the next poll); it is now logged and skipped per-frame.
+
+### Security
+- Photo URLs are logged as host + path only — never the signed S3 query string.
+- The S3 photo-host allowlist is anchored to `.amazonaws.com` so a look-alike host can't pass (SSRF hardening).
+- The HTS inbound frame buffer is capped (256 KB) to prevent unbounded growth from a misbehaving peer.
+- Two raw-payload HTS debug dumps now mask printable-text runs so they can't leak device-name/user PII.
+
 ## [1.7.0-beta.4] - 2026-05-28
 
 Orphaned bypass switches are now cleaned up automatically.
