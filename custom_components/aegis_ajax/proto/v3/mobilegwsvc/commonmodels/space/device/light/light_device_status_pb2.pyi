@@ -17,10 +17,10 @@ import builtins as _builtins
 import sys
 import typing as _typing
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias as _TypeAlias
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias as _TypeAlias, Never as _Never
 else:
-    from typing_extensions import TypeAlias as _TypeAlias
+    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -97,6 +97,23 @@ class LightDeviceStatus(_message.Message):
     WIFI_SIGNAL_LEVEL_DISCONNECTED: LightDeviceStatus.WifiSignalLevel.ValueType  # 5
 
     @_typing.final
+    class LockControlStatus(_message.Message):
+        DESCRIPTOR: _descriptor.Descriptor
+
+        STATE_FIELD_NUMBER: _builtins.int
+        state: _builtins.int
+        def __init__(
+            self,
+            *,
+            state: _builtins.int = ...,
+        ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+        _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
+        def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+    @_typing.final
     class StorageDevice(_message.Message):
         DESCRIPTOR: _descriptor.Descriptor
 
@@ -144,8 +161,11 @@ class LightDeviceStatus(_message.Message):
             storage_device_type: Global___LightDeviceStatus.StorageDevice.StorageDeviceType.ValueType = ...,
             storage_device_status: Global___LightDeviceStatus.StorageDevice.StorageDeviceStatus.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["storage_device_status", b"storage_device_status", "storage_device_type", b"storage_device_type"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Simple(_message.Message):
@@ -154,6 +174,11 @@ class LightDeviceStatus(_message.Message):
         def __init__(
             self,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+        _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class SimStatus(_message.Message):
@@ -166,8 +191,11 @@ class LightDeviceStatus(_message.Message):
             *,
             sim_card_status: _sim_card_status_pb2.SimCardStatus.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["sim_card_status", b"sim_card_status"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Monitoring(_message.Message):
@@ -180,8 +208,11 @@ class LightDeviceStatus(_message.Message):
             *,
             cms_active: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["cms_active", b"cms_active"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class CameraView(_message.Message):
@@ -194,8 +225,11 @@ class LightDeviceStatus(_message.Message):
             *,
             has_access: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["has_access", b"has_access"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class SignalStrength(_message.Message):
@@ -208,8 +242,11 @@ class LightDeviceStatus(_message.Message):
             *,
             device_signal_level: _device_signal_level_pb2.DeviceSignalLevel.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["device_signal_level", b"device_signal_level"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Battery(_message.Message):
@@ -247,8 +284,11 @@ class LightDeviceStatus(_message.Message):
             charge_level_percentage: _builtins.int = ...,
             is_without_charge: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["battery_state", b"battery_state", "charge_level_percentage", b"charge_level_percentage", "is_without_charge", b"is_without_charge"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Nfc(_message.Message):
@@ -261,8 +301,11 @@ class LightDeviceStatus(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Ble(_message.Message):
@@ -275,8 +318,11 @@ class LightDeviceStatus(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class MotionDetected(_message.Message):
@@ -294,6 +340,7 @@ class LightDeviceStatus(_message.Message):
         def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["detected_at", b"detected_at"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Privacy(_message.Message):
@@ -309,8 +356,11 @@ class LightDeviceStatus(_message.Message):
             is_video_surveillance: _builtins.bool = ...,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled", "is_video_surveillance", b"is_video_surveillance"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class GsmStatus(_message.Message):
@@ -358,8 +408,11 @@ class LightDeviceStatus(_message.Message):
             type: Global___LightDeviceStatus.GsmStatus.GsmType.ValueType = ...,
             status: Global___LightDeviceStatus.GsmStatus.Status.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["status", b"status", "type", b"type"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class DeviceFirmware(_message.Message):
@@ -474,8 +527,11 @@ class LightDeviceStatus(_message.Message):
             *,
             value: _builtins.int = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["value", b"value"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class WireInputStatus(_message.Message):
@@ -494,8 +550,11 @@ class LightDeviceStatus(_message.Message):
             is_alert: _builtins.bool = ...,
             type: Global___LightDeviceStatus.CustomAlarmType.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["contact_index", b"contact_index", "is_alert", b"is_alert", "type", b"type"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class TransmitterStatus(_message.Message):
@@ -511,8 +570,11 @@ class LightDeviceStatus(_message.Message):
             is_alert: _builtins.bool = ...,
             type: Global___LightDeviceStatus.CustomAlarmType.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["is_alert", b"is_alert", "type", b"type"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class RexConnected(_message.Message):
@@ -525,8 +587,11 @@ class LightDeviceStatus(_message.Message):
             *,
             is_rex_online: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["is_rex_online", b"is_rex_online"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class En54FireBuzzerStatus(_message.Message):
@@ -556,8 +621,11 @@ class LightDeviceStatus(_message.Message):
             *,
             status: Global___LightDeviceStatus.En54FireBuzzerStatus.BuzzerStatus.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["status", b"status"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class En54VadStatus(_message.Message):
@@ -587,8 +655,11 @@ class LightDeviceStatus(_message.Message):
             *,
             status: Global___LightDeviceStatus.En54VadStatus.VadStatus.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["status", b"status"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class WalkTestStatus(_message.Message):
@@ -616,8 +687,11 @@ class LightDeviceStatus(_message.Message):
             *,
             status: Global___LightDeviceStatus.WalkTestStatus.Status.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["status", b"status"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class WifiSignalLevelStatus(_message.Message):
@@ -630,8 +704,11 @@ class LightDeviceStatus(_message.Message):
             *,
             wifi_signal_level: Global___LightDeviceStatus.WifiSignalLevel.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["wifi_signal_level", b"wifi_signal_level"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     GSM_STATUS_FIELD_NUMBER: _builtins.int
     SIGNAL_STRENGTH_FIELD_NUMBER: _builtins.int
@@ -719,6 +796,7 @@ class LightDeviceStatus(_message.Message):
     EN54_DISABLEMENT_FIELD_NUMBER: _builtins.int
     ARC_REPORTING_DISABLED_FIELD_NUMBER: _builtins.int
     WALK_TEST_STATUS_FIELD_NUMBER: _builtins.int
+    LOCK_CONTROL_STATUS_FIELD_NUMBER: _builtins.int
     smart_lock: _smart_lock_pb2.SmartLockStatus.LockStatus.ValueType
     @_builtins.property
     def gsm_status(self) -> Global___LightDeviceStatus.GsmStatus: ...
@@ -892,6 +970,17 @@ class LightDeviceStatus(_message.Message):
     def arc_reporting_disabled(self) -> Global___LightDeviceStatus.Simple: ...
     @_builtins.property
     def walk_test_status(self) -> Global___LightDeviceStatus.WalkTestStatus: ...
+    @_builtins.property
+    def lock_control_status(self) -> Global___LightDeviceStatus.LockControlStatus:
+        """Field 99: lock open/closed state pushed as a sub-message on current
+        firmware, superseding the bare-enum `smart_lock` (field 66) which the
+        cloud no longer emits for LockBridge / Yale locks (#206). The inner
+        value is inverted relative to field 66's LockStatus, so it is read as
+        a raw int and mapped empirically (1=locked, 2=open) — cross-confirmed
+        against the device's local HTS signal and the reporter's lock/unlock
+        action timestamps.
+        """
+
     def __init__(
         self,
         *,
@@ -981,12 +1070,13 @@ class LightDeviceStatus(_message.Message):
         en54_disablement: Global___LightDeviceStatus.Simple | None = ...,
         arc_reporting_disabled: Global___LightDeviceStatus.Simple | None = ...,
         walk_test_status: Global___LightDeviceStatus.WalkTestStatus | None = ...,
+        lock_control_status: Global___LightDeviceStatus.LockControlStatus | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["access_card_disabled", b"access_card_disabled", "active_subscription", b"active_subscription", "always_active", b"always_active", "annunciation_test_active", b"annunciation_test_active", "anti_masking_alert", b"anti_masking_alert", "arc_reporting_disabled", b"arc_reporting_disabled", "arc_spark_detected", b"arc_spark_detected", "armed_in_night_mode", b"armed_in_night_mode", "battery", b"battery", "ble", b"ble", "bukhoor", b"bukhoor", "camera_view", b"camera_view", "case_drilling_detected", b"case_drilling_detected", "chimes_enabled", b"chimes_enabled", "co_level_detected", b"co_level_detected", "contact_hang", b"contact_hang", "current_short_circuit", b"current_short_circuit", "delay_when_leaving", b"delay_when_leaving", "device_firmware_status", b"device_firmware_status", "device_installation_warning", b"device_installation_warning", "door_need_anti_masking", b"door_need_anti_masking", "door_opened", b"door_opened", "en54_disablement", b"en54_disablement", "en54_fault", b"en54_fault", "en54_fire_buzzer_status", b"en54_fire_buzzer_status", "en54_vad_status", b"en54_vad_status", "end_of_service_life", b"end_of_service_life", "external_contact_alert", b"external_contact_alert", "external_contact_broken", b"external_contact_broken", "fire_alarm_fp", b"fire_alarm_fp", "fire_buzzer_active", b"fire_buzzer_active", "gsm_status", b"gsm_status", "high_current_protection", b"high_current_protection", "high_diff_temperature_detected", b"high_diff_temperature_detected", "high_frame_interconnect", b"high_frame_interconnect", "high_temperature_detected", b"high_temperature_detected", "high_voltage", b"high_voltage", "interconnect", b"interconnect", "interference_detected", b"interference_detected", "leak_detected", b"leak_detected", "lid_opened", b"lid_opened", "life_quality", b"life_quality", "light_switch_through_pass", b"light_switch_through_pass", "line_supply_high_temperature", b"line_supply_high_temperature", "low_voltage", b"low_voltage", "malfunction", b"malfunction", "migration_in_process", b"migration_in_process", "monitoring", b"monitoring", "motion_detected", b"motion_detected", "nfc", b"nfc", "one_time_deactivation", b"one_time_deactivation", "one_time_deactivation_tamper", b"one_time_deactivation_tamper", "one_time_deactivation_whole", b"one_time_deactivation_whole", "onvif_user_auth_enabled", b"onvif_user_auth_enabled", "pd_compliance_warning", b"pd_compliance_warning", "power_line_low", b"power_line_low", "power_management", b"power_management", "privacy", b"privacy", "real_active", b"real_active", "relay_stuck", b"relay_stuck", "rex_connected", b"rex_connected", "roller_shutter", b"roller_shutter", "sia_compliance_warning", b"sia_compliance_warning", "signal_strength", b"signal_strength", "sim_status", b"sim_status", "smart_bracket_unlocked", b"smart_bracket_unlocked", "smart_lock", b"smart_lock", "smoke_detected", b"smoke_detected", "someone_can_make_photo", b"someone_can_make_photo", "someone_has_camera_stream_access", b"someone_has_camera_stream_access", "standard_compliance_warning", b"standard_compliance_warning", "status", b"status", "storage_device", b"storage_device", "switch_alarm_pressed", b"switch_alarm_pressed", "temperature", b"temperature", "temporary_deactivation", b"temporary_deactivation", "temporary_deactivation_alarms", b"temporary_deactivation_alarms", "temporary_deactivation_tamper", b"temporary_deactivation_tamper", "temporary_deactivation_timer", b"temporary_deactivation_timer", "temporary_deactivation_whole", b"temporary_deactivation_whole", "transmitter_status", b"transmitter_status", "ul_not_compliant", b"ul_not_compliant", "walk_test_status", b"walk_test_status", "water_stop_prevention_warning", b"water_stop_prevention_warning", "water_stop_valve_stuck", b"water_stop_valve_stuck", "wifi_signal_level_status", b"wifi_signal_level_status", "wire_input_status", b"wire_input_status"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["access_card_disabled", b"access_card_disabled", "active_subscription", b"active_subscription", "always_active", b"always_active", "annunciation_test_active", b"annunciation_test_active", "anti_masking_alert", b"anti_masking_alert", "arc_reporting_disabled", b"arc_reporting_disabled", "arc_spark_detected", b"arc_spark_detected", "armed_in_night_mode", b"armed_in_night_mode", "battery", b"battery", "ble", b"ble", "bukhoor", b"bukhoor", "camera_view", b"camera_view", "case_drilling_detected", b"case_drilling_detected", "chimes_enabled", b"chimes_enabled", "co_level_detected", b"co_level_detected", "contact_hang", b"contact_hang", "current_short_circuit", b"current_short_circuit", "delay_when_leaving", b"delay_when_leaving", "device_firmware_status", b"device_firmware_status", "device_installation_warning", b"device_installation_warning", "door_need_anti_masking", b"door_need_anti_masking", "door_opened", b"door_opened", "en54_disablement", b"en54_disablement", "en54_fault", b"en54_fault", "en54_fire_buzzer_status", b"en54_fire_buzzer_status", "en54_vad_status", b"en54_vad_status", "end_of_service_life", b"end_of_service_life", "external_contact_alert", b"external_contact_alert", "external_contact_broken", b"external_contact_broken", "fire_alarm_fp", b"fire_alarm_fp", "fire_buzzer_active", b"fire_buzzer_active", "gsm_status", b"gsm_status", "high_current_protection", b"high_current_protection", "high_diff_temperature_detected", b"high_diff_temperature_detected", "high_frame_interconnect", b"high_frame_interconnect", "high_temperature_detected", b"high_temperature_detected", "high_voltage", b"high_voltage", "interconnect", b"interconnect", "interference_detected", b"interference_detected", "leak_detected", b"leak_detected", "lid_opened", b"lid_opened", "life_quality", b"life_quality", "light_switch_through_pass", b"light_switch_through_pass", "line_supply_high_temperature", b"line_supply_high_temperature", "lock_control_status", b"lock_control_status", "low_voltage", b"low_voltage", "malfunction", b"malfunction", "migration_in_process", b"migration_in_process", "monitoring", b"monitoring", "motion_detected", b"motion_detected", "nfc", b"nfc", "one_time_deactivation", b"one_time_deactivation", "one_time_deactivation_tamper", b"one_time_deactivation_tamper", "one_time_deactivation_whole", b"one_time_deactivation_whole", "onvif_user_auth_enabled", b"onvif_user_auth_enabled", "pd_compliance_warning", b"pd_compliance_warning", "power_line_low", b"power_line_low", "power_management", b"power_management", "privacy", b"privacy", "real_active", b"real_active", "relay_stuck", b"relay_stuck", "rex_connected", b"rex_connected", "roller_shutter", b"roller_shutter", "sia_compliance_warning", b"sia_compliance_warning", "signal_strength", b"signal_strength", "sim_status", b"sim_status", "smart_bracket_unlocked", b"smart_bracket_unlocked", "smart_lock", b"smart_lock", "smoke_detected", b"smoke_detected", "someone_can_make_photo", b"someone_can_make_photo", "someone_has_camera_stream_access", b"someone_has_camera_stream_access", "standard_compliance_warning", b"standard_compliance_warning", "status", b"status", "storage_device", b"storage_device", "switch_alarm_pressed", b"switch_alarm_pressed", "temperature", b"temperature", "temporary_deactivation", b"temporary_deactivation", "temporary_deactivation_alarms", b"temporary_deactivation_alarms", "temporary_deactivation_tamper", b"temporary_deactivation_tamper", "temporary_deactivation_timer", b"temporary_deactivation_timer", "temporary_deactivation_whole", b"temporary_deactivation_whole", "transmitter_status", b"transmitter_status", "ul_not_compliant", b"ul_not_compliant", "walk_test_status", b"walk_test_status", "water_stop_prevention_warning", b"water_stop_prevention_warning", "water_stop_valve_stuck", b"water_stop_valve_stuck", "wifi_signal_level_status", b"wifi_signal_level_status", "wire_input_status", b"wire_input_status"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["access_card_disabled", b"access_card_disabled", "active_subscription", b"active_subscription", "always_active", b"always_active", "annunciation_test_active", b"annunciation_test_active", "anti_masking_alert", b"anti_masking_alert", "arc_reporting_disabled", b"arc_reporting_disabled", "arc_spark_detected", b"arc_spark_detected", "armed_in_night_mode", b"armed_in_night_mode", "battery", b"battery", "ble", b"ble", "bukhoor", b"bukhoor", "camera_view", b"camera_view", "case_drilling_detected", b"case_drilling_detected", "chimes_enabled", b"chimes_enabled", "co_level_detected", b"co_level_detected", "contact_hang", b"contact_hang", "current_short_circuit", b"current_short_circuit", "delay_when_leaving", b"delay_when_leaving", "device_firmware_status", b"device_firmware_status", "device_installation_warning", b"device_installation_warning", "door_need_anti_masking", b"door_need_anti_masking", "door_opened", b"door_opened", "en54_disablement", b"en54_disablement", "en54_fault", b"en54_fault", "en54_fire_buzzer_status", b"en54_fire_buzzer_status", "en54_vad_status", b"en54_vad_status", "end_of_service_life", b"end_of_service_life", "external_contact_alert", b"external_contact_alert", "external_contact_broken", b"external_contact_broken", "fire_alarm_fp", b"fire_alarm_fp", "fire_buzzer_active", b"fire_buzzer_active", "gsm_status", b"gsm_status", "high_current_protection", b"high_current_protection", "high_diff_temperature_detected", b"high_diff_temperature_detected", "high_frame_interconnect", b"high_frame_interconnect", "high_temperature_detected", b"high_temperature_detected", "high_voltage", b"high_voltage", "interconnect", b"interconnect", "interference_detected", b"interference_detected", "leak_detected", b"leak_detected", "lid_opened", b"lid_opened", "life_quality", b"life_quality", "light_switch_through_pass", b"light_switch_through_pass", "line_supply_high_temperature", b"line_supply_high_temperature", "low_voltage", b"low_voltage", "malfunction", b"malfunction", "migration_in_process", b"migration_in_process", "monitoring", b"monitoring", "motion_detected", b"motion_detected", "nfc", b"nfc", "one_time_deactivation", b"one_time_deactivation", "one_time_deactivation_tamper", b"one_time_deactivation_tamper", "one_time_deactivation_whole", b"one_time_deactivation_whole", "onvif_user_auth_enabled", b"onvif_user_auth_enabled", "pd_compliance_warning", b"pd_compliance_warning", "power_line_low", b"power_line_low", "power_management", b"power_management", "privacy", b"privacy", "real_active", b"real_active", "relay_stuck", b"relay_stuck", "rex_connected", b"rex_connected", "roller_shutter", b"roller_shutter", "sia_compliance_warning", b"sia_compliance_warning", "signal_strength", b"signal_strength", "sim_status", b"sim_status", "smart_bracket_unlocked", b"smart_bracket_unlocked", "smart_lock", b"smart_lock", "smoke_detected", b"smoke_detected", "someone_can_make_photo", b"someone_can_make_photo", "someone_has_camera_stream_access", b"someone_has_camera_stream_access", "standard_compliance_warning", b"standard_compliance_warning", "status", b"status", "storage_device", b"storage_device", "switch_alarm_pressed", b"switch_alarm_pressed", "temperature", b"temperature", "temporary_deactivation", b"temporary_deactivation", "temporary_deactivation_alarms", b"temporary_deactivation_alarms", "temporary_deactivation_tamper", b"temporary_deactivation_tamper", "temporary_deactivation_timer", b"temporary_deactivation_timer", "temporary_deactivation_whole", b"temporary_deactivation_whole", "transmitter_status", b"transmitter_status", "ul_not_compliant", b"ul_not_compliant", "walk_test_status", b"walk_test_status", "water_stop_prevention_warning", b"water_stop_prevention_warning", "water_stop_valve_stuck", b"water_stop_valve_stuck", "wifi_signal_level_status", b"wifi_signal_level_status", "wire_input_status", b"wire_input_status"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["access_card_disabled", b"access_card_disabled", "active_subscription", b"active_subscription", "always_active", b"always_active", "annunciation_test_active", b"annunciation_test_active", "anti_masking_alert", b"anti_masking_alert", "arc_reporting_disabled", b"arc_reporting_disabled", "arc_spark_detected", b"arc_spark_detected", "armed_in_night_mode", b"armed_in_night_mode", "battery", b"battery", "ble", b"ble", "bukhoor", b"bukhoor", "camera_view", b"camera_view", "case_drilling_detected", b"case_drilling_detected", "chimes_enabled", b"chimes_enabled", "co_level_detected", b"co_level_detected", "contact_hang", b"contact_hang", "current_short_circuit", b"current_short_circuit", "delay_when_leaving", b"delay_when_leaving", "device_firmware_status", b"device_firmware_status", "device_installation_warning", b"device_installation_warning", "door_need_anti_masking", b"door_need_anti_masking", "door_opened", b"door_opened", "en54_disablement", b"en54_disablement", "en54_fault", b"en54_fault", "en54_fire_buzzer_status", b"en54_fire_buzzer_status", "en54_vad_status", b"en54_vad_status", "end_of_service_life", b"end_of_service_life", "external_contact_alert", b"external_contact_alert", "external_contact_broken", b"external_contact_broken", "fire_alarm_fp", b"fire_alarm_fp", "fire_buzzer_active", b"fire_buzzer_active", "gsm_status", b"gsm_status", "high_current_protection", b"high_current_protection", "high_diff_temperature_detected", b"high_diff_temperature_detected", "high_frame_interconnect", b"high_frame_interconnect", "high_temperature_detected", b"high_temperature_detected", "high_voltage", b"high_voltage", "interconnect", b"interconnect", "interference_detected", b"interference_detected", "leak_detected", b"leak_detected", "lid_opened", b"lid_opened", "life_quality", b"life_quality", "light_switch_through_pass", b"light_switch_through_pass", "line_supply_high_temperature", b"line_supply_high_temperature", "lock_control_status", b"lock_control_status", "low_voltage", b"low_voltage", "malfunction", b"malfunction", "migration_in_process", b"migration_in_process", "monitoring", b"monitoring", "motion_detected", b"motion_detected", "nfc", b"nfc", "one_time_deactivation", b"one_time_deactivation", "one_time_deactivation_tamper", b"one_time_deactivation_tamper", "one_time_deactivation_whole", b"one_time_deactivation_whole", "onvif_user_auth_enabled", b"onvif_user_auth_enabled", "pd_compliance_warning", b"pd_compliance_warning", "power_line_low", b"power_line_low", "power_management", b"power_management", "privacy", b"privacy", "real_active", b"real_active", "relay_stuck", b"relay_stuck", "rex_connected", b"rex_connected", "roller_shutter", b"roller_shutter", "sia_compliance_warning", b"sia_compliance_warning", "signal_strength", b"signal_strength", "sim_status", b"sim_status", "smart_bracket_unlocked", b"smart_bracket_unlocked", "smart_lock", b"smart_lock", "smoke_detected", b"smoke_detected", "someone_can_make_photo", b"someone_can_make_photo", "someone_has_camera_stream_access", b"someone_has_camera_stream_access", "standard_compliance_warning", b"standard_compliance_warning", "status", b"status", "storage_device", b"storage_device", "switch_alarm_pressed", b"switch_alarm_pressed", "temperature", b"temperature", "temporary_deactivation", b"temporary_deactivation", "temporary_deactivation_alarms", b"temporary_deactivation_alarms", "temporary_deactivation_tamper", b"temporary_deactivation_tamper", "temporary_deactivation_timer", b"temporary_deactivation_timer", "temporary_deactivation_whole", b"temporary_deactivation_whole", "transmitter_status", b"transmitter_status", "ul_not_compliant", b"ul_not_compliant", "walk_test_status", b"walk_test_status", "water_stop_prevention_warning", b"water_stop_prevention_warning", "water_stop_valve_stuck", b"water_stop_valve_stuck", "wifi_signal_level_status", b"wifi_signal_level_status", "wire_input_status", b"wire_input_status"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_status: _TypeAlias = _typing.Literal["gsm_status", "signal_strength", "sim_status", "monitoring", "camera_view", "someone_has_camera_stream_access", "someone_can_make_photo", "battery", "always_active", "rex_connected", "delay_when_leaving", "armed_in_night_mode", "access_card_disabled", "smoke_detected", "co_level_detected", "high_temperature_detected", "external_contact_broken", "case_drilling_detected", "fire_alarm_fp", "external_contact_alert", "roller_shutter", "door_opened", "leak_detected", "nfc", "ble", "power_management", "motion_detected", "interconnect", "high_voltage", "low_voltage", "current_short_circuit", "high_current_protection", "contact_hang", "migration_in_process", "pd_compliance_warning", "sia_compliance_warning", "ul_not_compliant", "standard_compliance_warning", "chimes_enabled", "real_active", "privacy", "relay_stuck", "light_switch_through_pass", "arc_spark_detected", "high_diff_temperature_detected", "malfunction", "end_of_service_life", "high_frame_interconnect", "device_firmware_status", "anti_masking_alert", "interference_detected", "door_need_anti_masking", "switch_alarm_pressed", "temporary_deactivation_whole", "temporary_deactivation_tamper", "temporary_deactivation_alarms", "temporary_deactivation_timer", "one_time_deactivation_whole", "one_time_deactivation_tamper", "temporary_deactivation", "one_time_deactivation", "smart_lock", "line_supply_high_temperature", "bukhoor", "smart_bracket_unlocked", "device_installation_warning", "power_line_low", "life_quality", "temperature", "wire_input_status", "transmitter_status", "active_subscription", "water_stop_valve_stuck", "water_stop_prevention_warning", "en54_fault", "annunciation_test_active", "lid_opened", "storage_device", "wifi_signal_level_status", "onvif_user_auth_enabled", "en54_fire_buzzer_status", "fire_buzzer_active", "en54_vad_status", "en54_disablement", "arc_reporting_disabled", "walk_test_status"]  # noqa: Y015
+    _WhichOneofReturnType_status: _TypeAlias = _typing.Literal["gsm_status", "signal_strength", "sim_status", "monitoring", "camera_view", "someone_has_camera_stream_access", "someone_can_make_photo", "battery", "always_active", "rex_connected", "delay_when_leaving", "armed_in_night_mode", "access_card_disabled", "smoke_detected", "co_level_detected", "high_temperature_detected", "external_contact_broken", "case_drilling_detected", "fire_alarm_fp", "external_contact_alert", "roller_shutter", "door_opened", "leak_detected", "nfc", "ble", "power_management", "motion_detected", "interconnect", "high_voltage", "low_voltage", "current_short_circuit", "high_current_protection", "contact_hang", "migration_in_process", "pd_compliance_warning", "sia_compliance_warning", "ul_not_compliant", "standard_compliance_warning", "chimes_enabled", "real_active", "privacy", "relay_stuck", "light_switch_through_pass", "arc_spark_detected", "high_diff_temperature_detected", "malfunction", "end_of_service_life", "high_frame_interconnect", "device_firmware_status", "anti_masking_alert", "interference_detected", "door_need_anti_masking", "switch_alarm_pressed", "temporary_deactivation_whole", "temporary_deactivation_tamper", "temporary_deactivation_alarms", "temporary_deactivation_timer", "one_time_deactivation_whole", "one_time_deactivation_tamper", "temporary_deactivation", "one_time_deactivation", "smart_lock", "line_supply_high_temperature", "bukhoor", "smart_bracket_unlocked", "device_installation_warning", "power_line_low", "life_quality", "temperature", "wire_input_status", "transmitter_status", "active_subscription", "water_stop_valve_stuck", "water_stop_prevention_warning", "en54_fault", "annunciation_test_active", "lid_opened", "storage_device", "wifi_signal_level_status", "onvif_user_auth_enabled", "en54_fire_buzzer_status", "fire_buzzer_active", "en54_vad_status", "en54_disablement", "arc_reporting_disabled", "walk_test_status", "lock_control_status"]  # noqa: Y015
     _WhichOneofArgType_status: _TypeAlias = _typing.Literal["status", b"status"]  # noqa: Y015
     def WhichOneof(self, oneof_group: _WhichOneofArgType_status) -> _WhichOneofReturnType_status | None: ...
 

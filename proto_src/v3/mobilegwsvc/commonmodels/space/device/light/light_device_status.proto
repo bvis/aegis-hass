@@ -106,6 +106,19 @@ message LightDeviceStatus {
     Simple en54_disablement = 91;
     Simple arc_reporting_disabled = 94;
     WalkTestStatus walk_test_status = 95;
+
+    // Field 99: lock open/closed state pushed as a sub-message on current
+    // firmware, superseding the bare-enum `smart_lock` (field 66) which the
+    // cloud no longer emits for LockBridge / Yale locks (#206). The inner
+    // value is inverted relative to field 66's LockStatus, so it is read as
+    // a raw int and mapped empirically (1=locked, 2=open) — cross-confirmed
+    // against the device's local HTS signal and the reporter's lock/unlock
+    // action timestamps.
+    LockControlStatus lock_control_status = 99;
+  }
+
+  message LockControlStatus {
+    int32 state = 1;
   }
 
   message StorageDevice {

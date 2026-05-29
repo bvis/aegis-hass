@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 if TYPE_CHECKING:
@@ -214,6 +214,34 @@ class TestParseDevice:
         assert len(probe_lines) == 1
         assert "30427616" in probe_lines[0]
         assert "deadbeef" in probe_lines[0]
+
+    def test_handle_update_lock_control_status_v99(self) -> None:
+        """Field-99 `lock_control_status` (#206) over the live stream maps to
+        the `smart_lock_state` value the lock entity reads, using the real
+        captured wire bytes from a Yale LockBridge."""
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        status = light_device_status_pb2.LightDeviceStatus.FromString(bytes.fromhex("9a06020802"))
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "31524B92"
+        update.status_update.status.CopyFrom(status)
+        update.status_update.update_type = 2  # UPDATE
+
+        captured: dict[str, Any] = {}
+
+        def _on_status(device_id: str, status_name: str, payload: dict[str, Any]) -> None:
+            captured.update(device_id=device_id, status_name=status_name, payload=payload)
+
+        api = DevicesApi(MagicMock())
+        api._handle_update(update, on_devices_snapshot=lambda _: None, on_status_update=_on_status)
+
+        assert captured["status_name"] == "lock_control_status"
+        assert captured["payload"]["value"] == "unlocked"
 
     def test_parse_unsupported_oneof_with_empty_proto_logs_nothing(
         self, caplog: pytest.LogCaptureFixture
@@ -803,6 +831,22 @@ class TestStatusParser:
         # we don't accidentally start treating it as a sub-message.
         lds = _LDS()
         status = lds(smart_lock=value)
+        result = DevicesApi._parse_statuses([status])
+        assert result.get("smart_lock_state") == expected
+
+    @pytest.mark.parametrize(
+        "raw_hex,expected",
+        [("9a06020801", "locked"), ("9a06020802", "unlocked")],
+    )
+    def test_smart_lock_status_v99(self, raw_hex: str, expected: str) -> None:
+        # Real wire bytes captured from a Yale LockBridge (#206). Current
+        # firmware stopped emitting the bare-enum `smart_lock` (field 66) and
+        # now pushes the lock state as a sub-message on field 99. The inner
+        # int is mapped empirically (1=locked, 2=open) — the value is inverted
+        # relative to the field-66 LockStatus, cross-confirmed against the
+        # device's local HTS signal and the reporter's lock/unlock timestamps.
+        lds = _LDS()
+        status = lds.FromString(bytes.fromhex(raw_hex))
         result = DevicesApi._parse_statuses([status])
         assert result.get("smart_lock_state") == expected
 

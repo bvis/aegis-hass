@@ -10,6 +10,7 @@ from custom_components.aegis_ajax.api import devices_parser
 from custom_components.aegis_ajax.api.devices_parser import (
     _ALARM_TYPE_NAMES,
     _GSM_TYPE_MAP,
+    _LOCK_CONTROL_STATE_MAP,
     _SIGNAL_LEVEL_MAP,
     _SIM_STATUS_MAP,
     _SMART_LOCK_STATE_MAP,
@@ -292,6 +293,12 @@ class DevicesApi:
                 )
             elif status_name == "smart_lock":
                 payload["value"] = _SMART_LOCK_STATE_MAP.get(int(status.smart_lock), "unknown")
+            elif status_name == "lock_control_status":
+                # Field 99 (#206): lock state pushed as a sub-message on current
+                # firmware. Mapped empirically — see `_LOCK_CONTROL_STATE_MAP`.
+                payload["value"] = _LOCK_CONTROL_STATE_MAP.get(
+                    int(status.lock_control_status.state), "unknown"
+                )
 
             on_status_update(device_id, status_name, payload)
         elif update_kind == "snapshot_update":

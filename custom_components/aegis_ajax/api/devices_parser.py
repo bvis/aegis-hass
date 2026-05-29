@@ -146,6 +146,17 @@ _SMART_LOCK_STATE_MAP: dict[int, str] = {
     3: "unlatched",
 }
 
+# Field-99 `LockControlStatus.state` → lock entity state (#206). Current
+# firmware pushes the lock state here instead of the bare-enum `smart_lock`
+# (field 66), with an INVERTED integer scheme relative to the LockStatus enum
+# above. Mapped empirically (1=locked, 2=open) — cross-confirmed against the
+# device's local HTS signal and the reporter's lock/unlock action timestamps.
+_LOCK_CONTROL_STATE_MAP: dict[int, str] = {
+    1: "locked",
+    2: "unlocked",
+    3: "unlatched",
+}
+
 _GSM_TYPE_MAP: dict[int, str] = {0: "Unknown", 1: "2G", 2: "3G", 3: "4G"}
 
 _SIGNAL_LEVEL_MAP: dict[int, str] = {
@@ -392,6 +403,12 @@ def _parse_statuses(statuses: Any) -> dict[str, Any]:  # noqa: ANN401
             # sub-message), so `status.smart_lock` is already the int value.
             result["smart_lock_state"] = _SMART_LOCK_STATE_MAP.get(
                 int(status.smart_lock), "unknown"
+            )
+        elif which == "lock_control_status":
+            # Field 99 (#206): current firmware reports the lock state here as
+            # a sub-message instead of the field-66 `smart_lock` enum above.
+            result["smart_lock_state"] = _LOCK_CONTROL_STATE_MAP.get(
+                int(status.lock_control_status.state), "unknown"
             )
     return result
 
