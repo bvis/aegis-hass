@@ -558,6 +558,54 @@ class DevicesApi:
             raise SmartLockError(error_type)
         _LOGGER.debug("SmartLock %s in space %s: action=%s OK", smart_lock_id, space_id, action)
 
+    async def probe_smart_locks(self, space_id: str, lock_device_ids: list[str]) -> None:
+        """One-shot read-only probe (#206 Bug B): list the smart locks in a
+        space via `SmartLockService.findAllBySpace` and log each lock's
+        identifiers next to the hub-device ids the lock entities are built
+        from. `switch_smart_lock` currently sends the hub-device id and the
+        server answers `smart_lock_not_found`; this surfaces the id the
+        command service actually expects so it can be correlated to the
+        hub-device. DEBUG-only, device names are NOT logged, and the whole
+        call is guarded — a failure must never affect setup.
+        """
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
+            return
+        try:
+            from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+                find_all_by_space_pb2,
+                smart_lock_service_endpoints_pb2_grpc,
+            )
+
+            channel = self._client._get_channel()
+            metadata = self._client._session.get_call_metadata()
+            stub = smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub(channel)
+            request = find_all_by_space_pb2.FindAllSmartLocksBySpaceRequest(space_id=space_id)
+            response = await stub.findAllBySpace(request, metadata=metadata, timeout=15)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("SmartLock probe (#206) failed for space %s", space_id, exc_info=True)
+            return
+
+        which = response.WhichOneof("response")
+        if which != "success":
+            _LOGGER.debug("SmartLock probe (#206) space %s returned %s", space_id, which)
+            return
+        _LOGGER.debug(
+            "SmartLock probe (#206) space %s: hub-device lock ids=%s", space_id, lock_device_ids
+        )
+        for sl in response.success.smart_locks:
+            details = sl.details
+            _LOGGER.debug(
+                "SmartLock probe (#206) space %s: in_space_id=%s details_id=%s "
+                "external_id=%s serial=%s type=%s lock_status=%s",
+                space_id,
+                sl.id,
+                details.id,
+                details.external_id,
+                details.serial_number,
+                int(details.type),
+                int(details.status.lock_status),
+            )
+
     async def capture_photo(self, hub_id: str, device_id: str, device_type: str) -> str | None:
         """Capture a photo using v2 PhotoOnDemandService.
 
