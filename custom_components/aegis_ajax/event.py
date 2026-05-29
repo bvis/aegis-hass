@@ -14,6 +14,7 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     DOORBELL_DEVICE_TYPES,
     DOORBELL_EVENT_TYPE,
+    DOORBELL_RING_EVENT_TYPE,
     MANUFACTURER,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -104,7 +105,9 @@ class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
     _attr_has_entity_name = True
     _attr_translation_key = "doorbell"
     _attr_device_class = EventDeviceClass.DOORBELL
-    _attr_event_types = [DOORBELL_EVENT_TYPE]
+    # HA requires a `doorbell` device-class event entity to advertise the
+    # canonical "ring" type (warns now, rejects from HA 2027.4) — #173.
+    _attr_event_types = [DOORBELL_RING_EVENT_TYPE]
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
         super().__init__(coordinator)
@@ -138,5 +141,6 @@ class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         """
         if event_type != DOORBELL_EVENT_TYPE:
             return
-        self._trigger_event(event_type, data)
+        # Emit HA's canonical "ring" type, not the internal routing key.
+        self._trigger_event(DOORBELL_RING_EVENT_TYPE, data)
         self.async_write_ha_state()

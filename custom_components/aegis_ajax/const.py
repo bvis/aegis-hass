@@ -483,8 +483,14 @@ DOORBELL_DEVICE_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# HA event_type fired by the per-device doorbell event entity (#173).
+# Internal routing key for doorbell pushes (used by the parser, the coordinator
+# dispatch, and the hub-level security event entity). Not the type the
+# doorbell-device-class entity emits — see DOORBELL_RING_EVENT_TYPE.
 DOORBELL_EVENT_TYPE = "doorbell_pressed"
+# Event type the per-device doorbell entity emits. HA requires an entity with
+# `device_class=doorbell` to support the canonical "ring" type (it warns and,
+# from HA 2027.4, rejects anything else). See #173.
+DOORBELL_RING_EVENT_TYPE = "ring"
 # HA event_type for motion pushes; used to flip a device's motion sensor (#173).
 MOTION_EVENT_TYPE = "motion"
 

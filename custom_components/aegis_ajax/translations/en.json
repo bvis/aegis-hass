@@ -283,7 +283,7 @@
                 "state_attributes": {
                     "event_type": {
                         "state": {
-                            "doorbell_pressed": "Doorbell pressed"
+                            "ring": "Doorbell pressed"
                         }
                     }
                 }

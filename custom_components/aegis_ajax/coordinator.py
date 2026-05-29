@@ -14,6 +14,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from custom_components.aegis_ajax.api import devices_parser
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import HtsClient
 from custom_components.aegis_ajax.api.hub_object import (
@@ -199,6 +200,15 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def spaces_api(self) -> SpacesApi:
         return self._spaces_api
+
+    @property
+    def doorbell_twin_aliases(self) -> dict[str, str]:
+        """`{dropped video-doorbell twin id: surviving video_edge id}` (#173).
+
+        Pushes carry the Jeweller twin id, which is gone after dedup; this lets
+        `notification` resolve doorbell/motion pushes onto the real device.
+        """
+        return self._devices_api.doorbell_twin_aliases
 
     @property
     def devices_api(self) -> DevicesApi:
@@ -867,7 +877,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         active integration still provides).
         """
         current = list(self.devices.values())
-        deduped = DevicesApi._dedupe_video_doorbells(current)
+        deduped, aliases = devices_parser._dedupe_video_doorbells(current)
+        self._devices_api.doorbell_twin_aliases.update(aliases)
         if len(deduped) == len(current):
             return
         kept_ids = {d.id for d in deduped}

@@ -117,6 +117,11 @@ class DevicesApi:
 
     def __init__(self, client: AjaxGrpcClient) -> None:
         self._client = client
+        # `{dropped video-doorbell twin id: surviving video_edge id}`,
+        # accumulated by `_dedupe_and_track_aliases` across snapshots. Lets
+        # `notification` resolve doorbell/motion pushes (which carry the
+        # Jeweller twin id) onto the video_edge device the user sees (#173).
+        self.doorbell_twin_aliases: dict[str, str] = {}
 
     # Parsing delegators. The proto-to-Device logic lives in the pure,
     # client-free `devices_parser` module; these thin forwarders preserve the
@@ -153,7 +158,14 @@ class DevicesApi:
 
     @staticmethod
     def _dedupe_video_doorbells(devices: list[Device]) -> list[Device]:
-        return devices_parser._dedupe_video_doorbells(devices)
+        return devices_parser._dedupe_video_doorbells(devices)[0]
+
+    def _dedupe_and_track_aliases(self, devices: list[Device]) -> list[Device]:
+        """Dedupe video-doorbell twins and record the twin→sibling alias map
+        (#173) so doorbell/motion pushes carrying the twin id still resolve."""
+        deduped, aliases = devices_parser._dedupe_video_doorbells(devices)
+        self.doorbell_twin_aliases.update(aliases)
+        return deduped
 
     async def get_devices_snapshot(self, space_id: str) -> list[Device]:
         """Get initial snapshot of all devices in a space."""
@@ -183,7 +195,7 @@ class DevicesApi:
                 _LOGGER.error("Device stream failed: %s", msg.failure)
                 break
 
-        return self._dedupe_video_doorbells(devices)
+        return self._dedupe_and_track_aliases(devices)
 
     def _handle_update(
         self,
@@ -362,7 +374,7 @@ class DevicesApi:
                                         continue
                                     if device is not None:
                                         devices.append(device)
-                                on_devices_snapshot(self._dedupe_video_doorbells(devices))
+                                on_devices_snapshot(self._dedupe_and_track_aliases(devices))
                                 # Reset backoff after successful snapshot
                                 backoff = 5.0
                             elif which == "updates":

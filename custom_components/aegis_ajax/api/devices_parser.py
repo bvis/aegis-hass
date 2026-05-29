@@ -548,7 +548,7 @@ def parse_device(proto_light_device: Any) -> Device | None:  # noqa: ANN401
     return None
 
 
-def _dedupe_video_doorbells(devices: list[Device]) -> list[Device]:
+def _dedupe_video_doorbells(devices: list[Device]) -> tuple[list[Device], dict[str, str]]:
     """Drop `motion_cam_video_*` hub_device twins that have a
     `video_edge_*` sibling with a matching name in the same snapshot.
 
@@ -557,25 +557,36 @@ def _dedupe_video_doorbells(devices: list[Device]) -> list[Device]:
     discriminator across the two LightDevice cases — the IDs are
     unrelated (Jeweller short id vs MAC-style `aa:bb:cc:dd:ee:ff-0`)
     and we don't have a serial-number bridge between them. See #173.
+
+    Returns the deduped device list plus an alias map `{dropped twin id:
+    surviving video_edge id}`. Doorbell ring / motion pushes carry the
+    Jeweller twin id, which is no longer in the device set after dedup, so
+    the alias lets `notification` still resolve those pushes onto the
+    video_edge device the user sees (the motion-attribution miss in #173).
     """
-    video_edge_names = {
-        d.name.casefold() for d in devices if d.device_type.startswith(_VIDEO_EDGE_PREFIX)
+    video_edge_id_by_name = {
+        d.name.casefold(): d.id for d in devices if d.device_type.startswith(_VIDEO_EDGE_PREFIX)
     }
     result: list[Device] = []
+    aliases: dict[str, str] = {}
     for d in devices:
         if (
             d.device_type.startswith(_MOTION_CAM_VIDEO_HUB_PREFIX)
-            and d.name.casefold() in video_edge_names
+            and d.name.casefold() in video_edge_id_by_name
         ):
+            sibling_id = video_edge_id_by_name[d.name.casefold()]
+            aliases[d.id] = sibling_id
             _LOGGER.debug(
                 "Dropping duplicate hub_device twin %s (%s) — same name "
-                "as a video_edge sibling in this snapshot (#173)",
+                "as a video_edge sibling in this snapshot (#173); "
+                "aliasing pushes to %s",
                 d.id,
                 d.device_type,
+                sibling_id,
             )
             continue
         result.append(d)
-    return result
+    return result, aliases
 
 
 def _parse_hub_device(hub_dev: Any) -> Device | None:  # noqa: ANN401

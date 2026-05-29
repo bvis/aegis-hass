@@ -1776,6 +1776,35 @@ class TestParseAndFireEventDeviceRouting:
         for call in listener._hass.loop.call_soon_threadsafe.call_args_list:
             assert call[0][0] is not coordinator.apply_push_device_motion
 
+    def test_motion_resolves_via_twin_alias(self) -> None:
+        # The push carries the Jeweller twin id (310A8DF4), which is gone after
+        # the #173 dedup; the surviving video_edge sibling is 9c756e2bca39-0.
+        # The twin→sibling alias must let motion attribute to the real device
+        # (the exact miss in Bruno's #173 capture: resolved=None → hub only).
+        listener, coordinator = self._make_listener(
+            {"9c756e2bca39-0": self._doorbell_device("9c756e2bca39-0")}
+        )
+        coordinator.doorbell_twin_aliases = {"310A8DF4": "9c756e2bca39-0"}
+
+        self._fire(listener, "motion", {"device_id": "310A8DF4", "device_name": "Deurbel"})
+
+        listener._hass.loop.call_soon_threadsafe.assert_any_call(
+            coordinator.apply_push_device_motion, "9c756e2bca39-0"
+        )
+
+    def test_doorbell_resolves_via_twin_alias(self) -> None:
+        listener, coordinator = self._make_listener(
+            {"9c756e2bca39-0": self._doorbell_device("9c756e2bca39-0")}
+        )
+        coordinator.doorbell_twin_aliases = {"310A8DF4": "9c756e2bca39-0"}
+
+        self._fire(
+            listener, "doorbell_pressed", {"device_id": "310A8DF4", "device_name": "Deurbel"}
+        )
+
+        coordinator.fire_push_device_event.assert_called_once()
+        assert coordinator.fire_push_device_event.call_args[0][0] == "9c756e2bca39-0"
+
 
 class TestParseAndFireEventThreadSafety:
     """The FCM callback runs on the firebase_messaging worker thread, so every

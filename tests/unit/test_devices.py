@@ -1169,6 +1169,27 @@ class TestDeduplicateVideoDoorbells:
         deduped = DevicesApi._dedupe_video_doorbells([video_indoor, hub_indoor])
         assert [d.id for d in deduped] == ["9c-ind-0"]
 
+    def test_dedup_records_twin_to_sibling_alias(self) -> None:
+        """The dropped Jeweller twin id is aliased to the surviving video_edge
+        id so doorbell/motion pushes (which carry the twin id) still resolve
+        to the real device — the motion-attribution miss in #173."""
+        video_edge = self._make("9c756e2bca39-0", "Deurbel", "video_edge_doorbell")
+        hub_twin = self._make("310A8DF4", "Deurbel", "motion_cam_video_doorbell", malfunctions=1)
+        api = DevicesApi(MagicMock())
+
+        deduped = api._dedupe_and_track_aliases([video_edge, hub_twin])
+
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+        assert api.doorbell_twin_aliases == {"310A8DF4": "9c756e2bca39-0"}
+
+    def test_dedup_no_twin_records_no_alias(self) -> None:
+        only_video_edge = self._make("9c756e2bca39-0", "Deurbel", "video_edge_doorbell")
+        api = DevicesApi(MagicMock())
+
+        api._dedupe_and_track_aliases([only_video_edge])
+
+        assert api.doorbell_twin_aliases == {}
+
 
 class TestDevicesApiInit:
     def test_init(self) -> None:

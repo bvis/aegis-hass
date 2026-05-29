@@ -116,9 +116,11 @@ class TestAjaxDoorbellEvent:
         entity = self._make_doorbell_entity()
         assert entity._attr_device_class == EventDeviceClass.DOORBELL
 
-    def test_event_types_contains_doorbell_pressed(self) -> None:
+    def test_event_types_is_ring(self) -> None:
+        # HA requires a `doorbell` device-class event entity to advertise the
+        # canonical "ring" type (warns now, rejects from HA 2027.4) — #173.
         entity = self._make_doorbell_entity()
-        assert "doorbell_pressed" in entity.event_types
+        assert entity.event_types == ["ring"]
 
     def test_handle_event_triggers_and_writes(self) -> None:
         entity = self._make_doorbell_entity()
@@ -126,11 +128,10 @@ class TestAjaxDoorbellEvent:
         entity.async_write_ha_state = MagicMock()
         entity.hass = MagicMock()
 
+        # Routing key in, canonical "ring" type out.
         entity.handle_event("doorbell_pressed", {"raw_tag": "ring_button_pressed"})
 
-        entity._trigger_event.assert_called_once_with(
-            "doorbell_pressed", {"raw_tag": "ring_button_pressed"}
-        )
+        entity._trigger_event.assert_called_once_with("ring", {"raw_tag": "ring_button_pressed"})
         entity.async_write_ha_state.assert_called_once()
 
     def test_handle_event_does_not_fire_bus_event(self) -> None:

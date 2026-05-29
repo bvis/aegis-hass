@@ -267,7 +267,7 @@
                 "state_attributes": {
                     "event_type": {
                         "state": {
-                            "doorbell_pressed": "Naciśnięto dzwonek"
+                            "ring": "Naciśnięto dzwonek"
                         }
                     }
                 }

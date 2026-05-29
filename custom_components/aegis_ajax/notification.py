@@ -644,6 +644,16 @@ class AjaxNotificationListener:
         device_id = event_data.get("device_id")
         resolved = device_id if device_id in devices else None
 
+        # The push carries the Jeweller twin id, but after the #173 dedup the
+        # device set holds the `video_edge` sibling instead. Resolve via the
+        # twin→sibling alias so BOTH doorbell rings and motion attribute to the
+        # real device — without this, motion (which has no single-doorbell
+        # fallback below) always lands on the hub.
+        if resolved is None and device_id is not None:
+            alias = self._coordinator.doorbell_twin_aliases.get(device_id)
+            if alias in devices:
+                resolved = alias
+
         if resolved is None and event_type == DOORBELL_EVENT_TYPE:
             doorbells = [
                 dev_id
