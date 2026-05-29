@@ -88,6 +88,11 @@ _STATUS_KEY_MAP: dict[str, str] = {
     "lock_control_status": "smart_lock_state",
 }
 
+# Mirror of `lock.LOCK_DEVICE_TYPES` (kept local to avoid a circular import
+# with the lock platform, which imports the coordinator). Used only by the
+# one-shot #206 Bug-B SmartLock id probe.
+_LOCK_DEVICE_TYPES: frozenset[str] = frozenset({"smart_lock", "smart_lock_yale"})
+
 # Statuses whose snapshot parser writes more than the single mapped key.
 # Used by the REMOVE op so stale sub-keys don't linger after the hub drops
 # the parent status from the stream.
@@ -163,6 +168,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # (same shape as `self.devices` keys). Empty dict = no readings
         # snapshotted yet OR no electrical devices in the install.
         self.device_readings: dict[str, DeviceReadings] = {}
+        # One-shot guard for the #206 Bug-B SmartLock id probe (DEBUG-only).
+        self._smart_lock_probe_done = False
         # Per-space monotonic timestamp of when the hub first reported
         # offline (cleared on the first ONLINE poll). Drives the
         # `hub_offline_24h` Repair surfaced after sustained downtime.
@@ -466,6 +473,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await self._devices_cache.async_save(self.devices)
                 except Exception:  # noqa: BLE001
                     _LOGGER.debug("Failed to persist devices cache", exc_info=True)
+        await self._probe_smart_locks_once()
         await self._start_device_streams()
         await self._start_hts()
         self._last_update_success_time = dt_util.utcnow()
@@ -480,6 +488,25 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             len(self.spaces),
             "scheduled" if self._hts_task is not None else "skipped",
         )
+
+    async def _probe_smart_locks_once(self) -> None:
+        """#206 Bug B: one-shot read-only probe of `SmartLockService` to
+        capture the id the command service expects (the hub-device id we send
+        today yields `smart_lock_not_found`). Runs once, only when a lock
+        device is present; the probe itself is DEBUG-gated and never raises.
+        """
+        if self._smart_lock_probe_done:
+            return
+        self._smart_lock_probe_done = True
+        lock_ids_by_space: dict[str, list[str]] = {}
+        for device in self.devices.values():
+            if device.device_type not in _LOCK_DEVICE_TYPES:
+                continue
+            space_id = next((s.id for s in self.spaces.values() if s.hub_id == device.hub_id), None)
+            if space_id:
+                lock_ids_by_space.setdefault(space_id, []).append(device.id)
+        for space_id, lock_ids in lock_ids_by_space.items():
+            await self._devices_api.probe_smart_locks(space_id, lock_ids)
 
     async def _maybe_fallback_device_snapshot(self) -> None:
         """Refresh devices from snapshot when persistent streams aren't all

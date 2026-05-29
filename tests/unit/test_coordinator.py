@@ -1910,3 +1910,45 @@ class TestManualHubRefresh:
         assert hts.request_full_status.await_count == 2
         hts.request_full_status.assert_any_await("hub-1")
         hts.request_full_status.assert_any_await("hub-2")
+
+
+class TestSmartLockProbeOrchestration:
+    """#206 Bug B: the one-shot probe correlates lock hub-devices to their
+    space and delegates to the read-only `DevicesApi.probe_smart_locks`."""
+
+    @pytest.mark.asyncio
+    async def test_probe_once_correlates_lock_to_space(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.spaces = {"s1": _make_space("s1")}  # hub_id="hub-1"
+        lock = Device(
+            id="31524B92",
+            hub_id="hub-1",
+            name="Yale",
+            device_type="smart_lock_yale",
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+        coordinator.devices = {"31524B92": lock, "d1": _make_device("d1")}
+        coordinator._devices_api.probe_smart_locks = AsyncMock()
+
+        await coordinator._probe_smart_locks_once()
+
+        coordinator._devices_api.probe_smart_locks.assert_awaited_once_with("s1", ["31524B92"])
+
+    @pytest.mark.asyncio
+    async def test_probe_skips_when_no_lock_and_runs_once(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.spaces = {"s1": _make_space("s1")}
+        coordinator.devices = {"d1": _make_device("d1")}  # no lock
+        coordinator._devices_api.probe_smart_locks = AsyncMock()
+
+        await coordinator._probe_smart_locks_once()
+        await coordinator._probe_smart_locks_once()
+
+        coordinator._devices_api.probe_smart_locks.assert_not_called()
+        assert coordinator._smart_lock_probe_done is True

@@ -2630,3 +2630,75 @@ class TestSetPhotoOnDemandMode:
             pytest.raises(DeviceCommandError, match="user.*bad_request"),
         ):
             await api.set_photo_on_demand_mode("hub-1", user_enabled=True)
+
+
+class TestSmartLockProbe:
+    """#206 Bug B: read-only `findAllBySpace` probe that surfaces the
+    smart-lock id the command service expects alongside the hub-device ids."""
+
+    def _make_api(self) -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_probe_logs_smart_lock_ids(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging as _logging  # noqa: PLC0415
+
+        from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+            find_all_by_space_pb2,
+        )
+
+        response = find_all_by_space_pb2.FindAllSmartLocksBySpaceResponse()
+        sl = response.success.smart_locks.add()
+        sl.id = "5_0"
+        sl.details.id = "details-abc"
+        sl.details.external_id = "ext-1"
+        sl.details.serial_number = "SN123"
+
+        api = self._make_api()
+        stub = MagicMock()
+        stub.findAllBySpace = AsyncMock(return_value=response)
+
+        with (
+            caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
+            patch(
+                "systems.ajax.api.mobile.v2.space.smartlock."
+                "smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub",
+                return_value=stub,
+            ),
+        ):
+            await api.probe_smart_locks("space-1", ["31524B92"])
+
+        msgs = [r.message for r in caplog.records]
+        assert any("hub-device lock ids=['31524B92']" in m for m in msgs)
+        assert any("in_space_id=5_0" in m and "external_id=ext-1" in m for m in msgs)
+
+    @pytest.mark.asyncio
+    async def test_probe_disabled_without_debug(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging as _logging  # noqa: PLC0415
+
+        api = self._make_api()
+        with caplog.at_level(_logging.INFO, logger="custom_components.aegis_ajax.api.devices"):
+            await api.probe_smart_locks("space-1", ["31524B92"])
+        # No gRPC call attempted, no probe output above DEBUG.
+        api._client._get_channel.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_probe_never_raises_on_error(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging as _logging  # noqa: PLC0415
+
+        api = self._make_api()
+        stub = MagicMock()
+        stub.findAllBySpace = AsyncMock(side_effect=RuntimeError("boom"))
+        with (
+            caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
+            patch(
+                "systems.ajax.api.mobile.v2.space.smartlock."
+                "smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub",
+                return_value=stub,
+            ),
+        ):
+            await api.probe_smart_locks("space-1", ["31524B92"])  # must not raise
+        assert any("SmartLock probe (#206) failed" in r.message for r in caplog.records)
