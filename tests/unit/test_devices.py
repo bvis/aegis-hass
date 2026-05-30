@@ -2654,14 +2654,23 @@ class TestSetPhotoOnDemandMode:
 
 
 class TestSmartLockProbe:
-    """#206 Bug B: read-only `findAllBySpace` probe that surfaces the
-    smart-lock id the command service expects alongside the hub-device ids."""
+    """#206 Bug B: read-only probe of the v2 SmartLockService. beta.7 showed
+    `findAllBySpace` returns success-but-empty, so beta.9 also retries with a
+    bumped client-version and queries `findAllAvailableToAdd` to disambiguate a
+    client-version gate from an un-enrolled lock."""
 
-    def _make_api(self) -> DevicesApi:
+    def _make_api(self, metadata: list[tuple[str, str]] | None = None) -> DevicesApi:
         client = MagicMock()
         client._get_channel.return_value = MagicMock()
-        client._session.get_call_metadata.return_value = []
+        client._session.get_call_metadata.return_value = metadata if metadata is not None else []
         return DevicesApi(client)
+
+    def _patch_stub(self, stub: MagicMock) -> contextlib.AbstractContextManager[MagicMock]:
+        return patch(
+            "systems.ajax.api.mobile.v2.space.smartlock."
+            "smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub",
+            return_value=stub,
+        )
 
     @pytest.mark.asyncio
     async def test_probe_logs_smart_lock_ids(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -2681,20 +2690,93 @@ class TestSmartLockProbe:
         api = self._make_api()
         stub = MagicMock()
         stub.findAllBySpace = AsyncMock(return_value=response)
+        stub.findAllAvailableToAdd = AsyncMock(side_effect=RuntimeError("not exercised here"))
 
         with (
             caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
-            patch(
-                "systems.ajax.api.mobile.v2.space.smartlock."
-                "smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub",
-                return_value=stub,
-            ),
+            self._patch_stub(stub),
         ):
             await api.probe_smart_locks("space-1", ["31524B92"])
 
         msgs = [r.message for r in caplog.records]
         assert any("hub-device lock ids=['31524B92']" in m for m in msgs)
         assert any("in_space_id=5_0" in m and "external_id=ext-1" in m for m in msgs)
+
+    @pytest.mark.asyncio
+    async def test_probe_retries_with_bumped_client_version(self) -> None:
+        import logging as _logging  # noqa: PLC0415
+
+        from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+            find_all_by_space_pb2,
+        )
+
+        from custom_components.aegis_ajax.api.devices import _PROBE_CLIENT_VERSION  # noqa: PLC0415
+        from custom_components.aegis_ajax.const import CLIENT_VERSION  # noqa: PLC0415
+
+        api = self._make_api(metadata=[("client-version-major", CLIENT_VERSION), ("x", "y")])
+        stub = MagicMock()
+        stub.findAllBySpace = AsyncMock(
+            return_value=find_all_by_space_pb2.FindAllSmartLocksBySpaceResponse()
+        )
+        stub.findAllAvailableToAdd = AsyncMock(
+            return_value=find_all_by_space_pb2.FindAllSmartLocksBySpaceResponse()
+        )
+
+        with (
+            patch.object(
+                _logging.getLogger("custom_components.aegis_ajax.api.devices"),
+                "isEnabledFor",
+                return_value=True,
+            ),
+            self._patch_stub(stub),
+        ):
+            await api.probe_smart_locks("space-1", ["31524B92"])
+
+        # findAllBySpace called twice: baseline + bumped client-version.
+        sent_versions = {
+            dict(call.kwargs["metadata"])["client-version-major"]
+            for call in stub.findAllBySpace.call_args_list
+        }
+        assert sent_versions == {CLIENT_VERSION, _PROBE_CLIENT_VERSION}
+        # The unrelated metadata tuple is preserved on the bumped call.
+        for call in stub.findAllBySpace.call_args_list:
+            assert ("x", "y") in call.kwargs["metadata"]
+
+    @pytest.mark.asyncio
+    async def test_probe_logs_available_to_add(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging as _logging  # noqa: PLC0415
+
+        from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+            find_all_available_to_add_pb2,
+            find_all_by_space_pb2,
+        )
+
+        available = find_all_available_to_add_pb2.FindAllSmartLocksAvailableToAddResponse()
+        entry = available.success.smart_locks.add()
+        entry.smart_lock.external_id = "ext-yale-9"
+        entry.smart_lock.serial_number = "SN-YALE"
+        entry.addition_status = 2  # AVAILABLE_TO_ADD
+
+        api = self._make_api()
+        stub = MagicMock()
+        stub.findAllBySpace = AsyncMock(
+            return_value=find_all_by_space_pb2.FindAllSmartLocksBySpaceResponse()
+        )
+        stub.findAllAvailableToAdd = AsyncMock(return_value=available)
+
+        with (
+            caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
+            self._patch_stub(stub),
+        ):
+            await api.probe_smart_locks("space-1", ["31524B92"])
+
+        msgs = [r.message for r in caplog.records]
+        assert any(
+            "findAllAvailableToAdd" in m
+            and "external_id=ext-yale-9" in m
+            and "addition_status=2" in m
+            for m in msgs
+        )
 
     @pytest.mark.asyncio
     async def test_probe_disabled_without_debug(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -2713,13 +2795,13 @@ class TestSmartLockProbe:
         api = self._make_api()
         stub = MagicMock()
         stub.findAllBySpace = AsyncMock(side_effect=RuntimeError("boom"))
+        stub.findAllAvailableToAdd = AsyncMock(side_effect=RuntimeError("boom"))
         with (
             caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
-            patch(
-                "systems.ajax.api.mobile.v2.space.smartlock."
-                "smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub",
-                return_value=stub,
-            ),
+            self._patch_stub(stub),
         ):
             await api.probe_smart_locks("space-1", ["31524B92"])  # must not raise
-        assert any("SmartLock probe (#206) failed" in r.message for r in caplog.records)
+        assert any("findAllBySpace" in r.message and "failed" in r.message for r in caplog.records)
+        assert any(
+            "findAllAvailableToAdd" in r.message and "failed" in r.message for r in caplog.records
+        )

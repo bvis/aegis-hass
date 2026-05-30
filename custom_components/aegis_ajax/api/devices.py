@@ -18,6 +18,7 @@ from custom_components.aegis_ajax.api.devices_parser import (
     _decode_proto_wire_shape,
     _redact_proto_bytes_to_hex,
 )
+from custom_components.aegis_ajax.const import CLIENT_VERSION
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,6 +28,24 @@ if TYPE_CHECKING:
     from custom_components.aegis_ajax.const import DeviceState
 
 _LOGGER = logging.getLogger(__name__)
+
+# #206: client-version reported on the bumped findAllBySpace retry. The Ajax
+# server silently drops feature fields keyed on the reported version (see the
+# monitoring_companies incident in const.CLIENT_VERSION's history); the Yale /
+# Assa Abloy SmartLock service postdates our default 3.30, so the locks may
+# only enumerate when we claim a newer client.
+_PROBE_CLIENT_VERSION = "3.60"
+
+# SmartLockType enum values (common.space.smartlock.SmartLockType).
+_SMART_LOCK_TYPE_ASSA_ABLOY = 1
+_SMART_LOCK_TYPE_ASSA_ABLOY_NA = 2
+
+
+def _override_client_version(
+    metadata: list[tuple[str, str]], version: str
+) -> list[tuple[str, str]]:
+    """Return a copy of call metadata with `client-version-major` swapped."""
+    return [(k, version if k == "client-version-major" else v) for k, v in metadata]
 
 
 class SmartLockError(Exception):
@@ -571,51 +590,141 @@ class DevicesApi:
         _LOGGER.debug("SmartLock %s in space %s: action=%s OK", smart_lock_id, space_id, action)
 
     async def probe_smart_locks(self, space_id: str, lock_device_ids: list[str]) -> None:
-        """One-shot read-only probe (#206 Bug B): list the smart locks in a
-        space via `SmartLockService.findAllBySpace` and log each lock's
-        identifiers next to the hub-device ids the lock entities are built
-        from. `switch_smart_lock` currently sends the hub-device id and the
-        server answers `smart_lock_not_found`; this surfaces the id the
-        command service actually expects so it can be correlated to the
-        hub-device. DEBUG-only, device names are NOT logged, and the whole
-        call is guarded — a failure must never affect setup.
+        """One-shot read-only probe (#206 Bug B) of the v2 `SmartLockService`.
+
+        beta.7 showed `findAllBySpace` returns `success` with an *empty* list
+        for Sebastian's Yale (Assa Abloy) locks, so `switch_smart_lock` getting
+        `smart_lock_not_found` is not a wrong-id problem — the command service
+        simply doesn't list these locks. This probe disambiguates the two
+        remaining causes in one capture:
+
+          1. ``findAllBySpace`` at our default client-version (baseline).
+          2. ``findAllBySpace`` with a *bumped* client-version — the Ajax
+             server silently gates feature fields on the reported version, so
+             the Assa Abloy locks may only enumerate when we claim a newer app.
+          3. ``findAllAvailableToAdd`` — if the locks surface here they exist
+             at the bridge but aren't enrolled in the SmartLock service.
+
+        DEBUG-only, device names are NOT logged, and every sub-call is guarded
+        independently — a failure must never affect setup.
         """
         if not _LOGGER.isEnabledFor(logging.DEBUG):
             return
-        try:
-            from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
-                find_all_by_space_pb2,
-                smart_lock_service_endpoints_pb2_grpc,
-            )
 
-            channel = self._client._get_channel()
-            metadata = self._client._session.get_call_metadata()
-            stub = smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub(channel)
-            request = find_all_by_space_pb2.FindAllSmartLocksBySpaceRequest(space_id=space_id)
-            response = await stub.findAllBySpace(request, metadata=metadata, timeout=15)
-        except Exception:  # noqa: BLE001
-            _LOGGER.debug("SmartLock probe (#206) failed for space %s", space_id, exc_info=True)
-            return
-
-        which = response.WhichOneof("response")
-        if which != "success":
-            _LOGGER.debug("SmartLock probe (#206) space %s returned %s", space_id, which)
-            return
         _LOGGER.debug(
             "SmartLock probe (#206) space %s: hub-device lock ids=%s", space_id, lock_device_ids
         )
-        for sl in response.success.smart_locks:
+        try:
+            from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+                find_all_available_to_add_pb2,
+                find_all_by_space_pb2,
+                smart_lock_service_endpoints_pb2_grpc,
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("SmartLock probe (#206): proto import failed", exc_info=True)
+            return
+
+        channel = self._client._get_channel()
+        stub = smart_lock_service_endpoints_pb2_grpc.SmartLockServiceStub(channel)
+
+        # Probe 1 + 2: findAllBySpace at baseline and bumped client-version.
+        for version in (CLIENT_VERSION, _PROBE_CLIENT_VERSION):
+            await self._probe_find_all_by_space(stub, find_all_by_space_pb2, space_id, version)
+        # Probe 3: findAllAvailableToAdd for both Assa Abloy variants.
+        for lock_type in (_SMART_LOCK_TYPE_ASSA_ABLOY, _SMART_LOCK_TYPE_ASSA_ABLOY_NA):
+            await self._probe_available_to_add(
+                stub, find_all_available_to_add_pb2, space_id, lock_type
+            )
+
+    async def _probe_find_all_by_space(
+        self,
+        stub: Any,  # noqa: ANN401
+        pb2: Any,  # noqa: ANN401
+        space_id: str,
+        version: str,
+    ) -> None:
+        """#206 helper: log the smart locks listed by findAllBySpace under the
+        given reported client-version. Read-only and fully guarded."""
+        metadata = _override_client_version(self._client._session.get_call_metadata(), version)
+        try:
+            request = pb2.FindAllSmartLocksBySpaceRequest(space_id=space_id)
+            response = await stub.findAllBySpace(request, metadata=metadata, timeout=15)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "SmartLock probe (#206) findAllBySpace (cv=%s) failed", version, exc_info=True
+            )
+            return
+        which = response.WhichOneof("response")
+        if which != "success":
+            _LOGGER.debug(
+                "SmartLock probe (#206) findAllBySpace (cv=%s) returned %s", version, which
+            )
+            return
+        locks = response.success.smart_locks
+        _LOGGER.debug(
+            "SmartLock probe (#206) findAllBySpace (cv=%s): %d lock(s)", version, len(locks)
+        )
+        for sl in locks:
             details = sl.details
             _LOGGER.debug(
-                "SmartLock probe (#206) space %s: in_space_id=%s details_id=%s "
-                "external_id=%s serial=%s type=%s lock_status=%s",
-                space_id,
+                "SmartLock probe (#206) findAllBySpace (cv=%s): in_space_id=%s details_id=%s "
+                "external_id=%s serial=%s type=%s lock_status=%s connection=%s",
+                version,
                 sl.id,
                 details.id,
                 details.external_id,
                 details.serial_number,
                 int(details.type),
                 int(details.status.lock_status),
+                int(details.status.connection_status),
+            )
+
+    async def _probe_available_to_add(
+        self,
+        stub: Any,  # noqa: ANN401
+        pb2: Any,  # noqa: ANN401
+        space_id: str,
+        lock_type: int,
+    ) -> None:
+        """#206 helper: log the smart locks that exist at the bridge but may
+        not be enrolled in the SmartLock service. Read-only and fully guarded."""
+        metadata = self._client._session.get_call_metadata()
+        try:
+            request = pb2.FindAllSmartLocksAvailableToAddRequest(space_id=space_id, type=lock_type)
+            response = await stub.findAllAvailableToAdd(request, metadata=metadata, timeout=15)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "SmartLock probe (#206) findAllAvailableToAdd (type=%s) failed",
+                lock_type,
+                exc_info=True,
+            )
+            return
+        which = response.WhichOneof("response")
+        if which != "success":
+            _LOGGER.debug(
+                "SmartLock probe (#206) findAllAvailableToAdd (type=%s) returned %s",
+                lock_type,
+                which,
+            )
+            return
+        locks = response.success.smart_locks
+        _LOGGER.debug(
+            "SmartLock probe (#206) findAllAvailableToAdd (type=%s): %d lock(s)",
+            lock_type,
+            len(locks),
+        )
+        for entry in locks:
+            sl = entry.smart_lock
+            _LOGGER.debug(
+                "SmartLock probe (#206) findAllAvailableToAdd (type=%s): external_id=%s "
+                "serial=%s type=%s addition_status=%s lock_status=%s connection=%s",
+                lock_type,
+                sl.external_id,
+                sl.serial_number,
+                int(sl.type),
+                int(entry.addition_status),
+                int(sl.status.lock_status),
+                int(sl.status.connection_status),
             )
 
     async def capture_photo(self, hub_id: str, device_id: str, device_type: str) -> str | None:
