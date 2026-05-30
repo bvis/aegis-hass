@@ -1411,6 +1411,25 @@ class TestApplyPushDeviceMotion:
 
         call_later.assert_called_once()
 
+    def test_auto_off_is_scheduled_as_loop_callback(self) -> None:
+        """Regression (#173): the auto-off action must be a HA `@callback` so
+        `async_call_later` runs it on the event loop. A plain lambda is
+        classified as a sync job and run in the executor (SyncWorker) thread,
+        where its `async_set_updated_data` raises the off-loop
+        `async_write_ha_state` RuntimeError storm Bruno hit on beta.8."""
+        from homeassistant.core import is_callback
+
+        coordinator = self._make_coordinator_with_device()
+
+        with patch("homeassistant.helpers.event.async_call_later") as call_later:
+            coordinator.apply_push_device_motion("doorbell-1")
+
+        action = call_later.call_args.args[2]
+        assert is_callback(action), (
+            "auto-off action is not a HA callback; async_call_later would run it "
+            "in the executor thread and async_set_updated_data would be off-loop"
+        )
+
 
 class TestApplyPushGroupSecurityState:
     """Per-group arm/disarm push updates (#148): only the matching Group is

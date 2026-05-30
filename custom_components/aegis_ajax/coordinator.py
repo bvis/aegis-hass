@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -1010,10 +1011,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cancel = self._motion_off_cancels.pop(device_id, None)
         if cancel is not None:
             cancel()
+        # The action MUST be a HA `@callback`: async_call_later classifies a
+        # plain sync function as an executor job and runs it in a worker thread,
+        # where `_clear_device_motion`'s `async_set_updated_data` would write
+        # entity state off-loop (the RuntimeError storm in #173 on beta.8).
         self._motion_off_cancels[device_id] = async_call_later(
             self.hass,
             MOTION_PUSH_AUTO_OFF_SECONDS,
-            lambda _now: self._clear_device_motion(device_id),
+            callback(lambda _now: self._clear_device_motion(device_id)),
         )
 
     def _clear_device_motion(self, device_id: str) -> None:
