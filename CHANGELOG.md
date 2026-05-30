@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0-beta.10] - 2026-05-30
+
+Fixes an off-loop state-write error storm from video-doorbell motion (#173).
+
+### Fixed
+- **Video-doorbell motion auto-off no longer writes entity state off-loop (#173).** After a motion push, the sensor's scheduled auto-off was passed to `async_call_later` as a plain lambda. Home Assistant classifies a non-`@callback` sync function as an executor job and runs it in a worker thread, so the auto-off's `async_set_updated_data` updated entity state off the event loop — producing a storm of `async_write_ha_state from a thread other than the event loop` RuntimeErrors (one per entity) ~30 s after every motion event. The scheduled action is now wrapped in `homeassistant.core.callback`, so it runs inline on the loop. Motion attribution itself (beta.8) was already correct; this only removes the error storm it triggered.
+
 ## [1.7.0-beta.9] - 2026-05-30
 
 Sharper diagnostic for SmartLock control from Home Assistant (#206).
