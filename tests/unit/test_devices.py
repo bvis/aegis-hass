@@ -2779,6 +2779,42 @@ class TestSmartLockProbe:
         )
 
     @pytest.mark.asyncio
+    async def test_probe_logs_failure_error_case(self, caplog: pytest.LogCaptureFixture) -> None:
+        """#206 beta.12: a `failure` response must log the inner error oneof
+        (e.g. `space_armed`), not just `failure` — that sub-case decides whether
+        HA-side lock control is fixable or a backend limitation."""
+        import logging as _logging  # noqa: PLC0415
+
+        from systems.ajax.api.mobile.v2.space.smartlock import (  # noqa: PLC0415
+            find_all_available_to_add_pb2,
+            find_all_by_space_pb2,
+        )
+
+        failed = find_all_available_to_add_pb2.FindAllSmartLocksAvailableToAddResponse()
+        failed.failure.external_service_access_denied.SetInParent()
+
+        api = self._make_api()
+        stub = MagicMock()
+        stub.findAllBySpace = AsyncMock(
+            return_value=find_all_by_space_pb2.FindAllSmartLocksBySpaceResponse()
+        )
+        stub.findAllAvailableToAdd = AsyncMock(return_value=failed)
+
+        with (
+            caplog.at_level(_logging.DEBUG, logger="custom_components.aegis_ajax.api.devices"),
+            self._patch_stub(stub),
+        ):
+            await api.probe_smart_locks("space-1", ["31524B92"])
+
+        msgs = [r.message for r in caplog.records]
+        assert any(
+            "findAllAvailableToAdd" in m
+            and "returned failure" in m
+            and "error=external_service_access_denied" in m
+            for m in msgs
+        )
+
+    @pytest.mark.asyncio
     async def test_probe_disabled_without_debug(self, caplog: pytest.LogCaptureFixture) -> None:
         import logging as _logging  # noqa: PLC0415
 

@@ -48,6 +48,19 @@ def _override_client_version(
     return [(k, version if k == "client-version-major" else v) for k, v in metadata]
 
 
+def _failure_error_case(response: Any, which: str) -> str | None:  # noqa: ANN401
+    """For a SmartLock response whose top-level oneof is `failure`, return the
+    inner error oneof case (e.g. `space_armed`, `external_service_access_denied`)
+    so the #206 probe records *why* a call failed, not just that it did."""
+    if which != "failure":
+        return None
+    try:
+        error = response.failure.WhichOneof("error")
+    except Exception:  # noqa: BLE001
+        return None
+    return error if isinstance(error, str) else None
+
+
 class SmartLockError(Exception):
     """Raised when a SwitchSmartLockService call fails."""
 
@@ -657,7 +670,10 @@ class DevicesApi:
         which = response.WhichOneof("response")
         if which != "success":
             _LOGGER.debug(
-                "SmartLock probe (#206) findAllBySpace (cv=%s) returned %s", version, which
+                "SmartLock probe (#206) findAllBySpace (cv=%s) returned %s (error=%s)",
+                version,
+                which,
+                _failure_error_case(response, which),
             )
             return
         locks = response.success.smart_locks
@@ -702,9 +718,10 @@ class DevicesApi:
         which = response.WhichOneof("response")
         if which != "success":
             _LOGGER.debug(
-                "SmartLock probe (#206) findAllAvailableToAdd (type=%s) returned %s",
+                "SmartLock probe (#206) findAllAvailableToAdd (type=%s) returned %s (error=%s)",
                 lock_type,
                 which,
+                _failure_error_case(response, which),
             )
             return
         locks = response.success.smart_locks
