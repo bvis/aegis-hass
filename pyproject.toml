@@ -2,7 +2,7 @@
 name = "aegis-ajax-hass"
 # Mirror of manifest.json's version (the source of truth HA reads). Kept in
 # sync by tests/unit/test_version_consistency.py — bump both when releasing.
-version = "1.7.0"
+version = "1.8.0-beta.1"
 description = "Home Assistant integration for Ajax Security Systems (co-branded) via gRPC"
 requires-python = ">=3.12"
 license = "MIT"

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.1] - 2026-05-31
+
+### Added
+- **HomeSiren / StreetSiren internal temperature sensor (#220).** Sirens report their temperature in the Ajax app but not in the device stream we run continuously, so no sensor appeared. The value is now pulled from the per-device `StreamHubDevice` snapshot on a throttled cycle (every 15 min — temperature is slow-moving) and surfaced as the standard temperature sensor. Covers `street_siren`, `street_siren_plus_g3`, `home_siren`, `home_siren_g3`, `home_siren_s` and `home_siren_fibra`. The value is preserved across stream snapshots so the sensor doesn't flicker to `unknown`. Buzzer/sounding state is not included (it needs a different signal path).
+
 ## [1.7.0] - 2026-05-30
 
 Doorbell, lock and bypass improvements, plus thread-safety and reliability fixes. Consolidates the 1.6.2-beta and 1.7.0-beta series.

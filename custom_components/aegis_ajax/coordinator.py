@@ -34,6 +34,8 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
+    SIREN_TEMP_REFRESH_INTERVAL,
+    SIREN_TEMPERATURE_DEVICE_TYPES,
     ConnectionStatus,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
@@ -156,6 +158,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Rooms rarely change — cache and refresh once per hour. None means
         # never fetched yet so the first poll always populates rooms.
         self._rooms_last_fetch: float | None = None
+        # Siren internal temperature (#220) — throttled one-shot refresh.
+        # None means never fetched so the first poll populates it.
+        self._siren_temp_last_fetch: float | None = None
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
@@ -283,6 +288,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._first_startup_init()
                 return {"spaces": self.spaces, "devices": self.devices}
             await self._maybe_fallback_device_snapshot()
+            await self._maybe_refresh_device_temperatures(now)
             await self._maybe_restart_hts()
             self._last_update_success_time = dt_util.utcnow()
             return {"spaces": self.spaces, "devices": self.devices}
@@ -447,6 +453,47 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
         self.rooms = refreshed_rooms
         self._rooms_last_fetch = now
+
+    async def _maybe_refresh_device_temperatures(self, now: float) -> None:
+        """Throttled one-shot refresh of siren internal temperature (#220).
+
+        Sirens don't carry a `temperature` status in the `StreamLightDevices`
+        stream the way motion/door sensors do, so the auto-created temperature
+        sensor never appears for them. The value lives in the rich per-device
+        `StreamHubDevice` snapshot instead. We pull it once per
+        `SIREN_TEMP_REFRESH_INTERVAL` for each siren that doesn't already have
+        a temperature, and merge it into `device.statuses["temperature"]` —
+        which is all `sensor.py` needs to materialise the sensor.
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        if (
+            self._siren_temp_last_fetch is not None
+            and now - self._siren_temp_last_fetch <= SIREN_TEMP_REFRESH_INTERVAL
+        ):
+            return
+        for device_id, device in list(self.devices.items()):
+            if (
+                device.device_type not in SIREN_TEMPERATURE_DEVICE_TYPES
+                or "temperature" in device.statuses
+            ):
+                continue
+            try:
+                temperature = await self._devices_api.get_hub_device_temperature(
+                    device.hub_id, device_id
+                )
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Failed to fetch temperature for siren %s", device_id, exc_info=True)
+                continue
+            if temperature is None:
+                continue
+            current = self.devices.get(device_id)
+            if current is None:
+                continue
+            self.devices[device_id] = dc_replace(
+                current, statuses={**current.statuses, "temperature": temperature}
+            )
+        self._siren_temp_last_fetch = now
 
     async def _first_startup_init(self) -> None:
         """First-cycle bootstrap: warm devices cache, start persistent
@@ -848,6 +895,28 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _handle_devices_snapshot(self, devices: list[Device]) -> None:
         """Handle initial snapshot or full device snapshot update from stream."""
         for device in devices:
+            # Siren temperature (#220) comes from a separate per-device RPC,
+            # not this stream, so a fresh snapshot would wipe the value we
+            # merged in `_maybe_refresh_device_temperatures` and the throttle
+            # would leave the sensor `unknown` until the next refresh. Carry
+            # the previously-merged temperature forward (it's slow-moving;
+            # the periodic refresh still updates it).
+            existing = self.devices.get(device.id)
+            if (
+                existing is not None
+                and device.device_type in SIREN_TEMPERATURE_DEVICE_TYPES
+                and "temperature" not in device.statuses
+                and "temperature" in existing.statuses
+            ):
+                from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+                device = dc_replace(
+                    device,
+                    statuses={
+                        **device.statuses,
+                        "temperature": existing.statuses["temperature"],
+                    },
+                )
             self.devices[device.id] = device
         # `DevicesApi` dedups video-doorbell twins per snapshot, but the merge
         # above only ever *adds* keys — a `motion_cam_video_*` ghost that was

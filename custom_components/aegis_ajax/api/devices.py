@@ -229,6 +229,44 @@ class DevicesApi:
 
         return self._dedupe_and_track_aliases(devices)
 
+    async def get_hub_device_temperature(self, hub_id: str, hub_device_id: str) -> float | None:
+        """Read one device's internal temperature via `StreamHubDevice` (#220).
+
+        A per-device stream (`hub_id` + `hub_device_id`) whose first
+        `success.snapshot` carries the rich `HubDevice` proto. Sirens expose
+        their temperature here but not in the lighter `StreamLightDevices`
+        stream. We read the first snapshot and stop — temperature is slow and
+        the `Success` oneof has no delta case anyway. Returns `None` on a
+        `failure` response (e.g. a hub-attached device not addressable on this
+        backend, cf. #206) or an empty stream; gRPC errors propagate to the
+        caller, which guards each device individually.
+        """
+        from v3.mobilegwsvc.service.stream_hub_device import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.StreamHubDeviceServiceStub(channel)
+        request = request_pb2.StreamHubDeviceRequest(hub_id=hub_id, hub_device_id=hub_device_id)
+        stream = stub.execute(request, metadata=metadata, timeout=10)
+
+        async for msg in stream:
+            if msg.HasField("success"):
+                if msg.success.WhichOneof("success") == "snapshot":
+                    return devices_parser.parse_hub_device_temperature(
+                        msg.success.snapshot.hub_device
+                    )
+            elif msg.HasField("failure"):
+                _LOGGER.debug(
+                    "StreamHubDevice failed for device %s: %s",
+                    hub_device_id,
+                    msg.failure,
+                )
+                break
+        return None
+
     def _handle_update(
         self,
         update: Any,  # noqa: ANN401

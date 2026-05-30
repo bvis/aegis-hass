@@ -548,6 +548,32 @@ def parse_device(proto_light_device: Any) -> Device | None:  # noqa: ANN401
     return None
 
 
+def parse_hub_device_temperature(hub_device: Any) -> float | None:  # noqa: ANN401
+    """Pull the internal temperature out of a rich `HubDevice` proto (#220).
+
+    The per-device `StreamHubDevice` RPC returns a `HubDevice` whose
+    `device` oneof selects a per-type message (`street_siren`,
+    `home_siren`, …). Siren-family messages carry a `device_temperature`
+    (`DeviceTemperature { value, is_extreme }`) that the lighter
+    `StreamLightDevices` stream omits for sirens — so this is the only
+    path to a siren's temperature. Returns the value as a float, or
+    `None` when the oneof is unset, the sub-message has no
+    `device_temperature`, or anything about the shape is unexpected.
+    """
+    which = hub_device.WhichOneof("device") if hasattr(hub_device, "WhichOneof") else None
+    if which is None:
+        return None
+    sub = getattr(hub_device, which, None)
+    if sub is None or not hasattr(sub, "HasField"):
+        return None
+    try:
+        if not sub.HasField("device_temperature"):
+            return None
+        return float(sub.device_temperature.value)
+    except (ValueError, TypeError):
+        return None
+
+
 def _dedupe_video_doorbells(devices: list[Device]) -> tuple[list[Device], dict[str, str]]:
     """Drop `motion_cam_video_*` hub_device twins that have a
     `video_edge_*` sibling with a matching name in the same snapshot.

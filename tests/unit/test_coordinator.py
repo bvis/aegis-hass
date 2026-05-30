@@ -1971,3 +1971,138 @@ class TestSmartLockProbeOrchestration:
 
         coordinator._devices_api.probe_smart_locks.assert_not_called()
         assert coordinator._smart_lock_probe_done is True
+
+
+def _make_siren(device_id: str, *, statuses: dict | None = None) -> Device:
+    return Device(
+        id=device_id,
+        hub_id="hub-1",
+        name="Siren",
+        device_type="street_siren",
+        room_id=None,
+        group_id=None,
+        state=DeviceState.ONLINE,
+        malfunctions=0,
+        bypassed=False,
+        statuses=statuses if statuses is not None else {},
+        battery=None,
+    )
+
+
+class TestMaybeRefreshDeviceTemperatures:
+    @pytest.mark.asyncio
+    async def test_merges_temperature_into_siren_statuses(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+
+        assert coordinator.devices["s1d"].statuses["temperature"] == 21.0
+        coordinator._devices_api.get_hub_device_temperature.assert_awaited_once_with("hub-1", "s1d")
+
+    @pytest.mark.asyncio
+    async def test_skips_non_siren_devices(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"d1": _make_device("d1")}  # door_protect
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+
+        coordinator._devices_api.get_hub_device_temperature.assert_not_called()
+        assert "temperature" not in coordinator.devices["d1"].statuses
+
+    @pytest.mark.asyncio
+    async def test_skips_siren_that_already_has_temperature(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={"temperature": 18.0})}
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=99.0)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+
+        coordinator._devices_api.get_hub_device_temperature.assert_not_called()
+        assert coordinator.devices["s1d"].statuses["temperature"] == 18.0
+
+    @pytest.mark.asyncio
+    async def test_throttles_subsequent_calls(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._maybe_refresh_device_temperatures(200.0)  # within interval
+
+        coordinator._devices_api.get_hub_device_temperature.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_none_result_leaves_statuses_untouched(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=None)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+
+        assert "temperature" not in coordinator.devices["s1d"].statuses
+
+    @pytest.mark.asyncio
+    async def test_one_device_error_does_not_abort_others(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"bad": _make_siren("bad"), "good": _make_siren("good")}
+
+        async def _temp(hub_id: str, device_id: str) -> float:
+            if device_id == "bad":
+                raise RuntimeError("boom")
+            return 20.0
+
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(side_effect=_temp)
+
+        await coordinator._maybe_refresh_device_temperatures(100.0)
+
+        assert coordinator.devices["good"].statuses["temperature"] == 20.0
+        assert "temperature" not in coordinator.devices["bad"].statuses
+
+    @pytest.mark.asyncio
+    async def test_wired_into_async_update_data(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        # Healthy streams + live HTS so the unrelated post-startup sub-steps
+        # (fallback snapshot / HTS restart) stay no-ops.
+        coordinator._stream_tasks = [MagicMock(done=MagicMock(return_value=False))]
+        coordinator._hts_client = MagicMock()
+        coordinator._hts_task = MagicMock(done=MagicMock(return_value=False))
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=22.0)
+
+        await coordinator._async_update_data()
+
+        assert coordinator.devices["s1d"].statuses["temperature"] == 22.0
+
+    def test_snapshot_preserves_merged_siren_temperature(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._devices_cache = None
+        coordinator.async_set_updated_data = MagicMock()
+        # A siren already carrying a temperature merged from StreamHubDevice.
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={"temperature": 22.0})}
+
+        # A fresh stream snapshot for the same siren WITHOUT temperature
+        # (the light stream never carries siren temperature).
+        coordinator._handle_devices_snapshot([_make_siren("s1d")])
+
+        assert coordinator.devices["s1d"].statuses["temperature"] == 22.0
+
+    def test_snapshot_does_not_invent_temperature_for_non_siren(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._devices_cache = None
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.devices = {"d1": replace(_make_device("d1"), statuses={"temperature": 18.0})}
+
+        # A door_protect is not in the siren set; carry-forward must not apply.
+        coordinator._handle_devices_snapshot([_make_device("d1")])
+
+        assert "temperature" not in coordinator.devices["d1"].statuses
