@@ -405,8 +405,12 @@ class TestDeviceTypeSensors:
     def test_fire_protect_plus_has_co(self) -> None:
         assert "co_detected" in _DEVICE_TYPE_SENSORS["fire_protect_plus"]
 
-    def test_leaks_protect_has_leak(self) -> None:
-        assert "leak_detected" in _DEVICE_TYPE_SENSORS["leaks_protect"]
+    def test_leak_protect_has_leak(self) -> None:
+        # #211: key must be `leak_protect` — the device_type `parse_device`
+        # emits (ObjectType oneof field name). The old plural `leaks_protect`
+        # never matched, so LeakProtect units showed no leak sensor.
+        assert "leak_detected" in _DEVICE_TYPE_SENSORS["leak_protect"]
+        assert "leaks_protect" not in _DEVICE_TYPE_SENSORS
 
     def test_door_protect_s_in_device_types(self) -> None:
         assert "door_protect_s" in _DEVICE_TYPE_SENSORS

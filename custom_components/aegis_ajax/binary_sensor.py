@@ -269,7 +269,10 @@ _DEVICE_TYPE_SENSORS: dict[str, list[str]] = {
         "high_temperature",
         "tamper",
     ],
-    "leaks_protect": ["leak_detected", "tamper"],
+    # `leak_protect` is the device_type `parse_device` emits (the ObjectType
+    # oneof field name, object_type.proto field 22). The old `leaks_protect`
+    # key never matched, so no LeakProtect ever got its leak sensor (#211).
+    "leak_protect": ["leak_detected", "tamper"],
     "home_siren": ["tamper"],
     "home_siren_s": ["tamper"],
     "home_siren_fibra": ["tamper"],
