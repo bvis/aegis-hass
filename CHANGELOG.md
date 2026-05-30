@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0-beta.11] - 2026-05-30
+
+Restores the leak sensor for LeakProtect devices (#211).
+
+### Fixed
+- **LeakProtect units now get their leak (moisture) binary_sensor (#211).** The sensor was keyed on the device_type `leaks_protect`, but `parse_device` emits `leak_protect` (the `ObjectType` oneof field name), so the key never matched and no LeakProtect ever showed a leak sensor — only the generic tamper/temperature/battery entities. Renamed the key to `leak_protect`. The entity is created from the device type, so a dry sensor correctly shows "Dry" and turns wet when a leak is reported.
+
 ## [1.7.0-beta.10] - 2026-05-30
 
 Fixes an off-loop state-write error storm from video-doorbell motion (#173).
