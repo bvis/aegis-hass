@@ -408,6 +408,8 @@ These four values are **app-wide identifiers**, not per-user secrets — every i
 
 Three of the four are stored in the Android APK's resource file at `res/values/strings.xml`. Note that Android compiles resource XML to a binary format before packaging, so simply renaming the APK to `.zip` and extracting it will give you unreadable bytes for that file — you'll want a standard Android resource viewer like [`apktool`](https://apktool.org/) to read it back into plain text.
 
+> **Use apktool ≥ 2.9.** Recent Ajax builds set the resource package id to `128` instead of the usual `127`. Older apktool versions (e.g. the `2.7` shipped by some Linux distributions) can't decode that and produce a near-empty `strings.xml` (just a handful of unrelated entries). If your extracted `strings.xml` looks empty, grab a current apktool from [apktool.org/docs/install](https://apktool.org/docs/install) and re-extract.
+
 Once readable, three of the four values appear as named entries:
 
 - `project_id` — short slug, e.g. `my-firebase-project-id` (kebab-case, no spaces)
