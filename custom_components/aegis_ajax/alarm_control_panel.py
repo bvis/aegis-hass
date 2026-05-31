@@ -11,6 +11,7 @@ from homeassistant.components.alarm_control_panel import (  # type: ignore[attr-
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
+    CodeFormat,
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -282,6 +283,18 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         return bool(self._get_options().get("use_pin_code", False))
 
     @property
+    def code_format(self) -> CodeFormat | None:
+        """Numeric keypad when a PIN is configured, otherwise no code entry.
+
+        Returning `CodeFormat.NUMBER` makes the Lovelace alarm card render a
+        numeric keypad and lets the Nabu Casa / Alexa skill prompt for a PIN on
+        disarm. `None` (no PIN configured) keeps the card keypad-free and is
+        also what lets Alexa discover the panel — its skill only exposes panels
+        that don't require a code to arm.
+        """
+        return CodeFormat.NUMBER if self.code_arm_required else None
+
+    @property
     def _force_arm(self) -> bool:
         return bool(self._get_options().get(CONF_FORCE_ARM, False))
 
@@ -337,8 +350,14 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
 class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
     _attr_name = None
+    # ARM_HOME is advertised mainly for the Nabu Casa / Alexa skill, which
+    # otherwise won't discover a panel exposing ARM_AWAY|ARM_NIGHT (#221).
+    # Ajax has a single partial mode ("Night mode"), so ARM_HOME and ARM_NIGHT
+    # both drive it — both settle to `armed_night`. See README.
     _attr_supported_features = (
-        AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.ARM_NIGHT
+        AlarmControlPanelEntityFeature.ARM_AWAY
+        | AlarmControlPanelEntityFeature.ARM_NIGHT
+        | AlarmControlPanelEntityFeature.ARM_HOME
     )
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str) -> None:
@@ -392,6 +411,13 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         self._optimistic_state_update(SecurityState.NIGHT_MODE)
         await self.coordinator.async_request_refresh()
 
+    async def async_alarm_arm_home(self, code: str | None = None) -> None:
+        """Arm home — Ajax has no native home/stay mode, so this maps to its
+        single partial mode (night). Same effect as `arm_night`; the state
+        settles to `armed_night`. Exposed mainly so the Alexa skill discovers
+        the panel and can arm/disarm by voice (#221)."""
+        await self.async_alarm_arm_night(code)
+
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         self._validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
@@ -436,7 +462,12 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
     surfacing it per group would mislead users about scope.
     """
 
-    _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
+    # Groups have a single arm mode (full group arm); ARM_HOME is advertised
+    # so the Alexa skill discovers the per-group panel too, mapping to the same
+    # group-arm command as ARM_AWAY (#221).
+    _attr_supported_features = (
+        AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.ARM_HOME
+    )
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str, group_id: str) -> None:
         super().__init__(coordinator, space_id)
@@ -489,6 +520,11 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
             raise self._arm_error(err) from err
         self._optimistic_state_update(SecurityState.ARMED)
         await self.coordinator.async_request_refresh()
+
+    async def async_alarm_arm_home(self, code: str | None = None) -> None:
+        """Arm home — groups have a single arm mode, so this maps to the same
+        group-arm command as arm_away (#221)."""
+        await self.async_alarm_arm_away(code)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         self._validate_code(code)

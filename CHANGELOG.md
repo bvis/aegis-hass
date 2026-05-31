@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.2] - 2026-05-31
+
+### Added
+- **Alexa / Home Assistant Cloud support for the alarm panel (#221).** The alarm panel now advertises `ARM_HOME` and reports `code_format: number` when a PIN is configured, which makes the Nabu Casa / Alexa skill discover the panel (it wouldn't discover a panel exposing Night without Home) and lets the Home Assistant Lovelace alarm card render a numeric keypad. Ajax has a single partial-arm mode ("Night mode"), so **Arm Home** maps to it just like **Arm Night** — both settle to `armed_night`; it is kept under both names to cover the HA/Alexa convention (Home) and Ajax's own term (Night). For per-group panels, Arm Home maps to the single group-arm command. Alexa caveats (documented in the README): the panel must not require a code to arm to be discovered, and Alexa's voice PIN disarm only supports 4-digit codes.
+
 ## [1.8.0-beta.1] - 2026-05-31
 
 ### Added

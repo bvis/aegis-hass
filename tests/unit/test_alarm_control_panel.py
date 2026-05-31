@@ -309,6 +309,36 @@ class TestAlarmControlPanel:
             await panel.async_alarm_arm_away(code="0000")
         coordinator.security_api.arm.assert_not_called()
 
+    def test_supported_features_includes_arm_home(self) -> None:
+        from homeassistant.components.alarm_control_panel import (
+            AlarmControlPanelEntityFeature,
+        )
+
+        coordinator = self._make_coordinator(use_pin_code=False)
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.supported_features & AlarmControlPanelEntityFeature.ARM_HOME
+
+    def test_code_format_number_when_pin_set(self) -> None:
+        from homeassistant.components.alarm_control_panel import CodeFormat
+
+        coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.code_format == CodeFormat.NUMBER
+
+    def test_code_format_none_without_pin(self) -> None:
+        coordinator = self._make_coordinator(use_pin_code=False)
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.code_format is None
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_home_maps_to_night_mode(self) -> None:
+        coordinator = self._make_coordinator(use_pin_code=False)
+        coordinator.security_api.arm_night_mode = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        await panel.async_alarm_arm_home()
+        coordinator.security_api.arm_night_mode.assert_called_once_with("s1", ignore_alarms=False)
+
 
 class TestGroupAlarmControlPanel:
     def _make_space_with_groups(
@@ -418,6 +448,32 @@ class TestGroupAlarmControlPanel:
         panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
         await panel.async_alarm_disarm()
         coordinator.security_api.disarm_group.assert_called_once_with("s1", "g1")
+
+    def test_supported_features_includes_arm_home(self) -> None:
+        from homeassistant.components.alarm_control_panel import (
+            AlarmControlPanelEntityFeature,
+        )
+
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.DISARMED)])
+        }
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        assert panel.supported_features & AlarmControlPanelEntityFeature.ARM_HOME
+
+    @pytest.mark.asyncio
+    async def test_arm_home_maps_to_arm_group(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.spaces = {
+            "s1": self._make_space_with_groups([("g1", "Villa", SecurityState.DISARMED)])
+        }
+        coordinator.devices = {}
+        coordinator.rooms = {}
+        coordinator.security_api.arm_group = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        await panel.async_alarm_arm_home()
+        coordinator.security_api.arm_group.assert_called_once_with("s1", "g1", ignore_alarms=False)
 
 
 class TestAsyncSetupEntry:

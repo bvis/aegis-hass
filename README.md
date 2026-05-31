@@ -192,6 +192,16 @@ Photos are automatically cleaned up based on your retention settings (configurab
 
 Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.
 
+### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
+
+Ajax has a single partial-arm mode (the app calls it **Night mode**) plus full arm. The panel exposes **Arm Away** (full arm) and both **Arm Home** and **Arm Night** for that one partial mode — so "Arm Home" and "Arm Night" do the same thing and both settle the panel to `armed_night`. "Arm Home" is advertised mainly so the **Nabu Casa / Alexa** skill discovers the panel (it won't discover a panel that exposes Night without Home).
+
+Notes for Alexa:
+
+- The skill only exposes a panel that does **not** require a code to arm. If you enable the PIN option (`use_pin_code`), the panel won't be discovered by Alexa.
+- Alexa requests a PIN only on **disarm**, and only supports a **4-digit** numeric code — Ajax PINs longer than 4 digits won't work for voice disarm.
+- When a PIN is configured, the panel reports `code_format: number`, which also makes the Home Assistant Lovelace alarm card render a numeric keypad.
+
 ### Panic button (SOS)
 
 The integration exposes the same panic button that the official Ajax mobile app does. It calls the underlying `SpaceService/pressPanicButton` endpoint.
