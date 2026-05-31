@@ -22,7 +22,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 
 ## Features
 
-- **Alarm Control Panel**: Arm away, disarm, night mode, group arming with PIN code support. When the space is in group / zone mode, per-group panels are created and react to FCM push events instantly — arming or disarming a single group from the Ajax mobile app reflects in HA within seconds (whole-space transitions already worked this way; group-level transitions joined in `1.5.0`)
+- **Alarm Control Panel**: Arm away, disarm, night mode, group arming with PIN code support. When the space is in group / zone mode, per-group panels are created and react to FCM push events instantly — arming or disarming a single group from the Ajax mobile app reflects in HA within seconds (whole-space transitions already worked this way; group-level transitions joined in `1.5.0`). Works with **Alexa via Home Assistant Cloud** (see [Arm modes & voice assistants](#arm-modes--voice-assistants-alexa-via-home-assistant-cloud))
 - **Force Arm Services**: `aegis_ajax.force_arm` and `aegis_ajax.force_arm_night` to arm ignoring open sensors
 - **Binary Sensors**: Door open/close, motion detection, smoke, steam (FireProtect 2 chamber discriminator), leak, tamper, CO, heat, glass break, vibration, tilt (DoorProtect Plus accelerometer), CRA monitoring status, cellular connection, lid tamper, external contact alert (wired reed switches on DoorProtect/Hub Hybrid inputs), external contact fault, MultiTransmitter wired-input alert with alarm category, anti-masking, interference detection, ethernet link, Wi-Fi link, mains power
 - **Hub Network**: Real-time hub network data — ethernet/wifi/gsm connection status, Wi-Fi SSID and signal strength, IP addressing, cellular signal strength and network type, power supply status
@@ -32,12 +32,15 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Switches**: Relays, wall switches, sockets (multi-channel support) — turn on/off via `DeviceCommandDeviceOn` / `DeviceCommandDeviceOff` gRPC services
 - **Lights**: Dimmers with absolute brightness control via `DeviceCommandBrightness`
 - **Locks**: Ajax SmartLock and LockBridge (Yale) — lock, unlock, and unlatch (HA's `lock.open`) via `SwitchSmartLockService`
-- **Valves** (read-only): Ajax WaterStop and WaterStop Fibra surface as native `valve.*` entities reflecting `WaterStopChannel.state` (open / closed), `is_transitioning`, and a `stuck` attribute pulled from the channel-level `MALFUNCTION_IS_STUCK`. Bidirectional control waits on capturing the official app's command-side calls — file an issue with a packet capture if you have a WaterStop and we'll wire the open / close path
+- **Valves** (read-only): Ajax WaterStop and WaterStop Fibra surface as native `valve.*` entities reflecting `WaterStopChannel.state` (open / closed), `is_transitioning`, and a `stuck` attribute pulled from the channel-level `MALFUNCTION_IS_STUCK`. Bidirectional control isn't wired yet — open an issue if you have a WaterStop and we'll work with you to add the open / close path
 - **Hub firmware update** (read-only): each hub exposes an `update.<hub>_firmware` entity that shows whether Ajax has queued a firmware update for the hub, with download progress when the cloud is pushing bytes. No install button is exposed on purpose — firmware updates remain Ajax-scheduled and the entity is informational. Click the entity for a short explainer of what "Up-to-date" actually means here.
 - **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention
 - **Media Browser**: Browse captured photos per device via HA Media Browser
 - **Event Platform**: Security events from FCM push notifications (alarm, arm/disarm, tamper, panic, fire, flood, motion, and more)
+- **Device automation triggers**: every Ajax security event is a named device trigger on the hub device, selectable directly in the HA automation editor (no manual event-type strings)
+- **Doorbell events**: video-edge doorbells get a per-device `event` entity emitting HA's canonical `ring` event, and a doorbell motion push turns the doorbell's motion sensor on (30 s auto-off)
+- **Per-device bypass switches**: each non-hub device can get a `bypass` switch to deactivate / reactivate it; gated by the `bypass_switches` option (`auto` / `always` / `never`)
 - **Logbook**: Human-readable security event descriptions with icons
 - **Real-time updates**: Persistent gRPC stream for instant sensor state changes (< 1 second latency)
 - **Push notifications**: FCM integration for immediate event delivery
@@ -142,8 +145,7 @@ Each co-branded Ajax app uses an internal **label name** to identify itself to t
 If your provider is not in the list above, you can find the correct label by:
 
 1. **Check the app's Google Play URL** — search for the package name (e.g. `com.ajaxsystems.yourapp`) and cross-reference with the table
-2. **Inspect network traffic** — the app sends its label in the `application-label` gRPC metadata header on every request
-3. **Check the app's resources** — the label is stored as `ajax_app_name` in `strings.xml`
+2. **Check the app's resources** — the label is stored as `ajax_app_name` in `strings.xml`
 
 You can type any custom label during setup if yours is not listed.
 
@@ -162,10 +164,10 @@ You can type any custom label during setup if yours is not listed.
 | Relays/Switches | Relay, WallSwitch, Socket (and outlet variants) | On/off per channel; electrical readings (current, voltage, energy) across the WallSwitch / Socket family. Power is exposed as a direct reading on the Outlet Type E / F family (the firmware reports it natively) and as a derived `current × voltage` reading on the WallSwitch family. |
 | Light switches | LightSwitch (Jeweller / Fibra) | On/off per channel |
 | Lights | LightSwitch Dimmer | Brightness control |
-| Locks | SmartLock, LockBridge (Yale) | Lock, unlock, unlatch (HA `lock.open` → momentary unlatch). State surfaces locked / unlocked / unlatched |
-| Doorbells | Wireless DoorBell (standalone Jeweller ring button), MotionCam Video Doorbell, SmartLock / LockBridge variants with integrated ring button | `doorbell_pressed` event on the hub's security event entity, with `device_name` / `device_id` / `device_type` enriched on the event payload. Video doorbell also exposes photo capture; SmartLock variant exposes lock state on the lock entity. Requires FCM credentials configured |
+| Locks | SmartLock, LockBridge (Yale) | Lock, unlock, unlatch (HA `lock.open` → momentary unlatch). State surfaces locked / unlocked / unlatched. _Known limitation:_ hub-attached Yale / LockBridge locks currently report **state only** — lock/unlock commands from HA aren't wired yet ([#206](https://github.com/bvis/aegis-hass/issues/206) / [#219](https://github.com/bvis/aegis-hass/issues/219)) |
+| Doorbells | Wireless DoorBell (standalone Jeweller ring button), MotionCam Video Doorbell, SmartLock / LockBridge variants with integrated ring button | `doorbell_pressed` on the hub's security event entity, plus a **per-device `event` entity** (`device_class: doorbell`) that emits Home Assistant's canonical `ring` event; a doorbell motion push also flips the doorbell's `motion_detected` on (30 s auto-off). Video doorbell also exposes photo capture; SmartLock variant exposes lock state on the lock entity. Requires FCM credentials configured |
 | Keypads | Keypad, KeypadPlus, KeypadCombi, KeypadTouchscreen | Battery, tamper, temperature, signal, NFC status |
-| Sirens | HomeSiren, HomeSiren S, HomeSiren Fibra, HomeSiren G3, StreetSiren, StreetSiren S, StreetSiren Plus, StreetSiren Plus Fibra/G3, StreetSiren Fibra, StreetSiren Double Deck (& S / Fibra) | Battery, tamper, signal |
+| Sirens | HomeSiren, HomeSiren S, HomeSiren Fibra, HomeSiren G3, StreetSiren, StreetSiren S, StreetSiren Plus, StreetSiren Plus Fibra/G3, StreetSiren Fibra, StreetSiren Double Deck (& S / Fibra) | Battery, tamper, signal, internal temperature (HomeSiren / StreetSiren family) |
 | Range extenders | ReX, ReX 2, ReX 2 Fire | Battery, signal |
 | Wired-Input Modules | MultiTransmitter, MultiTransmitter Fibra, Hub Hybrid wired inputs | Tamper of the module itself; each registered wired sensor appears as its own device with an alert binary sensor and an `alarm_type` attribute (intrusion / fire / glass_break / vibration / …) |
 
@@ -188,6 +190,7 @@ Photos are automatically cleaned up based on your retention settings (configurab
 |---|---|
 | `aegis_ajax.force_arm` | Arm the system ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
 | `aegis_ajax.force_arm_night` | Arm night mode ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
+| `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
 
 Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.
@@ -201,6 +204,7 @@ Notes for Alexa:
 - The skill only exposes a panel that does **not** require a code to arm. If you enable the PIN option (`use_pin_code`), the panel won't be discovered by Alexa.
 - Alexa requests a PIN only on **disarm**, and only supports a **4-digit** numeric code — Ajax PINs longer than 4 digits won't work for voice disarm.
 - When a PIN is configured, the panel reports `code_format: number`, which also makes the Home Assistant Lovelace alarm card render a numeric keypad.
+- **A bare "Alexa, arm \<name\>" arms _Home_, not Away.** This is Alexa's own default for an unqualified "arm" (it requests Armed Stay / Home), and since Arm Home maps to Ajax's partial mode the panel ends up partially armed. Home Assistant only forwards the mode Alexa asks for — the integration can't change Alexa's default. To arm fully: say **"Alexa, arm \<name\> in away mode"**, or create an **Alexa Routine** that maps your phrase (e.g. "arm the house") to the action *set panel → Armed Away*.
 
 ### Panic button (SOS)
 

@@ -170,25 +170,25 @@ sections:
       - type: horizontal-stack
         cards:
           - type: button
-            entity: button.hallway_capturar_foto
+            entity: button.hallway_capture_photo
             name: Photo Hallway
             icon: mdi:camera
             tap_action:
               action: call-service
               service: button.press
               target:
-                entity_id: button.hallway_capturar_foto
+                entity_id: button.hallway_capture_photo
             show_state: false
 
           - type: button
-            entity: button.dining_capturar_foto
+            entity: button.dining_capture_photo
             name: Photo Living
             icon: mdi:camera
             tap_action:
               action: call-service
               service: button.press
               target:
-                entity_id: button.dining_capturar_foto
+                entity_id: button.dining_capture_photo
             show_state: false
 
       # ─── Motion Sensor Details ───
