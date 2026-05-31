@@ -19,7 +19,12 @@ from custom_components.aegis_ajax.api.models import (
     Space,
     SpaceSnapshot,
 )
-from custom_components.aegis_ajax.const import ConnectionStatus, DeviceState, SecurityState
+from custom_components.aegis_ajax.const import (
+    SIREN_TEMP_REFRESH_INTERVAL,
+    ConnectionStatus,
+    DeviceState,
+    SecurityState,
+)
 
 
 def _make_space(space_id: str = "s1") -> Space:
@@ -1989,65 +1994,64 @@ def _make_siren(device_id: str, *, statuses: dict | None = None) -> Device:
     )
 
 
-class TestMaybeRefreshDeviceTemperatures:
+class TestSirenTemperatureRefresh:
     @pytest.mark.asyncio
     async def test_merges_temperature_into_siren_statuses(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
 
-        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._async_refresh_siren_temperatures()
 
         assert coordinator.devices["s1d"].statuses["temperature"] == 21.0
         coordinator._devices_api.get_hub_device_temperature.assert_awaited_once_with("hub-1", "s1d")
+        # The merge must be pushed to listeners or the sensor never materialises.
+        coordinator.async_set_updated_data.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_skips_non_siren_devices(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"d1": _make_device("d1")}  # door_protect
+        coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
 
-        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._async_refresh_siren_temperatures()
 
         coordinator._devices_api.get_hub_device_temperature.assert_not_called()
         assert "temperature" not in coordinator.devices["d1"].statuses
+        coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_skips_siren_that_already_has_temperature(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"s1d": _make_siren("s1d", statuses={"temperature": 18.0})}
+        coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=99.0)
 
-        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._async_refresh_siren_temperatures()
 
         coordinator._devices_api.get_hub_device_temperature.assert_not_called()
         assert coordinator.devices["s1d"].statuses["temperature"] == 18.0
-
-    @pytest.mark.asyncio
-    async def test_throttles_subsequent_calls(self) -> None:
-        coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {"s1d": _make_siren("s1d")}
-        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
-
-        await coordinator._maybe_refresh_device_temperatures(100.0)
-        await coordinator._maybe_refresh_device_temperatures(200.0)  # within interval
-
-        coordinator._devices_api.get_hub_device_temperature.assert_awaited_once()
+        coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_none_result_leaves_statuses_untouched(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=None)
 
-        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._async_refresh_siren_temperatures()
 
         assert "temperature" not in coordinator.devices["s1d"].statuses
+        coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_one_device_error_does_not_abort_others(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"bad": _make_siren("bad"), "good": _make_siren("good")}
+        coordinator.async_set_updated_data = MagicMock()
 
         async def _temp(hub_id: str, device_id: str) -> float:
             if device_id == "bad":
@@ -2056,23 +2060,26 @@ class TestMaybeRefreshDeviceTemperatures:
 
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(side_effect=_temp)
 
-        await coordinator._maybe_refresh_device_temperatures(100.0)
+        await coordinator._async_refresh_siren_temperatures()
 
         assert coordinator.devices["good"].statuses["temperature"] == 20.0
         assert "temperature" not in coordinator.devices["bad"].statuses
 
     @pytest.mark.asyncio
-    async def test_wired_into_async_update_data(self) -> None:
+    async def test_not_driven_by_poll_cycle(self) -> None:
+        # Regression for #220: the temperature refresh must NOT depend on the
+        # scheduled poll. On push-heavy hubs every HTS update calls
+        # `async_set_updated_data`, which resets HA's poll timer, so the
+        # scheduled poll never fires again after startup — a poll-driven
+        # refresh is starved and the siren sensor never appears. The poll path
+        # must therefore not touch siren temperatures at all.
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True
         coordinator._streams_started = True
         coordinator.devices = {"s1d": _make_siren("s1d")}
-        # Healthy streams + live HTS so the unrelated post-startup sub-steps
-        # (fallback snapshot / HTS restart) stay no-ops.
         coordinator._stream_tasks = [MagicMock(done=MagicMock(return_value=False))]
         coordinator._hts_client = MagicMock()
         coordinator._hts_task = MagicMock(done=MagicMock(return_value=False))
-
         coordinator._spaces_api = MagicMock()
         coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
         coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
@@ -2081,7 +2088,50 @@ class TestMaybeRefreshDeviceTemperatures:
 
         await coordinator._async_update_data()
 
-        assert coordinator.devices["s1d"].statuses["temperature"] == 22.0
+        coordinator._devices_api.get_hub_device_temperature.assert_not_called()
+
+    def test_schedule_registers_independent_timer_and_initial_kick(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        # Replace with a MagicMock so the initial-kick call returns a non-coro.
+        coordinator._async_refresh_siren_temperatures = MagicMock()
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_track_time_interval",
+            return_value=MagicMock(),
+        ) as mock_track:
+            coordinator._schedule_siren_temperature_refresh()
+
+        mock_track.assert_called_once()
+        assert mock_track.call_args.args[2] == timedelta(seconds=SIREN_TEMP_REFRESH_INTERVAL)
+        assert coordinator._unsub_siren_temp is mock_track.return_value
+        # Timer's first fire is one full interval out, so an initial
+        # non-blocking kick must run for the sensor to appear within seconds.
+        coordinator.hass.async_create_task.assert_called_once()
+
+    def test_schedule_is_idempotent(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator._unsub_siren_temp = MagicMock()
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_track_time_interval",
+        ) as mock_track:
+            coordinator._schedule_siren_temperature_refresh()
+
+        mock_track.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_timer(self) -> None:
+        coordinator = _make_coordinator()
+        unsub = MagicMock()
+        coordinator._unsub_siren_temp = unsub
+        coordinator._stream_tasks = []
+        coordinator._hts_task = None
+        coordinator._hts_client = None
+        coordinator._notification_listener = None
+        coordinator._client.close = AsyncMock()
+
+        await coordinator.async_shutdown()
+
+        unsub.assert_called_once()
+        assert coordinator._unsub_siren_temp is None
 
     def test_snapshot_preserves_merged_siren_temperature(self) -> None:
         coordinator = _make_coordinator()

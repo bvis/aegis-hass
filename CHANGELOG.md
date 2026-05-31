@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.3] - 2026-06-01
+
+### Fixed
+- **Siren temperature sensor now actually appears on push-heavy hubs (#220).** The refresh added in `1.8.0-beta.1` ran only inside the scheduled poll, but on hubs with an active HTS stream every push calls `async_set_updated_data`, which resets Home Assistant's poll timer — so the scheduled poll never fired again after startup and the refresh was starved (the sensor never materialised). It now runs on a dedicated 15-minute timer, independent of the poll, with a non-blocking initial fetch at startup so the sensor shows up within seconds instead of waiting for a poll that never comes.
+
 ## [1.8.0-beta.2] - 2026-05-31
 
 ### Added

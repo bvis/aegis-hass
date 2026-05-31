@@ -9,9 +9,10 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import callback
+from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -158,9 +159,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Rooms rarely change — cache and refresh once per hour. None means
         # never fetched yet so the first poll always populates rooms.
         self._rooms_last_fetch: float | None = None
-        # Siren internal temperature (#220) — throttled one-shot refresh.
-        # None means never fetched so the first poll populates it.
-        self._siren_temp_last_fetch: float | None = None
+        # Siren internal temperature (#220) — refreshed on a dedicated timer
+        # (`async_track_time_interval`), NOT the poll cycle. On push-heavy hubs
+        # every HTS update resets HA's poll timer, so the scheduled poll never
+        # fires again after startup; a poll-driven refresh would be starved.
+        self._unsub_siren_temp: CALLBACK_TYPE | None = None
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
@@ -288,7 +291,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._first_startup_init()
                 return {"spaces": self.spaces, "devices": self.devices}
             await self._maybe_fallback_device_snapshot()
-            await self._maybe_refresh_device_temperatures(now)
             await self._maybe_restart_hts()
             self._last_update_success_time = dt_util.utcnow()
             return {"spaces": self.spaces, "devices": self.devices}
@@ -454,24 +456,42 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.rooms = refreshed_rooms
         self._rooms_last_fetch = now
 
-    async def _maybe_refresh_device_temperatures(self, now: float) -> None:
-        """Throttled one-shot refresh of siren internal temperature (#220).
+    def _schedule_siren_temperature_refresh(self) -> None:
+        """Start the dedicated siren-temperature refresh timer (#220).
+
+        The refresh runs on its own `async_track_time_interval` timer rather
+        than inside `_async_update_data`: on push-heavy hubs every HTS update
+        calls `async_set_updated_data`, which resets HA's poll timer, so the
+        scheduled poll never fires again after startup and a poll-driven
+        refresh is starved (the sensor never materialises). The timer's first
+        fire is one full interval out, so we also kick a non-blocking initial
+        refresh so the sensor appears within seconds of startup.
+        """
+        if self._unsub_siren_temp is not None:
+            return
+        self._unsub_siren_temp = async_track_time_interval(
+            self.hass,
+            self._async_refresh_siren_temperatures,
+            timedelta(seconds=SIREN_TEMP_REFRESH_INTERVAL),
+        )
+        self.hass.async_create_task(self._async_refresh_siren_temperatures())
+
+    async def _async_refresh_siren_temperatures(self, _now: datetime | None = None) -> None:
+        """Fetch + merge siren internal temperature (#220), timer-driven.
 
         Sirens don't carry a `temperature` status in the `StreamLightDevices`
         stream the way motion/door sensors do, so the auto-created temperature
         sensor never appears for them. The value lives in the rich per-device
-        `StreamHubDevice` snapshot instead. We pull it once per
-        `SIREN_TEMP_REFRESH_INTERVAL` for each siren that doesn't already have
-        a temperature, and merge it into `device.statuses["temperature"]` —
-        which is all `sensor.py` needs to materialise the sensor.
+        `StreamHubDevice` snapshot instead. We pull it for each siren that
+        doesn't already have a temperature and merge it into
+        `device.statuses["temperature"]` — all `sensor.py` needs to materialise
+        the sensor. When anything changed, push it to listeners so the entity
+        platform picks it up immediately. The `async_track_time_interval`
+        cadence is the throttle; there is no separate rate-limit.
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
-        if (
-            self._siren_temp_last_fetch is not None
-            and now - self._siren_temp_last_fetch <= SIREN_TEMP_REFRESH_INTERVAL
-        ):
-            return
+        changed = False
         for device_id, device in list(self.devices.items()):
             if (
                 device.device_type not in SIREN_TEMPERATURE_DEVICE_TYPES
@@ -493,7 +513,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.devices[device_id] = dc_replace(
                 current, statuses={**current.statuses, "temperature": temperature}
             )
-        self._siren_temp_last_fetch = now
+            changed = True
+        if changed:
+            self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     async def _first_startup_init(self) -> None:
         """First-cycle bootstrap: warm devices cache, start persistent
@@ -534,6 +556,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._probe_smart_locks_once()
         await self._start_device_streams()
         await self._start_hts()
+        self._schedule_siren_temperature_refresh()
         self._last_update_success_time = dt_util.utcnow()
         # One-line summary so users debugging "HTS streams: 0/1" or
         # "FCM clients: 0/1" reports (#111) can see at a glance which
@@ -897,10 +920,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for device in devices:
             # Siren temperature (#220) comes from a separate per-device RPC,
             # not this stream, so a fresh snapshot would wipe the value we
-            # merged in `_maybe_refresh_device_temperatures` and the throttle
-            # would leave the sensor `unknown` until the next refresh. Carry
-            # the previously-merged temperature forward (it's slow-moving;
-            # the periodic refresh still updates it).
+            # merged in `_async_refresh_siren_temperatures` and leave the
+            # sensor `unknown` until the next timer fire. Carry the
+            # previously-merged temperature forward (it's slow-moving; the
+            # periodic refresh still updates it).
             existing = self.devices.get(device.id)
             if (
                 existing is not None
@@ -1131,6 +1154,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._notification_listener.async_start()
 
     async def async_shutdown(self) -> None:
+        # Stop the siren-temperature refresh timer (#220)
+        if self._unsub_siren_temp is not None:
+            self._unsub_siren_temp()
+            self._unsub_siren_temp = None
+
         # Cancel all stream tasks
         for task in self._stream_tasks:
             if not task.done():
