@@ -472,6 +472,12 @@ If you cannot obtain a coherent set, leaving FCM unconfigured is a fully support
 
 The integration is available in 14 languages: English, Spanish, Catalan, German, French, Italian, Dutch, Polish, Portuguese, Brazilian Portuguese, Romanian, Turkish, Ukrainian, and Czech.
 
+## Support
+
+This integration is free and open source, and stays that way — every feature is available to everyone. If it's useful to you and you'd like to support the time that goes into maintaining it, you can [buy me a coffee](https://buymeacoffee.com/basiliovera) ☕. Entirely optional and always appreciated.
+
+The most valuable contribution, though, is a good bug report or a wire capture from hardware I can't test against — that's what moves the integration forward.
+
 ## Legal Notice
 
 This integration is provided for **personal, non-commercial use** and for **interoperability purposes** as permitted under applicable law (including EU Directive 2009/24/EC on the legal protection of computer programs).
