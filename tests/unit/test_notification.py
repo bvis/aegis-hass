@@ -467,6 +467,7 @@ class TestAsyncStartFcmRepairs:
             hass=hass, coordinator=coordinator, **_FCM_KWARGS, entry_id="entry-x"
         )
         listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
 
         register_cls = MagicMock()
         instance = MagicMock()
@@ -485,6 +486,198 @@ class TestAsyncStartFcmRepairs:
             await listener.async_start()
 
         reg.assert_called_once_with(hass, entry_id="entry-x")
+
+
+class TestFcmRejectedCredsShortCircuit:
+    """#227 — don't re-hit the Firebase project on every restart with a
+    credential set Google already rejected. The rejection is remembered by a
+    one-way hash; a terminal failure persists it, a matching hash short-circuits
+    the next attempt, and a successful registration / changed values clear it.
+    """
+
+    @staticmethod
+    def _listener(hass: MagicMock) -> AjaxNotificationListener:
+        listener = AjaxNotificationListener(
+            hass=hass, coordinator=MagicMock(), **_FCM_KWARGS, entry_id="entry-x"
+        )
+        listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_save = AsyncMock()
+        listener._rejected_store.async_remove = AsyncMock()
+        return listener
+
+    @staticmethod
+    def _expected_hash() -> str:
+        from custom_components.aegis_ajax.notification import _fcm_creds_hash
+
+        return _fcm_creds_hash(
+            fcm_project_id=_FCM_KWARGS["fcm_project_id"],
+            fcm_app_id=_FCM_KWARGS["fcm_app_id"],
+            fcm_api_key=_FCM_KWARGS["fcm_api_key"],
+            fcm_sender_id=_FCM_KWARGS["fcm_sender_id"],
+        )
+
+    @staticmethod
+    def _repair_patches() -> tuple:
+        return (
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_credentials_invalid"
+            ),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminal_failure_persists_rejected_hash(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            side_effect=RuntimeError(
+                "Unable to establish subscription with Google Cloud Messaging."
+            )
+        )
+        listener = self._listener(hass)
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        listener._rejected_store.async_save.assert_awaited_once_with(
+            {"hash": self._expected_hash()}
+        )
+
+    @pytest.mark.asyncio
+    async def test_transient_failure_does_not_persist(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            side_effect=RuntimeError("Unable to register and check in to gcm")
+        )
+        listener = self._listener(hass)
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        listener._rejected_store.async_save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_short_circuits_when_hash_matches(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock()
+        listener = self._listener(hass)
+        listener._rejected_store.async_load = AsyncMock(
+            return_value={"hash": self._expected_hash()}
+        )
+        register_cls = MagicMock()
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv as reg,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        # No network registration attempt, but the Repair is kept visible.
+        register_cls.assert_not_called()
+        hass.async_add_executor_job.assert_not_called()
+        reg.assert_called_once_with(hass, entry_id="entry-x")
+
+    @pytest.mark.asyncio
+    async def test_no_short_circuit_when_hash_differs(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(side_effect=RuntimeError("boom"))
+        listener = self._listener(hass)
+        listener._rejected_store.async_load = AsyncMock(return_value={"hash": "some-other-hash"})
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        # Different values → must still attempt registration.
+        register_cls.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_success_clears_rejected_marker(self) -> None:
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            return_value={"fcm": {"registration": {"token": "T"}}}
+        )
+        listener = self._listener(hass)
+        listener._store.async_save = AsyncMock()
+        listener._rejected_store.async_load = AsyncMock(return_value={"hash": "stale-hash"})
+        listener._register_push_token = AsyncMock()
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch(
+                "firebase_messaging.fcmregister.FcmRegister",
+                MagicMock(return_value=MagicMock(register=MagicMock())),
+            ),
+            patch("firebase_messaging.FcmPushClient", MagicMock()),
+        ):
+            await listener.async_start()
+
+        listener._rejected_store.async_remove.assert_awaited_once()
+
+
+class TestIsTerminalFcmFailure:
+    def test_credential_rejection_strings_are_terminal(self) -> None:
+        from custom_components.aegis_ajax.notification import _is_terminal_fcm_failure
+
+        assert _is_terminal_fcm_failure(
+            RuntimeError("Unable to establish subscription with Google Cloud Messaging.")
+        )
+        assert _is_terminal_fcm_failure(RuntimeError("Unable to register with fcm"))
+
+    def test_network_and_unknown_are_not_terminal(self) -> None:
+        from custom_components.aegis_ajax.notification import _is_terminal_fcm_failure
+
+        assert not _is_terminal_fcm_failure(RuntimeError("Unable to register and check in to gcm"))
+        assert not _is_terminal_fcm_failure(TimeoutError())
+        assert not _is_terminal_fcm_failure(RuntimeError("something unexpected"))
+
+
+class TestFcmCredsHash:
+    def test_stable_and_sensitive(self) -> None:
+        from custom_components.aegis_ajax.notification import _fcm_creds_hash
+
+        a = _fcm_creds_hash(**{k: v for k, v in _FCM_KWARGS.items()})
+        b = _fcm_creds_hash(**{k: v for k, v in _FCM_KWARGS.items()})
+        assert a == b and len(a) == 64
+        changed = dict(_FCM_KWARGS)
+        changed["fcm_api_key"] = "AIza" + "y" * 35
+        assert _fcm_creds_hash(**changed) != a
+        # The hash must not leak the secret itself.
+        assert _FCM_KWARGS["fcm_api_key"] not in a
 
 
 class TestValidateFcmShape:
@@ -629,6 +822,7 @@ class TestAsyncStartFcmAndroidPackageHeader:
             app_label="Ajax",
         )
         listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
         listener._register_push_token = AsyncMock()
 
         register_cls = MagicMock()
@@ -690,6 +884,7 @@ class TestAsyncStartFcmAndroidPackageHeader:
             app_label="some_brand_we_dont_map_yet",
         )
         listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
         listener._register_push_token = AsyncMock()
 
         register_cls = MagicMock()
@@ -746,6 +941,7 @@ class TestAsyncStartFcmShapePreflight:
             entry_id="entry-x",
         )
         listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
 
         register_cls = MagicMock()
 
@@ -797,6 +993,7 @@ class TestAsyncStartFcmShapePreflight:
             hass=hass, coordinator=coordinator, **_VALID_FCM_SHAPES, entry_id="entry-x"
         )
         listener._store.async_load = AsyncMock(return_value=None)
+        listener._rejected_store.async_load = AsyncMock(return_value=None)
 
         register_cls = MagicMock()
         instance = MagicMock()

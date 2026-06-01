@@ -40,6 +40,10 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_KEY = f"{DOMAIN}_fcm_credentials"
+# Records the SHA-256 fingerprint of the most recent credential set that
+# Google terminally rejected, so we don't re-hit the Firebase project on every
+# restart with a key we already know is wrong (#227).
+REJECTED_STORAGE_KEY = f"{DOMAIN}_fcm_rejected"
 STORAGE_VERSION = 1
 
 # Ajax dispatches two FCM messages per security transition (one user-facing
@@ -101,6 +105,8 @@ from custom_components.aegis_ajax.notification_fcm_creds import (  # noqa: E402,
     _FCM_API_KEY_RE,
     _FCM_APP_ID_RE,
     _classify_fcm_failure,
+    _fcm_creds_hash,
+    _is_terminal_fcm_failure,
     _validate_fcm_shape,
 )
 
@@ -130,6 +136,9 @@ class AjaxNotificationListener:
         self._app_label = app_label
         self._push_client: Any = None
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._rejected_store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, REJECTED_STORAGE_KEY
+        )
         self._credentials: dict[str, Any] | None = None
         self._photo_callbacks: dict[str, asyncio.Future[str | None]] = {}
         self._notification_id_callbacks: dict[str, asyncio.Future[str | None]] = {}
@@ -230,6 +239,30 @@ class AjaxNotificationListener:
         )
 
         if not self._credentials:
+            # Short-circuit if this exact credential set was already rejected
+            # by Google (#227). Without working credentials, `async_start` runs
+            # the registration again on every restart / reload; for a
+            # well-formed-but-wrong api-key that means an unbounded series of
+            # failed requests against the Firebase project. We remember the
+            # rejected set by hash (never the secret) and skip the network
+            # attempt until the user changes the values.
+            creds_hash = _fcm_creds_hash(
+                fcm_project_id=self._fcm_project_id,
+                fcm_app_id=self._fcm_app_id,
+                fcm_api_key=self._fcm_api_key,
+                fcm_sender_id=self._fcm_sender_id,
+            )
+            rejected = await self._rejected_store.async_load()
+            if rejected and rejected.get("hash") == creds_hash:
+                _LOGGER.warning(
+                    "FCM credentials were already rejected by Google and haven't "
+                    "changed — skipping re-registration to avoid repeated failed "
+                    "requests against the Firebase project. Re-enter the four values "
+                    "via the Repair card under Settings → Repairs to try again."
+                )
+                if self._entry_id:
+                    async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
+                return
             _LOGGER.debug("Registering with FCM...")
             # Inject `X-Android-Package` on Firebase Installations calls when
             # we know the user's co-branded Android package. The Ajax co-brand
@@ -269,8 +302,16 @@ class AjaxNotificationListener:
                     raw_result = await self._hass.async_add_executor_job(registerer.register)
                 self._credentials = dict(raw_result)
                 await self._store.async_save(self._credentials)
+                if rejected:
+                    # These values worked — drop any stale rejection marker.
+                    await self._rejected_store.async_remove()
                 _LOGGER.info("FCM registration successful")
             except Exception as exc:
+                # Remember a terminal credential rejection so we don't re-hit
+                # the Firebase project on every restart (#227). Transient /
+                # host-unreachable errors stay retryable.
+                if _is_terminal_fcm_failure(exc):
+                    await self._rejected_store.async_save({"hash": creds_hash})
                 _LOGGER.warning(_classify_fcm_failure(exc), exc_info=True)
                 if self._entry_id:
                     async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)

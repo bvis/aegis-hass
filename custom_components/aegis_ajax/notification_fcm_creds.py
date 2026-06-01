@@ -8,6 +8,7 @@ notification.py re-exports the public surface.
 
 from __future__ import annotations
 
+import hashlib
 import re
 
 # Permissive Firebase-Installations shape match for `fcm_app_id`. We do NOT
@@ -71,6 +72,40 @@ def _validate_fcm_shape(
         )
 
     return None
+
+
+def _fcm_creds_hash(
+    *,
+    fcm_project_id: str,
+    fcm_app_id: str,
+    fcm_api_key: str,
+    fcm_sender_id: str,
+) -> str:
+    """Stable one-way fingerprint of a four-value FCM credential set.
+
+    Used to remember that a specific set was terminally rejected by Google so
+    we don't re-attempt registration against the Firebase project on every
+    restart (#227). It is a SHA-256 digest, never the secret itself.
+    """
+    joined = "|".join((fcm_project_id, fcm_app_id, fcm_api_key, fcm_sender_id))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+def _is_terminal_fcm_failure(exc: BaseException) -> bool:
+    """True when an FCM registration error is a Google credential rejection
+    (won't change on retry), False for transient / host-unreachable errors.
+
+    Mirrors the `_classify_fcm_failure` taxonomy: the two credential-rejection
+    strings are terminal; "unable to register and check in to gcm" is the
+    FCM-hosts-unreachable case (DNS / firewall / proxy) and must stay
+    retryable. Unknown errors default to NOT terminal, so a transient blip is
+    never mistaken for a permanently-bad credential set (which would suppress
+    a legitimate retry until the user re-enters the values).
+    """
+    lower = (str(exc) if exc else "").lower()
+    if "subscription" in lower and "google cloud messaging" in lower:
+        return True
+    return "unable to register with fcm" in lower
 
 
 def _classify_fcm_failure(exc: BaseException) -> str:

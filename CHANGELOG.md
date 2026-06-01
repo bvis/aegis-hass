@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.4] - 2026-06-01
+
+### Changed
+- **Don't re-attempt FCM registration for credentials Google already rejected (#227).** When the entered FCM api-key is well-formed but wrong (e.g. a non-FCM `AIza…` key extracted from the app), registration credentials are never persisted, so the integration used to re-attempt the registration against the cobranded Firebase project on every Home Assistant restart. It now remembers a terminally-rejected credential set by a one-way hash (the secret is never stored) and skips the network attempt until the values change, keeping the Repair card raised. Transient / host-unreachable failures stay retryable, and a successful registration or a changed credential set clears the marker.
+
 ## [1.8.0-beta.3] - 2026-06-01
 
 ### Fixed
