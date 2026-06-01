@@ -86,9 +86,15 @@ def _fcm_creds_hash(
     Used to remember that a specific set was terminally rejected by Google so
     we don't re-attempt registration against the Firebase project on every
     restart (#227). It is a SHA-256 digest, never the secret itself.
+
+    This is a change-detection fingerprint, NOT password storage: it's only
+    compared against itself to answer "are these the same four values I already
+    tried?", never used to authenticate anything, so a fast hash is correct and
+    a slow KDF (bcrypt/argon2) would be pointless here. `usedforsecurity=False`
+    documents that intent (and keeps it FIPS-safe).
     """
     joined = "|".join((fcm_project_id, fcm_app_id, fcm_api_key, fcm_sender_id))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+    return hashlib.sha256(joined.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _is_terminal_fcm_failure(exc: BaseException) -> bool:
