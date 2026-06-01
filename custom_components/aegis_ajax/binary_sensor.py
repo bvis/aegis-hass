@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.const import EntityCategory
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -180,11 +181,18 @@ _DEVICE_TYPE_SENSORS: dict[str, list[str]] = {
     "fire_protect": ["smoke_detected", "high_temperature", "tamper"],
     "fire_protect_plus": ["smoke_detected", "co_detected", "high_temperature", "tamper"],
     # FireProtect 2 family. Ajax's hub catalog uses both `_2` (legacy) and
-    # `_two*` (current) naming for the same generation of detectors. Map all
-    # variants to the same expressive sensor set; sub-models that don't have
-    # CO/smoke/heat physically just leave the corresponding entity at False.
-    "fire_protect_2": ["smoke_detected", "steam", "co_detected", "high_temperature", "tamper"],
-    "fire_protect_two": ["smoke_detected", "steam", "co_detected", "high_temperature", "tamper"],
+    # `_two*` (current) naming for the same generation of detectors.
+    #
+    # CO is the OPTIONAL cell across this line — only the SKUs whose object_type
+    # name explicitly encodes it (`*_c*`, `*_hc*`, `*_hsc*`) physically have it.
+    # The generic `fire_protect_two` case (which the cloud reports for plain
+    # Heat/Smoke RB units that lack a dedicated enum variant) must therefore
+    # NOT advertise a `co_detected` entity: doing so created a phantom CO sensor
+    # stuck at "Clear" on detectors that have no CO cell at all (#231). Smoke +
+    # heat are always present on a FireProtect 2, so they stay. A real CO alarm
+    # on a CO-equipped unit still arrives via FCM push regardless of this map.
+    "fire_protect_2": ["smoke_detected", "steam", "high_temperature", "tamper"],
+    "fire_protect_two": ["smoke_detected", "steam", "high_temperature", "tamper"],
     "fire_protect_two_base": [
         "smoke_detected",
         "steam",
@@ -343,6 +351,21 @@ async def async_setup_entry(
     entities: list[BinarySensorEntity] = []
     for device_id, device in coordinator.devices.items():
         sensor_keys = _DEVICE_TYPE_SENSORS.get(device.device_type, ["tamper"])
+        # #231 data probe: CO presence on the FireProtect 2 line is decided by
+        # the object_type variant, but the cloud reports several units under
+        # generic/non-sensor-encoded types (`fire_protect_two`, `_base`,
+        # `_plus`, `_plus_sb`, `_sb`) where we can only guess whether a CO cell
+        # exists. Log the exact type + our CO decision so a diagnostic from a
+        # CO-equipped detector tells us which type it actually reports — the one
+        # piece of data needed to confirm the `_base`/`_plus`/`_sb` mappings
+        # (and whether a CO model can ever land on the generic case).
+        if device.device_type.startswith(("fire_protect_two", "fire_protect_2")):
+            _LOGGER.debug(
+                "FireProtect 2 setup: device_type=%s co_sensor=%s (sensors=%s)",
+                device.device_type,
+                "co_detected" in sensor_keys,
+                sensor_keys,
+            )
         for key in sensor_keys:
             if key in BINARY_SENSOR_TYPES:
                 entities.append(
@@ -360,7 +383,51 @@ async def async_setup_entry(
                 entities.append(AjaxHubEthernetSensor(coordinator, space.hub_id))
                 entities.append(AjaxHubWifiSensor(coordinator, space.hub_id))
                 entities.append(AjaxHubPowerSensor(coordinator, space.hub_id))
+
+    # #231: a previous version attached a CO sensor to the generic FireProtect 2
+    # mapping. HA never evicts an entity its platform stopped providing, so on
+    # upgrade those phantom CO sensors would linger as `unavailable`. Mirror the
+    # bypass-switch eviction (switch.py) and drop CO entities this run no longer
+    # provides. Only runs when devices are loaded so a transient empty snapshot
+    # can't wipe a legitimate CO sensor (it would be recreated next setup anyway).
+    if coordinator.devices:
+        _evict_orphan_co_sensors(
+            hass,
+            entry,
+            provided={
+                e.unique_id
+                for e in entities
+                if isinstance(e, AjaxBinarySensor)
+                and e._status_key == "co_detected"
+                and e.unique_id is not None
+            },
+        )
     async_add_entities(entities)
+
+
+def _evict_orphan_co_sensors(
+    hass: HomeAssistant, entry: ConfigEntry, *, provided: set[str]
+) -> None:
+    """Remove `co_detected` binary sensors this run no longer provides (#231).
+
+    FireProtect 2 detectors without a CO cell used to get a phantom CO sensor
+    from the generic device-type mapping. HA leaves an entity its platform
+    stopped providing in the registry as `unavailable` until the user deletes
+    it by hand, so evict the stale CO entities at the registry level — same
+    approach as the orphan bypass-switch cleanup.
+    """
+    entity_reg = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(entity_reg, entry.entry_id):
+        if (
+            reg_entry.domain == "binary_sensor"
+            and reg_entry.unique_id.endswith("_co_detected")
+            and reg_entry.unique_id not in provided
+        ):
+            _LOGGER.info(
+                "Removing orphaned CO sensor %s — the device has no CO cell (#231)",
+                reg_entry.entity_id,
+            )
+            entity_reg.async_remove(reg_entry.entity_id)
 
 
 class AjaxBinarySensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySensorEntity):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,6 +23,7 @@ from custom_components.aegis_ajax.binary_sensor import (
     AjaxHubPowerSensor,
     AjaxHubWifiSensor,
     AjaxProblemSensor,
+    async_setup_entry,
 )
 from custom_components.aegis_ajax.const import ConnectionStatus, DeviceState, SecurityState
 
@@ -594,6 +595,51 @@ class TestDeviceTypeSensors:
     def test_fire_protect_without_smoke_chamber_has_no_steam(self, device_type: str) -> None:
         assert "steam" not in _DEVICE_TYPE_SENSORS[device_type]
 
+    # #231: CO is the optional cell on the FireProtect 2 line. The generic
+    # object_type (which the cloud reports for plain Heat/Smoke RB units that
+    # lack a dedicated enum variant) must NOT advertise a CO sensor — that
+    # created a phantom "Clear" CO entity on detectors with no CO cell.
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "fire_protect_2",
+            "fire_protect_two",
+            "fire_protect",
+            "fire_protect_two_hrb",
+            "fire_protect_two_hsb",
+            "fire_protect_two_h_ac",
+            "fire_protect_two_h_rb_ul",
+            "fire_protect_two_hs_ac",
+            "fire_protect_two_hs_ac_ul",
+            "fire_protect_two_hs_rb_ul",
+            "fire_protect_two_hs_sb_ul",
+        ],
+    )
+    def test_fire_protect_without_co_cell_has_no_co(self, device_type: str) -> None:
+        assert "co_detected" not in _DEVICE_TYPE_SENSORS[device_type]
+
+    # Regression guard: every variant whose object_type explicitly encodes a CO
+    # cell (`*_c*`, `*_hc*`, `*_hsc*`) must keep its CO sensor.
+    @pytest.mark.parametrize(
+        "device_type",
+        [
+            "fire_protect_plus",
+            "fire_protect_two_crb",
+            "fire_protect_two_csb",
+            "fire_protect_two_c_ac",
+            "fire_protect_two_c_rb_ul",
+            "fire_protect_two_hcrb",
+            "fire_protect_two_hcsb",
+            "fire_protect_two_hc_ac",
+            "fire_protect_two_hsc_ac",
+            "fire_protect_two_hsc_ac_ul",
+            "fire_protect_two_hsc_rb_ul",
+            "fire_protect_two_hsc_sb_ul",
+        ],
+    )
+    def test_fire_protect_with_co_cell_has_co(self, device_type: str) -> None:
+        assert "co_detected" in _DEVICE_TYPE_SENSORS[device_type]
+
     # Hub family — `hub`, `hub_plus`, `hub_two_4g` were already mapped, but
     # the v3 catalog also names `hub_two`, `hub_two_plus`, `hub_hybrid_*`,
     # `hub_mega`, `hub_lite`, `hub_4g`, `hub_three`, etc. Anyone running a
@@ -1076,3 +1122,96 @@ class TestAjaxHubPowerSensor:
         coordinator.hub_network = {}
         sensor = AjaxHubPowerSensor(coordinator, "hub-1")
         assert sensor.available is False
+
+
+def _reg_entry(entity_id: str, unique_id: str, domain: str = "binary_sensor") -> MagicMock:
+    e = MagicMock()
+    e.entity_id = entity_id
+    e.unique_id = unique_id
+    e.domain = domain
+    return e
+
+
+class TestOrphanCoSensorEviction:
+    """#231: phantom CO sensors on no-CO FireProtect 2 units are evicted."""
+
+    def _make_device(self, device_id: str, device_type: str) -> Device:
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name="FireProtect 2 RB",
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+
+    async def _run(self, *, devices: dict[str, Device], registry_entries: list) -> list[str]:
+        coordinator = MagicMock()
+        coordinator.devices = devices
+        coordinator.spaces = {}
+        coordinator.rooms = {}
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.runtime_data = coordinator
+
+        removed: list[str] = []
+        entity_reg = MagicMock()
+        entity_reg.async_remove.side_effect = removed.append
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            pass
+
+        with (
+            patch(
+                "custom_components.aegis_ajax.binary_sensor.er.async_get",
+                return_value=entity_reg,
+            ),
+            patch(
+                "custom_components.aegis_ajax.binary_sensor.er.async_entries_for_config_entry",
+                return_value=registry_entries,
+            ),
+        ):
+            await async_setup_entry(MagicMock(), entry, _add)
+        return removed
+
+    @pytest.mark.asyncio
+    async def test_evicts_co_on_generic_no_co_device(self) -> None:
+        removed = await self._run(
+            devices={"d1": self._make_device("d1", "fire_protect_two")},
+            registry_entries=[_reg_entry("binary_sensor.d1_co", "aegis_ajax_d1_co_detected")],
+        )
+        assert removed == ["binary_sensor.d1_co"]
+
+    @pytest.mark.asyncio
+    async def test_keeps_co_on_co_equipped_device(self) -> None:
+        removed = await self._run(
+            devices={"d1": self._make_device("d1", "fire_protect_two_hcrb")},
+            registry_entries=[_reg_entry("binary_sensor.d1_co", "aegis_ajax_d1_co_detected")],
+        )
+        assert removed == []
+
+    @pytest.mark.asyncio
+    async def test_does_not_touch_other_binary_sensors(self) -> None:
+        removed = await self._run(
+            devices={"d1": self._make_device("d1", "fire_protect_two")},
+            registry_entries=[
+                _reg_entry("binary_sensor.d1_smoke", "aegis_ajax_d1_smoke_detected"),
+                _reg_entry("binary_sensor.d1_co", "aegis_ajax_d1_co_detected"),
+            ],
+        )
+        assert removed == ["binary_sensor.d1_co"]
+
+    @pytest.mark.asyncio
+    async def test_skips_eviction_when_no_devices_loaded(self) -> None:
+        # A transient empty snapshot must NOT wipe a legitimate CO entity.
+        removed = await self._run(
+            devices={},
+            registry_entries=[_reg_entry("binary_sensor.d1_co", "aegis_ajax_d1_co_detected")],
+        )
+        assert removed == []
