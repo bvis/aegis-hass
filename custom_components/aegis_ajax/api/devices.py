@@ -230,12 +230,13 @@ class DevicesApi:
         return self._dedupe_and_track_aliases(devices)
 
     async def get_hub_device_temperature(self, hub_id: str, hub_device_id: str) -> float | None:
-        """Read one device's internal temperature via `StreamHubDevice` (#220).
+        """Read one device's internal temperature via `StreamHubDevice` (#220, #229).
 
         A per-device stream (`hub_id` + `hub_device_id`) whose first
-        `success.snapshot` carries the rich `HubDevice` proto. Sirens expose
-        their temperature here but not in the lighter `StreamLightDevices`
-        stream. We read the first snapshot and stop — temperature is slow and
+        `success.snapshot` carries the rich `HubDevice` proto. Sirens (#220) and
+        outdoor curtain PIRs (#229) expose their temperature here but not in the
+        lighter `StreamLightDevices` stream. We read the first snapshot and stop
+        — temperature is slow and
         the `Success` oneof has no delta case anyway. Returns `None` on a
         `failure` response (e.g. a hub-attached device not addressable on this
         backend, cf. #206) or an empty stream; gRPC errors propagate to the
@@ -255,9 +256,26 @@ class DevicesApi:
         async for msg in stream:
             if msg.HasField("success"):
                 if msg.success.WhichOneof("success") == "snapshot":
-                    return devices_parser.parse_hub_device_temperature(
-                        msg.success.snapshot.hub_device
-                    )
+                    hub_device = msg.success.snapshot.hub_device
+                    temperature = devices_parser.parse_hub_device_temperature(hub_device)
+                    if temperature is None:
+                        # #229 proto-drift probe: our HubDevice proto models only
+                        # the `_mini` curtain-outdoor variant. If a Base/Plus unit
+                        # populates a oneof case we don't know (or one without a
+                        # `device_temperature`), the value silently vanishes. Log
+                        # the actual case so we can extend the proto from a real
+                        # device's response (cf. #206).
+                        case = (
+                            hub_device.WhichOneof("device")
+                            if hasattr(hub_device, "WhichOneof")
+                            else None
+                        )
+                        _LOGGER.debug(
+                            "StreamHubDevice for %s: no temperature; HubDevice oneof case=%r",
+                            hub_device_id,
+                            case,
+                        )
+                    return temperature
             elif msg.HasField("failure"):
                 _LOGGER.debug(
                     "StreamHubDevice failed for device %s: %s",

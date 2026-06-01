@@ -20,7 +20,7 @@ from custom_components.aegis_ajax.api.models import (
     SpaceSnapshot,
 )
 from custom_components.aegis_ajax.const import (
-    SIREN_TEMP_REFRESH_INTERVAL,
+    HUB_DEVICE_TEMP_REFRESH_INTERVAL,
     ConnectionStatus,
     DeviceState,
     SecurityState,
@@ -1978,12 +1978,14 @@ class TestSmartLockProbeOrchestration:
         assert coordinator._smart_lock_probe_done is True
 
 
-def _make_siren(device_id: str, *, statuses: dict | None = None) -> Device:
+def _make_siren(
+    device_id: str, *, statuses: dict | None = None, device_type: str = "street_siren"
+) -> Device:
     return Device(
         id=device_id,
         hub_id="hub-1",
         name="Siren",
-        device_type="street_siren",
+        device_type=device_type,
         room_id=None,
         group_id=None,
         state=DeviceState.ONLINE,
@@ -1994,7 +1996,7 @@ def _make_siren(device_id: str, *, statuses: dict | None = None) -> Device:
     )
 
 
-class TestSirenTemperatureRefresh:
+class TestHubDeviceTemperatureRefresh:
     @pytest.mark.asyncio
     async def test_merges_temperature_into_siren_statuses(self) -> None:
         coordinator = _make_coordinator(["s1"])
@@ -2002,11 +2004,29 @@ class TestSirenTemperatureRefresh:
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
 
-        await coordinator._async_refresh_siren_temperatures()
+        await coordinator._async_refresh_hub_device_temperatures()
 
         assert coordinator.devices["s1d"].statuses["temperature"] == 21.0
         coordinator._devices_api.get_hub_device_temperature.assert_awaited_once_with("hub-1", "s1d")
         # The merge must be pushed to listeners or the sensor never materialises.
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_merges_temperature_into_curtain_outdoor_statuses(self) -> None:
+        # #229: outdoor curtain PIRs are gated for the StreamHubDevice
+        # temperature fetch just like sirens — the light stream omits their
+        # temperature, so the sensor only materialises via this path.
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {
+            "c1d": _make_siren("c1d", device_type="motion_protect_curtain_outdoor_plus")
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=17.0)
+
+        await coordinator._async_refresh_hub_device_temperatures()
+
+        assert coordinator.devices["c1d"].statuses["temperature"] == 17.0
+        coordinator._devices_api.get_hub_device_temperature.assert_awaited_once_with("hub-1", "c1d")
         coordinator.async_set_updated_data.assert_called_once()
 
     @pytest.mark.asyncio
@@ -2016,7 +2036,7 @@ class TestSirenTemperatureRefresh:
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
 
-        await coordinator._async_refresh_siren_temperatures()
+        await coordinator._async_refresh_hub_device_temperatures()
 
         coordinator._devices_api.get_hub_device_temperature.assert_not_called()
         assert "temperature" not in coordinator.devices["d1"].statuses
@@ -2029,7 +2049,7 @@ class TestSirenTemperatureRefresh:
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=99.0)
 
-        await coordinator._async_refresh_siren_temperatures()
+        await coordinator._async_refresh_hub_device_temperatures()
 
         coordinator._devices_api.get_hub_device_temperature.assert_not_called()
         assert coordinator.devices["s1d"].statuses["temperature"] == 18.0
@@ -2042,7 +2062,7 @@ class TestSirenTemperatureRefresh:
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=None)
 
-        await coordinator._async_refresh_siren_temperatures()
+        await coordinator._async_refresh_hub_device_temperatures()
 
         assert "temperature" not in coordinator.devices["s1d"].statuses
         coordinator.async_set_updated_data.assert_not_called()
@@ -2060,7 +2080,7 @@ class TestSirenTemperatureRefresh:
 
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(side_effect=_temp)
 
-        await coordinator._async_refresh_siren_temperatures()
+        await coordinator._async_refresh_hub_device_temperatures()
 
         assert coordinator.devices["good"].statuses["temperature"] == 20.0
         assert "temperature" not in coordinator.devices["bad"].statuses
@@ -2093,27 +2113,27 @@ class TestSirenTemperatureRefresh:
     def test_schedule_registers_independent_timer_and_initial_kick(self) -> None:
         coordinator = _make_coordinator(["s1"])
         # Replace with a MagicMock so the initial-kick call returns a non-coro.
-        coordinator._async_refresh_siren_temperatures = MagicMock()
+        coordinator._async_refresh_hub_device_temperatures = MagicMock()
         with patch(
             "custom_components.aegis_ajax.coordinator.async_track_time_interval",
             return_value=MagicMock(),
         ) as mock_track:
-            coordinator._schedule_siren_temperature_refresh()
+            coordinator._schedule_hub_device_temperature_refresh()
 
         mock_track.assert_called_once()
-        assert mock_track.call_args.args[2] == timedelta(seconds=SIREN_TEMP_REFRESH_INTERVAL)
-        assert coordinator._unsub_siren_temp is mock_track.return_value
+        assert mock_track.call_args.args[2] == timedelta(seconds=HUB_DEVICE_TEMP_REFRESH_INTERVAL)
+        assert coordinator._unsub_hub_device_temp is mock_track.return_value
         # Timer's first fire is one full interval out, so an initial
         # non-blocking kick must run for the sensor to appear within seconds.
         coordinator.hass.async_create_task.assert_called_once()
 
     def test_schedule_is_idempotent(self) -> None:
         coordinator = _make_coordinator(["s1"])
-        coordinator._unsub_siren_temp = MagicMock()
+        coordinator._unsub_hub_device_temp = MagicMock()
         with patch(
             "custom_components.aegis_ajax.coordinator.async_track_time_interval",
         ) as mock_track:
-            coordinator._schedule_siren_temperature_refresh()
+            coordinator._schedule_hub_device_temperature_refresh()
 
         mock_track.assert_not_called()
 
@@ -2121,7 +2141,7 @@ class TestSirenTemperatureRefresh:
     async def test_shutdown_cancels_timer(self) -> None:
         coordinator = _make_coordinator()
         unsub = MagicMock()
-        coordinator._unsub_siren_temp = unsub
+        coordinator._unsub_hub_device_temp = unsub
         coordinator._stream_tasks = []
         coordinator._hts_task = None
         coordinator._hts_client = None
@@ -2131,7 +2151,7 @@ class TestSirenTemperatureRefresh:
         await coordinator.async_shutdown()
 
         unsub.assert_called_once()
-        assert coordinator._unsub_siren_temp is None
+        assert coordinator._unsub_hub_device_temp is None
 
     def test_snapshot_preserves_merged_siren_temperature(self) -> None:
         coordinator = _make_coordinator()

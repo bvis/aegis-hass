@@ -32,11 +32,11 @@ from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import (
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    HUB_DEVICE_TEMP_REFRESH_INTERVAL,
+    HUB_DEVICE_TEMPERATURE_DEVICE_TYPES,
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
-    SIREN_TEMP_REFRESH_INTERVAL,
-    SIREN_TEMPERATURE_DEVICE_TYPES,
     ConnectionStatus,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
@@ -159,11 +159,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Rooms rarely change — cache and refresh once per hour. None means
         # never fetched yet so the first poll always populates rooms.
         self._rooms_last_fetch: float | None = None
-        # Siren internal temperature (#220) — refreshed on a dedicated timer
-        # (`async_track_time_interval`), NOT the poll cycle. On push-heavy hubs
-        # every HTS update resets HA's poll timer, so the scheduled poll never
-        # fires again after startup; a poll-driven refresh would be starved.
-        self._unsub_siren_temp: CALLBACK_TYPE | None = None
+        # Per-device internal temperature (#220 sirens, #229 outdoor curtain
+        # PIRs) — refreshed on a dedicated timer (`async_track_time_interval`),
+        # NOT the poll cycle. On push-heavy hubs every HTS update resets HA's
+        # poll timer, so the scheduled poll never fires again after startup; a
+        # poll-driven refresh would be starved.
+        self._unsub_hub_device_temp: CALLBACK_TYPE | None = None
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
@@ -456,8 +457,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.rooms = refreshed_rooms
         self._rooms_last_fetch = now
 
-    def _schedule_siren_temperature_refresh(self) -> None:
-        """Start the dedicated siren-temperature refresh timer (#220).
+    def _schedule_hub_device_temperature_refresh(self) -> None:
+        """Start the dedicated per-device-temperature refresh timer (#220, #229).
 
         The refresh runs on its own `async_track_time_interval` timer rather
         than inside `_async_update_data`: on push-heavy hubs every HTS update
@@ -467,22 +468,23 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fire is one full interval out, so we also kick a non-blocking initial
         refresh so the sensor appears within seconds of startup.
         """
-        if self._unsub_siren_temp is not None:
+        if self._unsub_hub_device_temp is not None:
             return
-        self._unsub_siren_temp = async_track_time_interval(
+        self._unsub_hub_device_temp = async_track_time_interval(
             self.hass,
-            self._async_refresh_siren_temperatures,
-            timedelta(seconds=SIREN_TEMP_REFRESH_INTERVAL),
+            self._async_refresh_hub_device_temperatures,
+            timedelta(seconds=HUB_DEVICE_TEMP_REFRESH_INTERVAL),
         )
-        self.hass.async_create_task(self._async_refresh_siren_temperatures())
+        self.hass.async_create_task(self._async_refresh_hub_device_temperatures())
 
-    async def _async_refresh_siren_temperatures(self, _now: datetime | None = None) -> None:
-        """Fetch + merge siren internal temperature (#220), timer-driven.
+    async def _async_refresh_hub_device_temperatures(self, _now: datetime | None = None) -> None:
+        """Fetch + merge per-device internal temperature (#220, #229), timer-driven.
 
-        Sirens don't carry a `temperature` status in the `StreamLightDevices`
-        stream the way motion/door sensors do, so the auto-created temperature
-        sensor never appears for them. The value lives in the rich per-device
-        `StreamHubDevice` snapshot instead. We pull it for each siren that
+        Sirens (#220) and outdoor curtain PIRs (#229) don't carry a
+        `temperature` status in the `StreamLightDevices` stream the way indoor
+        motion/door sensors do, so the auto-created temperature sensor never
+        appears for them. The value lives in the rich per-device
+        `StreamHubDevice` snapshot instead. We pull it for each such device that
         doesn't already have a temperature and merge it into
         `device.statuses["temperature"]` — all `sensor.py` needs to materialise
         the sensor. When anything changed, push it to listeners so the entity
@@ -494,7 +496,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         changed = False
         for device_id, device in list(self.devices.items()):
             if (
-                device.device_type not in SIREN_TEMPERATURE_DEVICE_TYPES
+                device.device_type not in HUB_DEVICE_TEMPERATURE_DEVICE_TYPES
                 or "temperature" in device.statuses
             ):
                 continue
@@ -503,7 +505,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device.hub_id, device_id
                 )
             except Exception:  # noqa: BLE001
-                _LOGGER.debug("Failed to fetch temperature for siren %s", device_id, exc_info=True)
+                _LOGGER.debug("Failed to fetch temperature for device %s", device_id, exc_info=True)
                 continue
             if temperature is None:
                 continue
@@ -556,7 +558,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._probe_smart_locks_once()
         await self._start_device_streams()
         await self._start_hts()
-        self._schedule_siren_temperature_refresh()
+        self._schedule_hub_device_temperature_refresh()
         self._last_update_success_time = dt_util.utcnow()
         # One-line summary so users debugging "HTS streams: 0/1" or
         # "FCM clients: 0/1" reports (#111) can see at a glance which
@@ -918,16 +920,16 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _handle_devices_snapshot(self, devices: list[Device]) -> None:
         """Handle initial snapshot or full device snapshot update from stream."""
         for device in devices:
-            # Siren temperature (#220) comes from a separate per-device RPC,
-            # not this stream, so a fresh snapshot would wipe the value we
-            # merged in `_async_refresh_siren_temperatures` and leave the
-            # sensor `unknown` until the next timer fire. Carry the
+            # Per-device temperature (#220, #229) comes from a separate
+            # per-device RPC, not this stream, so a fresh snapshot would wipe
+            # the value we merged in `_async_refresh_hub_device_temperatures`
+            # and leave the sensor `unknown` until the next timer fire. Carry the
             # previously-merged temperature forward (it's slow-moving; the
             # periodic refresh still updates it).
             existing = self.devices.get(device.id)
             if (
                 existing is not None
-                and device.device_type in SIREN_TEMPERATURE_DEVICE_TYPES
+                and device.device_type in HUB_DEVICE_TEMPERATURE_DEVICE_TYPES
                 and "temperature" not in device.statuses
                 and "temperature" in existing.statuses
             ):
@@ -1155,9 +1157,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_shutdown(self) -> None:
         # Stop the siren-temperature refresh timer (#220)
-        if self._unsub_siren_temp is not None:
-            self._unsub_siren_temp()
-            self._unsub_siren_temp = None
+        if self._unsub_hub_device_temp is not None:
+            self._unsub_hub_device_temp()
+            self._unsub_hub_device_temp = None
 
         # Cancel all stream tasks
         for task in self._stream_tasks:

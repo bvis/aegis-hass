@@ -1,4 +1,9 @@
-"""Tests for siren internal temperature via the per-device StreamHubDevice RPC (#220)."""
+"""Tests for per-device internal temperature via the per-device StreamHubDevice RPC.
+
+Covers sirens (#220) and outdoor curtain PIRs (#229) — device families whose
+temperature lives only in the rich `StreamHubDevice` snapshot, not the lighter
+`StreamLightDevices` stream.
+"""
 
 from __future__ import annotations
 
@@ -59,6 +64,28 @@ class TestParseHubDeviceTemperature:
             )
         )
         assert parse_hub_device_temperature(hub_device) == 19.0
+
+    def test_returns_value_for_motion_protect_curtain_outdoor_mini(self) -> None:
+        # #229: outdoor curtain PIRs carry their temperature in the same
+        # `device_temperature` field on the rich HubDevice oneof, just like
+        # sirens. The parser is oneof-case-agnostic, so it must work unchanged.
+        # NOTE: our HubDevice proto only models the `_mini` curtain variant
+        # (field 21); the Base/Plus variants are not yet in the proto — see the
+        # #229 probe log in `DevicesApi.get_hub_device_temperature`.
+        from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import (
+            hub_device_pb2,
+            motion_protect_curtain_outdoor_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device.common import (
+            device_temperature_pb2,
+        )
+
+        hub_device = hub_device_pb2.HubDevice(
+            motion_protect_curtain_outdoor_mini=motion_protect_curtain_outdoor_pb2.MotionProtectCurtainOutdoorMini(
+                device_temperature=device_temperature_pb2.DeviceTemperature(value=17)
+            )
+        )
+        assert parse_hub_device_temperature(hub_device) == 17.0
 
     def test_returns_none_when_device_temperature_absent(self) -> None:
         from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import (

@@ -553,10 +553,12 @@ def parse_hub_device_temperature(hub_device: Any) -> float | None:  # noqa: ANN4
 
     The per-device `StreamHubDevice` RPC returns a `HubDevice` whose
     `device` oneof selects a per-type message (`street_siren`,
-    `home_siren`, …). Siren-family messages carry a `device_temperature`
-    (`DeviceTemperature { value, is_extreme }`) that the lighter
-    `StreamLightDevices` stream omits for sirens — so this is the only
-    path to a siren's temperature. Returns the value as a float, or
+    `home_siren`, `motion_protect_curtain_outdoor`, …). Those messages
+    carry a `device_temperature` (`DeviceTemperature { value, is_extreme }`)
+    that the lighter `StreamLightDevices` stream omits (#220 sirens, #229
+    outdoor curtain PIRs) — so this is the only path to their temperature.
+    The lookup is oneof-case-agnostic, so any device whose sub-message has
+    a `device_temperature` works. Returns the value as a float, or
     `None` when the oneof is unset, the sub-message has no
     `device_temperature`, or anything about the shape is unexpected.
     """

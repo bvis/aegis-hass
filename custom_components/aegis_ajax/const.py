@@ -147,14 +147,17 @@ MAX_RETRIES = 3
 RATE_LIMIT_REQUESTS = 60
 RATE_LIMIT_WINDOW = 60  # seconds
 
-# Siren internal temperature (#220). Sirens report their temperature only in
-# the rich per-device `StreamHubDevice` snapshot, not in the lighter
-# `StreamLightDevices` stream we run continuously. We pull it with a throttled
-# one-shot snapshot per siren — temperature is slow-moving and a persistent
+# Per-device internal temperature (#220, #229). Some devices report their
+# temperature only in the rich per-device `StreamHubDevice` snapshot, not in
+# the lighter `StreamLightDevices` stream we run continuously: sirens (#220)
+# and outdoor curtain motion detectors (#229). We pull it with a throttled
+# one-shot snapshot per device — temperature is slow-moving and a persistent
 # per-device stream would contradict how the Ajax app uses that endpoint.
-SIREN_TEMP_REFRESH_INTERVAL = 900  # seconds (15 min)
-# Device types whose `HubDevice` oneof case carries a `device_temperature`.
-SIREN_TEMPERATURE_DEVICE_TYPES = frozenset(
+HUB_DEVICE_TEMP_REFRESH_INTERVAL = 900  # seconds (15 min)
+# Device types whose `HubDevice` oneof case carries a `device_temperature`
+# that the `StreamLightDevices` stream omits. Indoor motion/door sensors are
+# NOT here — they already carry `temperature` in the light stream.
+HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
     {
         "street_siren",
         "street_siren_plus_g3",
@@ -162,6 +165,12 @@ SIREN_TEMPERATURE_DEVICE_TYPES = frozenset(
         "home_siren_g3",
         "home_siren_s",
         "home_siren_fibra",
+        # Outdoor curtain PIRs (#229) — all map to the rich `HubDevice`
+        # oneof case `motion_protect_curtain_outdoor`, which carries
+        # `device_temperature`.
+        "motion_protect_curtain_outdoor_base",
+        "motion_protect_curtain_outdoor_mini",
+        "motion_protect_curtain_outdoor_plus",
     }
 )
 
