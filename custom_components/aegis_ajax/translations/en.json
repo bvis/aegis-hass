@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Disarm night mode",
+            "description": "Exit night mode while leaving any independently armed (away) groups armed. Unlike a full disarm, this only stands down the night-mode groups — the native Ajax \"disarm night mode\" operation.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Alarm panel entity for the space to disarm from night mode. If omitted, applies to all panels."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Press panic button (SOS)",
             "description": "Trigger the Ajax SOS / panic button on a space. Calls the same endpoint as the red SOS button in the official mobile app and forwards a Panic alarm to the monitoring station (CRA), which on most contracts triggers immediate police dispatch and bypasses verification windows. Use only for genuine emergencies. The confirm field must be set to true or the call is rejected.",

@@ -67,6 +67,37 @@ class TestForceArmService:
         mock_coordinator.async_request_refresh.assert_called_once()
 
 
+class TestDisarmNightModeService:
+    @pytest.mark.asyncio
+    async def test_disarm_night_mode_calls_security_api(self) -> None:
+        """Verify disarm_from_night_mode is called per space (#233)."""
+        from custom_components.aegis_ajax import _async_handle_disarm_night_mode
+
+        mock_security_api = MagicMock()
+        mock_security_api.disarm_from_night_mode = AsyncMock()
+
+        mock_coordinator = MagicMock()
+        mock_coordinator._space_ids = ["space1", "space2"]
+        mock_coordinator.security_api = mock_security_api
+        mock_coordinator.async_request_refresh = AsyncMock()
+
+        mock_entry = MagicMock()
+        mock_entry.runtime_data = mock_coordinator
+
+        hass = MagicMock()
+        hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
+
+        call = MagicMock()
+        call.data = {}  # No entity_id → all spaces
+
+        await _async_handle_disarm_night_mode(hass, call)
+
+        assert mock_security_api.disarm_from_night_mode.call_count == 2
+        mock_security_api.disarm_from_night_mode.assert_any_call("space1")
+        mock_security_api.disarm_from_night_mode.assert_any_call("space2")
+        mock_coordinator.async_request_refresh.assert_called_once()
+
+
 class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_services_registered_on_setup(self) -> None:
@@ -109,12 +140,13 @@ class TestServiceRegistration:
             result = await async_setup_entry(hass, entry)
 
         assert result is True
-        # Verify all four custom services were registered
+        # Verify all custom services were registered
         register_calls = {
             call_args[0][1] for call_args in hass.services.async_register.call_args_list
         }
         assert "force_arm" in register_calls
         assert "force_arm_night" in register_calls
+        assert "disarm_night_mode" in register_calls
         assert "press_panic_button" in register_calls
         assert "set_photo_on_demand_mode" in register_calls
 
@@ -141,5 +173,6 @@ class TestServiceRegistration:
         # Every service registered in async_setup_entry must be removed on unload
         assert "force_arm" in remove_calls
         assert "force_arm_night" in remove_calls
+        assert "disarm_night_mode" in remove_calls
         assert "press_panic_button" in remove_calls
         assert "set_photo_on_demand_mode" in remove_calls

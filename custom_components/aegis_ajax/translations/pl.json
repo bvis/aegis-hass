@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Rozbrój tryb nocny",
+            "description": "Wyłącza tryb nocny, pozostawiając uzbrojone grupy uzbrojone niezależnie (tryb wyjścia). W przeciwieństwie do pełnego rozbrojenia rozbraja tylko grupy w trybie nocnym — natywna operacja Ajax „rozbrój tryb nocny\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Jednostka",
+                    "description": "Jednostka panelu alarmowego przestrzeni do rozbrojenia z trybu nocnego. W przypadku pominięcia dotyczy wszystkich paneli."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Naciśnij przycisk paniki (SOS)",
             "description": "Wyzwala przycisk SOS / paniki Ajax w przestrzeni. Wywołuje ten sam endpoint co czerwony przycisk SOS w oficjalnej aplikacji i przekazuje alarm paniki do stacji monitorowania (CRA), co w większości umów oznacza natychmiastowe wezwanie policji bez okienek weryfikacyjnych. Używaj wyłącznie w prawdziwych sytuacjach awaryjnych. Pole confirm musi być ustawione na true, w przeciwnym razie wywołanie zostanie odrzucone.",

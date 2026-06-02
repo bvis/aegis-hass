@@ -32,6 +32,26 @@ force_arm_night:
           domain: alarm_control_panel
           integration: aegis_ajax
 
+disarm_night_mode:
+  name: Disarm night mode
+  description: >-
+    Exit night mode while leaving any independently armed (away) groups
+    armed. Unlike a full disarm, this only stands down the night-mode
+    groups — the native Ajax "disarm night mode" operation.
+  target:
+    entity:
+      domain: alarm_control_panel
+      integration: aegis_ajax
+  fields:
+    entity_id:
+      name: Entity
+      description: Alarm panel entity for the space to disarm from night mode. If omitted, applies to all panels.
+      required: false
+      selector:
+        entity:
+          domain: alarm_control_panel
+          integration: aegis_ajax
+
 press_panic_button:
   name: Press panic button (SOS)
   description: >-

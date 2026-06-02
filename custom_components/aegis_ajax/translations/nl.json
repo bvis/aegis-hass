@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Nachtmodus uitschakelen",
+            "description": "Verlaat de nachtmodus terwijl onafhankelijk ingeschakelde (afwezig) groepen ingeschakeld blijven. Anders dan een volledige uitschakeling worden alleen de nachtmodusgroepen uitgeschakeld — de native Ajax-bewerking \"nachtmodus uitschakelen\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entiteit",
+                    "description": "Alarmpaneel-entiteit voor de ruimte die uit de nachtmodus moet worden gehaald. Indien weggelaten, geldt voor alle panelen."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Paniekknop indrukken (SOS)",
             "description": "Activeert de Ajax SOS-/paniekknop in een ruimte. Roept hetzelfde endpoint aan als de rode SOS-knop in de officiële app en stuurt een paniekalarm naar de meldkamer (CRA), wat in de meeste contracten direct politie-inzet oproept en verificatievensters overslaat. Alleen gebruiken bij echte noodgevallen. Het veld confirm moet op true staan, anders wordt de oproep geweigerd.",

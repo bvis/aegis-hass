@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Gece modunu devre dışı bırak",
+            "description": "Bağımsız olarak (dışarıda modu) kurulu grupları kurulu bırakarak gece modundan çıkar. Tam devre dışı bırakmanın aksine yalnızca gece modu gruplarını devre dışı bırakır — Ajax'ın yerel \"gece modunu devre dışı bırak\" işlemi.",
+            "fields": {
+                "entity_id": {
+                    "name": "Varlık",
+                    "description": "Gece modundan çıkarılacak alanın alarm paneli varlığı. Belirtilmezse tüm panellere uygulanır."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Panik butonuna bas (SOS)",
             "description": "Ajax SOS / panik butonunu bir alanda tetikler. Resmi mobil uygulamadaki kırmızı SOS butonuyla aynı uç noktayı çağırır ve bir Panik alarmını izleme istasyonuna (CRA) iletir; bu da çoğu sözleşmede doğrulama pencerelerini atlayarak anında polis sevkini tetikler. Yalnızca gerçek acil durumlarda kullanın. confirm alanı true olarak ayarlanmalı, aksi takdirde çağrı reddedilir.",

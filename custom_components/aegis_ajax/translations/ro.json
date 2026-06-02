@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Dezarmează modul de noapte",
+            "description": "Iese din modul de noapte lăsând armate grupurile armate independent (mod plecat). Spre deosebire de o dezarmare totală, dezactivează doar grupurile în modul de noapte — operațiunea nativă Ajax „dezarmează modul de noapte\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entitate",
+                    "description": "Entitatea panoului de alarmă pentru spațiul care va fi dezarmat din modul de noapte. Dacă este omis, se aplică tuturor panourilor."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Apasă butonul de panică (SOS)",
             "description": "Declanșează butonul SOS / de panică Ajax într-un spațiu. Apelează același endpoint ca butonul SOS roșu din aplicația oficială și transmite o alarmă de panică către dispeceratul de monitorizare (CRA), ceea ce, în majoritatea contractelor, înseamnă intervenție imediată a poliției, ocolind ferestrele de verificare. Folosește doar în urgențe reale. Câmpul confirm trebuie să fie true sau apelul este respins.",

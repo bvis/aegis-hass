@@ -99,6 +99,7 @@ type AjaxCobrandedConfigEntry = ConfigEntry[AjaxCobrandedCoordinator]
 _CUSTOM_SERVICE_NAMES = (
     "force_arm",
     "force_arm_night",
+    "disarm_night_mode",
     "press_panic_button",
     "set_photo_on_demand_mode",
 )
@@ -165,6 +166,24 @@ async def _async_handle_force_arm_night(hass: HomeAssistant, call: ServiceCall) 
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm_night_mode(space_id, ignore_alarms=True)
+        cid = id(coordinator)
+        if cid not in refreshed:
+            await coordinator.async_request_refresh()
+            refreshed.add(cid)
+
+
+async def _async_handle_disarm_night_mode(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Handle disarm_night_mode service call.
+
+    Hits SpaceSecurityService/disarmFromNightMode — the native Ajax "exit
+    night mode" operation. Unlike a full disarm, it only stands down the
+    night-mode groups and leaves any independently armed (away) groups armed,
+    which `alarm_disarm` on the space panel cannot express (#233).
+    """
+    targets = _resolve_target_space_ids(hass, call)
+    refreshed: set[int] = set()
+    for coordinator, space_id in targets:
+        await coordinator.security_api.disarm_from_night_mode(space_id)
         cid = id(coordinator)
         if cid not in refreshed:
             await coordinator.async_request_refresh()
@@ -409,6 +428,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     async def _force_arm_night_handler(call: ServiceCall) -> None:
         await _async_handle_force_arm_night(hass, call)
 
+    async def _disarm_night_mode_handler(call: ServiceCall) -> None:
+        await _async_handle_disarm_night_mode(hass, call)
+
     async def _press_panic_button_handler(call: ServiceCall) -> None:
         await _async_handle_press_panic_button(hass, call)
 
@@ -419,6 +441,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         service_handlers = {
             "force_arm": _force_arm_handler,
             "force_arm_night": _force_arm_night_handler,
+            "disarm_night_mode": _disarm_night_mode_handler,
             "press_panic_button": _press_panic_button_handler,
             "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
         }

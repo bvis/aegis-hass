@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Odjistit noční režim",
+            "description": "Ukončí noční režim a ponechá nezávisle zastřežené (odchodové) skupiny zastřežené. Na rozdíl od úplného odjištění deaktivuje pouze skupiny nočního režimu – nativní operace Ajax „odjistit noční režim\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entita",
+                    "description": "Entita poplachového panelu prostoru, který se má odjistit z nočního režimu. Pokud je vynecháno, platí pro všechny panely."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Stisknout panikové tlačítko (SOS)",
             "description": "Spustí tlačítko SOS / paniky Ajaxu v prostoru. Volá stejný endpoint jako červené SOS tlačítko v oficiální mobilní aplikaci a předává poplach do pultu centralizované ochrany (CRA), což u většiny smluv znamená okamžitý zásah policie bez ověřovací doby. Používejte pouze v reálných nouzích. Pole confirm musí být true, jinak je volání odmítnuto.",

@@ -205,6 +205,7 @@ Photos are automatically cleaned up based on your retention settings (configurab
 |---|---|
 | `aegis_ajax.force_arm` | Arm the system ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
 | `aegis_ajax.force_arm_night` | Arm night mode ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
+| `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Supports entity target; if omitted, applies to all panels. |
 | `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
 

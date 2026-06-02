@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Desarmar modo noche",
+            "description": "Sal del modo noche dejando armados los grupos armados de forma independiente (modo ausente). A diferencia de un desarmado total, solo desactiva los grupos en modo noche: la operación nativa de Ajax \"desarmar modo noche\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entidad",
+                    "description": "Entidad del panel de alarma del espacio que se desarmará del modo noche. Si se omite, se aplica a todos los paneles."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Pulsar botón de pánico (SOS)",
             "description": "Activa el botón SOS / pánico de Ajax en un espacio. Llama al mismo endpoint que el botón SOS rojo de la app oficial y envía una alarma de pánico a la central receptora de alarmas (CRA), que en la mayoría de contratos activa despacho policial inmediato saltándose los tiempos de verificación. Úsalo solo en emergencias reales. El campo confirm debe estar a true o la llamada se rechaza.",

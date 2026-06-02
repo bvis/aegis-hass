@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Desarmar mode nit",
+            "description": "Surt del mode nit deixant armats els grups armats de manera independent (mode absent). A diferència d'un desarmat total, només desactiva els grups en mode nit: l'operació nativa d'Ajax \"desarmar mode nit\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entitat",
+                    "description": "Entitat del panell d'alarma de l'espai que es desarmarà del mode nit. Si s'omet, s'aplica a tots els panells."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Premer botó de pànic (SOS)",
             "description": "Activa el botó SOS / pànic d'Ajax en un espai. Crida el mateix endpoint que el botó SOS vermell de l'aplicació oficial i envia una alarma de pànic a la central receptora d'alarmes (CRA), que a la majoria de contractes activa el desplegament policial immediat saltant els temps de verificació. Utilitza-ho només en emergències reals. El camp confirm ha d'estar a true o la crida es rebutja.",

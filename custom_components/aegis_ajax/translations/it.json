@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Disinserisci modalità notte",
+            "description": "Esce dalla modalità notte lasciando inseriti i gruppi inseriti in modo indipendente (fuori casa). A differenza di un disinserimento totale, disattiva solo i gruppi in modalità notte: l'operazione nativa di Ajax \"disinserisci modalità notte\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entità",
+                    "description": "Entità del pannello di allarme dello spazio da disinserire dalla modalità notte. Se omesso, si applica a tutti i pannelli."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Premi il pulsante antipanico (SOS)",
             "description": "Attiva il pulsante SOS / antipanico Ajax su uno spazio. Chiama lo stesso endpoint del pulsante SOS rosso dell'app ufficiale e inoltra un allarme antipanico alla centrale di vigilanza (CRA), che nella maggior parte dei contratti attiva l'invio immediato della polizia bypassando le finestre di verifica. Usalo solo in emergenze reali. Il campo confirm deve essere true o la chiamata viene rifiutata.",

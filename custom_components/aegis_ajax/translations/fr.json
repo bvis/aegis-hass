@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Désarmer le mode nuit",
+            "description": "Quitte le mode nuit en laissant armés les groupes armés indépendamment (mode absent). Contrairement à un désarmement complet, seuls les groupes en mode nuit sont désactivés — l'opération native Ajax « désarmer le mode nuit ».",
+            "fields": {
+                "entity_id": {
+                    "name": "Entité",
+                    "description": "Entité du panneau d'alarme de l'espace à désarmer du mode nuit. Si omis, s'applique à tous les panneaux."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Appuyer sur le bouton panique (SOS)",
             "description": "Déclenche le bouton SOS / panique Ajax sur un espace. Appelle le même endpoint que le bouton SOS rouge de l'application officielle et envoie une alarme panique au centre de télésurveillance (CRA), ce qui, dans la plupart des contrats, déclenche une intervention policière immédiate sans fenêtre de vérification. À n'utiliser qu'en cas d'urgence réelle. Le champ confirm doit être à true sinon l'appel est rejeté.",

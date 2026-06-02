@@ -127,6 +127,16 @@
                 }
             }
         },
+        "disarm_night_mode": {
+            "name": "Nachtmodus deaktivieren",
+            "description": "Beendet den Nachtmodus, während unabhängig (abwesend) scharf geschaltete Gruppen scharf bleiben. Anders als ein vollständiges Unscharfschalten werden nur die Nachtmodus-Gruppen deaktiviert – die native Ajax-Funktion „Nachtmodus deaktivieren\".",
+            "fields": {
+                "entity_id": {
+                    "name": "Entität",
+                    "description": "Alarmpanel-Entität des Bereichs, der aus dem Nachtmodus genommen werden soll. Wenn nicht angegeben, gilt für alle Panels."
+                }
+            }
+        },
         "press_panic_button": {
             "name": "Notfalltaste drücken (SOS)",
             "description": "Löst die Ajax-SOS-/Panik-Taste in einem Bereich aus. Ruft denselben Endpunkt auf wie die rote SOS-Taste in der offiziellen App und sendet einen Panik-Alarm an die Notrufzentrale (NSL), was in den meisten Verträgen einen sofortigen Polizeieinsatz auslöst und Verifikationsfenster umgeht. Nur für echte Notfälle verwenden. Das Feld confirm muss true sein, sonst wird der Aufruf abgelehnt.",
