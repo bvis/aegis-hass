@@ -77,6 +77,9 @@ class AjaxGrpcClient:
         self._channel: grpc.aio.Channel | None = None
         self._rate_limit_timestamps: list[float] = []
         self._refresh_task: asyncio.Task[None] | None = None
+        # Serializes channel recreation (#236) so a stream reconnect and a
+        # poll failing on the same wedged channel don't churn it twice.
+        self._reconnect_lock = asyncio.Lock()
 
     @property
     def session(self) -> AjaxSession:
@@ -86,11 +89,39 @@ class AjaxGrpcClient:
     def is_connected(self) -> bool:
         return self._channel is not None and self._session.is_authenticated
 
-    async def connect(self) -> None:
+    def _open_channel(self) -> grpc.aio.Channel:
         target = f"{self._host}:{self._port}"
         credentials = grpc.ssl_channel_credentials()
-        self._channel = grpc.aio.secure_channel(target, credentials)
-        _LOGGER.debug("gRPC channel opened to %s", target)
+        return grpc.aio.secure_channel(target, credentials)
+
+    async def connect(self) -> None:
+        self._channel = self._open_channel()
+        _LOGGER.debug("gRPC channel opened to %s:%s", self._host, self._port)
+
+    async def reconnect_channel(self) -> None:
+        """Tear down the current gRPC channel and open a fresh one.
+
+        Used by long-lived consumers (the device stream) when the channel
+        wedges after a transport-level failure (UNAVAILABLE / peer reset)
+        and reconnecting onto it never recovers — the symptom behind #236,
+        where a single stream error left the integration silent for hours
+        until a full HA restart recreated the channel.
+
+        The session token is preserved, so no re-login is needed: callers
+        fetch the channel via `_get_channel()` at call time, so they
+        transparently pick up the new one on their next call. The lock
+        keeps a stream reconnect and a concurrent poll failure from
+        recreating the channel twice.
+        """
+        async with self._reconnect_lock:
+            old = self._channel
+            if old is not None:
+                try:
+                    await old.close()
+                except Exception:  # noqa: BLE001
+                    _LOGGER.debug("Error closing stale gRPC channel", exc_info=True)
+            self._channel = self._open_channel()
+            _LOGGER.debug("gRPC channel recreated after transport failure")
 
     async def close(self) -> None:
         if self._refresh_task and not self._refresh_task.done():
@@ -178,10 +209,13 @@ class AjaxGrpcClient:
         timeout: float = GRPC_TIMEOUT,
     ) -> Any:  # noqa: ANN401
         await self._check_rate_limit()
-        channel = self._get_channel()
         metadata = self._session.get_call_metadata()
 
         async def _do_call() -> Any:  # noqa: ANN401
+            # Re-fetch the channel on every attempt: if a stream reconnect
+            # recreated it (#236) between retries, the retried call must use
+            # the fresh channel rather than the dead one captured up front.
+            channel = self._get_channel()
             method = channel.unary_unary(
                 method_path,
                 request_serializer=request.SerializeToString,

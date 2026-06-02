@@ -2841,3 +2841,54 @@ class TestSmartLockProbe:
         assert any(
             "findAllAvailableToAdd" in r.message and "failed" in r.message for r in caplog.records
         )
+
+
+class TestDeviceStreamReconnect:
+    """The persistent device stream must recreate the shared gRPC channel
+    after a transport-level failure instead of reconnecting onto the same
+    wedged channel forever (issue #236)."""
+
+    @pytest.mark.asyncio
+    async def test_stream_recreates_channel_after_transport_error(self) -> None:
+        import grpc
+
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        client.reconnect_channel = AsyncMock()
+        api = DevicesApi(client)
+
+        transient = grpc.aio.AioRpcError(
+            grpc.StatusCode.UNAVAILABLE,
+            grpc.aio.Metadata(),
+            grpc.aio.Metadata(),
+            details="",
+        )
+
+        class _FailingStream:
+            def __aiter__(self) -> _FailingStream:
+                return self
+
+            async def __anext__(self) -> object:
+                raise transient
+
+        mock_stub = MagicMock()
+        mock_stub.execute.return_value = _FailingStream()
+
+        async def _stop_after_backoff(_delay: float) -> None:
+            # End the otherwise-infinite reconnect loop once it backs off.
+            raise asyncio.CancelledError
+
+        with (
+            patch(
+                "v3.mobilegwsvc.service.stream_light_devices."
+                "endpoint_pb2_grpc.StreamLightDevicesServiceStub",
+                return_value=mock_stub,
+            ),
+            patch("asyncio.sleep", side_effect=_stop_after_backoff),
+        ):
+            task = await api.start_device_stream("space-1", MagicMock(), MagicMock())
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        client.reconnect_channel.assert_awaited_once()

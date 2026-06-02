@@ -499,6 +499,22 @@ class DevicesApi:
                         space_id,
                         backoff,
                     )
+                    # Recreate the shared channel before retrying. The peer
+                    # reset (UNAVAILABLE) can leave the channel half-open, and
+                    # reconnecting onto it never recovers — the integration
+                    # then goes silent until a full HA restart (#236). A fresh
+                    # channel re-opens the stream cleanly; the server resends a
+                    # snapshot, so device state re-syncs on its own.
+                    try:
+                        await self._client.reconnect_channel()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.debug(
+                            "Channel recreation failed for space %s; will retry",
+                            space_id,
+                            exc_info=True,
+                        )
 
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60.0)

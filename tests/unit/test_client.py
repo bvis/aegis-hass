@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import grpc
 import pytest
 
 from custom_components.aegis_ajax.api.client import AjaxGrpcClient
@@ -106,6 +108,70 @@ class TestClientConnect:
         await client.close()
 
 
+class TestReconnectChannel:
+    """Channel recreation after a wedged transport (issue #236).
+
+    A long-lived stream that hits UNAVAILABLE must be able to swap the
+    shared channel for a fresh one without re-login, so reconnection
+    doesn't land back on the same half-open channel forever.
+    """
+
+    @pytest.mark.asyncio
+    async def test_reconnect_opens_fresh_channel_and_closes_old(self) -> None:
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._reconnect_lock = asyncio.Lock()
+        old_channel = AsyncMock()
+        client._channel = old_channel
+
+        new_channel = MagicMock()
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=new_channel) as mock_secure,
+        ):
+            await client.reconnect_channel()
+
+        old_channel.close.assert_awaited_once()
+        assert client._channel is new_channel
+        mock_secure.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reconnect_with_no_existing_channel(self) -> None:
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._reconnect_lock = asyncio.Lock()
+        client._channel = None
+
+        new_channel = MagicMock()
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=new_channel),
+        ):
+            await client.reconnect_channel()
+
+        assert client._channel is new_channel
+
+    @pytest.mark.asyncio
+    async def test_reconnect_preserves_session(self) -> None:
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._reconnect_lock = asyncio.Lock()
+        client._channel = AsyncMock()
+        session = MagicMock()
+        client._session = session
+
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=MagicMock()),
+        ):
+            await client.reconnect_channel()
+
+        session.clear_session.assert_not_called()
+
+
 class TestRateLimit:
     @pytest.mark.asyncio
     async def test_rate_limit_passes_under_limit(self) -> None:
@@ -194,6 +260,42 @@ class TestCallUnary:
         result = await client.call_unary("/some/method", mock_request, mock_response_type)
         assert result is mock_response
         mock_channel.unary_unary.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_call_unary_refetches_channel_between_retries(self) -> None:
+        """After the channel is recreated mid-flight (#236), a retried unary
+        call must pick up the new channel instead of reusing the dead one."""
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._rate_limit_timestamps = []
+        mock_session = MagicMock()
+        mock_session.get_call_metadata.return_value = []
+        client._session = mock_session
+
+        channel_a = MagicMock()
+        channel_b = MagicMock()
+        client._channel = channel_a
+
+        transient = grpc.aio.AioRpcError(
+            grpc.StatusCode.UNAVAILABLE,
+            grpc.aio.Metadata(),
+            grpc.aio.Metadata(),
+            details="",
+        )
+
+        async def method_a(*_args: object, **_kwargs: object) -> None:
+            # Simulate the stream task swapping the channel out from under us.
+            client._channel = channel_b
+            raise transient
+
+        channel_a.unary_unary.return_value = AsyncMock(side_effect=method_a)
+        mock_response = MagicMock()
+        channel_b.unary_unary.return_value = AsyncMock(return_value=mock_response)
+
+        with patch("asyncio.sleep", new=AsyncMock()):
+            result = await client.call_unary("/m", MagicMock(), MagicMock())
+
+        assert result is mock_response
+        channel_b.unary_unary.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_call_server_stream(self) -> None:
