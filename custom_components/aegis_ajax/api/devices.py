@@ -566,11 +566,15 @@ class DevicesApi:
         channel = self._client._get_channel()
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.DeviceCommandDeviceOnServiceStub(channel)
+        # Send channels exactly as given. Channelled devices (relay, socket,
+        # wall/light switch) pass an explicit `[channel]`; a SmartLock (#219)
+        # passes none — the Ajax app omits channels for the lock on/off command,
+        # so an empty list leaves the repeated field unset, matching the wire.
         request = request_pb2.DeviceCommandDeviceOnRequest(
             hub_id=command.hub_id,
             device_id=command.device_id,
             device_type=_build_object_type(command.device_type),
-            channels=command.channels or [1],
+            channels=command.channels,
         )
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
@@ -587,11 +591,13 @@ class DevicesApi:
         channel = self._client._get_channel()
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.DeviceCommandDeviceOffServiceStub(channel)
+        # See `_device_on`: channels are sent as given (explicit per channel for
+        # relays/switches, empty for a SmartLock #219).
         request = request_pb2.DeviceCommandDeviceOffRequest(
             hub_id=command.hub_id,
             device_id=command.device_id,
             device_type=_build_object_type(command.device_type),
-            channels=command.channels or [1],
+            channels=command.channels,
         )
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):

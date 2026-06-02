@@ -9,11 +9,11 @@ from homeassistant.components.lock import LockEntity, LockEntityFeature
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.devices import (
-    SMART_LOCK_ACTION_LOCK,
     SMART_LOCK_ACTION_UNLATCH,
-    SMART_LOCK_ACTION_UNLOCK,
+    DeviceCommandError,
     SmartLockError,
 )
+from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
 
@@ -28,8 +28,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Ajax catalog ships two SmartLock device-type buckets — `smart_lock` for
 # generic LockBridge integrations and `smart_lock_yale` for Yale-branded
-# locks. Both expose the same status oneof and are controlled by the same
-# SwitchSmartLockService, so they share a single entity class.
+# locks. Both expose the same status oneof, so they share a single entity
+# class. Lock/unlock is driven through the generic device on/off command
+# (see `_async_switch`), unlatch through SwitchSmartLockService.
 LOCK_DEVICE_TYPES: frozenset[str] = frozenset({"smart_lock", "smart_lock_yale"})
 
 
@@ -45,7 +46,12 @@ async def async_setup_entry(
 
 
 class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
-    """Lock entity backed by the Ajax SmartLock status + SwitchSmartLockService."""
+    """Lock entity backed by the Ajax SmartLock status stream.
+
+    State comes from the device status stream; lock/unlock is sent via the
+    generic `DeviceCommandDeviceOn/Off` command (#219), unlatch via
+    `SwitchSmartLockService`.
+    """
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -98,7 +104,43 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
             return None
         return device.statuses.get("smart_lock_state") == "unlatched"
 
+    async def _async_switch(self, *, lock: bool) -> None:
+        """Lock/unlock via the generic device on/off command (#219).
+
+        Hub-attached Jeweller locks (e.g. Yale modules added by an installer
+        on a third-party backend) are not in the SmartLock cloud registry, so
+        `SwitchSmartLockService` answers `smart_lock_not_found`. The Ajax app
+        drives them with `DeviceCommandDeviceOn/Off` keyed by device id —
+        lock = On, unlock = Off — exactly as for a relay (verified against the
+        app). No channel is sent for a lock.
+        """
+        device = self._device
+        if device is None:
+            return
+        factory = DeviceCommand.on if lock else DeviceCommand.off
+        command = factory(
+            hub_id=device.hub_id,
+            device_id=self._device_id,
+            device_type=device.device_type,
+        )
+        try:
+            await self.coordinator.devices_api.send_command(command)
+        except DeviceCommandError as exc:
+            _LOGGER.error(
+                "SmartLock %s %s failed: %s",
+                self._device_id,
+                "lock" if lock else "unlock",
+                exc,
+            )
+            return
+        await self.coordinator.async_request_refresh()
+
     async def _send_action(self, action: int) -> None:
+        """Unlatch (OPEN) via SwitchSmartLockService — the only unlatch path.
+
+        Lock/unlock no longer use this (see `_async_switch`); it remains for
+        the OPEN feature, which the generic on/off command can't express.
+        """
         space_id = self._resolve_space_id()
         if space_id is None:
             _LOGGER.error(
@@ -116,10 +158,10 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_lock(self, **kwargs: object) -> None:
-        await self._send_action(SMART_LOCK_ACTION_LOCK)
+        await self._async_switch(lock=True)
 
     async def async_unlock(self, **kwargs: object) -> None:
-        await self._send_action(SMART_LOCK_ACTION_UNLOCK)
+        await self._async_switch(lock=False)
 
     async def async_open(self, **kwargs: object) -> None:
         await self._send_action(SMART_LOCK_ACTION_UNLATCH)
