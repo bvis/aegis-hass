@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import grpc
 import pytest
 
-from custom_components.aegis_ajax.api.client import AjaxGrpcClient
+from custom_components.aegis_ajax.api.client import (
+    _KEEPALIVE_START_MS,
+    AjaxGrpcClient,
+)
 from custom_components.aegis_ajax.api.session import AjaxSession
 from custom_components.aegis_ajax.const import GRPC_HOST, GRPC_PORT
 
@@ -62,6 +65,7 @@ class TestClientConnect:
         client._host = GRPC_HOST
         client._port = GRPC_PORT
         client._channel = None
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
 
         mock_channel = MagicMock()
         with (
@@ -81,6 +85,7 @@ class TestClientConnect:
         client._host = GRPC_HOST
         client._port = GRPC_PORT
         client._channel = None
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
 
         with (
             patch("grpc.ssl_channel_credentials"),
@@ -96,6 +101,40 @@ class TestClientConnect:
         assert options["grpc.http2.max_pings_without_data"] == 0
         assert options["grpc.keepalive_permit_without_calls"] == 1
 
+    def test_reduce_keepalive_halves_then_floors(self) -> None:
+        """Keepalive self-tunes down by halving and stops at the 60s floor."""
+        from custom_components.aegis_ajax.api.client import _KEEPALIVE_FLOOR_MS
+
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
+
+        steps = []
+        while client.reduce_keepalive():
+            steps.append(client.keepalive_time_ms)
+
+        assert steps == [120000, 60000]
+        assert client.keepalive_time_ms == _KEEPALIVE_FLOOR_MS
+        # Already at the floor → no further reduction.
+        assert client.reduce_keepalive() is False
+        assert client.keepalive_time_ms == _KEEPALIVE_FLOOR_MS
+
+    @pytest.mark.asyncio
+    async def test_open_channel_uses_current_keepalive(self) -> None:
+        """A reduced interval is applied to the next channel that is opened."""
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._keepalive_time_ms = 60000
+
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=MagicMock()) as mock_secure,
+        ):
+            client._open_channel()
+
+        options = dict(mock_secure.call_args.kwargs["options"])
+        assert options["grpc.keepalive_time_ms"] == 60000
+
     @pytest.mark.asyncio
     async def test_reconnect_channel_sets_keepalive_options(self) -> None:
         """A recreated channel (post-failure) must carry the same keepalive."""
@@ -104,6 +143,7 @@ class TestClientConnect:
         client._port = GRPC_PORT
         client._channel = None
         client._reconnect_lock = asyncio.Lock()
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
 
         with (
             patch("grpc.ssl_channel_credentials"),
@@ -165,6 +205,7 @@ class TestReconnectChannel:
         client._host = GRPC_HOST
         client._port = GRPC_PORT
         client._reconnect_lock = asyncio.Lock()
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
         old_channel = AsyncMock()
         client._channel = old_channel
 
@@ -185,6 +226,7 @@ class TestReconnectChannel:
         client._host = GRPC_HOST
         client._port = GRPC_PORT
         client._reconnect_lock = asyncio.Lock()
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
         client._channel = None
 
         new_channel = MagicMock()
@@ -202,6 +244,7 @@ class TestReconnectChannel:
         client._host = GRPC_HOST
         client._port = GRPC_PORT
         client._reconnect_lock = asyncio.Lock()
+        client._keepalive_time_ms = _KEEPALIVE_START_MS
         client._channel = AsyncMock()
         session = MagicMock()
         client._session = session

@@ -406,6 +406,41 @@ class DevicesApi:
             if device is not None:
                 on_devices_snapshot([device])
 
+    # A dead stream that has stayed quiet at least this long (seconds) before
+    # erroring looks like a network idle-timeout drop rather than a reset during
+    # active traffic, so it's the signal to shorten the keepalive (#236).
+    _KEEPALIVE_RETUNE_IDLE_SECONDS = 60.0
+
+    def _maybe_retune_keepalive(self, exc: BaseException, last_msg_at: float | None) -> None:
+        """Self-tune the channel keepalive down when an idle stream keeps dropping.
+
+        Two guards keep this from making things worse:
+        - A `GOAWAY too_many_pings` (ENHANCE_YOUR_CALM) means we're pinging *too*
+          often, not too rarely — the opposite problem. Never shorten on it.
+        - Only retune when the stream had gone quiet for a while before dying
+          (an idle-timeout signature); a reset during active traffic is a
+          one-off and must not ratchet the interval down on a healthy network.
+        """
+        detail = ""
+        getter = getattr(exc, "debug_error_string", None)
+        if callable(getter):
+            try:
+                detail = str(getter() or "")
+            except Exception:  # noqa: BLE001
+                detail = ""
+        haystack = f"{exc} {detail}".lower()
+        if "too_many_pings" in haystack or "enhance_your_calm" in haystack:
+            _LOGGER.warning(
+                "Ajax server rejected our gRPC keepalive pings as too frequent "
+                "(too_many_pings); leaving the interval unchanged"
+            )
+            return
+        if last_msg_at is None:
+            return
+        idle = asyncio.get_running_loop().time() - last_msg_at
+        if idle >= self._KEEPALIVE_RETUNE_IDLE_SECONDS:
+            self._client.reduce_keepalive()
+
     async def start_device_stream(
         self,
         space_id: str,
@@ -432,6 +467,11 @@ class DevicesApi:
 
             backoff = 5.0
             while True:
+                # Monotonic time of the last message received on this attempt;
+                # `None` until the first one. Used to tell an idle-timeout drop
+                # (died after a quiet stretch → keepalive too slow) from a reset
+                # during active traffic (don't retune off a one-off blip).
+                last_msg_at: float | None = None
                 try:
                     channel = self._client._get_channel()
                     metadata = self._client._session.get_call_metadata()
@@ -441,6 +481,7 @@ class DevicesApi:
                     stream = stub.execute(request, metadata=metadata, timeout=None)
 
                     async for msg in stream:
+                        last_msg_at = asyncio.get_running_loop().time()
                         if msg.HasField("success"):
                             which = msg.success.WhichOneof("success")
                             if which == "snapshot":
@@ -493,18 +534,20 @@ class DevicesApi:
                 except asyncio.CancelledError:
                     _LOGGER.debug("Device stream task cancelled for space %s", space_id)
                     return
-                except Exception:
+                except Exception as exc:
                     _LOGGER.exception(
                         "Device stream error for space %s, reconnecting in %.0fs",
                         space_id,
                         backoff,
                     )
+                    self._maybe_retune_keepalive(exc, last_msg_at)
                     # Recreate the shared channel before retrying. The peer
                     # reset (UNAVAILABLE) can leave the channel half-open, and
                     # reconnecting onto it never recovers — the integration
                     # then goes silent until a full HA restart (#236). A fresh
-                    # channel re-opens the stream cleanly; the server resends a
-                    # snapshot, so device state re-syncs on its own.
+                    # channel re-opens the stream cleanly (with any retuned
+                    # keepalive); the server resends a snapshot, so device state
+                    # re-syncs on its own.
                     try:
                         await self._client.reconnect_channel()
                     except asyncio.CancelledError:

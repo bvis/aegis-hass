@@ -61,17 +61,32 @@ _TRANSIENT_CODES = {
 # merely quiet (device updates are push-on-change and legitimately idle for
 # long stretches), which a data-freshness watchdog could not.
 #
-# `max_pings_without_data=0` is required: the client sends no DATA on a
-# server-stream, so gRPC would otherwise stop pinging after 2 dataless pings
-# and lose detection on an idle-but-open stream. The interval is kept
-# conservative to avoid a strict backend answering GOAWAY "too_many_pings";
-# bump `keepalive_time_ms` if a server rejects it.
-_KEEPALIVE_OPTIONS: list[tuple[str, int]] = [
-    ("grpc.keepalive_time_ms", 60000),
-    ("grpc.keepalive_timeout_ms", 20000),
-    ("grpc.http2.max_pings_without_data", 0),
-    ("grpc.keepalive_permit_without_calls", 1),
-]
+# The interval self-tunes (see `reduce_keepalive`): it starts high — gentle on
+# the server and below a typical home-router TCP idle timeout — and halves down
+# to a floor whenever the stream keeps dying after an idle stretch, converging
+# under whatever idle timeout the user's network path actually enforces without
+# us having to know it in advance. The floor keeps pings from getting frequent
+# enough to draw a GOAWAY "too_many_pings"; the stream's reconnect handler
+# additionally refuses to reduce on that specific error (it's the opposite
+# problem — too many pings, not too few).
+_KEEPALIVE_START_MS = 240000
+_KEEPALIVE_FLOOR_MS = 60000
+_KEEPALIVE_TIMEOUT_MS = 20000
+
+
+def _keepalive_options(keepalive_time_ms: int) -> list[tuple[str, int]]:
+    """gRPC channel options for HTTP/2 keepalive at the given ping interval.
+
+    `max_pings_without_data=0` is required: the client sends no DATA on a
+    server-stream, so gRPC would otherwise stop pinging after 2 dataless
+    pings and lose detection on an idle-but-open stream.
+    """
+    return [
+        ("grpc.keepalive_time_ms", keepalive_time_ms),
+        ("grpc.keepalive_timeout_ms", _KEEPALIVE_TIMEOUT_MS),
+        ("grpc.http2.max_pings_without_data", 0),
+        ("grpc.keepalive_permit_without_calls", 1),
+    ]
 
 
 class AjaxGrpcClient:
@@ -102,6 +117,10 @@ class AjaxGrpcClient:
         # Serializes channel recreation (#236) so a stream reconnect and a
         # poll failing on the same wedged channel don't churn it twice.
         self._reconnect_lock = asyncio.Lock()
+        # Current keepalive ping interval; self-tunes down toward the floor
+        # via `reduce_keepalive` (#236). In-memory: resets to the high start
+        # on restart and re-converges.
+        self._keepalive_time_ms = _KEEPALIVE_START_MS
 
     @property
     def session(self) -> AjaxSession:
@@ -111,10 +130,38 @@ class AjaxGrpcClient:
     def is_connected(self) -> bool:
         return self._channel is not None and self._session.is_authenticated
 
+    @property
+    def keepalive_time_ms(self) -> int:
+        """Current HTTP/2 keepalive ping interval, in milliseconds."""
+        return self._keepalive_time_ms
+
+    def reduce_keepalive(self) -> bool:
+        """Halve the keepalive interval toward the floor; return True if it moved.
+
+        Called by the stream reconnect path when the connection keeps dying
+        after an idle stretch — i.e. the current ping interval is longer than
+        the network path's idle timeout, so pings arrive too late to keep the
+        link warm. The next `_open_channel` (on reconnect) picks up the value.
+        No-ops at the floor.
+        """
+        new = max(self._keepalive_time_ms // 2, _KEEPALIVE_FLOOR_MS)
+        if new == self._keepalive_time_ms:
+            return False
+        _LOGGER.warning(
+            "Device stream kept dropping while idle — reducing gRPC keepalive "
+            "from %ds to %ds to keep the connection warm",
+            self._keepalive_time_ms // 1000,
+            new // 1000,
+        )
+        self._keepalive_time_ms = new
+        return True
+
     def _open_channel(self) -> grpc.aio.Channel:
         target = f"{self._host}:{self._port}"
         credentials = grpc.ssl_channel_credentials()
-        return grpc.aio.secure_channel(target, credentials, options=_KEEPALIVE_OPTIONS)
+        return grpc.aio.secure_channel(
+            target, credentials, options=_keepalive_options(self._keepalive_time_ms)
+        )
 
     async def connect(self) -> None:
         self._channel = self._open_channel()

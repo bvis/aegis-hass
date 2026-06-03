@@ -2892,3 +2892,48 @@ class TestDeviceStreamReconnect:
                 await task
 
         client.reconnect_channel.assert_awaited_once()
+
+
+class TestKeepaliveRetune:
+    """#236: the device stream shortens the channel keepalive when an idle
+    stream keeps dropping, but never on a too_many_pings GOAWAY or a reset
+    during active traffic."""
+
+    def _api(self) -> tuple[DevicesApi, MagicMock]:
+        client = MagicMock()
+        client.reduce_keepalive = MagicMock(return_value=True)
+        return DevicesApi(client), client
+
+    @pytest.mark.asyncio
+    async def test_reduces_after_long_idle_drop(self) -> None:
+        api, client = self._api()
+        now = asyncio.get_running_loop().time()
+        api._maybe_retune_keepalive(RuntimeError("UNAVAILABLE"), last_msg_at=now - 120.0)
+        client.reduce_keepalive.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_does_not_reduce_after_recent_activity(self) -> None:
+        api, client = self._api()
+        now = asyncio.get_running_loop().time()
+        api._maybe_retune_keepalive(RuntimeError("UNAVAILABLE"), last_msg_at=now - 5.0)
+        client.reduce_keepalive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_does_not_reduce_when_never_received_a_message(self) -> None:
+        api, client = self._api()
+        api._maybe_retune_keepalive(RuntimeError("UNAVAILABLE"), last_msg_at=None)
+        client.reduce_keepalive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_does_not_reduce_on_too_many_pings(self) -> None:
+        """A too_many_pings GOAWAY is the opposite problem (pinging too often),
+        so the interval must be left alone even after a long idle stretch."""
+
+        class _PingError(Exception):
+            def debug_error_string(self) -> str:
+                return 'GOAWAY ... "too_many_pings" (ENHANCE_YOUR_CALM)'
+
+        api, client = self._api()
+        now = asyncio.get_running_loop().time()
+        api._maybe_retune_keepalive(_PingError("unavailable"), last_msg_at=now - 300.0)
+        client.reduce_keepalive.assert_not_called()
