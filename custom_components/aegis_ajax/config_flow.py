@@ -457,7 +457,15 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._client and self._client.session.session_token:
             new_data["session_token"] = self._client.session.session_token
             new_data["user_hex_id"] = self._client.session.user_hex_id
-        return self.async_update_reload_and_abort(entry, data=new_data)
+        # Refresh the visible title and unique_id too, not just the data —
+        # otherwise switching accounts leaves the old email on the entry's
+        # front page until a second reconfigure (#241).
+        return self.async_update_reload_and_abort(
+            entry,
+            unique_id=self._email,
+            title=f"Ajax Security ({self._email})",
+            data=new_data,
+        )
 
     @staticmethod
     @callback

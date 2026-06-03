@@ -633,6 +633,44 @@ class TestAsyncStepReauth:
         assert kwargs["data"]["session_token"] == "tok-2fa"
 
 
+class TestAsyncFinishReconfigure:
+    """Reconfiguring to a different account must refresh the entry's visible
+    title and unique_id, not just its data (#241)."""
+
+    @staticmethod
+    def _make_flow() -> tuple[AjaxCobrandedConfigFlow, MagicMock]:
+        flow = AjaxCobrandedConfigFlow()
+        entry = MagicMock()
+        entry.data = {"email": "old@example.com", "app_label": "Ajax"}
+        entry.unique_id = "old@example.com"
+        flow._get_reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+        return flow, entry
+
+    @pytest.mark.asyncio
+    async def test_finish_reconfigure_updates_title_and_unique_id(self) -> None:
+        flow, entry = self._make_flow()
+        flow._email = "new@example.com"
+        flow._app_label = "Ajax"
+        flow._password_hash = hashlib.sha256(b"pw").hexdigest()
+        mock_client = MagicMock()
+        mock_client.session.session_token = "tok"
+        mock_client.session.user_hex_id = "hex"
+        flow._client = mock_client
+
+        await flow._async_finish_reconfigure()
+
+        flow.async_update_reload_and_abort.assert_called_once()
+        kwargs = flow.async_update_reload_and_abort.call_args.kwargs
+        # The new email must drive both the stored data AND the visible title /
+        # unique_id, so the integration's front page reflects it immediately.
+        assert kwargs["data"]["email"] == "new@example.com"
+        assert kwargs["title"] == "Ajax Security (new@example.com)"
+        assert kwargs["unique_id"] == "new@example.com"
+
+
 class TestOptionsFlow:
     @staticmethod
     def _make_flow(
