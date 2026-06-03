@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -113,6 +114,42 @@ class TestSystemHealthInfo:
         hass = self._make_hass([MagicMock(runtime_data=coord)])
         info = await _system_health_info(hass)
         assert info["can_reach_server"] == "unreachable"
+
+    @pytest.mark.asyncio
+    async def test_reachable_when_poll_stale_but_hts_connected(self) -> None:
+        """A stale poll alone must not read as unreachable: HTS/FCM updates reset
+        HA's poll timer, so the polled refresh can be starved while data still
+        flows (#236). A live HTS connection means the cloud is reachable."""
+        coord = MagicMock()
+        coord.spaces = {"s1": MagicMock()}
+        coord.is_hts_connected = True
+        coord.last_update_success_time = datetime.now(UTC) - timedelta(minutes=30)
+        listener = MagicMock()
+        listener.is_fcm_connected = True
+        listener.pushes_received = 5
+        listener.last_push_at = None
+        coord.notification_listener = listener
+
+        hass = self._make_hass([MagicMock(runtime_data=coord)])
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "reachable"
+
+    @pytest.mark.asyncio
+    async def test_reachable_when_poll_stale_but_recent_push(self) -> None:
+        """A recent FCM push is also proof of reachability even if the poll is stale."""
+        coord = MagicMock()
+        coord.spaces = {"s1": MagicMock()}
+        coord.is_hts_connected = False
+        coord.last_update_success_time = datetime.now(UTC) - timedelta(minutes=30)
+        listener = MagicMock()
+        listener.is_fcm_connected = True
+        listener.pushes_received = 3
+        listener.last_push_at = time.monotonic() - 30  # 30s ago
+        coord.notification_listener = listener
+
+        hass = self._make_hass([MagicMock(runtime_data=coord)])
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "reachable"
 
     @pytest.mark.asyncio
     async def test_can_reach_server_never_polled(self) -> None:

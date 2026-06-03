@@ -79,18 +79,28 @@ async def _system_health_info(hass: HomeAssistant) -> dict[str, Any]:
             if last_push_age_seconds is None or age < last_push_age_seconds:
                 last_push_age_seconds = age
 
-    # Derive reachability from the actual gRPC poll path we already use,
-    # not from a separate HTTPS HEAD probe. The gRPC host doesn't
-    # respond to plain HTTPS GET / HEAD, so `async_check_can_reach_url`
-    # always returned "unreachable" even when polling worked perfectly
-    # (surfaced once #106 made the rest of the card render). If any
-    # account polled successfully in the last 10 min the cloud *is*
-    # reachable from the integration's perspective, regardless of what
-    # an external HTTP probe would say.
-    if last_update_age_seconds is None:
-        info["can_reach_server"] = "never polled"
-    elif last_update_age_seconds <= _REACHABILITY_STALE_AFTER:
+    # Reachability is "is the integration talking to Ajax at all", derived
+    # from our own data paths rather than a separate HTTPS HEAD probe — the
+    # gRPC host doesn't answer plain HTTPS GET/HEAD, so `async_check_can_reach_url`
+    # always returned "unreachable" even when polling worked (#106).
+    #
+    # Crucially, don't key it off the polled refresh alone: HTS and FCM updates
+    # call `async_set_updated_data`, which resets HA's poll timer, so the polled
+    # `_async_update_data` (the only thing that stamps `last_update_success_time`)
+    # can be starved indefinitely while data keeps flowing — which left the card
+    # reading "unreachable" on a perfectly healthy install (#236). A live HTS
+    # connection or a recent push is equally valid proof of reachability;
+    # `last_poll` below still reports its true age.
+    poll_fresh = (
+        last_update_age_seconds is not None and last_update_age_seconds <= _REACHABILITY_STALE_AFTER
+    )
+    push_fresh = (
+        last_push_age_seconds is not None and last_push_age_seconds <= _REACHABILITY_STALE_AFTER
+    )
+    if poll_fresh or hts_connected > 0 or push_fresh:
         info["can_reach_server"] = "reachable"
+    elif last_update_age_seconds is None:
+        info["can_reach_server"] = "never polled"
     else:
         info["can_reach_server"] = "unreachable"
 
