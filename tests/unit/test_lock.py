@@ -126,12 +126,13 @@ class TestAjaxLockState:
 class TestAjaxLockCommands:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("device_type", ["smart_lock", "smart_lock_yale"])
-    async def test_async_lock_sends_device_on(self, device_type: str) -> None:
-        # #219: lock = DeviceCommandDeviceOn keyed by device id. The Ajax app
+    async def test_async_lock_sends_device_off(self, device_type: str) -> None:
+        # #219: lock = DeviceCommandDeviceOff keyed by device id. The Ajax app
         # routes every hub-attached lock (generic AND Yale) through one command
         # path that normalises to the generic `smart_lock` ObjectType on
         # CHANNEL_1, so we always send device_type="smart_lock" + channels=[1]
-        # regardless of the stream's `smart_lock_yale` type.
+        # regardless of the stream's `smart_lock_yale` type. The polarity is
+        # inverted vs a relay: the app sends Off to LOCK (On retracts the bolt).
         device = _make_device(device_type, "unlocked")
         coordinator = _make_coordinator(device)
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)
@@ -140,7 +141,7 @@ class TestAjaxLockCommands:
 
         coordinator.devices_api.send_command.assert_awaited_once()
         cmd: DeviceCommand = coordinator.devices_api.send_command.await_args.args[0]
-        assert cmd.action == "on"
+        assert cmd.action == "off"
         assert cmd.hub_id == "hub-1"
         assert cmd.device_id == "lock-1"
         assert cmd.device_type == "smart_lock"
@@ -149,7 +150,7 @@ class TestAjaxLockCommands:
         coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_async_unlock_sends_device_off(self) -> None:
+    async def test_async_unlock_sends_device_on(self) -> None:
         device = _make_device("smart_lock", "locked")
         coordinator = _make_coordinator(device)
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)
@@ -157,7 +158,7 @@ class TestAjaxLockCommands:
         await lock.async_unlock()
 
         cmd: DeviceCommand = coordinator.devices_api.send_command.await_args.args[0]
-        assert cmd.action == "off"
+        assert cmd.action == "on"
         assert cmd.device_id == "lock-1"
         assert cmd.device_type == "smart_lock"
         assert cmd.channels == [1]

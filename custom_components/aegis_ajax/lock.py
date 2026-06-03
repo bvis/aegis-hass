@@ -110,20 +110,23 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
         Hub-attached Jeweller locks (e.g. Yale modules added by an installer
         on a third-party backend) are not in the SmartLock cloud registry, so
         `SwitchSmartLockService` answers `smart_lock_not_found`. The Ajax app
-        drives them with `DeviceCommandDeviceOn/Off` keyed by device id —
-        lock = On, unlock = Off.
+        drives them with `DeviceCommandDeviceOn/Off` keyed by device id.
 
-        Two details, decompiled from the app's hub-lock command path, are
-        load-bearing (an earlier attempt without them was accepted-but-inert):
-        the app routes EVERY hub-attached lock (generic and Yale alike) through
-        a single processor that emits the GENERIC `smart_lock` ObjectType, and
-        it always sends the command on CHANNEL_1. So we override the stream's
-        `smart_lock_yale` type to `smart_lock` and send `channels=[1]`.
+        Three details are decompiled from the app's hub-lock command path
+        (`SmartLockSpreadInfoMini` → `SwitchDeviceStateApi.switchOn/Off`):
+        it routes EVERY hub-attached lock (generic and Yale alike) through a
+        single processor that emits the GENERIC `smart_lock` ObjectType, always
+        on CHANNEL_1, and — the load-bearing detail this corrects — the
+        polarity is **inverted**: the app sends On to UNLOCK and Off to LOCK
+        (On energises the relay, retracting the bolt). An earlier attempt with
+        lock=On was accepted by the hub but actuated the wrong way. So we
+        override the stream's `smart_lock_yale` type to `smart_lock`, send
+        `channels=[1]`, and map lock = Off / unlock = On.
         """
         device = self._device
         if device is None:
             return
-        factory = DeviceCommand.on if lock else DeviceCommand.off
+        factory = DeviceCommand.off if lock else DeviceCommand.on
         command = factory(
             hub_id=device.hub_id,
             device_id=self._device_id,
