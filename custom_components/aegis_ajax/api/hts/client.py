@@ -74,6 +74,23 @@ MAX_CONSECUTIVE_READ_TIMEOUTS = 3
 # buffer would grow without bound. Force a reconnect past this size instead.
 MAX_FRAME_BUFFER_BYTES = 256 * 1024
 
+# HTS message type 0x08 is the hub's event/notification channel (not in the
+# documented `MsgType` table). It carries, among others, the frame the hub
+# emits the instant the hub-wide Chime is toggled — including from the Ajax app
+# (#239). We don't decode its meaning from the bytes yet; we recognise the
+# Chime frame by signature and use it only as a trigger to re-read the
+# authoritative gRPC chime_status.
+_MSG_TYPE_EVENT = 0x08
+# Leading TLV params shared by every observed Chime-toggle event frame
+# (BadFlo's #239 capture): params[0]=0x02, params[1]=0x22, params[2]=
+# 0x33 80 41 a4. params[3] is the candidate state byte (0x38/0x39) — logged
+# for correlation against the gRPC truth, never trusted as state on its own.
+_CHIME_EVENT_SIGNATURE: tuple[bytes, bytes, bytes] = (
+    b"\x02",
+    b"\x22",
+    b"\x33\x80\x41\xa4",
+)
+
 
 def _redact_payload_hex(data: bytes) -> str:
     """Hex-encode `data`, masking runs of >=3 printable-ASCII bytes as
@@ -201,6 +218,14 @@ class HtsClient:
         # readings — it just forwards every non-hub kv block from a
         # STATUS/SETTINGS body and lets the coordinator filter by type.
         self._on_device_kv: Callable[[str, str, dict[int, bytes]], None] | None = None
+        # Chime-event callback wired by the coordinator (#239). The hub emits a
+        # `type=0x08` event frame the instant the hub-wide Chime is toggled
+        # (including from the Ajax app); the client recognises that frame and
+        # forwards `(hub_id, redacted_payload_hex, candidate_state_byte)` so the
+        # coordinator can re-read the authoritative gRPC chime_status without
+        # waiting for the hourly snapshot. The byte is forwarded for DEBUG
+        # correlation logging only — never used as the state itself yet.
+        self._on_chime_event: Callable[[str, str, int | None], None] | None = None
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
 
     # ------------------------------------------------------------------
@@ -573,6 +598,7 @@ class HtsClient:
         self,
         on_state_update: Callable[[str, HubNetworkState], None] | None = None,
         on_device_kv: Callable[[str, str, dict[int, bytes]], None] | None = None,
+        on_chime_event: Callable[[str, str, int | None], None] | None = None,
     ) -> None:
         """Main receive loop: ACK messages and dispatch UPDATES.
 
@@ -585,9 +611,13 @@ class HtsClient:
                           match `coordinator.devices` keys. The coordinator decides
                           which device types consume the kv (#123 electrical
                           readings live here).
+            on_chime_event: Optional callback invoked with (hub_id, payload_hex,
+                          candidate_state_byte) when a hub Chime-toggle event frame
+                          (`type=0x08`) is recognised (#239).
         """
         self._on_state_update = on_state_update
         self._on_device_kv = on_device_kv
+        self._on_chime_event = on_chime_event
         self._ping_task = asyncio.create_task(self._ping_loop())
         self._status_refresh_task = asyncio.create_task(self._status_refresh_loop())
 
@@ -655,6 +685,8 @@ class HtsClient:
                     await self._handle_update(msg)
                 elif msg.msg_type == MsgType.ACK:
                     pass  # expected
+                elif int(msg.msg_type) == _MSG_TYPE_EVENT:
+                    self._handle_event_message(msg)
                 else:
                     _LOGGER.debug("  payload hex: %s", _redact_payload_hex(msg.payload[:80]))
         finally:
@@ -828,6 +860,45 @@ class HtsClient:
             return
 
         self._schedule_hub_refresh(hub_id, f"unknown update sub-key {sub_key}")
+
+    def _handle_event_message(self, msg: HtsMessage) -> None:
+        """Handle a `type=0x08` hub event frame (#239).
+
+        Always logs the (redacted) payload at DEBUG so the full 0x08 event
+        vocabulary is visible for analysis. When the frame matches the known
+        Chime-toggle signature, forwards `(hub_id, payload_hex, candidate_byte)`
+        to the coordinator's chime callback so it can re-read the authoritative
+        gRPC chime_status immediately instead of waiting for the hourly
+        snapshot. The candidate byte is forwarded for correlation logging only.
+        Fail-safe: any decode/dispatch problem just falls back to the periodic
+        snapshot path.
+        """
+        redacted = _redact_payload_hex(msg.payload)
+        _LOGGER.debug("  EVENT(0x08) payload hex: %s", redacted)
+        if self._on_chime_event is None:
+            return
+        try:
+            params = tlv_decode(msg.payload)
+        except Exception:
+            return
+        if not self._is_chime_event(params):
+            return
+        hub_id = self._hub_id_from_message(msg)
+        if not hub_id:
+            return
+        candidate = params[3][0] if len(params) >= 4 and params[3] else None
+        try:
+            self._on_chime_event(hub_id, redacted, candidate)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("on_chime_event callback raised for hub %s", hub_id)
+
+    @staticmethod
+    def _is_chime_event(params: list[bytes]) -> bool:
+        """Recognise a Chime-toggle event frame by its leading TLV params (#239)."""
+        return (
+            len(params) >= len(_CHIME_EVENT_SIGNATURE)
+            and tuple(params[: len(_CHIME_EVENT_SIGNATURE)]) == _CHIME_EVENT_SIGNATURE
+        )
 
     def _hub_id_from_message(self, msg: HtsMessage) -> str | None:
         """Return the hub id when the message is clearly associated with one hub."""

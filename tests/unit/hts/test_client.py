@@ -1411,3 +1411,82 @@ class TestConnect:
         ):
             result = await client.connect()
         assert result is fake
+
+
+class TestChimeEvent:
+    """`type=0x08` hub Chime-toggle event recognition + callback (#239)."""
+
+    @staticmethod
+    def _chime_payload(state_byte: bytes = b"\x39") -> bytes:
+        # Mirrors BadFlo's #239 capture: 0x02, 0x22, 0x33 80 41 a4, <state>, …
+        return tlv_encode([b"\x02", b"\x22", b"\x33\x80\x41\xa4", state_byte, b"\x00\x00", b"\x00"])
+
+    def test_is_chime_event_true_for_signature(self) -> None:
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        params = tlv_decode(self._chime_payload())
+        assert HtsClient._is_chime_event(params) is True
+
+    def test_is_chime_event_false_for_other_event(self) -> None:
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        params = tlv_decode(tlv_encode([b"\x02", b"\x99", b"\x00"]))
+        assert HtsClient._is_chime_event(params) is False
+
+    def test_event_message_fires_callback_with_candidate_byte(self) -> None:
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        cb = MagicMock()
+        client._on_chime_event = cb
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=0x08,
+            payload=self._chime_payload(b"\x39"),
+        )
+
+        client._handle_event_message(msg)
+
+        cb.assert_called_once()
+        hub_id, payload_hex, candidate = cb.call_args[0]
+        assert hub_id == "12345678"
+        assert candidate == 0x39
+        assert isinstance(payload_hex, str)
+
+    def test_non_chime_event_does_not_fire_callback(self) -> None:
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        cb = MagicMock()
+        client._on_chime_event = cb
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=0x08,
+            payload=tlv_encode([b"\x07", b"\x01"]),
+        )
+
+        client._handle_event_message(msg)
+
+        cb.assert_not_called()
+
+    def test_no_callback_set_is_safe(self) -> None:
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._on_chime_event = None
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=0x08,
+            payload=self._chime_payload(),
+        )
+        # Must not raise.
+        client._handle_event_message(msg)

@@ -169,6 +169,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
+        # Space ids with an in-flight chime snapshot re-read (#239), so a burst
+        # of HTS Chime events coalesces into a single gRPC snapshot call.
+        self._chime_refresh_inflight: set[str] = set()
         # Monotonic timestamp of the last user-triggered STATUS_BODY
         # refresh per hub. Read by `async_request_manual_refresh` to
         # rate-limit successive presses to `MANUAL_REFRESH_INTERVAL`.
@@ -686,6 +689,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._hts_client.listen(
                 on_state_update=self._on_hts_update,
                 on_device_kv=self._on_hts_device_kv,
+                on_chime_event=self._on_hts_chime_event,
             )
         except Exception as exc:
             # Surface at WARNING (#111) — a silent DEBUG made these failures
@@ -736,6 +740,65 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_readings[device_id_hex] = readings
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         _ = hub_id  # currently unused; kept in the signature for symmetry with on_state_update
+
+    def _on_hts_chime_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
+        """React to a hub Chime-toggle event pushed over HTS in real time (#239).
+
+        The hub emits this the instant the Chime is toggled (including from the
+        Ajax app), so it lets the switch reflect external changes immediately
+        rather than at the hourly snapshot cadence. We do NOT trust the event's
+        candidate byte as the state; we use the event purely as a trigger to
+        re-read the authoritative gRPC `chime_status`, and log the
+        `(payload, candidate byte, resulting status)` correlation at DEBUG so a
+        later version can graduate to decoding the byte directly and drop the
+        extra snapshot call. Runs on the event loop (HTS listen task), so it
+        schedules the async re-read as a task. Coalesces bursts per space.
+        """
+        space_id = next(
+            (sid for sid, s in self.spaces.items() if s.hub_id == hub_id),
+            None,
+        )
+        if space_id is None or space_id in self._chime_refresh_inflight:
+            return
+        self._chime_refresh_inflight.add(space_id)
+        self.hass.async_create_task(
+            self._refresh_chime_from_event(space_id, payload_hex, candidate)
+        )
+
+    async def _refresh_chime_from_event(
+        self, space_id: str, payload_hex: str, candidate: int | None
+    ) -> None:
+        """Re-read the authoritative chime_status after an HTS Chime event (#239)."""
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        try:
+            snapshot = await self._spaces_api.get_space_snapshot(space_id)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "Chime HTS event for space %s: snapshot re-read failed; "
+                "falling back to the periodic refresh",
+                space_id,
+                exc_info=True,
+            )
+            return
+        finally:
+            self._chime_refresh_inflight.discard(space_id)
+        # Correlation log for the eventual HTS-native implementation: pairs the
+        # raw event byte with the gRPC ground truth it resolved to (#239).
+        candidate_hex = "none" if candidate is None else f"0x{candidate:02X}"
+        _LOGGER.debug(
+            "Chime HTS event correlation: space=%s candidate_byte=%s payload=%s "
+            "-> gRPC chime_status=%s",
+            space_id,
+            candidate_hex,
+            payload_hex,
+            snapshot.chime_status.name,
+        )
+        current = self.spaces.get(space_id)
+        if current is None or current.chime_status == snapshot.chime_status:
+            return
+        self.spaces[space_id] = dc_replace(current, chime_status=snapshot.chime_status)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def _handle_hts_task_done(self, task: asyncio.Task[None]) -> None:
         """Clear stale HTS state when the listen task exits."""

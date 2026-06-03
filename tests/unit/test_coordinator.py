@@ -2233,3 +2233,101 @@ class TestSetChimeOptimistic:
         coordinator.set_chime_optimistic("unknown", enable=False)
         assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
         coordinator.async_set_updated_data.assert_not_called()
+
+
+class TestHtsChimeEvent:
+    """HTS Chime-event nudge → authoritative gRPC re-read (#239)."""
+
+    def _make_coordinator(
+        self, chime_status: ChimeStatus = ChimeStatus.CAN_BE_ENABLED
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=client, space_ids=["s1"], poll_interval=300
+            )
+        coordinator.hass = hass
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="HUB1",
+                name="Home",
+                security_state=SecurityState.DISARMED,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+                chime_status=chime_status,
+            )
+        }
+        return coordinator
+
+    def test_event_schedules_refresh_for_matching_hub(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.hass.async_create_task = MagicMock()
+
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x39)
+
+        coordinator.hass.async_create_task.assert_called_once()
+        assert "s1" in coordinator._chime_refresh_inflight
+        # Avoid an un-awaited coroutine warning from the stubbed task factory.
+        coordinator.hass.async_create_task.call_args[0][0].close()
+
+    def test_unknown_hub_is_ignored(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.hass.async_create_task = MagicMock()
+
+        coordinator._on_hts_chime_event("OTHER", "deadbeef", 0x39)
+
+        coordinator.hass.async_create_task.assert_not_called()
+
+    def test_inflight_event_is_coalesced(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.hass.async_create_task = MagicMock()
+        coordinator._chime_refresh_inflight.add("s1")
+
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x39)
+
+        coordinator.hass.async_create_task.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_updates_chime_status_and_clears_inflight(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
+        coordinator._chime_refresh_inflight.add("s1")
+        snapshot = MagicMock()
+        snapshot.chime_status = ChimeStatus.ENABLED
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=snapshot)
+
+        await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
+
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
+        assert "s1" not in coordinator._chime_refresh_inflight
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_clears_inflight_on_snapshot_failure(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator._chime_refresh_inflight.add("s1")
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(side_effect=RuntimeError("boom"))
+
+        await coordinator._refresh_chime_from_event("s1", "deadbeef", None)
+
+        assert "s1" not in coordinator._chime_refresh_inflight
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_no_write_when_status_unchanged(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator._chime_refresh_inflight.add("s1")
+        snapshot = MagicMock()
+        snapshot.chime_status = ChimeStatus.ENABLED
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=snapshot)
+
+        await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
+
+        coordinator.async_set_updated_data.assert_not_called()
