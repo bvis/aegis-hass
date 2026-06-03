@@ -418,6 +418,13 @@ The integration can run with or without Firebase Cloud Messaging (FCM) push, but
 
 If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can dismiss the related Repair card; the integration will not break.
 
+> **FCM shows connected but app → HA updates still don't arrive?** Make sure Home
+> Assistant uses a **different Ajax account than your phone app**. Ajax doesn't
+> reliably deliver one account's push to two sessions at once, so an actively-used
+> phone app can leave HA's push channel starved even though FCM reports connected —
+> you'd still get changes on the next poll, just not instantly. A dedicated account
+> for HA (see [Configuration](#configuration)) avoids this.
+
 > **Alternative to FCM: Ajax's SIA stream.** If you'd rather not extract Firebase
 > credentials at all, many Ajax hubs can stream events to Home Assistant's built-in
 > [SIA integration](https://www.home-assistant.io/integrations/sia/) (set up a
