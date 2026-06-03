@@ -95,7 +95,10 @@ Click the button above, or manually:
 > Instead of your primary admin login, create a separate Ajax account, invite it to
 > your space (Ajax app → space → Users → Invite) and grant it only what the
 > integration needs. A non-admin **User** role is enough to read device state and
-> arm / disarm. You can also revoke its **photo / video** access if you don't use
+> arm / disarm — but to also receive **push events**, the account must be allowed to
+> receive event notifications (a very restricted role can register for push yet never
+> get events; see the FCM troubleshooting note below). You can also revoke its
+> **photo / video** access if you don't use
 > Photo on Demand, so Home Assistant never has access to camera images. This keeps
 > your main credentials out of HA and limits what a compromised HA host could reach
 > in your Ajax installation.
@@ -418,12 +421,17 @@ The integration can run with or without Firebase Cloud Messaging (FCM) push, but
 
 If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can dismiss the related Repair card; the integration will not break.
 
-> **FCM shows connected but app → HA updates still don't arrive?** Make sure Home
-> Assistant uses a **different Ajax account than your phone app**. Ajax doesn't
-> reliably deliver one account's push to two sessions at once, so an actively-used
-> phone app can leave HA's push channel starved even though FCM reports connected —
-> you'd still get changes on the next poll, just not instantly. A dedicated account
-> for HA (see [Configuration](#configuration)) avoids this.
+> **FCM shows connected but app → HA updates still don't arrive?** Two common causes:
+>
+> - **Same account in the app and in HA.** Ajax doesn't reliably deliver one account's
+>   push to two sessions at once, so an actively-used phone app can leave HA's push
+>   channel starved even though FCM reports connected. Give HA its own account (see
+>   [Configuration](#configuration)).
+> - **The HA account can't receive event notifications.** A very limited invited role
+>   may register for push yet never get events — one user found a full-access role was
+>   needed. Make sure the account is allowed to receive notifications for the space.
+>
+> Either way you'd still get changes on the next poll, just not instantly.
 
 > **Alternative to FCM: Ajax's SIA stream.** If you'd rather not extract Firebase
 > credentials at all, many Ajax hubs can stream events to Home Assistant's built-in
