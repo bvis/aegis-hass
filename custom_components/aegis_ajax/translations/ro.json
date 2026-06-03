@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Excludere"
+            },
+            "chime": {
+                "name": "Sonerie"
             }
         },
         "update": {

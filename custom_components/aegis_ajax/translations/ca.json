@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Bypass"
+            },
+            "chime": {
+                "name": "Timbre"
             }
         },
         "update": {

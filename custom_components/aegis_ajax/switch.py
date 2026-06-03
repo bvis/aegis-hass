@@ -19,14 +19,18 @@ from custom_components.aegis_ajax.const import (
     DEFAULT_BYPASS_SWITCHES,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
-from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
+from custom_components.aegis_ajax.entity import (
+    async_send_device_command,
+    async_set_chimes_mode,
+    build_device_info,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from custom_components.aegis_ajax.api.models import Device
+    from custom_components.aegis_ajax.api.models import Device, Space
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,6 +121,21 @@ async def async_setup_entry(
                     device_type=device.device_type,
                 )
             )
+    # One hub-wide Chime switch per hub that exposes the feature (#239). Hubs
+    # that don't report a Chime status (UNSPECIFIED) get none.
+    for space in coordinator.spaces.values():
+        if (
+            space.hub_id
+            and space.chime_status.is_supported
+            and coordinator.devices.get(space.hub_id)
+        ):
+            entities.append(
+                AjaxChimeSwitch(
+                    coordinator=coordinator,
+                    space_id=space.id,
+                    hub_id=space.hub_id,
+                )
+            )
     _evict_orphan_bypass_switches(
         hass,
         entry,
@@ -124,6 +143,15 @@ async def async_setup_entry(
             e.unique_id
             for e in entities
             if isinstance(e, AjaxBypassSwitch) and e.unique_id is not None
+        },
+    )
+    _evict_orphan_chime_switches(
+        hass,
+        entry,
+        provided={
+            e.unique_id
+            for e in entities
+            if isinstance(e, AjaxChimeSwitch) and e.unique_id is not None
         },
     )
     async_add_entities(entities)
@@ -152,6 +180,32 @@ def _evict_orphan_bypass_switches(
             _LOGGER.info(
                 "Removing orphaned bypass switch %s — the bypass_switches option "
                 "no longer provides it (#bypass)",
+                reg_entry.entity_id,
+            )
+            entity_reg.async_remove(reg_entry.entity_id)
+
+
+def _evict_orphan_chime_switches(
+    hass: HomeAssistant, entry: ConfigEntry, *, provided: set[str]
+) -> None:
+    """Remove Chime-switch entities no longer provided (#239).
+
+    A hub that stops exposing the Chime feature (firmware change, hub removed
+    from the space) drops its `AjaxChimeSwitch`. HA leaves the orphan in the
+    registry as `unavailable` until the user deletes it; evict it here on the
+    reload that drops it, mirroring the bypass-switch eviction.
+    """
+    entity_reg = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(entity_reg, entry.entry_id):
+        unique_id = reg_entry.unique_id
+        if (
+            reg_entry.domain == "switch"
+            and unique_id.endswith("_chime")
+            and unique_id not in provided
+        ):
+            _LOGGER.info(
+                "Removing orphaned Chime switch %s — the hub no longer exposes "
+                "the Chime feature (#239)",
                 reg_entry.entity_id,
             )
             entity_reg.async_remove(reg_entry.entity_id)
@@ -275,3 +329,56 @@ class AjaxBypassSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity
             enable=enable,
         )
         await async_send_device_command(self.coordinator, cmd)
+
+
+class AjaxChimeSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
+    """Enable/disable the hub-wide Chime (#239).
+
+    `on` = the hub plays the Chime tone on the configured detectors while
+    disarmed; `off` = silenced. Hub-level setting, so one switch per hub.
+    State is read from `space.chime_status` (the same field the Ajax app
+    shows); toggling requires the account's `EDIT_CHIMES` permission — a
+    limited account surfaces a clear `permission_denied` error on toggle.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "chime"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxCobrandedCoordinator,
+        space_id: str,
+        hub_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._hub_id = hub_id
+        self._attr_unique_id = f"aegis_ajax_{hub_id}_chime"
+        hub_device = coordinator.devices.get(hub_id)
+        if hub_device:
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
+
+    @property
+    def _space(self) -> Space | None:
+        return self.coordinator.spaces.get(self._space_id)
+
+    @property
+    def available(self) -> bool:
+        space = self._space
+        return space is not None and space.is_online and space.chime_status.is_supported
+
+    @property
+    def is_on(self) -> bool | None:
+        space = self._space
+        if space is None:
+            return None
+        return space.chime_status.is_on
+
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await async_set_chimes_mode(self.coordinator, self._hub_id, enable=True)
+        self.coordinator.set_chime_optimistic(self._space_id, enable=True)
+
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await async_set_chimes_mode(self.coordinator, self._hub_id, enable=False)
+        self.coordinator.set_chime_optimistic(self._space_id, enable=False)

@@ -21,6 +21,7 @@ from custom_components.aegis_ajax.api.models import (
 )
 from custom_components.aegis_ajax.const import (
     HUB_DEVICE_TEMP_REFRESH_INTERVAL,
+    ChimeStatus,
     ConnectionStatus,
     DeviceState,
     SecurityState,
@@ -2176,3 +2177,59 @@ class TestHubDeviceTemperatureRefresh:
         coordinator._handle_devices_snapshot([_make_device("d1")])
 
         assert "temperature" not in coordinator.devices["d1"].statuses
+
+
+class TestSetChimeOptimistic:
+    """Immediate optimistic Chime state after an HA-initiated toggle (#239)."""
+
+    def _make_coordinator(
+        self, chime_status: ChimeStatus = ChimeStatus.CAN_BE_ENABLED
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        client = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=client, space_ids=["s1"], poll_interval=300
+            )
+        coordinator.hass = hass
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="hub-1",
+                name="Home",
+                security_state=SecurityState.DISARMED,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+                chime_status=chime_status,
+            )
+        }
+        return coordinator
+
+    def test_enable_sets_enabled(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
+        coordinator.set_chime_optimistic("s1", enable=True)
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_disable_sets_can_be_enabled(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator.set_chime_optimistic("s1", enable=False)
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.CAN_BE_ENABLED
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_no_change_skips_update(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator.set_chime_optimistic("s1", enable=True)
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_unknown_space_no_op(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator.set_chime_optimistic("unknown", enable=False)
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
+        coordinator.async_set_updated_data.assert_not_called()

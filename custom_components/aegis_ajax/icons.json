@@ -38,7 +38,8 @@
         },
         "switch": {
             "channel_1": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
-            "channel_2": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } }
+            "channel_2": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
+            "chime": { "default": "mdi:bell", "state": { "on": "mdi:bell-ring", "off": "mdi:bell-off" } }
         },
         "button": {
             "capture_photo": { "default": "mdi:camera" }

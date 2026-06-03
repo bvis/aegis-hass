@@ -63,15 +63,43 @@ async def async_send_device_command(
     try:
         await coordinator.devices_api.send_command(command)
     except DeviceCommandError as err:
-        translation_key = COMMAND_ERROR_TRANSLATION_KEYS.get(err.reason or "")
-        if translation_key is not None:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN, translation_key=translation_key
-            ) from err
-        placeholders: dict[str, Any] = {"reason": err.reason or "unknown"}
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="command_failed",
-            translation_placeholders=placeholders,
-        ) from err
+        _raise_translated_command_error(err)
     await coordinator.async_request_refresh()
+
+
+async def async_set_chimes_mode(
+    coordinator: AjaxCobrandedCoordinator, hub_id: str, *, enable: bool
+) -> None:
+    """Toggle the hub-wide Chime, mapping hub rejections to a clear error (#239).
+
+    Companion to `async_send_device_command` for the hub-level Chime command,
+    which isn't a per-device `DeviceCommand`. Same error-to-translation mapping
+    (`permission_denied` when the account lacks EDIT_CHIMES, `hub_offline`, …)
+    and the coordinator is only refreshed on success.
+    """
+    from custom_components.aegis_ajax.api.devices import DeviceCommandError  # noqa: PLC0415
+
+    try:
+        await coordinator.devices_api.set_chimes_mode(hub_id, enable=enable)
+    except DeviceCommandError as err:
+        _raise_translated_command_error(err)
+    await coordinator.async_request_refresh()
+
+
+def _raise_translated_command_error(err: Any) -> None:  # noqa: ANN401
+    """Re-raise a `DeviceCommandError` as a translated `HomeAssistantError`.
+
+    Maps the server's failure-oneof reason to an `exceptions.*` key when known,
+    otherwise falls back to `command_failed` echoing the raw reason.
+    """
+    translation_key = COMMAND_ERROR_TRANSLATION_KEYS.get(err.reason or "")
+    if translation_key is not None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key=translation_key
+        ) from err
+    placeholders: dict[str, Any] = {"reason": err.reason or "unknown"}
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="command_failed",
+        translation_placeholders=placeholders,
+    ) from err

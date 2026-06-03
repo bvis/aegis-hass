@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Pominięcie"
+            },
+            "chime": {
+                "name": "Gong"
             }
         },
         "update": {

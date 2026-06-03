@@ -13,7 +13,7 @@ from custom_components.aegis_ajax.api.models import (
     Space,
     SpaceSnapshot,
 )
-from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
+from custom_components.aegis_ajax.const import ChimeStatus, ConnectionStatus, SecurityState
 
 # GroupSecurity.State proto enum:
 #   GROUP_SECURITY_STATE_NONE = 0
@@ -52,6 +52,29 @@ class SpacesApi:
             connection_status=ConnectionStatus(proto_space.hub_connection_status),
             malfunctions_count=proto_space.malfunctions_count,
         )
+
+    @staticmethod
+    def extract_chime_status(proto_space: Any) -> ChimeStatus:  # noqa: ANN401
+        """Pull the hub-wide Chime status off the full space snapshot (#239).
+
+        Mirrors the official app's `tqs.a(space)`: walk `space.devices`, take
+        the `StandaloneDevice` whose `device` oneof is `hub`, and read its
+        `chime_status`. Only the heavy `get_space_snapshot` carries the full
+        `Space` (with `devices`); the lighter `list_spaces` returns a
+        `LiteSpace` that has no devices, so Chime state rides the same hourly
+        snapshot path as rooms/groups. Defensive on every step — no hub
+        device, an unrecognised enum value, or a snapshot without `devices`
+        all yield `UNSPECIFIED` (no Chime switch), never an error that would
+        blank the whole snapshot.
+        """
+        try:
+            for device in proto_space.devices:
+                which = device.WhichOneof("device") if hasattr(device, "WhichOneof") else None
+                if which == "hub":
+                    return ChimeStatus(int(device.hub.chime_status))
+        except (TypeError, ValueError, AttributeError):
+            pass
+        return ChimeStatus.UNSPECIFIED
 
     @staticmethod
     def parse_groups(proto_security: Any, space_id: str) -> tuple[tuple[Group, ...], bool]:  # noqa: ANN401
@@ -212,6 +235,7 @@ class SpacesApi:
         monitoring_companies: list[MonitoringCompany] = []
         groups: tuple[Group, ...] = ()
         group_mode_enabled: bool = False
+        chime_status = ChimeStatus.UNSPECIFIED
         try:
             async for msg in stream:
                 if msg.HasField("failure"):
@@ -228,6 +252,7 @@ class SpacesApi:
                     monitoring_companies.append(self.parse_monitoring_company(proto_company))
                 if hasattr(snapshot, "security"):
                     groups, group_mode_enabled = self.parse_groups(snapshot.security, space_id)
+                chime_status = self.extract_chime_status(snapshot)
                 break
         finally:
             cancel = getattr(stream, "cancel", None)
@@ -250,6 +275,7 @@ class SpacesApi:
             monitoring_companies_loaded=True,
             groups=groups,
             group_mode_enabled=group_mode_enabled,
+            chime_status=chime_status,
         )
 
     async def _resolve_company_name(

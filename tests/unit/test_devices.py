@@ -2937,3 +2937,78 @@ class TestKeepaliveRetune:
         now = asyncio.get_running_loop().time()
         api._maybe_retune_keepalive(_PingError("unavailable"), last_msg_at=now - 300.0)
         client.reduce_keepalive.assert_not_called()
+
+
+class TestSetChimesMode:
+    """`device_command_chimes_mode` — hub-wide Chime enable/disable (#239)."""
+
+    def _make_api(self) -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("enable", "expected_attr"),
+        [(True, "CHIMES_STATUS_ENABLE"), (False, "CHIMES_STATUS_DISABLE")],
+    )
+    async def test_sends_hub_id_and_chimes_status(self, enable: bool, expected_attr: str) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_chimes_mode import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ok = response_pb2.DeviceCommandChimesModeResponse(success=common_response_pb2.Success())
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return ok
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(endpoint_pb2_grpc, "DeviceCommandChimesModeServiceStub", _StubFactory):
+            await api.set_chimes_mode("hub-1", enable=enable)
+
+        assert len(captured) == 1
+        req = captured[0]
+        assert req.hub_id == "hub-1"
+        assert req.WhichOneof("additional_param") == "chimes_status"
+        assert req.chimes_status == getattr(
+            request_pb2.DeviceCommandChimesModeRequest, expected_attr
+        )
+
+    @pytest.mark.asyncio
+    async def test_failure_raises_with_reason(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_chimes_mode import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        failure = response_pb2.DeviceCommandChimesModeResponse(
+            failure=response_pb2.DeviceCommandChimesModeResponse.Failure(
+                permission_denied=common_response_pb2.Error(),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(return_value=failure)
+
+        with (
+            patch.object(endpoint_pb2_grpc, "DeviceCommandChimesModeServiceStub", _StubFactory),
+            pytest.raises(DeviceCommandError) as exc_info,
+        ):
+            await api.set_chimes_mode("hub-1", enable=True)
+
+        assert exc_info.value.reason == "permission_denied"

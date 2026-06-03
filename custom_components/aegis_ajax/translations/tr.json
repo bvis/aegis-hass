@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Atlama"
+            },
+            "chime": {
+                "name": "Zil sesi"
             }
         },
         "update": {

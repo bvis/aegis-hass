@@ -13,7 +13,7 @@ from custom_components.aegis_ajax.api.models import (
     SpaceSnapshot,
 )
 from custom_components.aegis_ajax.api.spaces import SpacesApi
-from custom_components.aegis_ajax.const import ConnectionStatus, SecurityState
+from custom_components.aegis_ajax.const import ChimeStatus, ConnectionStatus, SecurityState
 
 _FIND_SPACES_BASE = "v3.mobilegwsvc.service.find_user_spaces_with_pagination"
 _STREAM_SPACE_REQUEST = "systems.ajax.api.mobile.v2.space.stream_space_updates_request_pb2"
@@ -39,6 +39,53 @@ class TestParseSpace:
         assert result.security_state == SecurityState.DISARMED
         assert result.connection_status == ConnectionStatus.ONLINE
         assert result.monitoring_companies_loaded is False
+
+
+class TestExtractChimeStatus:
+    """Real-proto coverage of the `tqs.a(space)` hub-Chime walk (#239).
+
+    Reads off the full `Space` snapshot (the only response carrying `devices`).
+    """
+
+    @staticmethod
+    def _build_space(chime_value: int | None) -> object:
+        from systems.ajax.api.mobile.v2.common.space import space_pb2
+        from systems.ajax.api.mobile.v2.common.space.device import (
+            standalone_device_pb2,
+        )
+
+        space = space_pb2.Space(id="s1")
+        if chime_value is not None:
+            hub_dev = standalone_device_pb2.StandaloneDevice()
+            hub_dev.hub.chime_status = chime_value
+            space.devices.append(hub_dev)
+        return space
+
+    @pytest.mark.parametrize(
+        ("chime_value", "expected"),
+        [
+            (1, ChimeStatus.ENABLED),
+            (2, ChimeStatus.CAN_BE_ENABLED),
+            (3, ChimeStatus.MALFUNCTION),
+            (4, ChimeStatus.DISABLED),
+            (0, ChimeStatus.UNSPECIFIED),
+        ],
+    )
+    def test_reads_chime_status_off_hub_device(
+        self, chime_value: int, expected: ChimeStatus
+    ) -> None:
+        space = self._build_space(chime_value)
+        assert SpacesApi.extract_chime_status(space) == expected
+
+    def test_no_hub_device_yields_unspecified(self) -> None:
+        space = self._build_space(None)
+        assert SpacesApi.extract_chime_status(space) == ChimeStatus.UNSPECIFIED
+
+    def test_no_devices_attribute_yields_unspecified(self) -> None:
+        # `spec=[]` makes attribute access raise AttributeError, emulating a
+        # response object that doesn't carry `devices` (e.g. a LiteSpace).
+        proto_space = MagicMock(spec=[])
+        assert SpacesApi.extract_chime_status(proto_space) == ChimeStatus.UNSPECIFIED
 
     def test_parse_space_armed(self) -> None:
         proto_space = MagicMock()
@@ -439,6 +486,45 @@ class TestGetSpaceSnapshot:
         assert snapshot.monitoring_companies[1].name == "Central Two"
         assert snapshot.monitoring_companies[1].status == MonitoringCompanyStatus.PENDING_APPROVAL
         assert snapshot.monitoring_companies_loaded is True
+
+    @pytest.mark.asyncio
+    async def test_reads_hub_chime_status_from_snapshot(self) -> None:
+        """The snapshot's full Space carries the hub Chime status (#239)."""
+        from systems.ajax.api.mobile.v2.common.space.device import (
+            standalone_device_pb2,
+        )
+
+        mock_client = MagicMock()
+        mock_client._get_channel.return_value = MagicMock()
+        mock_client._session.get_call_metadata.return_value = []
+        api = SpacesApi(mock_client)
+
+        hub_dev = standalone_device_pb2.StandaloneDevice()
+        hub_dev.hub.chime_status = 1  # ENABLED
+
+        snapshot_msg = MagicMock()
+        snapshot_msg.HasField.side_effect = lambda f: f == "success"
+        snapshot_msg.success.WhichOneof.return_value = "snapshot"
+        snapshot_msg.success.snapshot.rooms = []
+        snapshot_msg.success.snapshot.monitoring_companies = []
+        snapshot_msg.success.snapshot.devices = [hub_dev]
+
+        stream = _async_iter([snapshot_msg])
+        stub_instance = MagicMock()
+        stub_instance.stream = MagicMock(return_value=stream)
+        grpc_module = MagicMock(SpaceServiceStub=MagicMock(return_value=stub_instance))
+
+        with patch.dict(
+            "sys.modules",
+            {
+                _STREAM_SPACE_REQUEST: MagicMock(),
+                _SPACE_GRPC: grpc_module,
+                _SPACE_LOCATOR: MagicMock(),
+            },
+        ):
+            snapshot = await api.get_space_snapshot("space-1")
+
+        assert snapshot.chime_status == ChimeStatus.ENABLED
 
 
 _PANIC_REQUEST = "systems.ajax.api.mobile.v2.space.press_panic_button_request_pb2"

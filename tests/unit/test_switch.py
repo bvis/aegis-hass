@@ -434,3 +434,233 @@ class TestBypassOrphanEviction:
             ],
         )
         assert removed == []
+
+
+class TestAjaxChimeSwitch:
+    """Hub-wide Chime switch (#239)."""
+
+    def _make(self, chime_status: object = None, online: bool = True) -> tuple[object, MagicMock]:
+        from custom_components.aegis_ajax.const import ChimeStatus
+        from custom_components.aegis_ajax.switch import AjaxChimeSwitch
+
+        if chime_status is None:
+            chime_status = ChimeStatus.ENABLED
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        hub = MagicMock(device_type="hub_two_plus")
+        coordinator.devices = {"hub-1": hub}
+        space = MagicMock(id="s1", hub_id="hub-1")
+        space.is_online = online
+        space.chime_status = chime_status
+        coordinator.spaces = {"s1": space}
+        sw = AjaxChimeSwitch(coordinator=coordinator, space_id="s1", hub_id="hub-1")
+        return sw, coordinator
+
+    def test_unique_id(self) -> None:
+        sw, _ = self._make()
+        assert sw.unique_id == "aegis_ajax_hub-1_chime"
+
+    def test_translation_key(self) -> None:
+        sw, _ = self._make()
+        assert sw._attr_translation_key == "chime"
+
+    def test_is_config_entity(self) -> None:
+        from homeassistant.helpers.entity import EntityCategory
+
+        sw, _ = self._make()
+        assert sw._attr_entity_category == EntityCategory.CONFIG
+
+    def test_is_on_when_enabled(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        sw, _ = self._make(chime_status=ChimeStatus.ENABLED)
+        assert sw.is_on is True
+
+    def test_is_off_when_can_be_enabled(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        sw, _ = self._make(chime_status=ChimeStatus.CAN_BE_ENABLED)
+        assert sw.is_on is False
+
+    def test_is_off_when_disabled(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        sw, _ = self._make(chime_status=ChimeStatus.DISABLED)
+        assert sw.is_on is False
+
+    def test_available_requires_online_and_supported(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        sw, _ = self._make(chime_status=ChimeStatus.ENABLED, online=True)
+        assert sw.available is True
+
+    def test_unavailable_when_offline(self) -> None:
+        sw, _ = self._make(online=False)
+        assert sw.available is False
+
+    def test_unavailable_when_unspecified(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        sw, _ = self._make(chime_status=ChimeStatus.UNSPECIFIED)
+        assert sw.available is False
+
+    def test_is_on_none_when_space_missing(self) -> None:
+        sw, coordinator = self._make()
+        coordinator.spaces = {}
+        assert sw.is_on is None
+
+    @pytest.mark.asyncio
+    async def test_turn_on_enables(self) -> None:
+        sw, coordinator = self._make()
+        coordinator.devices_api.set_chimes_mode = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_turn_on()
+
+        coordinator.devices_api.set_chimes_mode.assert_awaited_once_with("hub-1", enable=True)
+        coordinator.async_request_refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_turn_off_disables(self) -> None:
+        sw, coordinator = self._make()
+        coordinator.devices_api.set_chimes_mode = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_turn_off()
+
+        coordinator.devices_api.set_chimes_mode.assert_awaited_once_with("hub-1", enable=False)
+
+    @pytest.mark.asyncio
+    async def test_permission_denied_surfaces_homeassistant_error(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        sw, coordinator = self._make()
+        coordinator.devices_api.set_chimes_mode = AsyncMock(
+            side_effect=DeviceCommandError(
+                "chimes_mode: permission_denied", reason="permission_denied"
+            )
+        )
+        coordinator.async_request_refresh = AsyncMock()
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await sw.async_turn_on()
+
+        assert exc.value.translation_key == "command_permission_denied"
+        coordinator.async_request_refresh.assert_not_awaited()
+
+
+class TestChimeSwitchSetup:
+    """`async_setup_entry` creates a Chime switch only for hubs that expose it."""
+
+    async def _run(self, *, chime_status: object) -> set[str]:
+        from custom_components.aegis_ajax.switch import AjaxChimeSwitch, async_setup_entry
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        hub = MagicMock(device_type="hub_two_plus", hub_id="hub-1")
+        coordinator.devices = {"hub-1": hub}
+        space = MagicMock(id="s1", hub_id="hub-1")
+        space.chime_status = chime_status
+        coordinator.spaces = {"s1": space}
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.runtime_data = coordinator
+        entry.data = {"user_hex_id": "ABCD1234"}
+        entry.options = {"bypass_switches": "never"}
+        added: list = []
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            added.extend(entities)
+
+        with (
+            patch("custom_components.aegis_ajax.switch.er.async_get", return_value=MagicMock()),
+            patch(
+                "custom_components.aegis_ajax.switch.er.async_entries_for_config_entry",
+                return_value=[],
+            ),
+        ):
+            await async_setup_entry(MagicMock(), entry, _add)
+        return {e.unique_id for e in added if isinstance(e, AjaxChimeSwitch)}
+
+    @pytest.mark.asyncio
+    async def test_creates_when_enabled(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        ids = await self._run(chime_status=ChimeStatus.ENABLED)
+        assert ids == {"aegis_ajax_hub-1_chime"}
+
+    @pytest.mark.asyncio
+    async def test_creates_when_can_be_enabled(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        ids = await self._run(chime_status=ChimeStatus.CAN_BE_ENABLED)
+        assert ids == {"aegis_ajax_hub-1_chime"}
+
+    @pytest.mark.asyncio
+    async def test_no_switch_when_unspecified(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        ids = await self._run(chime_status=ChimeStatus.UNSPECIFIED)
+        assert ids == set()
+
+
+class TestChimeOrphanEviction:
+    """Chime switches no longer provided are evicted (#239)."""
+
+    async def _run(self, *, chime_status: object, registry_entries: list) -> list[str]:
+        from custom_components.aegis_ajax.switch import async_setup_entry
+
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        hub = MagicMock(device_type="hub_two_plus", hub_id="hub-1")
+        coordinator.devices = {"hub-1": hub}
+        space = MagicMock(id="s1", hub_id="hub-1")
+        space.chime_status = chime_status
+        coordinator.spaces = {"s1": space}
+        coordinator.spaces_api.get_member_space_permissions = AsyncMock(return_value=None)
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.runtime_data = coordinator
+        entry.data = {"user_hex_id": "ABCD1234"}
+        entry.options = {"bypass_switches": "never"}
+
+        removed: list[str] = []
+        entity_reg = MagicMock()
+        entity_reg.async_remove.side_effect = removed.append
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            pass
+
+        with (
+            patch("custom_components.aegis_ajax.switch.er.async_get", return_value=entity_reg),
+            patch(
+                "custom_components.aegis_ajax.switch.er.async_entries_for_config_entry",
+                return_value=registry_entries,
+            ),
+        ):
+            await async_setup_entry(MagicMock(), entry, _add)
+        return removed
+
+    @pytest.mark.asyncio
+    async def test_evicts_when_unspecified(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        removed = await self._run(
+            chime_status=ChimeStatus.UNSPECIFIED,
+            registry_entries=[_reg_entry("switch.hub_chime", "aegis_ajax_hub-1_chime")],
+        )
+        assert removed == ["switch.hub_chime"]
+
+    @pytest.mark.asyncio
+    async def test_keeps_when_supported(self) -> None:
+        from custom_components.aegis_ajax.const import ChimeStatus
+
+        removed = await self._run(
+            chime_status=ChimeStatus.ENABLED,
+            registry_entries=[_reg_entry("switch.hub_chime", "aegis_ajax_hub-1_chime")],
+        )
+        assert removed == []

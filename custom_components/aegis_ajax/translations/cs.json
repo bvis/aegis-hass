@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Vyřazení"
+            },
+            "chime": {
+                "name": "Gong"
             }
         },
         "update": {

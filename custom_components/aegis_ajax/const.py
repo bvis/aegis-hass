@@ -197,6 +197,33 @@ class ConnectionStatus(IntEnum):
     OFFLINE = 2
 
 
+class ChimeStatus(IntEnum):
+    """Maps the mobile v2 `DisplayedChimeStatus` proto enum (#239).
+
+    The hub-wide Chime on/off setting the Ajax app exposes (bottom-left of
+    the security screen). Read off `StandaloneDevice.hub.chime_status` inside
+    a space — the same field the official app maps (`tqs.a(space).getChimeStatus()`).
+    `CAN_BE_ENABLED` means Chime is supported and currently off; `UNSPECIFIED`
+    means the hub doesn't expose the feature at all, so no switch is created.
+    """
+
+    UNSPECIFIED = 0
+    ENABLED = 1
+    CAN_BE_ENABLED = 2
+    MALFUNCTION = 3
+    DISABLED = 4
+
+    @property
+    def is_supported(self) -> bool:
+        """True when the hub exposes the Chime feature (any state but UNSPECIFIED)."""
+        return self != ChimeStatus.UNSPECIFIED
+
+    @property
+    def is_on(self) -> bool:
+        """True only when Chime is actively enabled."""
+        return self == ChimeStatus.ENABLED
+
+
 class UserRole(IntEnum):
     """Maps UserRole proto enum."""
 

@@ -430,6 +430,9 @@
             },
             "bypass": {
                 "name": "Bypass"
+            },
+            "chime": {
+                "name": "Chime"
             }
         }
     },

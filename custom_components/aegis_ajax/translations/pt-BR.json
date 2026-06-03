@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Ignorar"
+            },
+            "chime": {
+                "name": "Campainha"
             }
         },
         "update": {

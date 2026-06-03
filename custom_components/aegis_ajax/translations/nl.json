@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Overbruggen"
+            },
+            "chime": {
+                "name": "Deurbel"
             }
         },
         "update": {

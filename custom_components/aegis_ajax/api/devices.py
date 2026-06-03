@@ -992,3 +992,31 @@ class DevicesApi:
                 hub_id,
                 label,
             )
+
+    async def set_chimes_mode(self, hub_id: str, *, enable: bool) -> None:
+        """Enable/disable the hub-wide Chime (#239).
+
+        Hub-level setting (the toggle bottom-left of the Ajax app's security
+        screen), so the request carries only `hub_id` + `chimes_status` — the
+        same call the app's `ChimesModeGrpcApi.setHubChimes` issues. The
+        `groups_statuses` branch (per-group chime) is intentionally not used.
+        Raises `DeviceCommandError` carrying the server's failure-oneof case
+        (`permission_denied` when the account lacks EDIT_CHIMES, `hub_offline`,
+        `hub_busy`, …) so callers can map it to a translated error.
+        """
+        from v3.mobilegwsvc.service.device_command_chimes_mode import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.DeviceCommandChimesModeServiceStub(channel)
+        request_cls = request_pb2.DeviceCommandChimesModeRequest
+        status = request_cls.CHIMES_STATUS_ENABLE if enable else request_cls.CHIMES_STATUS_DISABLE
+        request = request_cls(hub_id=hub_id, chimes_status=status)
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"chimes_mode: {error}", reason=error)
+        _LOGGER.debug("Hub %s chimes_mode enable=%s OK", hub_id, enable)

@@ -37,6 +37,7 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
+    ChimeStatus,
     ConnectionStatus,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
@@ -395,6 +396,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         groups=previous.groups,
                         group_mode_enabled=previous.group_mode_enabled,
                     )
+                # Chime status (#239) also only comes from the hourly snapshot;
+                # `list_spaces` (LiteSpace) doesn't carry it, so preserve the
+                # last known value or the Chime switch flips to UNSPECIFIED
+                # (unavailable) on every plain poll.
+                if previous.chime_status is not ChimeStatus.UNSPECIFIED:
+                    s = dc_replace(s, chime_status=previous.chime_status)
             new_spaces[s.id] = s
         return new_spaces
 
@@ -453,6 +460,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     monitoring_companies_loaded=snapshot.monitoring_companies_loaded,
                     groups=snapshot.groups,
                     group_mode_enabled=snapshot.group_mode_enabled,
+                    chime_status=snapshot.chime_status,
                 )
         self.rooms = refreshed_rooms
         self._rooms_last_fetch = now
@@ -918,6 +926,28 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dc_replace(g, security_state=new_state) if g.id == group_id else g for g in space.groups
         )
         self.spaces[space_id] = dc_replace(space, groups=new_groups)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    def set_chime_optimistic(self, space_id: str, *, enable: bool) -> None:
+        """Optimistically reflect a hub Chime toggle we just issued (#239).
+
+        The hub-wide Chime status only rides the hourly `get_space_snapshot`
+        path — `list_spaces` (LiteSpace) doesn't carry it — so a plain
+        `async_request_refresh` after the command wouldn't move the switch for
+        up to an hour. Write the expected state in-memory and notify listeners
+        so the toggle is reflected immediately; the next snapshot reconciles
+        with the hub's authoritative value (and catches app-side changes).
+        No-op for an unknown space.
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        space = self.spaces.get(space_id)
+        if space is None:
+            return
+        new_status = ChimeStatus.ENABLED if enable else ChimeStatus.CAN_BE_ENABLED
+        if space.chime_status == new_status:
+            return
+        self.spaces[space_id] = dc_replace(space, chime_status=new_status)
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def _handle_devices_snapshot(self, devices: list[Device]) -> None:

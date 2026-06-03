@@ -419,6 +419,9 @@
             },
             "bypass": {
                 "name": "Contournement"
+            },
+            "chime": {
+                "name": "Carillon"
             }
         },
         "update": {

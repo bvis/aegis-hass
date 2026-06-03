@@ -7,6 +7,7 @@ from enum import IntEnum
 from typing import Any
 
 from custom_components.aegis_ajax.const import (
+    ChimeStatus,
     ConnectionStatus,
     DeviceState,
     SecurityState,
@@ -78,6 +79,9 @@ class Space:
     monitoring_companies_loaded: bool = False
     groups: tuple[Group, ...] = field(default_factory=tuple)
     group_mode_enabled: bool = False
+    # Hub-wide Chime on/off setting (#239). UNSPECIFIED = the hub doesn't
+    # expose the feature, so no Chime switch is created for it.
+    chime_status: ChimeStatus = ChimeStatus.UNSPECIFIED
 
     @property
     def is_online(self) -> bool:
@@ -125,6 +129,8 @@ class SpaceSnapshot:
     monitoring_companies_loaded: bool = False
     groups: tuple[Group, ...] = field(default_factory=tuple)
     group_mode_enabled: bool = False
+    # Hub-wide Chime status read off the full snapshot's hub device (#239).
+    chime_status: ChimeStatus = ChimeStatus.UNSPECIFIED
 
 
 @dataclass(frozen=True)
