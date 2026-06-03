@@ -91,13 +91,20 @@ Click the button above, or manually:
 4. Select which spaces (hubs) to add
 5. Done
 
-> **Recommended: use a dedicated, limited Ajax account.** Instead of your primary
-> admin login, create a separate Ajax account, invite it to your space (Ajax app →
-> space → Users → Invite) and grant it only what the integration needs. A non-admin
-> **User** role is enough to read device state and arm / disarm. You can also revoke
-> its **photo / video** access if you don't use Photo on Demand, so Home Assistant
-> never has access to camera images. This keeps your main credentials out of HA and
-> limits what a compromised HA host could reach in your Ajax installation.
+> **Recommended: use a dedicated Ajax account, separate from the one on your phone.**
+> Instead of your primary admin login, create a separate Ajax account, invite it to
+> your space (Ajax app → space → Users → Invite) and grant it only what the
+> integration needs. A non-admin **User** role is enough to read device state and
+> arm / disarm. You can also revoke its **photo / video** access if you don't use
+> Photo on Demand, so Home Assistant never has access to camera images. This keeps
+> your main credentials out of HA and limits what a compromised HA host could reach
+> in your Ajax installation.
+>
+> **This also matters for real-time updates.** Running the *same* Ajax account in
+> both your phone app and Home Assistant can prevent instant push notifications from
+> reaching HA — changes you make from the app (arm / disarm, sensor events) would
+> then only appear on the next poll instead of immediately. Giving HA its own account
+> avoids this contention.
 >
 > Trade-offs to know: without photo / video permission the MotionCam Photo-on-Demand
 > button won't work, and per-device bypass switches need the account to hold the
