@@ -89,7 +89,7 @@ async def _system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     # `_async_update_data` (the only thing that stamps `last_update_success_time`)
     # can be starved indefinitely while data keeps flowing — which left the card
     # reading "unreachable" on a perfectly healthy install (#236). A live HTS
-    # connection or a recent push is equally valid proof of reachability;
+    # connection is equally valid proof that sensor data is flowing;
     # `last_poll` below still reports its true age.
     poll_fresh = (
         last_update_age_seconds is not None and last_update_age_seconds <= _REACHABILITY_STALE_AFTER
@@ -97,8 +97,17 @@ async def _system_health_info(hass: HomeAssistant) -> dict[str, Any]:
     push_fresh = (
         last_push_age_seconds is not None and last_push_age_seconds <= _REACHABILITY_STALE_AFTER
     )
-    if poll_fresh or hts_connected > 0 or push_fresh:
+    # The gRPC poll and the HTS stream are the paths that carry live
+    # sensor/device state, so a fresh one of either means entities are
+    # updating. FCM push only carries security events (arm/disarm, alarm,
+    # motion, doorbell) — a recent push proves the cloud is reachable but does
+    # NOT keep sensor values current. Report that distinctly so an "FCM alive,
+    # poll + HTS dead" install can't masquerade as fully healthy while its
+    # sensors quietly go stale (#236).
+    if poll_fresh or hts_connected > 0:
         info["can_reach_server"] = "reachable"
+    elif push_fresh:
+        info["can_reach_server"] = "push only — sensor data may be stale"
     elif last_update_age_seconds is None:
         info["can_reach_server"] = "never polled"
     else:

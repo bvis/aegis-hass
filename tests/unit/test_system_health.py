@@ -135,8 +135,11 @@ class TestSystemHealthInfo:
         assert info["can_reach_server"] == "reachable"
 
     @pytest.mark.asyncio
-    async def test_reachable_when_poll_stale_but_recent_push(self) -> None:
-        """A recent FCM push is also proof of reachability even if the poll is stale."""
+    async def test_push_only_when_poll_and_hts_dead_but_recent_push(self) -> None:
+        """FCM push carries only security events, not live sensor state. With the
+        poll stale and HTS down, a recent push proves the cloud is reachable but
+        sensor values may be stale, so it reads as a distinct "push only" state
+        rather than full reachability (#236)."""
         coord = MagicMock()
         coord.spaces = {"s1": MagicMock()}
         coord.is_hts_connected = False
@@ -145,6 +148,24 @@ class TestSystemHealthInfo:
         listener.is_fcm_connected = True
         listener.pushes_received = 3
         listener.last_push_at = time.monotonic() - 30  # 30s ago
+        coord.notification_listener = listener
+
+        hass = self._make_hass([MagicMock(runtime_data=coord)])
+        info = await _system_health_info(hass)
+        assert info["can_reach_server"] == "push only — sensor data may be stale"
+
+    @pytest.mark.asyncio
+    async def test_reachable_trumps_push_only_when_hts_connected(self) -> None:
+        """A live HTS connection (sensor data flowing) reads as fully reachable
+        even when a recent push would otherwise qualify it as "push only"."""
+        coord = MagicMock()
+        coord.spaces = {"s1": MagicMock()}
+        coord.is_hts_connected = True
+        coord.last_update_success_time = datetime.now(UTC) - timedelta(minutes=30)
+        listener = MagicMock()
+        listener.is_fcm_connected = True
+        listener.pushes_received = 3
+        listener.last_push_at = time.monotonic() - 30
         coord.notification_listener = listener
 
         hass = self._make_hass([MagicMock(runtime_data=coord)])
