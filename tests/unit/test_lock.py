@@ -127,7 +127,11 @@ class TestAjaxLockCommands:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("device_type", ["smart_lock", "smart_lock_yale"])
     async def test_async_lock_sends_device_on(self, device_type: str) -> None:
-        # #219: lock = DeviceCommandDeviceOn keyed by device id, no channels.
+        # #219: lock = DeviceCommandDeviceOn keyed by device id. The Ajax app
+        # routes every hub-attached lock (generic AND Yale) through one command
+        # path that normalises to the generic `smart_lock` ObjectType on
+        # CHANNEL_1, so we always send device_type="smart_lock" + channels=[1]
+        # regardless of the stream's `smart_lock_yale` type.
         device = _make_device(device_type, "unlocked")
         coordinator = _make_coordinator(device)
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)
@@ -139,8 +143,8 @@ class TestAjaxLockCommands:
         assert cmd.action == "on"
         assert cmd.hub_id == "hub-1"
         assert cmd.device_id == "lock-1"
-        assert cmd.device_type == device_type
-        assert cmd.channels == []
+        assert cmd.device_type == "smart_lock"
+        assert cmd.channels == [1]
         coordinator.devices_api.switch_smart_lock.assert_not_called()
         coordinator.async_request_refresh.assert_awaited_once()
 
@@ -155,7 +159,8 @@ class TestAjaxLockCommands:
         cmd: DeviceCommand = coordinator.devices_api.send_command.await_args.args[0]
         assert cmd.action == "off"
         assert cmd.device_id == "lock-1"
-        assert cmd.channels == []
+        assert cmd.device_type == "smart_lock"
+        assert cmd.channels == [1]
         coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio

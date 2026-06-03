@@ -583,9 +583,10 @@ class DevicesApi:
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.DeviceCommandDeviceOnServiceStub(channel)
         # Send channels exactly as given. Channelled devices (relay, socket,
-        # wall/light switch) pass an explicit `[channel]`; a SmartLock (#219)
-        # passes none — the Ajax app omits channels for the lock on/off command,
-        # so an empty list leaves the repeated field unset, matching the wire.
+        # wall/light switch) pass an explicit `[channel]`; a hub-attached
+        # SmartLock (#219) passes `[1]` (CHANNEL_1) — the Ajax app always sends
+        # the lock on/off command on channel 1 (decompiled), and an on/off with
+        # no channel is accepted-but-inert.
         request = request_pb2.DeviceCommandDeviceOnRequest(
             hub_id=command.hub_id,
             device_id=command.device_id,
@@ -608,7 +609,7 @@ class DevicesApi:
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.DeviceCommandDeviceOffServiceStub(channel)
         # See `_device_on`: channels are sent as given (explicit per channel for
-        # relays/switches, empty for a SmartLock #219).
+        # relays/switches, `[1]` for a hub-attached SmartLock #219).
         request = request_pb2.DeviceCommandDeviceOffRequest(
             hub_id=command.hub_id,
             device_id=command.device_id,

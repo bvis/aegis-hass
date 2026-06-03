@@ -111,8 +111,14 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
         on a third-party backend) are not in the SmartLock cloud registry, so
         `SwitchSmartLockService` answers `smart_lock_not_found`. The Ajax app
         drives them with `DeviceCommandDeviceOn/Off` keyed by device id —
-        lock = On, unlock = Off — exactly as for a relay (verified against the
-        app). No channel is sent for a lock.
+        lock = On, unlock = Off.
+
+        Two details, decompiled from the app's hub-lock command path, are
+        load-bearing (an earlier attempt without them was accepted-but-inert):
+        the app routes EVERY hub-attached lock (generic and Yale alike) through
+        a single processor that emits the GENERIC `smart_lock` ObjectType, and
+        it always sends the command on CHANNEL_1. So we override the stream's
+        `smart_lock_yale` type to `smart_lock` and send `channels=[1]`.
         """
         device = self._device
         if device is None:
@@ -121,7 +127,8 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
         command = factory(
             hub_id=device.hub_id,
             device_id=self._device_id,
-            device_type=device.device_type,
+            device_type="smart_lock",
+            channels=[1],
         )
         try:
             await self.coordinator.devices_api.send_command(command)
