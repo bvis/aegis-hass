@@ -592,9 +592,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._devices_api.probe_smart_locks(space_id, lock_ids)
 
     async def _maybe_fallback_device_snapshot(self) -> None:
-        """Refresh devices from snapshot when persistent streams aren't all
-        alive. Healthy streams (the common case) make this a no-op so
-        normal cycles stay cheap.
+        """Refresh devices from a snapshot when no stream task is running —
+        none started, or all exited their retry loop. Live-but-stalled
+        transports are handled at the connection layer by gRPC keepalive
+        (see `_KEEPALIVE_OPTIONS`): a wedged channel surfaces as an error the
+        stream's own reconnect recovers from, rather than being detected here.
+        This is a cheap no-op whenever a stream task is alive (the common case).
         """
         streams_healthy = self._stream_tasks and all(not t.done() for t in self._stream_tasks)
         if streams_healthy:

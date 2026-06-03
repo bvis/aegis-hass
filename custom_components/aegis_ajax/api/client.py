@@ -51,6 +51,28 @@ _TRANSIENT_CODES = {
     grpc.StatusCode.INTERNAL,
 }
 
+# HTTP/2 keepalive for the channel. The device stream is a long-lived
+# server-streaming RPC; without keepalive a half-open connection (a NAT /
+# router silently dropping an idle link with no RST) leaves its `async for`
+# blocked forever with no exception, so the integration goes silent until a
+# full HA restart (#236). A periodic PING turns that into an UNAVAILABLE the
+# stream's reconnect path already recovers from — and, because it's a
+# transport-level check, it distinguishes a dead link from a stream that is
+# merely quiet (device updates are push-on-change and legitimately idle for
+# long stretches), which a data-freshness watchdog could not.
+#
+# `max_pings_without_data=0` is required: the client sends no DATA on a
+# server-stream, so gRPC would otherwise stop pinging after 2 dataless pings
+# and lose detection on an idle-but-open stream. The interval is kept
+# conservative to avoid a strict backend answering GOAWAY "too_many_pings";
+# bump `keepalive_time_ms` if a server rejects it.
+_KEEPALIVE_OPTIONS: list[tuple[str, int]] = [
+    ("grpc.keepalive_time_ms", 60000),
+    ("grpc.keepalive_timeout_ms", 20000),
+    ("grpc.http2.max_pings_without_data", 0),
+    ("grpc.keepalive_permit_without_calls", 1),
+]
+
 
 class AjaxGrpcClient:
     """High-level gRPC client for the Ajax mobile gateway."""
@@ -92,7 +114,7 @@ class AjaxGrpcClient:
     def _open_channel(self) -> grpc.aio.Channel:
         target = f"{self._host}:{self._port}"
         credentials = grpc.ssl_channel_credentials()
-        return grpc.aio.secure_channel(target, credentials)
+        return grpc.aio.secure_channel(target, credentials, options=_KEEPALIVE_OPTIONS)
 
     async def connect(self) -> None:
         self._channel = self._open_channel()

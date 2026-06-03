@@ -73,6 +73,49 @@ class TestClientConnect:
             assert client._channel is mock_channel
 
     @pytest.mark.asyncio
+    async def test_connect_sets_keepalive_options(self) -> None:
+        """The long-lived device stream needs HTTP/2 keepalive so a half-open
+        connection surfaces as UNAVAILABLE (which the reconnect path recovers)
+        instead of hanging silently until an HA restart (#236)."""
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._channel = None
+
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=MagicMock()) as mock_secure,
+        ):
+            await client.connect()
+
+        options = dict(mock_secure.call_args.kwargs["options"])
+        assert options["grpc.keepalive_time_ms"] > 0
+        assert options["grpc.keepalive_timeout_ms"] > 0
+        # Must ping even when the open stream is idle (push-on-change can be
+        # quiet for hours) — otherwise gRPC stops pinging after 2 dataless pings.
+        assert options["grpc.http2.max_pings_without_data"] == 0
+        assert options["grpc.keepalive_permit_without_calls"] == 1
+
+    @pytest.mark.asyncio
+    async def test_reconnect_channel_sets_keepalive_options(self) -> None:
+        """A recreated channel (post-failure) must carry the same keepalive."""
+        client = AjaxGrpcClient.__new__(AjaxGrpcClient)
+        client._host = GRPC_HOST
+        client._port = GRPC_PORT
+        client._channel = None
+        client._reconnect_lock = asyncio.Lock()
+
+        with (
+            patch("grpc.ssl_channel_credentials"),
+            patch("grpc.aio.secure_channel", return_value=MagicMock()) as mock_secure,
+        ):
+            await client.reconnect_channel()
+
+        options = dict(mock_secure.call_args.kwargs["options"])
+        assert options["grpc.keepalive_time_ms"] > 0
+        assert options["grpc.http2.max_pings_without_data"] == 0
+
+    @pytest.mark.asyncio
     async def test_close_clears_channel(self) -> None:
         client = AjaxGrpcClient.__new__(AjaxGrpcClient)
         mock_channel = AsyncMock()
