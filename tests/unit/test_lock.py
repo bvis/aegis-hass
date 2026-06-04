@@ -178,8 +178,23 @@ class TestAjaxLockCommands:
         coordinator.devices_api.send_command.assert_awaited_once()
         coordinator.async_request_refresh.assert_awaited_once()
 
+    def test_open_feature_not_advertised(self) -> None:
+        # Unlatch only works via the cloud SwitchSmartLockService; the
+        # hub-attached locks we expose can't reach it, so OPEN is not surfaced
+        # (no phantom "Open" button that always fails). The unlatch machinery
+        # below stays for future cloud-SmartLock support.
+        from homeassistant.components.lock import LockEntityFeature
+
+        device = _make_device("smart_lock", "locked")
+        coordinator = _make_coordinator(device)
+        lock = AjaxLock(coordinator=coordinator, device_id=device.id)
+
+        assert LockEntityFeature.OPEN not in lock.supported_features
+
     @pytest.mark.asyncio
     async def test_async_open_invokes_unlatch_action(self) -> None:
+        # OPEN is not advertised, but the unlatch path is retained and still
+        # functional for the day cloud-SmartLock support re-enables it.
         device = _make_device("smart_lock", "locked")
         coordinator = _make_coordinator(device)
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)

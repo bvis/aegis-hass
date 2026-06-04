@@ -55,9 +55,18 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
-    # OPEN maps to UNLATCH on the Ajax side — pull the latch without keeping
-    # the door deadbolted, e.g. for delivery drop-offs.
-    _attr_supported_features = LockEntityFeature.OPEN
+    # OPEN (unlatch) is intentionally NOT advertised. Unlatch can only be issued
+    # through the cloud `SwitchSmartLockService` (keyed by `smart_lock_id`); the
+    # generic hub on/off command has no unlatch action. Every lock this
+    # integration currently exposes is a hub-attached Jeweller lock that isn't in
+    # the SmartLock cloud registry (#206/#219), so unlatch returns
+    # `smart_lock_not_found` — the official Ajax app can't unlatch them either.
+    # Surfacing an "Open" button that always fails only frustrates, so we hide
+    # it. The unlatch path below (`async_open`/`_send_action`) is kept intact for
+    # when proper cloud-SmartLock support lands: re-enable OPEN per-lock, gated
+    # on `LightSmartLock`'s `unlatch_info` capability (the field that drives the
+    # app's `hasUnlatchCapability`), rather than advertising it unconditionally.
+    _attr_supported_features = LockEntityFeature(0)
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
         super().__init__(coordinator)
