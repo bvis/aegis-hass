@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - **Recommend a separate Ajax account with notification access for reliable push (#234).** A limited User-role account registers for FCM but receives no events; the Home Assistant account needs its own login and notification access.
+- **README synced with the current lock and chime behaviour.** Documented the hub Chime switch, corrected the lock capabilities (lock/unlock work; unlatch isn't exposed and why), and dropped the stale "lock/unlock not wired yet" note and the "chime mode" entry from the unsupported list.
 
 ## [1.8.0] - 2026-06-01
 
