@@ -421,7 +421,13 @@ class TestAsyncStartFcmRepairs:
         """No api_key → raise `fcm_not_configured` repair so the user gets a
         visible nudge to enter keys via the Repair card, plus a WARNING log
         line (instead of the previous silent INFO). `fcm_credentials_invalid`
-        is left alone — it's a different state (keys present but rejected)."""
+        is left alone — it's a different state (keys present but rejected).
+
+        #252: the repair is NOT cleared first in this path. Deleting and
+        re-creating it on every start wiped HA's per-issue dismissal, so a
+        user who chose to leave push off saw the card return after every
+        reboot. We now `async_register` idempotently (HA preserves a prior
+        dismissal) and only clear once credentials are actually present."""
         hass = MagicMock()
         coordinator = MagicMock()
         listener = AjaxNotificationListener(
@@ -452,9 +458,10 @@ class TestAsyncStartFcmRepairs:
 
         reg_invalid.assert_not_called()
         clr_invalid.assert_called_once_with(hass, entry_id="entry-x")
-        # Cleared once at the top of async_start (start with a clean slate)
-        # then re-registered after the missing-api-key check fires.
-        clr_missing.assert_called_once_with(hass, entry_id="entry-x")
+        # #252: must NOT clear in the unconfigured path — clearing deletes the
+        # registry entry, which would wipe a user's dismissal so the card
+        # reappears every reboot. Register is idempotent; HA keeps the dismiss.
+        clr_missing.assert_not_called()
         reg_missing.assert_called_once_with(hass, entry_id="entry-x")
 
     @pytest.mark.asyncio
@@ -480,12 +487,17 @@ class TestAsyncStartFcmRepairs:
             ) as reg,
             patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
             patch("custom_components.aegis_ajax.notification.async_register_fcm_not_configured"),
-            patch("custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"),
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"
+            ) as clr_missing,
             patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
         ):
             await listener.async_start()
 
         reg.assert_called_once_with(hass, entry_id="entry-x")
+        # #252: credentials ARE present here (only registration failed), so the
+        # "not configured" repair is cleared once the api_key check passes.
+        clr_missing.assert_called_once_with(hass, entry_id="entry-x")
 
 
 class TestFcmRejectedCredsShortCircuit:
