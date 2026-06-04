@@ -99,6 +99,19 @@ _STATUS_KEY_MAP: dict[str, str] = {
 # one-shot #206 Bug-B SmartLock id probe.
 _LOCK_DEVICE_TYPES: frozenset[str] = frozenset({"smart_lock", "smart_lock_yale"})
 
+# HTS `type=0x08` Chime-event state byte → ChimeStatus (#239). The hub stamps
+# the new chime state into params[3] of the event frame the instant the chime
+# is toggled (incl. from the Ajax app): 0x38 = on, 0x39 = off (BadFlo's
+# capture). Decoding it directly reflects app-side toggles immediately and
+# avoids re-reading the gRPC snapshot, which lags the toggle — that re-read
+# returned a stale `ENABLED` right after an app-side OFF, so the switch never
+# moved (#239 beta.2 regression). The gRPC re-read survives only as the
+# fallback for an unrecognised byte.
+_CHIME_EVENT_STATE_BYTE: dict[int, ChimeStatus] = {
+    0x38: ChimeStatus.ENABLED,
+    0x39: ChimeStatus.CAN_BE_ENABLED,
+}
+
 # Statuses whose snapshot parser writes more than the single mapped key.
 # Used by the REMOVE op so stale sub-keys don't linger after the hub drops
 # the parent status from the stream.
@@ -745,25 +758,53 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """React to a hub Chime-toggle event pushed over HTS in real time (#239).
 
         The hub emits this the instant the Chime is toggled (including from the
-        Ajax app), so it lets the switch reflect external changes immediately
-        rather than at the hourly snapshot cadence. We do NOT trust the event's
-        candidate byte as the state; we use the event purely as a trigger to
-        re-read the authoritative gRPC `chime_status`, and log the
-        `(payload, candidate byte, resulting status)` correlation at DEBUG so a
-        later version can graduate to decoding the byte directly and drop the
-        extra snapshot call. Runs on the event loop (HTS listen task), so it
-        schedules the async re-read as a task. Coalesces bursts per space.
+        Ajax app), so the switch reflects external changes immediately rather
+        than at the hourly snapshot cadence. The event's state byte is decoded
+        directly (`_CHIME_EVENT_STATE_BYTE`: 0x38 on / 0x39 off) and written to
+        `chime_status` straight away — no gRPC re-read, which lagged the toggle
+        and returned a stale value right after an app-side change. An
+        unrecognised byte falls back to re-reading the authoritative gRPC
+        snapshot. Runs on the event loop (HTS listen task).
         """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
         space_id = next(
             (sid for sid, s in self.spaces.items() if s.hub_id == hub_id),
             None,
         )
-        if space_id is None or space_id in self._chime_refresh_inflight:
+        if space_id is None:
             return
-        self._chime_refresh_inflight.add(space_id)
-        self.hass.async_create_task(
-            self._refresh_chime_from_event(space_id, payload_hex, candidate)
+
+        status = _CHIME_EVENT_STATE_BYTE.get(candidate) if candidate is not None else None
+        if status is None:
+            # Unknown byte — fall back to the authoritative gRPC re-read, still
+            # coalescing bursts per space. Log so a new value can be mapped.
+            _LOGGER.debug(
+                "Chime HTS event for space %s: unrecognised state byte %s; "
+                "falling back to gRPC re-read (payload=%s)",
+                space_id,
+                "none" if candidate is None else f"0x{candidate:02X}",
+                payload_hex,
+            )
+            if space_id in self._chime_refresh_inflight:
+                return
+            self._chime_refresh_inflight.add(space_id)
+            self.hass.async_create_task(
+                self._refresh_chime_from_event(space_id, payload_hex, candidate)
+            )
+            return
+
+        _LOGGER.debug(
+            "Chime HTS event for space %s: state byte 0x%02X -> %s (decoded from stream)",
+            space_id,
+            candidate,
+            status.name,
         )
+        current = self.spaces.get(space_id)
+        if current is None or current.chime_status == status:
+            return
+        self.spaces[space_id] = dc_replace(current, chime_status=status)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     async def _refresh_chime_from_event(
         self, space_id: str, payload_hex: str, candidate: int | None

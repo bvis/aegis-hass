@@ -2267,11 +2267,44 @@ class TestHtsChimeEvent:
         }
         return coordinator
 
-    def test_event_schedules_refresh_for_matching_hub(self) -> None:
-        coordinator = self._make_coordinator()
+    def test_on_byte_decodes_directly_no_reread(self) -> None:
+        # 0x38 = chime ON → ENABLED, written straight from the stream with no
+        # gRPC re-read (#239 final form / beta.2 regression fix).
+        coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
+        coordinator.hass.async_create_task = MagicMock()
+
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x38)
+
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
+        coordinator.hass.async_create_task.assert_not_called()
+        coordinator.async_set_updated_data.assert_called_once()
+        assert "s1" not in coordinator._chime_refresh_inflight
+
+    def test_off_byte_decodes_to_can_be_enabled(self) -> None:
+        # 0x39 = chime OFF → CAN_BE_ENABLED. This is the case beta.2 got wrong:
+        # the gRPC re-read returned a stale ENABLED, so the switch never moved.
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
         coordinator.hass.async_create_task = MagicMock()
 
         coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x39)
+
+        assert coordinator.spaces["s1"].chime_status == ChimeStatus.CAN_BE_ENABLED
+        coordinator.hass.async_create_task.assert_not_called()
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_direct_decode_no_write_when_unchanged(self) -> None:
+        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator.hass.async_create_task = MagicMock()
+
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x38)
+
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_unknown_byte_falls_back_to_reread(self) -> None:
+        coordinator = self._make_coordinator()
+        coordinator.hass.async_create_task = MagicMock()
+
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x99)
 
         coordinator.hass.async_create_task.assert_called_once()
         assert "s1" in coordinator._chime_refresh_inflight
@@ -2282,16 +2315,16 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator()
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("OTHER", "deadbeef", 0x39)
+        coordinator._on_hts_chime_event("OTHER", "deadbeef", 0x38)
 
         coordinator.hass.async_create_task.assert_not_called()
 
-    def test_inflight_event_is_coalesced(self) -> None:
+    def test_inflight_unknown_byte_is_coalesced(self) -> None:
         coordinator = self._make_coordinator()
         coordinator.hass.async_create_task = MagicMock()
         coordinator._chime_refresh_inflight.add("s1")
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x39)
+        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x99)
 
         coordinator.hass.async_create_task.assert_not_called()
 
