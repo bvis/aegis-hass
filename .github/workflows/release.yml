@@ -30,7 +30,13 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           VERSION="${TAG_NAME#v}"
-          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
+          # Beta tags (v1.9.0-beta.6) map to the base section `## [1.9.0]`
+          # in CHANGELOG.md, which carries the `- unreleased` heading while
+          # the beta series is in flight. Strip the pre-release suffix so the
+          # release notes pick up that section instead of falling back to a
+          # bare one-liner.
+          BASE_VERSION="${VERSION%%-*}"
+          NOTES=$(awk "/^## \[${BASE_VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
           if [ -z "$NOTES" ]; then
             NOTES="Release ${TAG_NAME}"
           fi
