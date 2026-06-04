@@ -179,6 +179,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # poll timer, so the scheduled poll never fires again after startup; a
         # poll-driven refresh would be starved.
         self._unsub_hub_device_temp: CALLBACK_TYPE | None = None
+        # Independent poll safety-net timer (#178). On active hubs every HTS
+        # update reschedules HA's built-in poll timer faster than
+        # `poll_interval`, starving the scheduled `_async_update_data`; this
+        # dedicated timer drives a periodic refresh regardless of HTS chatter.
+        self._unsub_poll_safety: CALLBACK_TYPE | None = None
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
@@ -543,6 +548,42 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if changed:
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
+    def _schedule_poll_safety_refresh(self) -> None:
+        """Start the independent poll safety-net timer (#178).
+
+        On any active hub every HTS network/device update calls
+        `async_set_updated_data`, which reschedules HA's built-in poll timer.
+        HTS pushes arrive every ~30-60 s — well under `poll_interval` — so the
+        scheduled `_async_update_data` is starved and never fires on its own,
+        leaving `security_state` and the hourly snapshot refresh
+        (rooms/groups/chime/CRA/SIM/firmware) dependent 100% on FCM push with
+        no safety net when push is delayed or absent (#178, #239).
+
+        This dedicated `async_track_time_interval` fires on wall-clock time,
+        independent of the coordinator's internal scheduler, and requests a
+        refresh so `_async_update_data` runs on a fixed cadence regardless of
+        HTS chatter. The startup refresh already populated state, so no initial
+        kick is needed — the first fire is one interval out by design.
+
+        `self._poll_interval` is already clamped to [MIN, MAX] in `__init__`.
+        """
+        if self._unsub_poll_safety is not None:
+            return
+        self._unsub_poll_safety = async_track_time_interval(
+            self.hass,
+            self._async_poll_safety_refresh,
+            timedelta(seconds=self._poll_interval),
+        )
+
+    async def _async_poll_safety_refresh(self, _now: datetime | None = None) -> None:
+        """Timer-driven safety-net refresh (#178). See `_schedule_poll_safety_refresh`.
+
+        Routes through the public `async_request_refresh` so it reuses the
+        whole polled path (`list_spaces` + hourly snapshot gating) and the
+        coordinator's debouncer coalesces it with any concurrent refresh.
+        """
+        await self.async_request_refresh()
+
     async def _first_startup_init(self) -> None:
         """First-cycle bootstrap: warm devices cache, start persistent
         streams + HTS lifecycle, log a one-line startup summary.
@@ -583,6 +624,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._start_device_streams()
         await self._start_hts()
         self._schedule_hub_device_temperature_refresh()
+        self._schedule_poll_safety_refresh()
         self._last_update_success_time = dt_util.utcnow()
         # One-line summary so users debugging "HTS streams: 0/1" or
         # "FCM clients: 0/1" reports (#111) can see at a glance which
@@ -1297,6 +1339,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._unsub_hub_device_temp is not None:
             self._unsub_hub_device_temp()
             self._unsub_hub_device_temp = None
+
+        # Stop the poll safety-net timer (#178)
+        if self._unsub_poll_safety is not None:
+            self._unsub_poll_safety()
+            self._unsub_poll_safety = None
 
         # Cancel all stream tasks
         for task in self._stream_tasks:

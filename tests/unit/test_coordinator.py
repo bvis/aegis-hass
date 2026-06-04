@@ -2179,6 +2179,82 @@ class TestHubDeviceTemperatureRefresh:
         assert "temperature" not in coordinator.devices["d1"].statuses
 
 
+class TestPollSafetyTimer:
+    """Independent poll safety-net timer (#178) — backstop when push is starved.
+
+    On any active hub every HTS update calls `async_set_updated_data`, which
+    reschedules HA's built-in poll timer faster than `poll_interval`, so the
+    scheduled `_async_update_data` never fires on its own and `security_state`
+    plus the hourly snapshot refresh depend 100% on FCM push. A dedicated
+    `async_track_time_interval` fires on wall-clock time regardless of HTS
+    chatter and requests a refresh, restoring the polled safety net.
+    """
+
+    def test_schedule_registers_independent_timer(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_track_time_interval",
+            return_value=MagicMock(),
+        ) as mock_track:
+            coordinator._schedule_poll_safety_refresh()
+
+        mock_track.assert_called_once()
+        # poll_interval=30 (from _make_coordinator) is clamped to MIN (60) in __init__.
+        assert mock_track.call_args.args[2] == timedelta(seconds=60)
+        assert coordinator._unsub_poll_safety is mock_track.return_value
+
+    def test_schedule_is_idempotent(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator._unsub_poll_safety = MagicMock()
+        with patch(
+            "custom_components.aegis_ajax.coordinator.async_track_time_interval",
+        ) as mock_track:
+            coordinator._schedule_poll_safety_refresh()
+
+        mock_track.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_requests_coordinator_refresh(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await coordinator._async_poll_safety_refresh()
+
+        coordinator.async_request_refresh.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_startup_init_schedules_timer(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._devices_cache = None
+        coordinator.spaces = {}
+        coordinator._probe_smart_locks_once = AsyncMock()
+        coordinator._start_device_streams = AsyncMock()
+        coordinator._start_hts = AsyncMock()
+        coordinator._schedule_hub_device_temperature_refresh = MagicMock()
+        coordinator._schedule_poll_safety_refresh = MagicMock()
+
+        await coordinator._first_startup_init()
+
+        coordinator._schedule_poll_safety_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_timer(self) -> None:
+        coordinator = _make_coordinator()
+        unsub = MagicMock()
+        coordinator._unsub_poll_safety = unsub
+        coordinator._unsub_hub_device_temp = None
+        coordinator._stream_tasks = []
+        coordinator._hts_task = None
+        coordinator._hts_client = None
+        coordinator._notification_listener = None
+        coordinator._client.close = AsyncMock()
+
+        await coordinator.async_shutdown()
+
+        unsub.assert_called_once()
+        assert coordinator._unsub_poll_safety is None
+
+
 class TestSetChimeOptimistic:
     """Immediate optimistic Chime state after an HA-initiated toggle (#239)."""
 

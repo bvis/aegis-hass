@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - unreleased
+
+### Fixed
+- **Alarm state and the hourly refresh now update on their own on active hubs, without relying on push (#178).** On a hub that streams frequent network updates, every update reset Home Assistant's poll timer before it could fire, so the periodic refresh that reads the alarm state (and hourly re-reads rooms, groups, chime, monitoring company, SIM and firmware) effectively never ran on its own — leaving those values dependent entirely on FCM push. If push was delayed or not configured, the panel only updated on a manual reload. A dedicated refresh timer now runs the poll on a fixed cadence regardless of stream activity, restoring the safety net behind push.
+
 ## [1.9.0] - 2026-06-04
 
 ### Added
