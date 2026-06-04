@@ -170,12 +170,17 @@ class AjaxNotificationListener:
 
     async def async_start(self) -> None:
         """Register with FCM and start listening for push notifications."""
-        # Repair is per-entry; clear at every start so that a fresh
-        # credentials roundtrip can re-raise it from a clean slate.
+        # The "credentials present but rejected/malformed" repairs are cleared
+        # at every start so a fresh credentials roundtrip re-raises them from a
+        # clean slate. `fcm_not_configured` is deliberately NOT cleared here:
+        # clearing deletes the registry entry, which wipes any dismissal the
+        # user set, so the card reappeared after every reboot for users who
+        # chose to leave push off (#252). We re-register it idempotently below
+        # (HA preserves a prior dismissal) and only clear it once credentials
+        # are actually present.
         if self._entry_id:
             async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
             async_clear_fcm_credentials_malformed(self._hass, entry_id=self._entry_id)
-            async_clear_fcm_not_configured(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
             _LOGGER.warning(
                 "FCM credentials not configured — push notifications disabled, "
@@ -186,6 +191,10 @@ class AjaxNotificationListener:
             if self._entry_id:
                 async_register_fcm_not_configured(self._hass, entry_id=self._entry_id)
             return
+        # Credentials are present — clear the "not configured" repair if it was
+        # raised on a prior credential-less start.
+        if self._entry_id:
+            async_clear_fcm_not_configured(self._hass, entry_id=self._entry_id)
 
         # Pre-flight shape check on the four values. A malformed
         # `fcm_app_id` (truncated hash tail) surfaces server-side as

@@ -421,7 +421,14 @@ The integration can run with or without Firebase Cloud Messaging (FCM) push, but
 | Device sensor state (temperature, signal strength, open / closed contacts, …) | Real-time (gRPC stream) | Real-time (gRPC stream) |
 | Hub network info, SIM info, room / space topology | Polled | Polled |
 
-If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can dismiss the related Repair card; the integration will not break.
+If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can **dismiss** the *FCM not configured* Repair card and it stays dismissed across restarts — the integration will not break and won't keep re-raising the card on every reboot. The WARNING line under **Settings → System → Logs** is the only remaining reminder.
+
+You can enter the four FCM values later from either place — no need to remove and re-add the integration:
+
+- **Settings → Devices & Services → Aegis for Ajax → Configure** (the Options flow), or
+- the **FCM not configured** Repair card under **Settings → Repairs** (it opens the same four-field form).
+
+Once entered, the values are stored on the config entry and persist across restarts; you should only ever need to enter them once. See [The four values](#the-four-values) for where to obtain each one.
 
 > **FCM shows connected but app → HA updates still don't arrive?** Two common causes:
 >
