@@ -2349,7 +2349,7 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x38)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x38)
 
         assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
         coordinator.hass.async_create_task.assert_not_called()
@@ -2362,7 +2362,7 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator(ChimeStatus.ENABLED)
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x39)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x39)
 
         assert coordinator.spaces["s1"].chime_status == ChimeStatus.CAN_BE_ENABLED
         coordinator.hass.async_create_task.assert_not_called()
@@ -2372,7 +2372,7 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator(ChimeStatus.ENABLED)
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x38)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x38)
 
         coordinator.async_set_updated_data.assert_not_called()
 
@@ -2380,7 +2380,7 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator()
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x99)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x99)
 
         coordinator.hass.async_create_task.assert_called_once()
         assert "s1" in coordinator._chime_refresh_inflight
@@ -2391,7 +2391,7 @@ class TestHtsChimeEvent:
         coordinator = self._make_coordinator()
         coordinator.hass.async_create_task = MagicMock()
 
-        coordinator._on_hts_chime_event("OTHER", "deadbeef", 0x38)
+        coordinator._on_hts_space_event("OTHER", "deadbeef", 0x38)
 
         coordinator.hass.async_create_task.assert_not_called()
 
@@ -2400,7 +2400,7 @@ class TestHtsChimeEvent:
         coordinator.hass.async_create_task = MagicMock()
         coordinator._chime_refresh_inflight.add("s1")
 
-        coordinator._on_hts_chime_event("HUB1", "deadbeef", 0x99)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x99)
 
         coordinator.hass.async_create_task.assert_not_called()
 
@@ -2439,6 +2439,89 @@ class TestHtsChimeEvent:
 
         await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
 
+        coordinator.async_set_updated_data.assert_not_called()
+
+
+class TestHtsSecurityEvent:
+    """HTS `type=0x08` security-state event → instant `security_state` (#258).
+
+    Arm/disarm share the chime event signature; the state byte (params[3])
+    discriminates: 0x00 disarm / 0x01 arm away / 0x02 night. Decoded directly
+    so the panel follows app-side arm/disarm instantly instead of mis-routing to
+    the chime handler and waiting for the poll.
+    """
+
+    def _make_coordinator(
+        self, security_state: SecurityState = SecurityState.DISARMED
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            coordinator = AjaxCobrandedCoordinator(
+                hass=hass, client=MagicMock(), space_ids=["s1"], poll_interval=300
+            )
+        coordinator.hass = hass
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.hass.async_create_task = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="HUB1",
+                name="Home",
+                security_state=security_state,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+                chime_status=ChimeStatus.CAN_BE_ENABLED,
+            )
+        }
+        return coordinator
+
+    def test_arm_away_byte_decodes_to_armed(self) -> None:
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
+        assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
+        coordinator.async_set_updated_data.assert_called_once()
+        # No chime gRPC re-read for a security event.
+        coordinator.hass.async_create_task.assert_not_called()
+        assert "s1" not in coordinator._chime_refresh_inflight
+
+    def test_disarm_byte_decodes_to_disarmed(self) -> None:
+        coordinator = self._make_coordinator(SecurityState.ARMED)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x00)
+        assert coordinator.spaces["s1"].security_state == SecurityState.DISARMED
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_night_byte_decodes_to_night_mode(self) -> None:
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x02)
+        assert coordinator.spaces["s1"].security_state == SecurityState.NIGHT_MODE
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_no_write_when_state_unchanged(self) -> None:
+        coordinator = self._make_coordinator(SecurityState.ARMED)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_optimistic_state_window_blocks_event(self) -> None:
+        # An in-flight HA-initiated command holds an optimistic state; a racing
+        # event must not override it (apply_push_security_state guard).
+        import time
+
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator._optimistic_space_states["s1"] = (
+            time.monotonic() + 10,
+            SecurityState.DISARMED,
+        )
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_unknown_hub_is_ignored(self) -> None:
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator._on_hts_space_event("OTHER", "deadbeef", 0x01)
         coordinator.async_set_updated_data.assert_not_called()
 
 

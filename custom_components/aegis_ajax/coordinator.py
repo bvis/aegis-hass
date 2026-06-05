@@ -41,6 +41,7 @@ from custom_components.aegis_ajax.const import (
     SIGNAL_NEW_DEVICE,
     ChimeStatus,
     ConnectionStatus,
+    SecurityState,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
 from custom_components.aegis_ajax.repairs import (
@@ -113,6 +114,23 @@ _LOCK_DEVICE_TYPES: frozenset[str] = frozenset({"smart_lock", "smart_lock_yale"}
 _CHIME_EVENT_STATE_BYTE: dict[int, ChimeStatus] = {
     0x38: ChimeStatus.ENABLED,
     0x39: ChimeStatus.CAN_BE_ENABLED,
+}
+
+# HTS `type=0x08` security-state event byte → SecurityState (#258). The SAME
+# event frame and signature `(0x02, 0x22, 0x33 80 41 a4)` the chime toggle uses
+# is also emitted on arm/disarm — `33 80 41 a4` is a generic space/source
+# marker, NOT chime-specific; params[3] is the discriminator. The chime bytes
+# (0x38/0x39) and these security bytes never collide. Mapped from BadFlo's
+# capture (#258): 0x00 disarm, 0x01 arm away, 0x02 night mode. Decoded directly
+# so the alarm panel follows an app-side arm/disarm instantly instead of waiting
+# for the periodic poll (the event was previously mis-routed to the chime
+# handler and dropped). Partial/group arm bytes aren't mapped yet → unknown
+# bytes fall through to the chime re-read fallback and the 300s poll still
+# reconciles them.
+_SECURITY_EVENT_STATE_BYTE: dict[int, SecurityState] = {
+    0x00: SecurityState.DISARMED,
+    0x01: SecurityState.ARMED,
+    0x02: SecurityState.NIGHT_MODE,
 }
 
 # Statuses whose snapshot parser writes more than the single mapped key.
@@ -753,7 +771,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._hts_client.listen(
                 on_state_update=self._on_hts_update,
                 on_device_kv=self._on_hts_device_kv,
-                on_chime_event=self._on_hts_chime_event,
+                on_chime_event=self._on_hts_space_event,
             )
         except Exception as exc:
             # Surface at WARNING (#111) — a silent DEBUG made these failures
@@ -846,17 +864,23 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             async_dispatcher_send(self.hass, SIGNAL_NEW_DEVICE, device_id_hex)
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
-    def _on_hts_chime_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
-        """React to a hub Chime-toggle event pushed over HTS in real time (#239).
+    def _on_hts_space_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
+        """React to a hub `type=0x08` space event pushed over HTS in real time.
 
-        The hub emits this the instant the Chime is toggled (including from the
-        Ajax app), so the switch reflects external changes immediately rather
-        than at the hourly snapshot cadence. The event's state byte is decoded
-        directly (`_CHIME_EVENT_STATE_BYTE`: 0x38 on / 0x39 off) and written to
-        `chime_status` straight away — no gRPC re-read, which lagged the toggle
-        and returned a stale value right after an app-side change. An
-        unrecognised byte falls back to re-reading the authoritative gRPC
-        snapshot. Runs on the event loop (HTS listen task).
+        One event frame/signature carries two kinds of space change, told apart
+        by its state byte (params[3]):
+        - **Chime toggle** (#239): 0x38 on / 0x39 off → decoded to `chime_status`.
+        - **Arm/disarm** (#258): 0x00 disarm / 0x01 arm away / 0x02 night → decoded
+          to `security_state` so the alarm panel follows an app-side change
+          instantly. Previously these shared the chime signature and were
+          mis-routed here as "unrecognised", so the panel only caught up on the
+          next poll.
+
+        Both are decoded directly from the event rather than re-read over gRPC,
+        which lags and can return a stale value right after an app-side change.
+        An unrecognised byte falls back to re-reading the authoritative gRPC
+        chime snapshot; the 300s poll reconciles any unmapped security state.
+        Runs on the event loop (HTS listen task).
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
@@ -865,6 +889,21 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             None,
         )
         if space_id is None:
+            return
+
+        # Arm/disarm (#258) — decode the security state and apply it immediately,
+        # reusing the FCM push path (handles the optimistic-state race + dedup).
+        security_state = (
+            _SECURITY_EVENT_STATE_BYTE.get(candidate) if candidate is not None else None
+        )
+        if security_state is not None:
+            _LOGGER.debug(
+                "Security HTS event for space %s: state byte 0x%02X -> %s (decoded from stream)",
+                space_id,
+                candidate,
+                security_state.name,
+            )
+            self.apply_push_security_state(space_id, security_state)
             return
 
         status = _CHIME_EVENT_STATE_BYTE.get(candidate) if candidate is not None else None
