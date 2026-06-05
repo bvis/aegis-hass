@@ -83,13 +83,15 @@
                     "fcm_api_key": "Klucz API FCM",
                     "fcm_sender_id": "ID nadawcy FCM",
                     "clear_fcm_credentials": "Usuń poświadczenia FCM (czyści wszystkie cztery pola)",
+                    "disable_push_warning": "Nie używam powiadomień push",
                     "photo_retention_days": "Przechowywanie zdjęć (dni)",
                     "photo_max_per_device": "Maks. zdjęć na urządzenie (0 = bez limitu)",
                     "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji",
                     "bypass_switches": "Twórz przełączniki pomijania urządzeń"
                 },
                 "data_description": {
-                    "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń."
+                    "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
+                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM."
                 }
             }
         }

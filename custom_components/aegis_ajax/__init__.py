@@ -63,7 +63,9 @@ except TypeError as exc:
     raise
 from custom_components.aegis_ajax.const import (  # noqa: E402
     CONF_AUTO_CREATE_LABELS,
+    CONF_DISABLE_PUSH_WARNING,
     DEFAULT_AUTO_CREATE_LABELS,
+    DEFAULT_DISABLE_PUSH_WARNING,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     LABELS,
@@ -386,6 +388,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
             fcm_sender_id=_get_fcm("fcm_sender_id"),
             entry_id=entry.entry_id,
             app_label=str(entry.data.get("app_label", "")),
+            disable_push_warning=bool(
+                entry.options.get(CONF_DISABLE_PUSH_WARNING, DEFAULT_DISABLE_PUSH_WARNING)
+            ),
         ),
         name=f"aegis_ajax_fcm_start_{entry.entry_id}",
     )

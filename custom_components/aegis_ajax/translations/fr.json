@@ -83,13 +83,15 @@
                     "fcm_api_key": "Clé API FCM",
                     "fcm_sender_id": "ID d'expéditeur FCM",
                     "clear_fcm_credentials": "Supprimer les identifiants FCM (efface les quatre champs)",
+                    "disable_push_warning": "Je n'utilise pas les notifications push",
                     "photo_retention_days": "Rétention des photos (jours)",
                     "photo_max_per_device": "Max photos par appareil (0 = illimité)",
                     "auto_create_labels": "Créer et attribuer automatiquement des étiquettes Aegis aux entités",
                     "bypass_switches": "Créer des interrupteurs de contournement"
                 },
                 "data_description": {
-                    "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils."
+                    "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils.",
+                    "disable_push_warning": "Activez si vous fonctionnez volontairement sans push. Masque le rappel récurrent « FCM non configuré » et la carte de réparation. Les événements en temps réel (sonnette, armement/désarmement, alarme) n'atteindront Home Assistant qu'une fois FCM configuré."
                 }
             }
         }

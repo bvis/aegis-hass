@@ -83,13 +83,15 @@
                     "fcm_api_key": "Clau d'API FCM",
                     "fcm_sender_id": "ID de remitent FCM",
                     "clear_fcm_credentials": "Eliminar credencials FCM (esborra els quatre camps)",
+                    "disable_push_warning": "No faig servir notificacions push",
                     "photo_retention_days": "Retenció de fotos (dies)",
                     "photo_max_per_device": "Màxim de fotos per dispositiu (0 = il·limitat)",
                     "auto_create_labels": "Crear i assignar automàticament etiquetes Aegis a les entitats",
                     "bypass_switches": "Crear switches de bypass de dispositius"
                 },
                 "data_description": {
-                    "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius."
+                    "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius.",
+                    "disable_push_warning": "Activa'l si funciones expressament sense push. Amaga el recordatori recurrent \"FCM no configurat\" i la targeta de reparació. Els esdeveniments en temps real (timbre, armar/desarmar, alarma) continuaran sense arribar a Home Assistant fins que configuris FCM."
                 }
             }
         }

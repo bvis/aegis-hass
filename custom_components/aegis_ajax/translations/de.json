@@ -83,13 +83,15 @@
                     "fcm_api_key": "FCM-API-Schlüssel",
                     "fcm_sender_id": "FCM-Absender-ID",
                     "clear_fcm_credentials": "FCM-Anmeldedaten löschen (alle vier Felder leeren)",
+                    "disable_push_warning": "Ich nutze keine Push-Benachrichtigungen",
                     "photo_retention_days": "Foto-Aufbewahrung (Tage)",
                     "photo_max_per_device": "Max. Fotos pro Gerät (0 = unbegrenzt)",
                     "auto_create_labels": "Aegis-Labels automatisch erstellen und Entitäten zuweisen",
                     "bypass_switches": "Geräte-Überbrückungsschalter erstellen"
                 },
                 "data_description": {
-                    "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat."
+                    "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat.",
+                    "disable_push_warning": "Aktivieren, wenn Sie absichtlich ohne Push arbeiten. Blendet die wiederkehrende Erinnerung „FCM nicht konfiguriert“ und die Reparaturkarte aus. Echtzeit-Ereignisse (Türklingel, Scharf-/Unscharfschalten, Alarm) erreichen Home Assistant erst, wenn FCM konfiguriert ist."
                 }
             }
         }

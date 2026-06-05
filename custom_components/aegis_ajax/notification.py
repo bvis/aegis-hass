@@ -125,6 +125,7 @@ class AjaxNotificationListener:
         fcm_sender_id: str,
         entry_id: str = "",
         app_label: str = "",
+        disable_push_warning: bool = False,
     ) -> None:
         self._hass = hass
         self._coordinator = coordinator
@@ -134,6 +135,7 @@ class AjaxNotificationListener:
         self._fcm_sender_id = fcm_sender_id
         self._entry_id = entry_id
         self._app_label = app_label
+        self._disable_push_warning = disable_push_warning
         self._push_client: Any = None
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._rejected_store: Store[dict[str, Any]] = Store(
@@ -182,11 +184,24 @@ class AjaxNotificationListener:
             async_clear_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
             async_clear_fcm_credentials_malformed(self._hass, entry_id=self._entry_id)
         if not self._fcm_api_key:
+            # Opt-out (#252): a user who deliberately runs without push set the
+            # `disable_push_warning` option. Don't nag (no WARNING, no Repair),
+            # and clear any card raised on a prior start so it doesn't linger.
+            if self._disable_push_warning:
+                _LOGGER.debug(
+                    "FCM credentials not configured, but the push reminder is "
+                    "disabled by option — staying silent."
+                )
+                if self._entry_id:
+                    async_clear_fcm_not_configured(self._hass, entry_id=self._entry_id)
+                return
             _LOGGER.warning(
                 "FCM credentials not configured — push notifications disabled, "
                 "real-time events (doorbell ring, arm/disarm, alarm) will not reach HA. "
                 "Configure them in Settings → Devices & Services → Aegis for Ajax → Configure, "
-                "or open the Repair card surfaced under Settings → Repairs."
+                "or open the Repair card surfaced under Settings → Repairs. "
+                "If you intentionally run without push, enable "
+                "'I don't use push notifications' in Configure to hide this reminder."
             )
             if self._entry_id:
                 async_register_fcm_not_configured(self._hass, entry_id=self._entry_id)

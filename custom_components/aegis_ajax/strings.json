@@ -85,10 +85,12 @@
                     "photo_retention_days": "Photo retention (days)",
                     "photo_max_per_device": "Max photos per device (0 = unlimited)",
                     "auto_create_labels": "Auto-create and assign Aegis labels to entities",
-                    "bypass_switches": "Create device bypass switches"
+                    "bypass_switches": "Create device bypass switches",
+                    "disable_push_warning": "I don't use push notifications"
                 },
                 "data_description": {
-                    "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices."
+                    "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
+                    "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM."
                 }
             }
         }

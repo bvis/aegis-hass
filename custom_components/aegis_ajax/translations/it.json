@@ -83,13 +83,15 @@
                     "fcm_api_key": "Chiave API FCM",
                     "fcm_sender_id": "ID mittente FCM",
                     "clear_fcm_credentials": "Elimina credenziali FCM (cancella tutti e quattro i campi)",
+                    "disable_push_warning": "Non uso le notifiche push",
                     "photo_retention_days": "Conservazione foto (giorni)",
                     "photo_max_per_device": "Max foto per dispositivo (0 = illimitato)",
                     "auto_create_labels": "Crea e assegna automaticamente etichette Aegis alle entità",
                     "bypass_switches": "Crea interruttori di esclusione dispositivo"
                 },
                 "data_description": {
-                    "bypass_switches": "Gli interruttori di esclusione permettono di disattivare un dispositivo prima di inserire l'allarme. 'Auto' li crea solo se il tuo account Ajax ha il permesso di disattivare i dispositivi."
+                    "bypass_switches": "Gli interruttori di esclusione permettono di disattivare un dispositivo prima di inserire l'allarme. 'Auto' li crea solo se il tuo account Ajax ha il permesso di disattivare i dispositivi.",
+                    "disable_push_warning": "Attiva se usi l'integrazione di proposito senza push. Nasconde il promemoria ricorrente \"FCM non configurato\" e la scheda di riparazione. Gli eventi in tempo reale (campanello, attivazione/disattivazione, allarme) non raggiungeranno Home Assistant finché non configuri FCM."
                 }
             }
         }
