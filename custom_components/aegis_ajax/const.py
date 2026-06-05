@@ -271,6 +271,13 @@ CONF_DISABLE_PUSH_WARNING = "disable_push_warning"
 DEFAULT_DISABLE_PUSH_WARNING = False
 
 CONF_FORCE_ARM = "force_arm"
+# Whether the alarm panel advertises ARM_HOME. ARM_HOME duplicates Ajax's
+# single partial ("Night") mode and exists mainly so the Nabu Casa / Alexa
+# skill discovers the panel (#221). Users without Alexa/Cloud see a redundant
+# "Arm Home" button on the Lovelace card and can hide it via this option (#259).
+# Defaults to True to preserve the discovery path for existing Alexa users.
+CONF_EXPOSE_ARM_HOME = "expose_arm_home"
+DEFAULT_EXPOSE_ARM_HOME = True
 CONF_PHOTO_RETENTION_DAYS = "photo_retention_days"
 CONF_PHOTO_MAX_PER_DEVICE = "photo_max_per_device"
 CONF_AUTO_CREATE_LABELS = "auto_create_labels"

@@ -123,6 +123,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 |---|---|---|
 | Poll interval | 300s | Fallback polling interval, allowed range 60-300 seconds (real-time stream handles most updates) |
 | Force arm | disabled | Arm ignoring open sensors and malfunctions (bypasses hub safety checks) |
+| Show "Arm Home" button | enabled | Whether the alarm panel advertises **Arm Home**. It duplicates Ajax's single partial (Night) mode and exists mainly so the Nabu Casa / Alexa skill discovers the panel. Disable to hide the redundant button if you don't use Alexa / Home Assistant Cloud — **Arm Away** and **Arm Night** are unaffected. |
 | PIN code | disabled | Require PIN for arm/disarm from HA UI |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
 | I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
@@ -228,6 +229,8 @@ Both `force_arm` services accept an optional `entity_id` target (alarm control p
 ### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
 
 Ajax has a single partial-arm mode (the app calls it **Night mode**) plus full arm. The panel exposes **Arm Away** (full arm) and both **Arm Home** and **Arm Night** for that one partial mode — so "Arm Home" and "Arm Night" do the same thing and both settle the panel to `armed_night`. "Arm Home" is advertised mainly so the **Nabu Casa / Alexa** skill discovers the panel (it won't discover a panel that exposes Night without Home).
+
+If you don't use Alexa / Home Assistant Cloud, the **Arm Home** button on the Lovelace alarm card is a redundant duplicate of **Arm Night**. Turn off the **Show "Arm Home" button** option (Configure) to hide it; **Arm Away** and **Arm Night** stay available.
 
 Notes for Alexa:
 
