@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Yedek yoklama aralığı (saniye, 60-300)",
                     "force_arm": "Zorla kurma (açık sensörleri ve arızaları yoksay)",
+                    "expose_arm_home": "\"Evde Devreye Al\" düğmesini göster",
                     "use_pin_code": "Kurma/devre dışı bırakma için PIN kodu gerektir",
                     "pin_code": "PIN kodu",
                     "fcm_project_id": "FCM Proje Kimliği (anlık bildirimler için)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Cihaz atlama anahtarları oluştur"
                 },
                 "data_description": {
-                    "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur."
+                    "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
+                    "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın."
                 }
             }
         }

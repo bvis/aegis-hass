@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Intervalo de sondagem reserva (segundos, 60-300)",
                     "force_arm": "Armar forçado (ignorar sensores abertos e falhas)",
+                    "expose_arm_home": "Mostrar botão \"Armar em casa\"",
                     "use_pin_code": "Exigir código PIN para armar/desarmar",
                     "pin_code": "Código PIN",
                     "fcm_project_id": "ID do projeto FCM (para notificações push)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Criar interruptores de bypass de dispositivos"
                 },
                 "data_description": {
-                    "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos."
+                    "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos.",
+                    "expose_arm_home": "Adiciona um modo Armar em casa ao painel de alarme. Ele espelha o modo Noturno e é necessário principalmente para Amazon Alexa ou Nabu Casa Cloud. Desative para ocultar o botão duplicado se você não os usa."
                 }
             }
         }

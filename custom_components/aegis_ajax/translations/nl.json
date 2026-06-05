@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Reserve-pollinginterval (seconden, 60-300)",
                     "force_arm": "Geforceerd inschakelen (open sensoren en storingen negeren)",
+                    "expose_arm_home": "Knop \"Thuis inschakelen\" tonen",
                     "use_pin_code": "PIN-code vereisen voor in-/uitschakelen",
                     "pin_code": "PIN-code",
                     "fcm_project_id": "FCM-project-ID (voor pushmeldingen)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Apparaat-overbrugschakelaars aanmaken"
                 },
                 "data_description": {
-                    "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren."
+                    "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren.",
+                    "expose_arm_home": "Voegt een modus Thuis inschakelen toe aan het alarmpaneel. Dit is gelijk aan de Nachtmodus en is voornamelijk nodig voor Amazon Alexa of Nabu Casa Cloud. Schakel uit om de dubbele knop te verbergen als je deze niet gebruikt."
                 }
             }
         }

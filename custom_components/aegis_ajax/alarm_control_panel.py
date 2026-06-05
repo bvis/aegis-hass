@@ -17,7 +17,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.aegis_ajax.const import CONF_FORCE_ARM, DOMAIN, MANUFACTURER, SecurityState
+from custom_components.aegis_ajax.const import (
+    CONF_EXPOSE_ARM_HOME,
+    CONF_FORCE_ARM,
+    DEFAULT_EXPOSE_ARM_HOME,
+    DOMAIN,
+    MANUFACTURER,
+    SecurityState,
+)
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
 
@@ -297,6 +304,21 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
     @property
     def _force_arm(self) -> bool:
         return bool(self._get_options().get(CONF_FORCE_ARM, False))
+
+    @property
+    def supported_features(self) -> AlarmControlPanelEntityFeature:
+        """Advertise the panel's arm modes, optionally hiding ARM_HOME (#259).
+
+        ARM_HOME duplicates Ajax's single partial mode and is advertised mainly
+        so the Alexa skill discovers the panel (#221). Users without Alexa/Cloud
+        can hide the redundant button via the `expose_arm_home` option; when off
+        we mask the bit while keeping ARM_AWAY/ARM_NIGHT intact.
+        """
+        features = self._attr_supported_features
+        expose = bool(self._get_options().get(CONF_EXPOSE_ARM_HOME, DEFAULT_EXPOSE_ARM_HOME))
+        if not expose:
+            features &= ~AlarmControlPanelEntityFeature.ARM_HOME
+        return features
 
     def _validate_code(self, code: str | None) -> None:
         """Raise HomeAssistantError if the provided code does not match the stored hash."""

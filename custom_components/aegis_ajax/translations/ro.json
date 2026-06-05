@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Interval de interogare de rezervă (secunde, 60-300)",
                     "force_arm": "Armare forțată (ignoră senzorii deschiși și defecțiunile)",
+                    "expose_arm_home": "Afișează butonul „Armare acasă”",
                     "use_pin_code": "Necesită cod PIN pentru armare/dezarmare",
                     "pin_code": "Cod PIN",
                     "fcm_project_id": "ID proiect FCM (pentru notificări push)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Creează comutatoare de excludere dispozitiv"
                 },
                 "data_description": {
-                    "bypass_switches": "Comutatoarele de excludere permit dezactivarea unui dispozitiv înainte de armare. „Auto” le creează doar dacă contul tău Ajax are permisiunea de a dezactiva dispozitive."
+                    "bypass_switches": "Comutatoarele de excludere permit dezactivarea unui dispozitiv înainte de armare. „Auto” le creează doar dacă contul tău Ajax are permisiunea de a dezactiva dispozitive.",
+                    "expose_arm_home": "Adaugă un mod Armare acasă în panoul de alarmă. Reproduce modul de noapte și este necesar în principal pentru Amazon Alexa sau Nabu Casa Cloud. Dezactivează pentru a ascunde butonul duplicat dacă nu le folosești."
                 }
             }
         }

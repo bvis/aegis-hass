@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Zapasowy interwał odpytywania (sekundy, 60-300)",
                     "force_arm": "Wymuszone uzbrojenie (ignoruj otwarte czujniki i awarie)",
+                    "expose_arm_home": "Pokaż przycisk „Uzbrój w domu”",
                     "use_pin_code": "Wymagaj kodu PIN do uzbrojenia/rozbrojenia",
                     "pin_code": "Kod PIN",
                     "fcm_project_id": "ID projektu FCM (dla powiadomień push)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Twórz przełączniki pomijania urządzeń"
                 },
                 "data_description": {
-                    "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń."
+                    "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
+                    "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz."
                 }
             }
         }

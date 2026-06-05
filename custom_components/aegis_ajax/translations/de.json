@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Ersatz-Abfrageintervall (Sekunden, 60-300)",
                     "force_arm": "Scharfschalten erzwingen (offene Sensoren und Störungen ignorieren)",
+                    "expose_arm_home": "Schaltfläche „Zu Hause scharfschalten“ anzeigen",
                     "use_pin_code": "PIN-Code für Scharf-/Unscharfschalten erforderlich",
                     "pin_code": "PIN-Code",
                     "fcm_project_id": "FCM-Projekt-ID (für Push-Benachrichtigungen)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Geräte-Überbrückungsschalter erstellen"
                 },
                 "data_description": {
-                    "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat."
+                    "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat.",
+                    "expose_arm_home": "Fügt dem Alarmfeld einen Modus „Zu Hause scharfschalten“ hinzu. Er entspricht dem Nachtmodus und wird hauptsächlich für Amazon Alexa oder Nabu Casa Cloud benötigt. Deaktivieren, um die doppelte Schaltfläche auszublenden, wenn Sie diese nicht verwenden."
                 }
             }
         }

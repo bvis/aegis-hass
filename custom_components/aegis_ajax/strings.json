@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Fallback poll interval (seconds, 60-300)",
                     "force_arm": "Force arm (ignore open sensors and malfunctions)",
+                    "expose_arm_home": "Show \"Arm Home\" button",
                     "use_pin_code": "Require PIN code for arm/disarm",
                     "pin_code": "PIN code",
                     "fcm_project_id": "FCM Project ID (for push notifications)",
@@ -88,7 +89,8 @@
                     "bypass_switches": "Create device bypass switches"
                 },
                 "data_description": {
-                    "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices."
+                    "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
+                    "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them."
                 }
             }
         }

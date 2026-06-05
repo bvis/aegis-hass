@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Intervalle d'interrogation de secours (secondes, 60-300)",
                     "force_arm": "Armement forcé (ignorer capteurs ouverts et dysfonctionnements)",
+                    "expose_arm_home": "Afficher le bouton « Armer à la maison »",
                     "use_pin_code": "Exiger un code PIN pour armer/désarmer",
                     "pin_code": "Code PIN",
                     "fcm_project_id": "ID de projet FCM (pour les notifications push)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Créer des interrupteurs de contournement"
                 },
                 "data_description": {
-                    "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils."
+                    "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils.",
+                    "expose_arm_home": "Ajoute un mode Armer à la maison au panneau d'alarme. Il reproduit le mode Nuit et n'est nécessaire que pour Amazon Alexa ou Nabu Casa Cloud. Désactivez-le pour masquer le bouton en double si vous ne les utilisez pas."
                 }
             }
         }

@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Interval de sondeig de reserva (segons, 60-300)",
                     "force_arm": "Armar forçat (ignorar sensors oberts i avaries)",
+                    "expose_arm_home": "Mostra el botó \"Arma a casa\"",
                     "use_pin_code": "Requerir codi PIN per armar/desarmar",
                     "pin_code": "Codi PIN",
                     "fcm_project_id": "ID de projecte FCM (per a notificacions push)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Crear switches de bypass de dispositius"
                 },
                 "data_description": {
-                    "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius."
+                    "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius.",
+                    "expose_arm_home": "Afegeix un mode Arma a casa al tauler d'alarma. Replica el mode Nit i només cal per a Amazon Alexa o Nabu Casa Cloud. Desactiva'l per amagar el botó duplicat si no els fas servir."
                 }
             }
         }

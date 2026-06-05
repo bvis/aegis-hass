@@ -40,11 +40,13 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_NEVER,
     CONF_AUTO_CREATE_LABELS,
     CONF_BYPASS_SWITCHES,
+    CONF_EXPOSE_ARM_HOME,
     CONF_FORCE_ARM,
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
+    DEFAULT_EXPOSE_ARM_HOME,
     DEFAULT_PHOTO_MAX_PER_DEVICE,
     DEFAULT_PHOTO_RETENTION_DAYS,
     DEFAULT_POLL_INTERVAL,
@@ -556,6 +558,12 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     vol.Optional(
                         CONF_FORCE_ARM,
                         default=self._entry.options.get(CONF_FORCE_ARM, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_EXPOSE_ARM_HOME,
+                        default=self._entry.options.get(
+                            CONF_EXPOSE_ARM_HOME, DEFAULT_EXPOSE_ARM_HOME
+                        ),
                     ): bool,
                     vol.Optional(
                         "use_pin_code",

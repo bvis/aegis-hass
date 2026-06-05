@@ -76,6 +76,7 @@
                 "data": {
                     "poll_interval": "Záložní interval dotazování (sekundy, 60-300)",
                     "force_arm": "Nucené zastřežení (ignorovat otevřené senzory a poruchy)",
+                    "expose_arm_home": "Zobrazit tlačítko „Aktivovat doma“",
                     "use_pin_code": "Vyžadovat PIN kód pro střežení/odstřežení",
                     "pin_code": "PIN kód",
                     "fcm_project_id": "ID projektu FCM (pro push notifikace)",
@@ -89,7 +90,8 @@
                     "bypass_switches": "Vytvořit přepínače vyřazení zařízení"
                 },
                 "data_description": {
-                    "bypass_switches": "Přepínače vyřazení umožňují deaktivovat zařízení před zastřežením. 'Auto' je vytvoří jen tehdy, má-li tvůj účet Ajax oprávnění deaktivovat zařízení."
+                    "bypass_switches": "Přepínače vyřazení umožňují deaktivovat zařízení před zastřežením. 'Auto' je vytvoří jen tehdy, má-li tvůj účet Ajax oprávnění deaktivovat zařízení.",
+                    "expose_arm_home": "Přidá na panel alarmu režim Aktivovat doma. Kopíruje noční režim a je potřeba hlavně pro Amazon Alexa nebo Nabu Casa Cloud. Vypněte pro skrytí duplicitního tlačítka, pokud je nepoužíváte."
                 }
             }
         }
