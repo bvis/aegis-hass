@@ -465,6 +465,43 @@ class TestAsyncStartFcmRepairs:
         reg_missing.assert_called_once_with(hass, entry_id="entry-x")
 
     @pytest.mark.asyncio
+    async def test_no_repair_when_push_warning_disabled(self) -> None:
+        """User opted out of push (`disable_push_warning`): an empty api_key
+        must NOT raise the `fcm_not_configured` repair, and any stale card is
+        cleared. #252 — a durable opt-out for users who deliberately run
+        without push, instead of relying on HA's per-issue dismissal."""
+        hass = MagicMock()
+        coordinator = MagicMock()
+        listener = AjaxNotificationListener(
+            hass=hass,
+            coordinator=coordinator,
+            fcm_project_id="",
+            fcm_app_id="",
+            fcm_api_key="",
+            fcm_sender_id="",
+            entry_id="entry-x",
+            disable_push_warning=True,
+        )
+
+        with (
+            patch("custom_components.aegis_ajax.notification.async_clear_fcm_credentials_invalid"),
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_credentials_malformed"
+            ),
+            patch(
+                "custom_components.aegis_ajax.notification.async_register_fcm_not_configured"
+            ) as reg_missing,
+            patch(
+                "custom_components.aegis_ajax.notification.async_clear_fcm_not_configured"
+            ) as clr_missing,
+        ):
+            await listener.async_start()
+
+        # Opt-out: never nag, and clear any card raised on a prior start.
+        reg_missing.assert_not_called()
+        clr_missing.assert_called_once_with(hass, entry_id="entry-x")
+
+    @pytest.mark.asyncio
     async def test_register_failure_raises_repair(self) -> None:
         """firebase_messaging.register() throwing → repair raised, listener returns gracefully."""
         hass = MagicMock()

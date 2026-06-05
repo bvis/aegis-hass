@@ -84,6 +84,7 @@
                     "fcm_api_key": "Clave de API FCM",
                     "fcm_sender_id": "ID de remitente FCM",
                     "clear_fcm_credentials": "Eliminar credenciales FCM (borra los cuatro campos)",
+                    "disable_push_warning": "No uso notificaciones push",
                     "photo_retention_days": "Retención de fotos (días)",
                     "photo_max_per_device": "Máximo de fotos por dispositivo (0 = ilimitado)",
                     "auto_create_labels": "Crear y asignar automáticamente etiquetas Aegis a las entidades",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Los switches de bypass permiten desactivar un dispositivo antes de armar. 'Auto' solo los crea si tu cuenta de Ajax tiene permiso para desactivar dispositivos.",
-                    "expose_arm_home": "Añade un modo Armar en casa al panel de alarma. Duplica el modo Noche y solo hace falta para Amazon Alexa o Nabu Casa Cloud. Desactívalo para ocultar el botón duplicado si no los usas."
+                    "expose_arm_home": "Añade un modo Armar en casa al panel de alarma. Duplica el modo Noche y solo hace falta para Amazon Alexa o Nabu Casa Cloud. Desactívalo para ocultar el botón duplicado si no los usas.",
+                    "disable_push_warning": "Actívalo si funcionas a propósito sin push. Oculta el recordatorio recurrente \"FCM no configurado\" y su tarjeta de reparación. Los eventos en tiempo real (timbre, armar/desarmar, alarma) seguirán sin llegar a Home Assistant hasta que configures FCM."
                 }
             }
         }

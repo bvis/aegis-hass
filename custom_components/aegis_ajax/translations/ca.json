@@ -84,6 +84,7 @@
                     "fcm_api_key": "Clau d'API FCM",
                     "fcm_sender_id": "ID de remitent FCM",
                     "clear_fcm_credentials": "Eliminar credencials FCM (esborra els quatre camps)",
+                    "disable_push_warning": "No faig servir notificacions push",
                     "photo_retention_days": "Retenció de fotos (dies)",
                     "photo_max_per_device": "Màxim de fotos per dispositiu (0 = il·limitat)",
                     "auto_create_labels": "Crear i assignar automàticament etiquetes Aegis a les entitats",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius.",
-                    "expose_arm_home": "Afegeix un mode Arma a casa al tauler d'alarma. Replica el mode Nit i només cal per a Amazon Alexa o Nabu Casa Cloud. Desactiva'l per amagar el botó duplicat si no els fas servir."
+                    "expose_arm_home": "Afegeix un mode Arma a casa al tauler d'alarma. Replica el mode Nit i només cal per a Amazon Alexa o Nabu Casa Cloud. Desactiva'l per amagar el botó duplicat si no els fas servir.",
+                    "disable_push_warning": "Activa'l si funciones expressament sense push. Amaga el recordatori recurrent \"FCM no configurat\" i la targeta de reparació. Els esdeveniments en temps real (timbre, armar/desarmar, alarma) continuaran sense arribar a Home Assistant fins que configuris FCM."
                 }
             }
         }

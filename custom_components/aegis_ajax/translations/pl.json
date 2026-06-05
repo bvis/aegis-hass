@@ -84,6 +84,7 @@
                     "fcm_api_key": "Klucz API FCM",
                     "fcm_sender_id": "ID nadawcy FCM",
                     "clear_fcm_credentials": "Usuń poświadczenia FCM (czyści wszystkie cztery pola)",
+                    "disable_push_warning": "Nie używam powiadomień push",
                     "photo_retention_days": "Przechowywanie zdjęć (dni)",
                     "photo_max_per_device": "Maks. zdjęć na urządzenie (0 = bez limitu)",
                     "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
-                    "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz."
+                    "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz.",
+                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM."
                 }
             }
         }

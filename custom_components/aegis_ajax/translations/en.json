@@ -84,6 +84,7 @@
                     "fcm_api_key": "FCM API Key",
                     "fcm_sender_id": "FCM Sender ID",
                     "clear_fcm_credentials": "Delete FCM credentials (clears all four fields)",
+                    "disable_push_warning": "I don't use push notifications",
                     "photo_retention_days": "Photo retention (days)",
                     "photo_max_per_device": "Max photos per device (0 = unlimited)",
                     "auto_create_labels": "Auto-create and assign Aegis labels to entities",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
-                    "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them."
+                    "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them.",
+                    "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM."
                 }
             }
         }

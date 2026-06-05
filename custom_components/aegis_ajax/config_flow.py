@@ -40,12 +40,14 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_NEVER,
     CONF_AUTO_CREATE_LABELS,
     CONF_BYPASS_SWITCHES,
+    CONF_DISABLE_PUSH_WARNING,
     CONF_EXPOSE_ARM_HOME,
     CONF_FORCE_ARM,
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
+    DEFAULT_DISABLE_PUSH_WARNING,
     DEFAULT_EXPOSE_ARM_HOME,
     DEFAULT_PHOTO_MAX_PER_DEVICE,
     DEFAULT_PHOTO_RETENTION_DAYS,
@@ -589,6 +591,12 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                         description={"suggested_value": self._get_fcm("fcm_sender_id")},
                     ): str,
                     vol.Optional("clear_fcm_credentials", default=False): bool,
+                    vol.Optional(
+                        CONF_DISABLE_PUSH_WARNING,
+                        default=self._entry.options.get(
+                            CONF_DISABLE_PUSH_WARNING, DEFAULT_DISABLE_PUSH_WARNING
+                        ),
+                    ): bool,
                     vol.Optional(
                         CONF_PHOTO_RETENTION_DAYS,
                         default=self._entry.options.get(

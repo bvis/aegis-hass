@@ -84,6 +84,7 @@
                     "fcm_api_key": "FCM-API-sleutel",
                     "fcm_sender_id": "FCM-afzender-ID",
                     "clear_fcm_credentials": "FCM-inloggegevens verwijderen (wist alle vier velden)",
+                    "disable_push_warning": "Ik gebruik geen pushmeldingen",
                     "photo_retention_days": "Foto bewaarperiode (dagen)",
                     "photo_max_per_device": "Max foto's per apparaat (0 = onbeperkt)",
                     "auto_create_labels": "Aegis-labels automatisch aanmaken en aan entiteiten toewijzen",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren.",
-                    "expose_arm_home": "Voegt een modus Thuis inschakelen toe aan het alarmpaneel. Dit is gelijk aan de Nachtmodus en is voornamelijk nodig voor Amazon Alexa of Nabu Casa Cloud. Schakel uit om de dubbele knop te verbergen als je deze niet gebruikt."
+                    "expose_arm_home": "Voegt een modus Thuis inschakelen toe aan het alarmpaneel. Dit is gelijk aan de Nachtmodus en is voornamelijk nodig voor Amazon Alexa of Nabu Casa Cloud. Schakel uit om de dubbele knop te verbergen als je deze niet gebruikt.",
+                    "disable_push_warning": "Schakel dit in als je bewust zonder push werkt. Verbergt de terugkerende herinnering \"FCM niet geconfigureerd\" en de reparatiekaart. Realtime gebeurtenissen (deurbel, in-/uitschakelen, alarm) bereiken Home Assistant pas als je FCM configureert."
                 }
             }
         }

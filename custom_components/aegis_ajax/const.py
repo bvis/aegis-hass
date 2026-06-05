@@ -261,6 +261,15 @@ DEFAULT_BYPASS_SWITCHES = BYPASS_SWITCHES_AUTO
 # `permission_denied` on the bypass command.
 BYPASS_REQUIRED_PERMISSION = "DEVICE_EDIT"
 
+# Opt-out for users who deliberately run without push notifications. When set,
+# the integration does not raise the recurring `fcm_not_configured` Repair card
+# or the WARNING log when the four FCM fields are empty, and clears any card
+# raised on a prior start. A durable alternative to HA's per-issue dismissal,
+# which is easy to miss on a fixable repair (#252). Real-time push still stays
+# off until FCM is configured; this only silences the reminder.
+CONF_DISABLE_PUSH_WARNING = "disable_push_warning"
+DEFAULT_DISABLE_PUSH_WARNING = False
+
 CONF_FORCE_ARM = "force_arm"
 # Whether the alarm panel advertises ARM_HOME. ARM_HOME duplicates Ajax's
 # single partial ("Night") mode and exists mainly so the Nabu Casa / Alexa

@@ -126,6 +126,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 | Show "Arm Home" button | enabled | Whether the alarm panel advertises **Arm Home**. It duplicates Ajax's single partial (Night) mode and exists mainly so the Nabu Casa / Alexa skill discovers the panel. Disable to hide the redundant button if you don't use Alexa / Home Assistant Cloud — **Arm Away** and **Arm Night** are unaffected. |
 | PIN code | disabled | Require PIN for arm/disarm from HA UI |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
+| I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
 | Photo retention (days) | 30 | How many days to keep captured photos (1-365) |
 | Max photos per device | 100 | Maximum photos stored per camera (0 = unlimited) |
 | Auto-create labels | enabled | Create and assign `aegis_*` labels (camera, hub, door, motion, …) to your entities for easy grouping in dashboards/automations. Disable if you prefer to manage labels manually — with the option enabled the integration re-creates the labels on every restart. |

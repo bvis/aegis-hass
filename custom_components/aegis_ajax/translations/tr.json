@@ -84,6 +84,7 @@
                     "fcm_api_key": "FCM API Anahtarı",
                     "fcm_sender_id": "FCM Gönderici Kimliği",
                     "clear_fcm_credentials": "FCM kimlik bilgilerini sil (dört alanı da temizler)",
+                    "disable_push_warning": "Anlık bildirim kullanmıyorum",
                     "photo_retention_days": "Fotoğraf saklama süresi (gün)",
                     "photo_max_per_device": "Cihaz başına maks. fotoğraf (0 = sınırsız)",
                     "auto_create_labels": "Aegis etiketlerini otomatik olarak oluştur ve varlıklara ata",
@@ -91,7 +92,8 @@
                 },
                 "data_description": {
                     "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
-                    "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın."
+                    "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın.",
+                    "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz."
                 }
             }
         }
