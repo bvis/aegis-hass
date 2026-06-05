@@ -9,8 +9,11 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.const import EntityCategory
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.aegis_ajax.const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import build_device_info
 
@@ -404,6 +407,29 @@ async def async_setup_entry(
         )
     async_add_entities(entities)
 
+    # SpaceControl keyfobs are HTS-only and discovered seconds after setup (when
+    # the first SETTINGS_BODY arrives), so they are not in `coordinator.devices`
+    # here. Add any already known, then listen on the generic SIGNAL_NEW_DEVICE
+    # dispatcher to add each new one as it is discovered at runtime.
+    seen_keyfobs: set[str] = set()
+
+    def _add_keyfobs(keyfob_ids: list[str]) -> None:
+        new = [
+            AjaxKeyfobActiveSensor(coordinator, kid)
+            for kid in keyfob_ids
+            if kid not in seen_keyfobs and kid in coordinator.keyfobs
+        ]
+        if new:
+            seen_keyfobs.update(e._keyfob_id for e in new)
+            async_add_entities(new)
+
+    _add_keyfobs(list(coordinator.keyfobs))
+    entry.async_on_unload(
+        async_dispatcher_connect(
+            hass, SIGNAL_NEW_DEVICE, lambda device_id: _add_keyfobs([device_id])
+        )
+    )
+
 
 def _evict_orphan_co_sensors(
     hass: HomeAssistant, entry: ConfigEntry, *, provided: set[str]
@@ -545,6 +571,61 @@ class AjaxProblemSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySenso
         if device:
             return {"malfunctions_count": device.malfunctions}
         return {}
+
+
+class AjaxKeyfobActiveSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySensorEntity):
+    """EXPERIMENTAL "Active" state for an Ajax SpaceControl keyfob.
+
+    Keyfobs are HTS-only (not in the gRPC device snapshot). They carry no
+    per-device data (no battery/online), so rather than one HA device each they
+    are grouped under a single virtual "Keyfobs" device (one per hub), with one
+    entity per keyfob named after it. The `active` value is derived from an
+    UNVERIFIED flag byte (`0x0b`) — every observed keyfob reads "active" and we
+    have no deactivated sample, so the value is surfaced experimentally.
+    `flags_hex` is exposed as an attribute so a user with a CRA-deactivated
+    keyfob can confirm which byte actually flips.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.RUNNING
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, keyfob_id: str) -> None:
+        super().__init__(coordinator)
+        self._keyfob_id = keyfob_id
+        self._attr_unique_id = f"aegis_ajax_{keyfob_id}_active"
+        keyfob = coordinator.keyfobs.get(keyfob_id)
+        if keyfob:
+            # The entity's own name is the keyfob name; with has_entity_name the
+            # device page lists it (e.g. "Front fob") under the "Keyfobs" device.
+            self._attr_name = keyfob.name
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"{keyfob.hub_id}_keyfobs")},
+                name="Keyfobs",
+                manufacturer=MANUFACTURER,
+                model="SpaceControl keyfobs (experimental)",
+                via_device=(DOMAIN, keyfob.hub_id),
+            )
+
+    @property
+    def available(self) -> bool:
+        return self._keyfob_id in self.coordinator.keyfobs
+
+    @property
+    def is_on(self) -> bool:
+        keyfob = self.coordinator.keyfobs.get(self._keyfob_id)
+        return keyfob is not None and keyfob.active
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        keyfob = self.coordinator.keyfobs.get(self._keyfob_id)
+        if keyfob is None:
+            return {}
+        return {
+            "index": keyfob.index,
+            "flags_hex": keyfob.flags_hex,
+            "experimental": True,
+        }
 
 
 class AjaxCraConnectionSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySensorEntity):

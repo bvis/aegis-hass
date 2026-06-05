@@ -527,6 +527,13 @@ ALL_EVENT_TYPES: list[str] = sorted(
     | set(SMARTLOCK_EVENT_TAG_MAP.values())
 )
 
+# Dispatcher signal for entities discovered at runtime (after platform setup),
+# rather than from the gRPC `coordinator.devices` snapshot available at setup.
+# Payload is the discovered device id (str); subscribers filter for what they
+# create. Currently only SpaceControl keyfobs (HTS-only, discovered seconds after
+# startup) use it; kept generic so future runtime discovery can reuse it.
+SIGNAL_NEW_DEVICE = f"{DOMAIN}_new_device"
+
 # Device types that get their own per-device doorbell `event` entity on their
 # device card (#173). The ring event is also fired on the hub-level event
 # entity for backwards compatibility; this surfaces it where users look first.

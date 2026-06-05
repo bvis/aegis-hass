@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - unreleased
+
+### Added
+- **SpaceControl keyfobs now appear in Home Assistant, with an experimental "Active" sensor.** Keyfobs (llaveros) are reported only over the hub's HTS link, never in the gRPC device snapshot, so they were invisible until now. They are grouped under a single **Keyfobs** device per hub, with one diagnostic **Active** binary sensor per keyfob (named after it). The active value is **experimental and unverified**: every observed keyfob reports as active and we have no deactivated sample to confirm against (only an installer/CRA can deactivate a keyfob), so the sensor reads "active" until a diagnostic from a genuinely deactivated keyfob confirms the indicator. To help with that, keyfob detail is logged at debug level (names redacted) and included in the diagnostics download. Who armed/disarmed via a keyfob already appeared in the logbook ("Disarmed (via NAME)") and is unaffected.
+
+### Documentation
+- **Documented keyfobs as experimental and asked for deactivated-keyfob logs.** README now lists keyfobs in Supported Devices, adds a Keyfobs (experimental) entity section explaining the unconfirmed active/inactive state, and a Help Wanted entry inviting a diagnostics dump + debug log from anyone with a keyfob deactivated by their installer/CRA so the indicator can be confirmed.
+
 ## [1.9.1] - 2026-06-05
 
 ### Fixed

@@ -2440,3 +2440,90 @@ class TestHtsChimeEvent:
         await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
 
         coordinator.async_set_updated_data.assert_not_called()
+
+
+def _keyfob_kv(name: bytes = b"ALICE", index: bytes = b"\x02\xef", active: int = 0x01) -> dict:
+    """Build a real-shape SpaceControl keyfob SETTINGS_BODY row (synthetic name)."""
+    return {
+        0x02: name,
+        0x07: bytes.fromhex("00000000ffffffff"),
+        0x08: bytes.fromhex("00000000ffffffff"),
+        0x09: bytes.fromhex("00000000"),
+        0x0A: index,
+        0x0B: bytes([active]),
+        0x0C: b"\x01",
+        0x0D: b"\x01",
+        0x0E: b"\x01",
+        0x0F: bytes(8),
+        0x10: b"\x00",
+        0x11: bytes(4),
+        0x13: bytes(16),
+        0x14: bytes(16),
+        0x16: b"\xff\xff",
+    }
+
+
+class TestOnHtsDeviceKvKeyfob:
+    """Keyfobs are HTS-only — they reach _on_hts_device_kv with no gRPC device."""
+
+    def test_new_keyfob_is_stored_and_announced(self) -> None:
+        from custom_components.aegis_ajax.api.hts.keyfobs import Keyfob
+        from custom_components.aegis_ajax.const import SIGNAL_NEW_DEVICE
+
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send") as mock_send:
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", _keyfob_kv())
+
+        assert coordinator.keyfobs["2ACCB91C"] == Keyfob(
+            id="2ACCB91C",
+            hub_id="002B1A51",
+            name="ALICE",
+            index=751,
+            active=True,
+            flags_hex="01:01:01:01",
+        )
+        mock_send.assert_called_once()
+        assert mock_send.call_args.args[1:] == (SIGNAL_NEW_DEVICE, "2ACCB91C")
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_unchanged_keyfob_no_refresh(self) -> None:
+        from custom_components.aegis_ajax.api.hts.keyfobs import parse_keyfob
+
+        coordinator = _make_coordinator()
+        coordinator.keyfobs["2ACCB91C"] = parse_keyfob("2ACCB91C", "002B1A51", _keyfob_kv())
+        coordinator.async_set_updated_data = MagicMock()
+
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send") as mock_send:
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", _keyfob_kv())
+
+        coordinator.async_set_updated_data.assert_not_called()
+        mock_send.assert_not_called()
+
+    def test_changed_keyfob_refreshes_without_reannouncing(self) -> None:
+        from custom_components.aegis_ajax.api.hts.keyfobs import parse_keyfob
+
+        coordinator = _make_coordinator()
+        coordinator.keyfobs["2ACCB91C"] = parse_keyfob("2ACCB91C", "002B1A51", _keyfob_kv())
+        coordinator.async_set_updated_data = MagicMock()
+
+        # Active flag flips (e.g. a deactivated keyfob): refresh, but not "new".
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send") as mock_send:
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", _keyfob_kv(active=0x00))
+
+        assert coordinator.keyfobs["2ACCB91C"].active is False
+        coordinator.async_set_updated_data.assert_called_once()
+        mock_send.assert_not_called()
+
+    def test_non_keyfob_unknown_row_ignored(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+
+        # A 1-key company marker row at an unknown id — not a keyfob.
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send") as mock_send:
+            coordinator._on_hts_device_kv("0000016A", "0000016A", {0x01: b"ACME"})
+
+        assert coordinator.keyfobs == {}
+        coordinator.async_set_updated_data.assert_not_called()
+        mock_send.assert_not_called()

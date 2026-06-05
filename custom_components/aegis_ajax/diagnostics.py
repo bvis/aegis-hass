@@ -68,6 +68,15 @@ async def async_get_config_entry_diagnostics(
             }
             for did, d in coordinator.devices.items()
         },
+        "keyfobs": {
+            kid: {
+                "name": k.name,
+                "index": k.index,
+                "active": k.active,
+                "flags_hex": k.flags_hex,
+            }
+            for kid, k in coordinator.keyfobs.items()
+        },
         "stream_tasks": len(coordinator._stream_tasks),
         "notification_listener": coordinator.notification_listener is not None,
     }

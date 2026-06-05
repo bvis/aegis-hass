@@ -192,6 +192,7 @@ You can type any custom label during setup if yours is not listed.
 | Hub Chime | Hubs that expose the chime setting | `switch.<hub>_chime` toggles the hub-wide chime tone (door-open alert while disarmed); reflects app-side changes instantly. Requires the account's chime-edit permission |
 | Doorbells | Wireless DoorBell (standalone Jeweller ring button), MotionCam Video Doorbell, SmartLock / LockBridge variants with integrated ring button | `doorbell_pressed` on the hub's security event entity, plus a **per-device `event` entity** (`device_class: doorbell`) that emits Home Assistant's canonical `ring` event; a doorbell motion push also flips the doorbell's `motion_detected` on (30 s auto-off). Video doorbell also exposes photo capture; SmartLock variant exposes lock state on the lock entity. Requires FCM credentials configured |
 | Keypads | Keypad, KeypadPlus, KeypadCombi, KeypadTouchscreen | Battery, tamper, temperature, signal, NFC status |
+| Keyfobs (experimental) | SpaceControl, SpaceControl S | Grouped under a single **Keyfobs** device, with one **Active** binary sensor per keyfob (diagnostic). The active/inactive value is **experimental and not yet confirmed** — see [Keyfobs (experimental)](#keyfobs-experimental). Who armed/disarmed via a keyfob already appears in the logbook regardless |
 | Sirens | HomeSiren, HomeSiren S, HomeSiren Fibra, HomeSiren G3, StreetSiren, StreetSiren S, StreetSiren Plus, StreetSiren Plus Fibra/G3, StreetSiren Fibra, StreetSiren Double Deck (& S / Fibra) | Battery, tamper, signal, internal temperature (HomeSiren / StreetSiren family) |
 | Range extenders | ReX, ReX 2, ReX 2 Fire | Battery, signal |
 | Wired-Input Modules | MultiTransmitter, MultiTransmitter Fibra, Hub Hybrid wired inputs | Tamper of the module itself; each registered wired sensor appears as its own device with an alert binary sensor and an `alarm_type` attribute (intrusion / fire / glass_break / vibration / …) |
@@ -335,6 +336,15 @@ Use these in automation templates, e.g. `{{ trigger.event.data.device_name }}`.
 - **External contact fault** — circuit-fault indicator for the same external wiring (cable disconnect or short)
 - **Wire input alert** — triggered state of a third-party sensor wired into a MultiTransmitter or a Hub Hybrid wire input. Exposes an `alarm_type` attribute reflecting the category Ajax assigned to that input (intrusion, fire, glass_break, vibration, etc.). Available on `wire_input_mt` and `wire_input` device types
 
+### Keyfobs (experimental)
+SpaceControl keyfobs are grouped under a single **Keyfobs** device (one per hub), with one **Active** binary sensor per keyfob, named after it (using the keyfob name set in the Ajax app).
+
+> **The active/inactive state is experimental and not yet confirmed.** On every install seen so far each keyfob reports as **active**, and a keyfob can only be deactivated by an installer or monitoring company (there's no toggle in the Ajax app, or here), so there has been no *inactive* example to validate against — the sensor may not yet reflect a genuinely deactivated keyfob.
+>
+> **You can help finalize it:** if you have a keyfob that your installer/CRA has deactivated, a **Download diagnostics** (Settings → Devices & Services → Aegis for Ajax → ⋮ → Download diagnostics) plus a debug log (`custom_components.aegis_ajax: debug`) attached to a [GitHub issue](https://github.com/bvis/aegis-hass/issues/new) would let us confirm the indicator and get it right. See [Help Wanted](#help-wanted).
+
+Who armed or disarmed the system with a keyfob already appears in the logbook ("Disarmed (via …)") and on the hub's security event entity — that's independent of these sensors.
+
 ## Automation Blueprints
 
 Aegis includes 8 ready-to-use automation blueprints. Import them via URL in **Settings → Automations → Blueprints → Import Blueprint**:
@@ -393,7 +403,7 @@ If a specific group of sensors stops working:
 - [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.3.0`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
 - [ ] Per-device firmware update entities. Hub-level entity ships in `1.4.0` via `streamHubObject` field 201; field 200 (`device_firmware_updates`) carries the same shape per device for the per-device entities, same read-only-by-design pattern
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
-- [ ] SpaceControl (keyfob) event support
+- [x] SpaceControl (keyfob) detection — keyfobs surface as a **Keyfobs** device with an experimental per-keyfob active sensor (`1.10.0`); the active/inactive value still awaits confirmation from a deactivated-keyfob log. (Who armed/disarmed via a keyfob was already attributed in the logbook.)
 
 ## Help Wanted
 
@@ -403,7 +413,8 @@ Areas where the integration could grow with community input:
 
 - **Video streaming** (live view on MotionCam Video, Video Edge cameras) — the biggest open gap.
 - **Bidirectional WaterStop control** — read-only valve entity ships since `1.3.0`; full open / close is still pending.
-- **SpaceControl (keyfob) events**, **per-device firmware updates**, **device settings** (sensitivity, brightness, alert thresholds).
+- **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. If yours has one deactivated by your installer/CRA, a diagnostics dump + debug log would let us finalize the indicator.
+- **Per-device firmware updates**, **device settings** (sensitivity, brightness, alert thresholds).
 - **Co-branded apps** the integration doesn't yet recognise in the `App Label` dropdown.
 - **Any new device family** that shows up in the snapshot without entities.
 

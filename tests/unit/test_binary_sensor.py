@@ -1215,3 +1215,101 @@ class TestOrphanCoSensorEviction:
             registry_entries=[_reg_entry("binary_sensor.d1_co", "aegis_ajax_d1_co_detected")],
         )
         assert removed == []
+
+
+class TestKeyfobActiveSensor:
+    """Experimental SpaceControl keyfob 'Active' diagnostic sensor."""
+
+    @staticmethod
+    def _keyfob():  # noqa: ANN205
+        from custom_components.aegis_ajax.api.hts.keyfobs import Keyfob
+
+        return Keyfob(
+            id="2ACCB91C",
+            hub_id="002B1A51",
+            name="ALICE",
+            index=751,
+            active=True,
+            flags_hex="01:01:01:01",
+        )
+
+    def test_entity_reflects_keyfob_state(self) -> None:
+        from custom_components.aegis_ajax.binary_sensor import AjaxKeyfobActiveSensor
+
+        coordinator = MagicMock()
+        coordinator.keyfobs = {"2ACCB91C": self._keyfob()}
+        sensor = AjaxKeyfobActiveSensor(coordinator, "2ACCB91C")
+
+        assert sensor.unique_id == "aegis_ajax_2ACCB91C_active"
+        assert sensor.available is True
+        assert sensor.is_on is True
+        assert sensor.extra_state_attributes == {
+            "index": 751,
+            "flags_hex": "01:01:01:01",
+            "experimental": True,
+        }
+        # Grouped under a single virtual "Keyfobs" device per hub; the entity
+        # itself is named after the keyfob.
+        assert sensor.name == "ALICE"
+        assert sensor.device_info["identifiers"] == {("aegis_ajax", "002B1A51_keyfobs")}
+        assert sensor.device_info["via_device"] == ("aegis_ajax", "002B1A51")
+        assert sensor.device_info["name"] == "Keyfobs"
+
+    def test_unavailable_when_keyfob_gone(self) -> None:
+        from custom_components.aegis_ajax.binary_sensor import AjaxKeyfobActiveSensor
+
+        coordinator = MagicMock()
+        coordinator.keyfobs = {"2ACCB91C": self._keyfob()}
+        sensor = AjaxKeyfobActiveSensor(coordinator, "2ACCB91C")
+        coordinator.keyfobs = {}
+
+        assert sensor.available is False
+        assert sensor.is_on is False
+        assert sensor.extra_state_attributes == {}
+
+    @pytest.mark.asyncio
+    async def test_dynamic_add_via_dispatcher(self) -> None:
+        from custom_components.aegis_ajax.binary_sensor import AjaxKeyfobActiveSensor
+
+        coordinator = MagicMock()
+        coordinator.devices = {}
+        coordinator.spaces = {}
+        coordinator.rooms = {}
+        coordinator.keyfobs = {}  # none known at setup
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.runtime_data = coordinator
+
+        added: list = []
+
+        def _add(entities: list, *a: object, **k: object) -> None:
+            added.extend(entities)
+
+        captured: dict = {}
+
+        def _fake_connect(hass: object, signal: str, cb: object):  # noqa: ANN202
+            captured["signal"] = signal
+            captured["cb"] = cb
+            return lambda: None
+
+        with patch(
+            "custom_components.aegis_ajax.binary_sensor.async_dispatcher_connect",
+            side_effect=_fake_connect,
+        ):
+            await async_setup_entry(MagicMock(), entry, _add)
+
+        # No keyfobs at setup → none added yet, but the dispatcher is wired.
+        assert not [e for e in added if isinstance(e, AjaxKeyfobActiveSensor)]
+        assert captured["signal"].endswith("_new_device")
+
+        # Keyfob discovered at runtime → dispatcher callback adds exactly one.
+        coordinator.keyfobs = {"2ACCB91C": self._keyfob()}
+        captured["cb"]("2ACCB91C")
+        kf_entities = [e for e in added if isinstance(e, AjaxKeyfobActiveSensor)]
+        assert len(kf_entities) == 1
+        assert kf_entities[0].unique_id == "aegis_ajax_2ACCB91C_active"
+
+        # Idempotent: a duplicate signal for the same id does not double-add.
+        captured["cb"]("2ACCB91C")
+        assert len([e for e in added if isinstance(e, AjaxKeyfobActiveSensor)]) == 1

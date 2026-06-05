@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -37,6 +38,7 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
+    SIGNAL_NEW_DEVICE,
     ChimeStatus,
     ConnectionStatus,
 )
@@ -58,6 +60,7 @@ if TYPE_CHECKING:
         DeviceReadings,
         HubNetworkState,
     )
+    from custom_components.aegis_ajax.api.hts.keyfobs import Keyfob
     from custom_components.aegis_ajax.api.models import Device, Room, Space
     from custom_components.aegis_ajax.notification import AjaxNotificationListener
 
@@ -201,6 +204,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # (same shape as `self.devices` keys). Empty dict = no readings
         # snapshotted yet OR no electrical devices in the install.
         self.device_readings: dict[str, DeviceReadings] = {}
+        # SpaceControl keyfobs (HTS-only; not in the gRPC device snapshot).
+        # Populated from SETTINGS_BODY rows via `_on_hts_device_kv`. Keyed by
+        # upper-case 8-char device id. The binary_sensor platform creates a
+        # device + experimental "Active" sensor per entry, added at runtime via
+        # the `SIGNAL_NEW_DEVICE` dispatcher as keyfobs are discovered.
+        self.keyfobs: dict[str, Keyfob] = {}
         # One-shot guard for the #206 Bug-B SmartLock id probe (DEBUG-only).
         self._smart_lock_probe_done = False
         # Per-space monotonic timestamp of when the hub first reported
@@ -782,6 +791,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         device = self.devices.get(device_id_hex)
         if device is None:
+            # Not a gRPC-modeled device — it may be a SpaceControl keyfob, which
+            # only ever appears in the HTS SETTINGS_BODY (never in the gRPC
+            # snapshot). Classify and surface it; everything else (users,
+            # markers) is ignored. See api/hts/keyfobs.py.
+            self._handle_keyfob_kv(hub_id, device_id_hex, kv)
             return
         readings = parse_device_readings(
             device.device_type,
@@ -795,6 +809,42 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_readings[device_id_hex] = readings
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         _ = hub_id  # currently unused; kept in the signature for symmetry with on_state_update
+
+    def _handle_keyfob_kv(self, hub_id: str, device_id_hex: str, kv: dict[int, bytes]) -> None:
+        """Classify a non-gRPC SETTINGS_BODY row as a SpaceControl keyfob.
+
+        Keyfobs are HTS-only — they never appear in the gRPC device snapshot, so
+        they reach this path (where `self.devices` has no entry). A recognised
+        keyfob is stored in `self.keyfobs` and announced via `SIGNAL_NEW_DEVICE`
+        so the binary_sensor platform can add its device + experimental "Active"
+        sensor at runtime. Rows that merely *look* like keyfobs are DEBUG-logged
+        (name redacted) so a user with a CRA-deactivated keyfob can share a log
+        and let us confirm the still-unverified active flag — see keyfobs.py.
+        """
+        from custom_components.aegis_ajax.api.hts.keyfobs import (  # noqa: PLC0415
+            looks_like_keyfob_candidate,
+            parse_keyfob,
+        )
+        from custom_components.aegis_ajax.notification import _redact_printable  # noqa: PLC0415
+
+        if looks_like_keyfob_candidate(device_id_hex, kv):
+            _LOGGER.debug(
+                "Keyfob candidate %s on hub %s: %s",
+                device_id_hex,
+                hub_id,
+                {f"0x{k:02x}": _redact_printable(v) for k, v in sorted(kv.items())},
+            )
+
+        keyfob = parse_keyfob(device_id_hex, hub_id, kv)
+        if keyfob is None:
+            return
+        if self.keyfobs.get(device_id_hex) == keyfob:
+            return
+        is_new = device_id_hex not in self.keyfobs
+        self.keyfobs[device_id_hex] = keyfob
+        if is_new:
+            async_dispatcher_send(self.hass, SIGNAL_NEW_DEVICE, device_id_hex)
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def _on_hts_chime_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
         """React to a hub Chime-toggle event pushed over HTS in real time (#239).
