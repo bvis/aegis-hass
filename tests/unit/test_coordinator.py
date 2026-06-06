@@ -2343,32 +2343,30 @@ class TestHtsChimeEvent:
         }
         return coordinator
 
-    def test_on_byte_decodes_directly_no_reread(self) -> None:
-        # 0x38 = chime ON → ENABLED, written straight from the stream with no
-        # gRPC re-read (#239 final form / beta.2 regression fix).
+    def test_chime_on_byte_decodes_directly(self) -> None:
+        # 0x38 = chime ON → ENABLED, written straight from the stream, no refresh.
         coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
+        coordinator.async_request_refresh = MagicMock()
         coordinator.hass.async_create_task = MagicMock()
 
         coordinator._on_hts_space_event("HUB1", "deadbeef", 0x38)
 
         assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
-        coordinator.hass.async_create_task.assert_not_called()
+        coordinator.async_request_refresh.assert_not_called()
         coordinator.async_set_updated_data.assert_called_once()
-        assert "s1" not in coordinator._chime_refresh_inflight
 
-    def test_off_byte_decodes_to_can_be_enabled(self) -> None:
-        # 0x39 = chime OFF → CAN_BE_ENABLED. This is the case beta.2 got wrong:
-        # the gRPC re-read returned a stale ENABLED, so the switch never moved.
+    def test_chime_off_byte_decodes_to_can_be_enabled(self) -> None:
         coordinator = self._make_coordinator(ChimeStatus.ENABLED)
+        coordinator.async_request_refresh = MagicMock()
         coordinator.hass.async_create_task = MagicMock()
 
         coordinator._on_hts_space_event("HUB1", "deadbeef", 0x39)
 
         assert coordinator.spaces["s1"].chime_status == ChimeStatus.CAN_BE_ENABLED
-        coordinator.hass.async_create_task.assert_not_called()
+        coordinator.async_request_refresh.assert_not_called()
         coordinator.async_set_updated_data.assert_called_once()
 
-    def test_direct_decode_no_write_when_unchanged(self) -> None:
+    def test_chime_decode_no_write_when_unchanged(self) -> None:
         coordinator = self._make_coordinator(ChimeStatus.ENABLED)
         coordinator.hass.async_create_task = MagicMock()
 
@@ -2376,79 +2374,25 @@ class TestHtsChimeEvent:
 
         coordinator.async_set_updated_data.assert_not_called()
 
-    def test_unknown_byte_falls_back_to_reread(self) -> None:
+    def test_chime_unknown_hub_is_ignored(self) -> None:
         coordinator = self._make_coordinator()
-        coordinator.hass.async_create_task = MagicMock()
-
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x99)
-
-        coordinator.hass.async_create_task.assert_called_once()
-        assert "s1" in coordinator._chime_refresh_inflight
-        # Avoid an un-awaited coroutine warning from the stubbed task factory.
-        coordinator.hass.async_create_task.call_args[0][0].close()
-
-    def test_unknown_hub_is_ignored(self) -> None:
-        coordinator = self._make_coordinator()
+        coordinator.async_request_refresh = MagicMock()
         coordinator.hass.async_create_task = MagicMock()
 
         coordinator._on_hts_space_event("OTHER", "deadbeef", 0x38)
 
-        coordinator.hass.async_create_task.assert_not_called()
-
-    def test_inflight_unknown_byte_is_coalesced(self) -> None:
-        coordinator = self._make_coordinator()
-        coordinator.hass.async_create_task = MagicMock()
-        coordinator._chime_refresh_inflight.add("s1")
-
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x99)
-
-        coordinator.hass.async_create_task.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_refresh_updates_chime_status_and_clears_inflight(self) -> None:
-        coordinator = self._make_coordinator(ChimeStatus.CAN_BE_ENABLED)
-        coordinator._chime_refresh_inflight.add("s1")
-        snapshot = MagicMock()
-        snapshot.chime_status = ChimeStatus.ENABLED
-        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=snapshot)
-
-        await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
-
-        assert coordinator.spaces["s1"].chime_status == ChimeStatus.ENABLED
-        assert "s1" not in coordinator._chime_refresh_inflight
-        coordinator.async_set_updated_data.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_refresh_clears_inflight_on_snapshot_failure(self) -> None:
-        coordinator = self._make_coordinator()
-        coordinator._chime_refresh_inflight.add("s1")
-        coordinator._spaces_api.get_space_snapshot = AsyncMock(side_effect=RuntimeError("boom"))
-
-        await coordinator._refresh_chime_from_event("s1", "deadbeef", None)
-
-        assert "s1" not in coordinator._chime_refresh_inflight
-        coordinator.async_set_updated_data.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_refresh_no_write_when_status_unchanged(self) -> None:
-        coordinator = self._make_coordinator(ChimeStatus.ENABLED)
-        coordinator._chime_refresh_inflight.add("s1")
-        snapshot = MagicMock()
-        snapshot.chime_status = ChimeStatus.ENABLED
-        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=snapshot)
-
-        await coordinator._refresh_chime_from_event("s1", "deadbeef", 0x39)
-
+        coordinator.async_request_refresh.assert_not_called()
         coordinator.async_set_updated_data.assert_not_called()
 
 
 class TestHtsSecurityEvent:
-    """HTS `type=0x08` security-state event → instant `security_state` (#258).
+    """HTS `type=0x08` non-chime space event → authoritative re-read (#258).
 
-    Arm/disarm share the chime event signature; the state byte (params[3])
-    discriminates: 0x00 disarm / 0x01 arm away / 0x02 night. Decoded directly
-    so the panel follows app-side arm/disarm instantly instead of mis-routing to
-    the chime handler and waiting for the poll.
+    Arm/disarm/night share the chime event frame. Their byte is NOT decoded as
+    state (arm-initiated ≠ armed; a disarm during the exit delay emits no event;
+    events drop on reconnect → a decoded state sticks wrong). Instead the event
+    triggers `async_request_refresh` to re-read the real `security_state`; the
+    state is never set straight from the byte.
     """
 
     def _make_coordinator(
@@ -2480,48 +2424,33 @@ class TestHtsSecurityEvent:
         }
         return coordinator
 
-    def test_arm_away_byte_decodes_to_armed(self) -> None:
-        coordinator = self._make_coordinator(SecurityState.DISARMED)
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
-        assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
-        coordinator.async_set_updated_data.assert_called_once()
-        # No chime gRPC re-read for a security event.
-        coordinator.hass.async_create_task.assert_not_called()
-        assert "s1" not in coordinator._chime_refresh_inflight
-
-    def test_disarm_byte_decodes_to_disarmed(self) -> None:
-        coordinator = self._make_coordinator(SecurityState.ARMED)
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x00)
-        assert coordinator.spaces["s1"].security_state == SecurityState.DISARMED
-        coordinator.async_set_updated_data.assert_called_once()
-
-    def test_night_byte_decodes_to_night_mode(self) -> None:
-        coordinator = self._make_coordinator(SecurityState.DISARMED)
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x02)
-        assert coordinator.spaces["s1"].security_state == SecurityState.NIGHT_MODE
-        coordinator.async_set_updated_data.assert_called_once()
-
-    def test_no_write_when_state_unchanged(self) -> None:
-        coordinator = self._make_coordinator(SecurityState.ARMED)
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
+    def _arm_disarm_triggers_refresh(self, byte: int, initial: SecurityState) -> None:
+        coordinator = self._make_coordinator(initial)
+        coordinator.async_request_refresh = MagicMock()
+        coordinator._on_hts_space_event("HUB1", "deadbeef", byte)
+        # Re-reads authoritative state; never decodes the byte into the panel.
+        coordinator.async_request_refresh.assert_called_once()
+        assert coordinator.spaces["s1"].security_state == initial
         coordinator.async_set_updated_data.assert_not_called()
 
-    def test_optimistic_state_window_blocks_event(self) -> None:
-        # An in-flight HA-initiated command holds an optimistic state; a racing
-        # event must not override it (apply_push_security_state guard).
-        import time
+    def test_arm_byte_triggers_refresh_not_decode(self) -> None:
+        self._arm_disarm_triggers_refresh(0x01, SecurityState.DISARMED)
 
-        coordinator = self._make_coordinator(SecurityState.DISARMED)
-        coordinator._optimistic_space_states["s1"] = (
-            time.monotonic() + 10,
-            SecurityState.DISARMED,
-        )
-        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
-        coordinator.async_set_updated_data.assert_not_called()
+    def test_disarm_byte_triggers_refresh_not_decode(self) -> None:
+        self._arm_disarm_triggers_refresh(0x00, SecurityState.ARMED)
+
+    def test_night_byte_triggers_refresh_not_decode(self) -> None:
+        self._arm_disarm_triggers_refresh(0x02, SecurityState.DISARMED)
+
+    def test_unmapped_byte_also_triggers_refresh(self) -> None:
+        # exit-delay / partial / group bytes we haven't mapped still re-read.
+        self._arm_disarm_triggers_refresh(0x05, SecurityState.DISARMED)
 
     def test_unknown_hub_is_ignored(self) -> None:
         coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator.async_request_refresh = MagicMock()
         coordinator._on_hts_space_event("OTHER", "deadbeef", 0x01)
+        coordinator.async_request_refresh.assert_not_called()
         coordinator.async_set_updated_data.assert_not_called()
 
 

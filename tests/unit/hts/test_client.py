@@ -1421,17 +1421,35 @@ class TestChimeEvent:
         # Mirrors BadFlo's #239 capture: 0x02, 0x22, 0x33 80 41 a4, <state>, …
         return tlv_encode([b"\x02", b"\x22", b"\x33\x80\x41\xa4", state_byte, b"\x00\x00", b"\x00"])
 
-    def test_is_chime_event_true_for_signature(self) -> None:
+    def test_is_space_event_true_for_signature(self) -> None:
         from custom_components.aegis_ajax.api.hts.messages import tlv_decode
 
         params = tlv_decode(self._chime_payload())
-        assert HtsClient._is_chime_event(params) is True
+        assert HtsClient._is_space_event(params) is True
 
-    def test_is_chime_event_false_for_other_event(self) -> None:
+    def test_is_space_event_true_for_other_hub_source_id(self) -> None:
+        # #258: params[2] is the source device id and VARIES per hub. A
+        # different id (bvis-home's 0x77 dd 6a 14) must still match — the old
+        # hardcoded-0x338041a4 signature only fired on BadFlo's hub.
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        params = tlv_decode(
+            tlv_encode([b"\x02", b"\x22", b"\x77\xdd\x6a\x14", b"\x01", b"\x00\x00", b"\x00"])
+        )
+        assert HtsClient._is_space_event(params) is True
+
+    def test_is_space_event_false_for_other_event(self) -> None:
         from custom_components.aegis_ajax.api.hts.messages import tlv_decode
 
         params = tlv_decode(tlv_encode([b"\x02", b"\x99", b"\x00"]))
-        assert HtsClient._is_chime_event(params) is False
+        assert HtsClient._is_space_event(params) is False
+
+    def test_is_space_event_false_for_non_4byte_source(self) -> None:
+        # Guard against a too-loose match: params[2] must be a 4-byte id.
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        params = tlv_decode(tlv_encode([b"\x02", b"\x22", b"\x00", b"\x01"]))
+        assert HtsClient._is_space_event(params) is False
 
     def test_event_message_fires_callback_with_candidate_byte(self) -> None:
         client = _make_client()

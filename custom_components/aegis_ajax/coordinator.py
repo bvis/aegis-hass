@@ -41,7 +41,6 @@ from custom_components.aegis_ajax.const import (
     SIGNAL_NEW_DEVICE,
     ChimeStatus,
     ConnectionStatus,
-    SecurityState,
 )
 from custom_components.aegis_ajax.device_cache import DevicesCache
 from custom_components.aegis_ajax.repairs import (
@@ -116,22 +115,14 @@ _CHIME_EVENT_STATE_BYTE: dict[int, ChimeStatus] = {
     0x39: ChimeStatus.CAN_BE_ENABLED,
 }
 
-# HTS `type=0x08` security-state event byte → SecurityState (#258). The SAME
-# event frame and signature `(0x02, 0x22, 0x33 80 41 a4)` the chime toggle uses
-# is also emitted on arm/disarm — `33 80 41 a4` is a generic space/source
-# marker, NOT chime-specific; params[3] is the discriminator. The chime bytes
-# (0x38/0x39) and these security bytes never collide. Mapped from BadFlo's
-# capture (#258): 0x00 disarm, 0x01 arm away, 0x02 night mode. Decoded directly
-# so the alarm panel follows an app-side arm/disarm instantly instead of waiting
-# for the periodic poll (the event was previously mis-routed to the chime
-# handler and dropped). Partial/group arm bytes aren't mapped yet → unknown
-# bytes fall through to the chime re-read fallback and the 300s poll still
-# reconciles them.
-_SECURITY_EVENT_STATE_BYTE: dict[int, SecurityState] = {
-    0x00: SecurityState.DISARMED,
-    0x01: SecurityState.ARMED,
-    0x02: SecurityState.NIGHT_MODE,
-}
+# The chime toggle and arm/disarm share the same `type=0x08` event frame; the
+# state byte (params[3]) tells them apart. Chime is decoded directly above
+# (idempotent + low-stakes). The security state is deliberately NOT decoded
+# from the byte (#258): arm-initiated ≠ armed, a disarm during the exit delay
+# emits no event, and events can be dropped on an HTS reconnect — so a decoded
+# state can stick wrong on an alarm panel (observed live, 2026-06-06). Any
+# non-chime event is used only as a real-time nudge to re-read the authoritative
+# `security_state` over gRPC; the 300s poll backstops a missed nudge.
 
 # Statuses whose snapshot parser writes more than the single mapped key.
 # Used by the REMOVE op so stale sub-keys don't linger after the hub drops
@@ -208,9 +199,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # HTS client for hub network data (ethernet, wifi, gsm, power)
         self._hts_client: HtsClient | None = None
         self._hts_task: asyncio.Task[None] | None = None
-        # Space ids with an in-flight chime snapshot re-read (#239), so a burst
-        # of HTS Chime events coalesces into a single gRPC snapshot call.
-        self._chime_refresh_inflight: set[str] = set()
         # Monotonic timestamp of the last user-triggered STATUS_BODY
         # refresh per hub. Read by `async_request_manual_refresh` to
         # rate-limit successive presses to `MANUAL_REFRESH_INTERVAL`.
@@ -867,19 +855,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _on_hts_space_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
         """React to a hub `type=0x08` space event pushed over HTS in real time.
 
-        One event frame/signature carries two kinds of space change, told apart
-        by its state byte (params[3]):
-        - **Chime toggle** (#239): 0x38 on / 0x39 off → decoded to `chime_status`.
-        - **Arm/disarm** (#258): 0x00 disarm / 0x01 arm away / 0x02 night → decoded
-          to `security_state` so the alarm panel follows an app-side change
-          instantly. Previously these shared the chime signature and were
-          mis-routed here as "unrecognised", so the panel only caught up on the
-          next poll.
+        One event frame carries different space changes, told apart by the state
+        byte (params[3]):
+        - **Chime toggle** (#239): 0x38 on / 0x39 off → decoded to `chime_status`
+          directly. Chime is idempotent and low-stakes, so decoding from the
+          event is safe and instant.
+        - **Anything else** (arm / disarm / night / exit-delay …, #258): used
+          only as a real-time NUDGE to re-read the authoritative `security_state`
+          over gRPC. The byte is deliberately NOT decoded as state — arm-initiated
+          ≠ armed, a disarm during the exit delay emits no event, and events can
+          be dropped on an HTS reconnect, so a decoded state can stick wrong on an
+          alarm panel (observed live 2026-06-06). `async_request_refresh` is
+          debounced, so a burst of frames coalesces into one re-read; the 300s
+          poll backstops a missed nudge.
 
-        Both are decoded directly from the event rather than re-read over gRPC,
-        which lags and can return a stale value right after an app-side change.
-        An unrecognised byte falls back to re-reading the authoritative gRPC
-        chime snapshot; the 300s poll reconciles any unmapped security state.
         Runs on the event loop (HTS listen task).
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
@@ -891,38 +880,19 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if space_id is None:
             return
 
-        # Arm/disarm (#258) — decode the security state and apply it immediately,
-        # reusing the FCM push path (handles the optimistic-state race + dedup).
-        security_state = (
-            _SECURITY_EVENT_STATE_BYTE.get(candidate) if candidate is not None else None
-        )
-        if security_state is not None:
-            _LOGGER.debug(
-                "Security HTS event for space %s: state byte 0x%02X -> %s (decoded from stream)",
-                space_id,
-                candidate,
-                security_state.name,
-            )
-            self.apply_push_security_state(space_id, security_state)
-            return
-
         status = _CHIME_EVENT_STATE_BYTE.get(candidate) if candidate is not None else None
         if status is None:
-            # Unknown byte — fall back to the authoritative gRPC re-read, still
-            # coalescing bursts per space. Log so a new value can be mapped.
+            # Non-chime space event (#258) — re-read the authoritative state
+            # instead of trusting the byte. Covers arm/disarm/night and any
+            # unmapped transition; never shows a decoded-but-wrong state.
             _LOGGER.debug(
-                "Chime HTS event for space %s: unrecognised state byte %s; "
-                "falling back to gRPC re-read (payload=%s)",
+                "Space HTS event for space %s (byte %s): requesting authoritative refresh "
+                "(payload=%s)",
                 space_id,
                 "none" if candidate is None else f"0x{candidate:02X}",
                 payload_hex,
             )
-            if space_id in self._chime_refresh_inflight:
-                return
-            self._chime_refresh_inflight.add(space_id)
-            self.hass.async_create_task(
-                self._refresh_chime_from_event(space_id, payload_hex, candidate)
-            )
+            self.hass.async_create_task(self.async_request_refresh())
             return
 
         _LOGGER.debug(
@@ -935,41 +905,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if current is None or current.chime_status == status:
             return
         self.spaces[space_id] = dc_replace(current, chime_status=status)
-        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
-
-    async def _refresh_chime_from_event(
-        self, space_id: str, payload_hex: str, candidate: int | None
-    ) -> None:
-        """Re-read the authoritative chime_status after an HTS Chime event (#239)."""
-        from dataclasses import replace as dc_replace  # noqa: PLC0415
-
-        try:
-            snapshot = await self._spaces_api.get_space_snapshot(space_id)
-        except Exception:  # noqa: BLE001
-            _LOGGER.debug(
-                "Chime HTS event for space %s: snapshot re-read failed; "
-                "falling back to the periodic refresh",
-                space_id,
-                exc_info=True,
-            )
-            return
-        finally:
-            self._chime_refresh_inflight.discard(space_id)
-        # Correlation log for the eventual HTS-native implementation: pairs the
-        # raw event byte with the gRPC ground truth it resolved to (#239).
-        candidate_hex = "none" if candidate is None else f"0x{candidate:02X}"
-        _LOGGER.debug(
-            "Chime HTS event correlation: space=%s candidate_byte=%s payload=%s "
-            "-> gRPC chime_status=%s",
-            space_id,
-            candidate_hex,
-            payload_hex,
-            snapshot.chime_status.name,
-        )
-        current = self.spaces.get(space_id)
-        if current is None or current.chime_status == snapshot.chime_status:
-            return
-        self.spaces[space_id] = dc_replace(current, chime_status=snapshot.chime_status)
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def _handle_hts_task_done(self, task: asyncio.Task[None]) -> None:

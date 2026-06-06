@@ -81,15 +81,19 @@ MAX_FRAME_BUFFER_BYTES = 256 * 1024
 # Chime frame by signature and use it only as a trigger to re-read the
 # authoritative gRPC chime_status.
 _MSG_TYPE_EVENT = 0x08
-# Leading TLV params shared by every observed Chime-toggle event frame
-# (BadFlo's #239 capture): params[0]=0x02, params[1]=0x22, params[2]=
-# 0x33 80 41 a4. params[3] is the candidate state byte (0x38/0x39) — logged
-# for correlation against the gRPC truth, never trusted as state on its own.
-_CHIME_EVENT_SIGNATURE: tuple[bytes, bytes, bytes] = (
-    b"\x02",
-    b"\x22",
-    b"\x33\x80\x41\xa4",
-)
+# A `type=0x08` space event (chime toggle #239, arm/disarm #258) starts with
+# params[0]=0x02, params[1]=0x22, then params[2]=the 4-byte SOURCE id that
+# triggered it (the keypad/keyfob/app device — VARIES per hub and per trigger,
+# NOT a fixed signature). params[3] is the 1-byte state discriminator (chime
+# 0x38/0x39; security 0x00 disarm / 0x01 arm / 0x02 night). The coordinator
+# decodes params[3]; here we only gate the forward.
+#
+# NOTE: an earlier version hardcoded params[2]==0x33 80 41 a4 (BadFlo's source
+# id from the #239 capture), so the matcher only fired on his hub — chime AND
+# the #258 arm/disarm decode silently no-op'd everywhere else. Match the
+# constant 2-byte prefix + a 4-byte source id instead (#258, bvis-home capture
+# showed source id 0x77 dd 6a 14).
+_SPACE_EVENT_PREFIX: tuple[bytes, bytes] = (b"\x02", b"\x22")
 
 
 def _redact_payload_hex(data: bytes) -> str:
@@ -881,7 +885,7 @@ class HtsClient:
             params = tlv_decode(msg.payload)
         except Exception:
             return
-        if not self._is_chime_event(params):
+        if not self._is_space_event(params):
             return
         hub_id = self._hub_id_from_message(msg)
         if not hub_id:
@@ -893,11 +897,18 @@ class HtsClient:
             _LOGGER.exception("on_chime_event callback raised for hub %s", hub_id)
 
     @staticmethod
-    def _is_chime_event(params: list[bytes]) -> bool:
-        """Recognise a Chime-toggle event frame by its leading TLV params (#239)."""
+    def _is_space_event(params: list[bytes]) -> bool:
+        """Recognise a `type=0x08` space event (chime #239 / arm-disarm #258).
+
+        Matches the constant 2-byte prefix (0x02, 0x22) plus a 4-byte source id
+        at params[2] — deliberately NOT a fixed params[2] value, which varies by
+        hub/trigger (#258). params[3] (the state byte) is left for the coordinator.
+        """
         return (
-            len(params) >= len(_CHIME_EVENT_SIGNATURE)
-            and tuple(params[: len(_CHIME_EVENT_SIGNATURE)]) == _CHIME_EVENT_SIGNATURE
+            len(params) >= 4
+            and tuple(params[:2]) == _SPACE_EVENT_PREFIX
+            and len(params[2]) == 4
+            and len(params[3]) >= 1
         )
 
     def _hub_id_from_message(self, msg: HtsMessage) -> str | None:
