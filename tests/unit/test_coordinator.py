@@ -469,6 +469,36 @@ class TestAsyncUpdateData:
         # Flag consumed so it doesn't snapshot on every subsequent poll.
         assert coordinator._force_snapshot_refresh is False
 
+    def test_security_event_uses_dedicated_short_cooldown_debouncer(self) -> None:
+        """A non-chime space event (#270) must re-read `security_state` through a
+        dedicated short-cooldown debouncer, NOT the shared 10 s request-refresh
+        debouncer. The default 10 s cooldown coalesces a rapid arm→disarm→arm
+        burst into one trailing re-read that lags the alarm panel by up to ~10 s
+        when FCM push doesn't deliver; the dedicated debouncer keeps the panel
+        responsive while still setting `_force_snapshot_refresh` for group state.
+        """
+        from homeassistant.helpers.update_coordinator import REQUEST_REFRESH_DEFAULT_COOLDOWN
+
+        from custom_components.aegis_ajax.const import SECURITY_EVENT_REFRESH_COOLDOWN
+
+        # Far shorter than HA's shared request-refresh cooldown — that gap is the bug.
+        assert SECURITY_EVENT_REFRESH_COOLDOWN < REQUEST_REFRESH_DEFAULT_COOLDOWN
+
+        coordinator = _make_coordinator()
+        coordinator.spaces["s1"] = _make_space("s1")
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator.hass = MagicMock()
+
+        # Non-chime byte (0x02) → security nudge branch, not the chime decode.
+        coordinator._on_hts_space_event("hub-1", "deadbeef", 0x02)
+
+        # Routed through the dedicated debouncer, and groups are forced to refresh.
+        coordinator._security_refresh_debouncer.async_call.assert_called_once()
+        assert coordinator._force_snapshot_refresh is True
+        # The dedicated debouncer wraps an immediate refresh, never the shared
+        # `async_request_refresh` whose 10 s cooldown caused the lag.
+        coordinator.hass.async_create_task.assert_called_once()
+
     @pytest.mark.asyncio
     async def test_update_data_raises_update_failed_on_error(self) -> None:
         from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -2446,8 +2476,8 @@ class TestHtsSecurityEvent:
     Arm/disarm/night share the chime event frame. Their byte is NOT decoded as
     state (arm-initiated ≠ armed; a disarm during the exit delay emits no event;
     events drop on reconnect → a decoded state sticks wrong). Instead the event
-    triggers `async_request_refresh` to re-read the real `security_state`; the
-    state is never set straight from the byte.
+    triggers a re-read of the real `security_state` through the dedicated
+    short-cooldown debouncer (#270); the state is never set straight from the byte.
     """
 
     def _make_coordinator(
@@ -2481,10 +2511,11 @@ class TestHtsSecurityEvent:
 
     def _arm_disarm_triggers_refresh(self, byte: int, initial: SecurityState) -> None:
         coordinator = self._make_coordinator(initial)
-        coordinator.async_request_refresh = MagicMock()
+        coordinator._security_refresh_debouncer = MagicMock()
         coordinator._on_hts_space_event("HUB1", "deadbeef", byte)
-        # Re-reads authoritative state; never decodes the byte into the panel.
-        coordinator.async_request_refresh.assert_called_once()
+        # Re-reads authoritative state via the dedicated debouncer (#270); never
+        # decodes the byte into the panel.
+        coordinator._security_refresh_debouncer.async_call.assert_called_once()
         assert coordinator.spaces["s1"].security_state == initial
         coordinator.async_set_updated_data.assert_not_called()
 
@@ -2503,9 +2534,9 @@ class TestHtsSecurityEvent:
 
     def test_unknown_hub_is_ignored(self) -> None:
         coordinator = self._make_coordinator(SecurityState.DISARMED)
-        coordinator.async_request_refresh = MagicMock()
+        coordinator._security_refresh_debouncer = MagicMock()
         coordinator._on_hts_space_event("OTHER", "deadbeef", 0x01)
-        coordinator.async_request_refresh.assert_not_called()
+        coordinator._security_refresh_debouncer.async_call.assert_not_called()
         coordinator.async_set_updated_data.assert_not_called()
 
     def test_arm_disarm_event_forces_group_snapshot_refresh(self) -> None:
@@ -2513,7 +2544,7 @@ class TestHtsSecurityEvent:
         # the arm/disarm event must force the next refresh to re-read it — else
         # group panels lag up to an hour without FCM.
         coordinator = self._make_coordinator(SecurityState.DISARMED)
-        coordinator.async_request_refresh = MagicMock()
+        coordinator._security_refresh_debouncer = MagicMock()
         assert coordinator._force_snapshot_refresh is False
         coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
         assert coordinator._force_snapshot_refresh is True

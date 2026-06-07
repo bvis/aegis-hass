@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -38,6 +39,7 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
+    SECURITY_EVENT_REFRESH_COOLDOWN,
     SIGNAL_NEW_DEVICE,
     ChimeStatus,
     ConnectionStatus,
@@ -192,6 +194,21 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # sets this flag so the next refresh bypasses the hourly snapshot gate
         # and re-reads group states immediately. Consumed in `_maybe_refresh_rooms`.
         self._force_snapshot_refresh: bool = False
+        # Dedicated debouncer for event-triggered `security_state` re-reads (#270).
+        # The shared request-refresh debouncer HA gives us has a 10 s cooldown,
+        # which coalesced a rapid arm→disarm→arm burst into a single trailing
+        # re-read that lagged the alarm panel by up to ~10 s when FCM push didn't
+        # deliver promptly. A short dedicated cooldown fires the re-read ~1 s
+        # after each event (still collapsing true sub-second duplicate frames),
+        # and the small settle gives the gRPC snapshot time to propagate. Built
+        # with the `hass` param (not `self.hass`, unset until `super().__init__`).
+        self._security_refresh_debouncer = Debouncer(
+            hass,
+            _LOGGER,
+            cooldown=SECURITY_EVENT_REFRESH_COOLDOWN,
+            immediate=False,
+            function=self.async_refresh,
+        )
         # Per-device internal temperature (#220 sirens, #229 outdoor curtain
         # PIRs) — refreshed on a dedicated timer (`async_track_time_interval`),
         # NOT the poll cycle. On push-heavy hubs every HTS update resets HA's
@@ -931,9 +948,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
           over gRPC. The byte is deliberately NOT decoded as state — arm-initiated
           ≠ armed, a disarm during the exit delay emits no event, and events can
           be dropped on an HTS reconnect, so a decoded state can stick wrong on an
-          alarm panel (observed live 2026-06-06). `async_request_refresh` is
-          debounced, so a burst of frames coalesces into one re-read; the 300s
-          poll backstops a missed nudge.
+          alarm panel (observed live 2026-06-06). The re-read goes through a
+          dedicated short-cooldown debouncer (#270), so a burst of frames
+          coalesces into a re-read ~1s after the last frame — fast enough that
+          the panel doesn't visibly lag — instead of the up-to-10s lag the
+          shared request-refresh debouncer caused; the 300s poll backstops a
+          missed nudge.
 
         Runs on the event loop (HTS listen task).
         """
@@ -963,7 +983,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # the lighter `list_spaces` poll doesn't carry. Without this the group
             # panel would lag until the hourly snapshot when push is off.
             self._force_snapshot_refresh = True
-            self.hass.async_create_task(self.async_request_refresh())
+            # Route through the dedicated short-cooldown debouncer (#270), NOT the
+            # shared 10 s request-refresh debouncer — the latter coalesced a rapid
+            # arm→disarm→arm burst into one trailing re-read that left the panel on
+            # the stale state for up to ~10 s when FCM push didn't arrive first.
+            self.hass.async_create_task(self._security_refresh_debouncer.async_call())
             return
 
         _LOGGER.debug(
@@ -1441,6 +1465,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._unsub_poll_safety is not None:
             self._unsub_poll_safety()
             self._unsub_poll_safety = None
+
+        # Cancel any pending security-event re-read (#270)
+        self._security_refresh_debouncer.async_shutdown()
 
         # Cancel all stream tasks
         for task in self._stream_tasks:

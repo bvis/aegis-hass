@@ -137,6 +137,14 @@ STREAM_RECONNECT_MAX_BACKOFF = 60  # seconds
 MIN_POLL_INTERVAL = 60  # seconds
 MAX_POLL_INTERVAL = 300  # seconds
 DEFAULT_POLL_INTERVAL = 300  # seconds fallback (stream handles real-time updates)
+# Cooldown for the dedicated debouncer that re-reads `security_state` after a
+# space arm/disarm HTS event (#270). HA's default request-refresh debouncer
+# uses a 10 s cooldown, which coalesces a rapid arm→disarm→arm burst into a
+# single trailing re-read that can lag the alarm panel by up to ~10 s when FCM
+# push doesn't deliver promptly. A short dedicated cooldown keeps the panel
+# responsive while still collapsing true sub-second duplicate frames; the small
+# trailing settle also gives the gRPC snapshot time to propagate the new state.
+SECURITY_EVENT_REFRESH_COOLDOWN = 1.0  # seconds
 # Auto-off window for a device `motion_detected` status set from an FCM motion
 # push (#173). Video-edge devices only report motion over FCM, so the binary
 # sensor has no "cleared" event — we self-clear it like a PIR detector.

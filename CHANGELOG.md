@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - unreleased
+
+### Fixed
+- **Alarm panel could miss a rapid arm/disarm/arm transition without push (#270).** When the panel state had to fall back on the hub's arm/disarm event (because an FCM push didn't arrive promptly), the re-read of the authoritative state went through Home Assistant's shared refresh debouncer, whose 10-second cooldown collapsed a quick arm→disarm→arm sequence into a single delayed re-read — so the panel could keep showing the previous state for up to ~10 seconds (until the next event or the periodic poll). The event-triggered re-read now uses a dedicated ~1-second debouncer, so each transition is picked up within about a second while true sub-second duplicate frames are still collapsed. Installs where FCM push delivers promptly were already instant and are unaffected.
+
 ## [1.11.0] - 2026-06-07
 
 ### Added
