@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - unreleased
+
+### Fixed
+- **Per-group/zone alarm panels follow an app-side arm/disarm without push (#266).** Arming or disarming a single group (e.g. a dedicated "Garage" zone) from the Ajax app only changes that group's state, which the lightweight per-cycle poll doesn't carry — per-group state comes from the heavier hourly snapshot. The space-level panel already re-read its state on the hub's arm/disarm event, but group panels didn't, so without FCM push a zone panel could lag up to an hour behind. The same hub event now also forces an immediate re-read of group states, so per-group panels update within about a second on installs without push (and remain instant with push). The heavier read runs only on an actual arm/disarm event, not on every poll.
+
 ## [1.10.0] - 2026-06-06
 
 ### Added

@@ -185,6 +185,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Rooms rarely change — cache and refresh once per hour. None means
         # never fetched yet so the first poll always populates rooms.
         self._rooms_last_fetch: float | None = None
+        # Per-group security state lives only on the hourly snapshot, not the
+        # lighter `list_spaces` poll (like chime/groups). A space HTS event
+        # (#258) re-reads the space state but not the groups, so without FCM
+        # per-group panels lagged up to an hour (#266). The space-event handler
+        # sets this flag so the next refresh bypasses the hourly snapshot gate
+        # and re-reads group states immediately. Consumed in `_maybe_refresh_rooms`.
+        self._force_snapshot_refresh: bool = False
         # Per-device internal temperature (#220 sirens, #229 outdoor curtain
         # PIRs) — refreshed on a dedicated timer (`async_track_time_interval`),
         # NOT the poll cycle. On push-heavy hubs every HTS update resets HA's
@@ -475,10 +482,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         rooms_refresh_interval = 3600.0
         if (
-            self._rooms_last_fetch is not None
+            not self._force_snapshot_refresh
+            and self._rooms_last_fetch is not None
             and now - self._rooms_last_fetch <= rooms_refresh_interval
         ):
             return
+        # Consume the event-triggered override (#266): a space arm/disarm event
+        # forces this one snapshot read so per-group panels follow immediately;
+        # the next event re-sets it. Consumed even if the snapshot below fails,
+        # so a transient error can't pin the integration into snapshotting on
+        # every poll — the 300s poll and hourly gate remain the backstops.
+        self._force_snapshot_refresh = False
         refreshed_rooms: dict[str, Room] = {}
         for space_id in self.spaces:
             try:
@@ -892,6 +906,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "none" if candidate is None else f"0x{candidate:02X}",
                 payload_hex,
             )
+            # Force the next refresh to re-read group security states too (#266):
+            # arming/disarming a single group changes only per-group state, which
+            # the lighter `list_spaces` poll doesn't carry. Without this the group
+            # panel would lag until the hourly snapshot when push is off.
+            self._force_snapshot_refresh = True
             self.hass.async_create_task(self.async_request_refresh())
             return
 

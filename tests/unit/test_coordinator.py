@@ -415,6 +415,61 @@ class TestAsyncUpdateData:
         assert coordinator.spaces["s1"].group_mode_enabled is True
 
     @pytest.mark.asyncio
+    async def test_space_event_forces_group_state_refresh_within_the_hour(self) -> None:
+        """A space arm/disarm HTS event (#266) sets `_force_snapshot_refresh`, so
+        the next poll re-reads group security states from the heavier snapshot
+        even inside the hourly window — without it, per-group panels lag up to an
+        hour when FCM push is off. The flag is consumed so later polls stay light.
+        """
+        from custom_components.aegis_ajax.api.models import Group
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        # Pretend the hourly snapshot just ran — the gate would normally skip it.
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            groups=(
+                Group(
+                    id="g1",
+                    space_id="s1",
+                    name="Garage",
+                    security_state=SecurityState.DISARMED,
+                    sorting_key="01",
+                ),
+            ),
+            group_mode_enabled=True,
+        )
+        # A space event arrived → forces the next refresh to re-read groups.
+        coordinator._force_snapshot_refresh = True
+
+        fresh_groups = (
+            Group(
+                id="g1",
+                space_id="s1",
+                name="Garage",
+                security_state=SecurityState.ARMED,
+                sorting_key="01",
+            ),
+        )
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(
+            return_value=SpaceSnapshot(groups=fresh_groups, group_mode_enabled=True)
+        )
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        # Snapshot was read despite being inside the hour, and group state moved.
+        coordinator._spaces_api.get_space_snapshot.assert_awaited_once()
+        assert coordinator.spaces["s1"].groups[0].security_state == SecurityState.ARMED
+        # Flag consumed so it doesn't snapshot on every subsequent poll.
+        assert coordinator._force_snapshot_refresh is False
+
+    @pytest.mark.asyncio
     async def test_update_data_raises_update_failed_on_error(self) -> None:
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -2452,6 +2507,23 @@ class TestHtsSecurityEvent:
         coordinator._on_hts_space_event("OTHER", "deadbeef", 0x01)
         coordinator.async_request_refresh.assert_not_called()
         coordinator.async_set_updated_data.assert_not_called()
+
+    def test_arm_disarm_event_forces_group_snapshot_refresh(self) -> None:
+        # #266: per-group security state lives only on the hourly snapshot, so
+        # the arm/disarm event must force the next refresh to re-read it — else
+        # group panels lag up to an hour without FCM.
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator.async_request_refresh = MagicMock()
+        assert coordinator._force_snapshot_refresh is False
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x01)
+        assert coordinator._force_snapshot_refresh is True
+
+    def test_chime_event_does_not_force_group_snapshot_refresh(self) -> None:
+        # Chime is decoded directly from the event and doesn't touch group state,
+        # so it must not trigger the heavier snapshot read.
+        coordinator = self._make_coordinator(SecurityState.DISARMED)
+        coordinator._on_hts_space_event("HUB1", "deadbeef", 0x38)
+        assert coordinator._force_snapshot_refresh is False
 
 
 def _keyfob_kv(name: bytes = b"ALICE", index: bytes = b"\x02\xef", active: int = 0x01) -> dict:
