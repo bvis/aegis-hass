@@ -330,12 +330,15 @@ from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: E402
     DEVICE_KEY_OUTLET_POWER_W,
     DEVICE_KEY_OUTLET_VOLTAGE_V,
     DEVICE_KEY_POWER_CONSUMED_WH,
+    DEVICE_KEY_TEMPERATURE_C,
     DEVICE_KEY_VOLTAGE_V,
     DIRECT_POWER_DEVICE_TYPES,
     ELECTRICAL_DEVICE_TYPES,
+    HTS_TEMPERATURE_DEVICE_TYPES,
     DeviceReadings,
     _int_be_val,
     parse_device_readings,
+    parse_device_temperature_c,
 )
 
 
@@ -558,3 +561,64 @@ class TestParseDeviceReadings:
         )
         assert r is not None
         assert r.power_w is None
+
+
+class TestParseDeviceTemperatureC:
+    """HTS sub-key 0x02 → internal temperature for gRPC-temp-less devices (#229)."""
+
+    def test_curtain_plus_decodes_whole_celsius(self) -> None:
+        # 0x1b = 27 °C, matching the value the Ajax app shows for the Plus.
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_curtain_outdoor_plus", {DEVICE_KEY_TEMPERATURE_C: b"\x1b"}
+            )
+            == 27.0
+        )
+
+    def test_curtain_base_decodes(self) -> None:
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_curtain_outdoor_base", {DEVICE_KEY_TEMPERATURE_C: b"\x17"}
+            )
+            == 23.0
+        )
+
+    def test_subzero_decodes_as_signed_int8(self) -> None:
+        # Outdoor detector below freezing: 0xFB = -5 °C, not 251.
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_curtain_outdoor_plus", {DEVICE_KEY_TEMPERATURE_C: b"\xfb"}
+            )
+            == -5.0
+        )
+
+    def test_non_gated_type_returns_none(self) -> None:
+        # Mini gets temperature over gRPC, so it's intentionally not read here;
+        # neither are indoor sensors that already carry it in the light stream.
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_curtain_outdoor_mini", {DEVICE_KEY_TEMPERATURE_C: b"\x1b"}
+            )
+            is None
+        )
+        assert (
+            parse_device_temperature_c("motion_protect", {DEVICE_KEY_TEMPERATURE_C: b"\x1b"})
+            is None
+        )
+
+    def test_missing_subkey_returns_none(self) -> None:
+        assert parse_device_temperature_c("motion_protect_curtain_outdoor_plus", {}) is None
+
+    def test_out_of_range_value_rejected(self) -> None:
+        # 0x7f = 127 °C is outside the plausible window → declined, not surfaced.
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_curtain_outdoor_plus", {DEVICE_KEY_TEMPERATURE_C: b"\x7f"}
+            )
+            is None
+        )
+
+    def test_gated_types_present(self) -> None:
+        assert "motion_protect_curtain_outdoor_plus" in HTS_TEMPERATURE_DEVICE_TYPES
+        assert "motion_protect_curtain_outdoor_base" in HTS_TEMPERATURE_DEVICE_TYPES
+        assert "motion_protect_curtain_outdoor_mini" not in HTS_TEMPERATURE_DEVICE_TYPES

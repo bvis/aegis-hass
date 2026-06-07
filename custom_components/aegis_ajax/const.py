@@ -165,9 +165,12 @@ HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
         "home_siren_g3",
         "home_siren_s",
         "home_siren_fibra",
-        # Outdoor curtain PIRs (#229) — all map to the rich `HubDevice`
-        # oneof case `motion_protect_curtain_outdoor`, which carries
-        # `device_temperature`.
+        # Outdoor curtain PIRs (#229). Only the *Mini* carries
+        # `device_temperature` in its gRPC `HubDevice` message; the Plus/Base
+        # messages are stubs with no temperature field, so their temperature is
+        # sourced from HTS sub-key 0x02 instead (see
+        # api/hts/hub_state.HTS_TEMPERATURE_DEVICE_TYPES). All three stay in
+        # this set so the merged temperature carries across gRPC snapshots.
         "motion_protect_curtain_outdoor_base",
         "motion_protect_curtain_outdoor_mini",
         "motion_protect_curtain_outdoor_plus",

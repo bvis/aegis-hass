@@ -2611,3 +2611,46 @@ class TestOnHtsDeviceKvKeyfob:
         assert coordinator.keyfobs == {}
         coordinator.async_set_updated_data.assert_not_called()
         mock_send.assert_not_called()
+
+
+class TestHtsDeviceTemperature:
+    """HTS 0x02 → temperature for gRPC-temp-less device families (#229)."""
+
+    def _coordinator_with_device(
+        self, device_type: str, statuses: dict | None = None
+    ) -> AjaxCobrandedCoordinator:  # noqa: F821
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.devices["d1"] = replace(
+            _make_device("d1"), device_type=device_type, statuses=statuses or {}
+        )
+        return coordinator
+
+    def test_curtain_plus_temperature_merged_from_0x02(self) -> None:
+        coordinator = self._coordinator_with_device("motion_protect_curtain_outdoor_plus")
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x1b"})
+        assert coordinator.devices["d1"].statuses["temperature"] == 27.0
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_existing_grpc_temperature_not_overwritten(self) -> None:
+        # gRPC wins: an already-present temperature is left untouched.
+        coordinator = self._coordinator_with_device(
+            "motion_protect_curtain_outdoor_plus", statuses={"temperature": 21.0}
+        )
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x1b"})
+        assert coordinator.devices["d1"].statuses["temperature"] == 21.0
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_non_gated_device_not_given_hts_temperature(self) -> None:
+        # A door sensor's 0x02 is not turned into a temperature here (it gets
+        # temperature over gRPC); the HTS path must not fabricate one.
+        coordinator = self._coordinator_with_device("door_protect")
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x1b"})
+        assert "temperature" not in coordinator.devices["d1"].statuses
+        coordinator.async_set_updated_data.assert_not_called()
+
+    def test_gated_device_without_usable_0x02_is_noop(self) -> None:
+        coordinator = self._coordinator_with_device("motion_protect_curtain_outdoor_base")
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x05: b"\x01"})
+        assert "temperature" not in coordinator.devices["d1"].statuses
+        coordinator.async_set_updated_data.assert_not_called()

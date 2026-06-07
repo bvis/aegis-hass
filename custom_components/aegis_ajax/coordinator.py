@@ -817,6 +817,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # markers) is ignored. See api/hts/keyfobs.py.
             self._handle_keyfob_kv(hub_id, device_id_hex, kv)
             return
+        # Internal temperature via HTS 0x02 (#229), for device families with no
+        # gRPC temperature source (Curtain Outdoor Plus/Base). Additive: only
+        # fills when the device doesn't already carry a temperature, so devices
+        # that get it over gRPC are untouched. Returns early if it applied a
+        # value (a temperature device isn't also an electrical one).
+        if self._maybe_apply_hts_device_temperature(device_id_hex, device, kv):
+            return
         readings = parse_device_readings(
             device.device_type,
             kv,
@@ -829,6 +836,51 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_readings[device_id_hex] = readings
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         _ = hub_id  # currently unused; kept in the signature for symmetry with on_state_update
+
+    def _maybe_apply_hts_device_temperature(
+        self, device_id_hex: str, device: Device, kv: dict[int, bytes]
+    ) -> bool:
+        """Merge an HTS-sourced internal temperature into a device (#229).
+
+        For device families that report temperature only over HTS (Curtain
+        Outdoor Plus/Base — their gRPC `HubDevice` message has no
+        `device_temperature` field), decode sub-key 0x02 and merge it into
+        `device.statuses["temperature"]`, which is all `sensor.py` needs to
+        materialise the temperature sensor. Mirrors the gRPC per-device-temp
+        merge in `_async_refresh_hub_device_temperatures`; the carry-forward in
+        the device-snapshot path keeps it across gRPC refreshes.
+
+        Additive and safe: skips devices that already carry a temperature (gRPC
+        wins) and devices not in `HTS_TEMPERATURE_DEVICE_TYPES`. Returns True
+        when a value was applied. Runs on the loop (HTS listen task).
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
+            HTS_TEMPERATURE_DEVICE_TYPES,
+            parse_device_temperature_c,
+        )
+
+        if device.device_type not in HTS_TEMPERATURE_DEVICE_TYPES:
+            return False
+        if "temperature" in device.statuses:
+            return False
+        temperature = parse_device_temperature_c(device.device_type, kv)
+        if temperature is None:
+            # Gated type but no usable 0x02 — log once-per-row so a reporter on
+            # DEBUG can confirm whether the firmware sends it at all (#229).
+            _LOGGER.debug(
+                "Device %s (%s): no usable HTS temperature in 0x02 (kv keys=%s)",
+                device_id_hex,
+                device.device_type,
+                sorted(kv),
+            )
+            return False
+        self.devices[device_id_hex] = dc_replace(
+            device, statuses={**device.statuses, "temperature": temperature}
+        )
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+        return True
 
     def _handle_keyfob_kv(self, hub_id: str, device_id_hex: str, kv: dict[int, bytes]) -> None:
         """Classify a non-gRPC SETTINGS_BODY row as a SpaceControl keyfob.
