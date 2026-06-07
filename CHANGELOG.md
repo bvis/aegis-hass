@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.10.1] - unreleased
+## [1.11.0] - unreleased
+
+### Added
+- **Internal temperature for the MotionProtect Curtain Outdoor Plus / Base (#229).** Unlike the Mini, the Plus and Base variants don't carry an internal-temperature field in the per-device gRPC data, so no temperature sensor appeared. Their temperature is now read from the hub's HTS status channel (the same channel the WallSwitch electrical readings use) and surfaced as the standard temperature sensor. The reading is additive and safe: it only fills in when no temperature is already provided over gRPC, so every other device is untouched, and an implausible value is declined rather than shown.
 
 ### Fixed
 - **Per-group/zone alarm panels follow an app-side arm/disarm without push (#266).** Arming or disarming a single group (e.g. a dedicated "Garage" zone) from the Ajax app only changes that group's state, which the lightweight per-cycle poll doesn't carry — per-group state comes from the heavier hourly snapshot. The space-level panel already re-read its state on the hub's arm/disarm event, but group panels didn't, so without FCM push a zone panel could lag up to an hour behind. The same hub event now also forces an immediate re-read of group states, so per-group panels update within about a second on installs without push (and remain instant with push). The heavier read runs only on an actual arm/disarm event, not on every poll.

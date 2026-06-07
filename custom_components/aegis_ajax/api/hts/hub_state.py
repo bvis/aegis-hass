@@ -241,6 +241,55 @@ DIRECT_POWER_DEVICE_TYPES: frozenset[str] = frozenset(
     {"socket_outlet_type_e", "socket_outlet_type_f"}
 )
 
+# Internal temperature (#229). A device's STATUS_BODY row carries its internal
+# temperature in whole degrees Celsius at sub-key 0x02, as a signed int8 (a
+# sub-zero outdoor reading is a negative byte). Verified by correlating
+# bvis-home's STATUS_BODY 0x02 against the gRPC-sourced temperature of every
+# temperature-reporting device (Door Protect / Keypad / MotionCam): the 0x02
+# value matched the known reading on all of them. This is the ONLY temperature
+# source for device families whose gRPC `HubDevice` message has no
+# `device_temperature` field — see the Curtain Outdoor Plus/Base note in
+# const.py. Indoor motion/door sensors and the Curtain Outdoor *Mini* already
+# get temperature over gRPC, so they are intentionally NOT read here.
+DEVICE_KEY_TEMPERATURE_C = 0x02
+
+# Device types whose internal temperature is sourced from HTS 0x02 because they
+# expose no gRPC temperature. When a future device family reports temperature
+# only over HTS, add it here (and keep it in
+# const.HUB_DEVICE_TEMPERATURE_DEVICE_TYPES so the merged value carries across
+# gRPC snapshots).
+HTS_TEMPERATURE_DEVICE_TYPES: frozenset[str] = frozenset(
+    {
+        "motion_protect_curtain_outdoor_plus",
+        "motion_protect_curtain_outdoor_base",
+    }
+)
+
+# Plausible internal-temperature window (°C). A 0x02 value outside it means the
+# byte isn't a temperature on this row, so we decline it rather than surface a
+# bogus reading.
+_HTS_TEMP_MIN_C = -40
+_HTS_TEMP_MAX_C = 85
+
+
+def parse_device_temperature_c(device_type: str, kv: dict[int, bytes]) -> float | None:
+    """Decode a device's internal temperature (°C) from its HTS kv block (#229).
+
+    Returns the temperature as a float for device types in
+    `HTS_TEMPERATURE_DEVICE_TYPES` when sub-key 0x02 is present and within a
+    plausible range; otherwise `None`. The byte is a signed int8 so a sub-zero
+    outdoor reading decodes correctly.
+    """
+    if device_type not in HTS_TEMPERATURE_DEVICE_TYPES:
+        return None
+    raw = kv.get(DEVICE_KEY_TEMPERATURE_C)
+    if not raw:
+        return None
+    value = int.from_bytes(raw[:1], "big", signed=True)
+    if not (_HTS_TEMP_MIN_C <= value <= _HTS_TEMP_MAX_C):
+        return None
+    return float(value)
+
 
 def parse_device_readings(
     device_type: str,
