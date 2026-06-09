@@ -1,0 +1,21 @@
+# Gitleaks configuration for aegis-hass.
+# Extends the built-in default ruleset and adds allowlisting for known
+# non-secret values so the pre-commit hook stays low-noise.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets and test fixtures"
+
+# Paths that only ever contain placeholders or synthesized values.
+paths = [
+  '''tests/.*''',
+  '''scripts/test_.*\.py''',
+]
+
+# The Firebase Web API key shipped inside the public Ajax cobranded APKs is a
+# public client identifier (extracted from a published app), not a secret.
+# See SECURITY.md and the aegis-ajax-cobranded-fcm docs.
+regexes = [
+  '''AIza[0-9A-Za-z_-]{35}''',
+]
