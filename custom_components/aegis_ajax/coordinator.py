@@ -345,6 +345,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             await self._ensure_authenticated()
             self.spaces = await self._refresh_spaces()
+            self._prune_manual_refresh()
             now = asyncio.get_running_loop().time()
             self._update_hub_offline_repairs(now)
             await self._maybe_refresh_sim_and_firmware(now)
@@ -403,6 +404,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ConfigEntryAuthFailed(str(err)) from err
         configured = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, self._poll_interval))
         self.update_interval = timedelta(seconds=configured)
+
+    def _prune_manual_refresh(self) -> None:
+        """Drop manual-refresh rate-limit entries for hubs no longer on the
+        account (#276). `_last_manual_refresh` gains a key per hub on every
+        manual-refresh button press; without pruning, a hub removed from
+        the account keeps its entry for the life of the session.
+        """
+        live_hubs = {s.hub_id for s in self.spaces.values() if s.hub_id}
+        for hub_id in list(self._last_manual_refresh):
+            if hub_id not in live_hubs:
+                del self._last_manual_refresh[hub_id]
 
     async def _refresh_spaces(self) -> dict[str, Space]:
         """List spaces, recover once from a stale-token `UNAUTHENTICATED`,
