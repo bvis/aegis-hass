@@ -464,16 +464,18 @@ class AjaxNotificationListener:
                     resolved = False
                     for device_id, future in list(self._photo_callbacks.items()):
                         if not future.done() and device_id.upper() in photo_url.upper():
-                            future.set_result(photo_url)
-                            self._photo_callbacks.pop(device_id, None)
+                            self._resolve_future_on_loop(
+                                self._photo_callbacks, device_id, photo_url
+                            )
                             resolved = True
                             break
                     if not resolved:
                         # Fallback: resolve first pending (single-device case)
                         for device_id, future in list(self._photo_callbacks.items()):
                             if not future.done():
-                                future.set_result(photo_url)
-                                self._photo_callbacks.pop(device_id, None)
+                                self._resolve_future_on_loop(
+                                    self._photo_callbacks, device_id, photo_url
+                                )
                                 break
                     break
             except Exception:
@@ -490,8 +492,9 @@ class AjaxNotificationListener:
                 # notification_id contains the device_id (e.g., ...A1B2C3D4...)
                 for device_id, future in list(self._notification_id_callbacks.items()):
                     if not future.done() and device_id.upper() in notif_id.upper():
-                        future.set_result(notif_id)
-                        self._notification_id_callbacks.pop(device_id, None)
+                        self._resolve_future_on_loop(
+                            self._notification_id_callbacks, device_id, notif_id
+                        )
                         _LOGGER.debug("Resolved notification_id for device %s", device_id)
                         break
 
@@ -757,6 +760,28 @@ class AjaxNotificationListener:
             )
         elif event_type == MOTION_EVENT_TYPE:
             self._dispatch_to_loop(self._coordinator.apply_push_device_motion, resolved)
+
+    def _resolve_future_on_loop(
+        self,
+        callbacks: dict[str, asyncio.Future[str | None]],
+        device_id: str,
+        value: str,
+    ) -> None:
+        """Resolve a `wait_for_*` future from the FCM worker thread (#274).
+
+        `Future.set_result` is loop-only, and the future may be cancelled by
+        a `wait_for_*` timeout racing this push — so the done-check, the
+        set_result and the dict cleanup all run on the HA event loop. The
+        worker-side match that selected `device_id` is only a best-effort
+        filter over a snapshot.
+        """
+
+        def _resolve() -> None:
+            future = callbacks.pop(device_id, None)
+            if future is not None and not future.done():
+                future.set_result(value)
+
+        self._dispatch_to_loop(_resolve)
 
     def _dispatch_to_loop(self, func: Callable[..., object], *args: object) -> None:
         """Marshal a coordinator state-write from the FCM worker thread onto the

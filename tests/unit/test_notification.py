@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -97,17 +98,25 @@ class TestNotificationListener:
 
     @pytest.mark.asyncio
     async def test_on_notification_extracts_photo_url(self) -> None:
-        """ENCODED_DATA with an HTTPS URL resolves pending photo futures."""
+        """ENCODED_DATA with an HTTPS URL resolves pending photo futures.
+
+        Resolution must be marshaled to the event loop (#274):
+        `_on_notification` runs on the FCM worker thread and
+        `Future.set_result` is loop-only.
+        """
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.loop.is_running.return_value = True
+        scheduled: list[tuple[Any, tuple[Any, ...]]] = []
+        hass.loop.call_soon_threadsafe.side_effect = lambda func, *args: scheduled.append(
+            (func, args)
+        )
         coordinator = MagicMock()
-        coordinator.async_request_refresh = AsyncMock()
 
         listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
 
         # Create a pending future
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         future: asyncio.Future[str | None] = loop.create_future()
         listener._photo_callbacks["dev-1"] = future
 
@@ -117,7 +126,13 @@ class TestNotificationListener:
 
         listener._on_notification({"ENCODED_DATA": encoded}, "persistent-2")
 
-        assert future.done()
+        # The (simulated) worker thread must not resolve the future inline.
+        assert not future.done()
+
+        # Run what the worker scheduled onto the loop.
+        for func, args in scheduled:
+            func(*args)
+
         assert future.result() == "https://app.prod.ajax.systems/photo/test.jpg"
         assert listener._photo_callbacks == {}
 
@@ -141,8 +156,13 @@ class TestNotificationListener:
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.loop.is_running.return_value = True
+        # Route worker-thread dispatches onto the real test loop so the
+        # marshaled future resolution (#274) actually executes.
+        real_loop = asyncio.get_running_loop()
+        hass.loop.call_soon_threadsafe.side_effect = lambda func, *args: real_loop.call_soon(
+            func, *args
+        )
         coordinator = MagicMock()
-        coordinator.async_request_refresh = AsyncMock()
 
         listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
 
@@ -377,17 +397,24 @@ class TestNotificationListener:
 
     @pytest.mark.asyncio
     async def test_on_notification_extracts_notification_id(self) -> None:
-        """ENCODED_DATA with a notification_id resolves pending notification_id futures."""
+        """ENCODED_DATA with a notification_id resolves pending notification_id futures.
+
+        Resolution must be marshaled to the event loop (#274), same as the
+        photo-URL futures: `Future.set_result` is loop-only.
+        """
         hass = MagicMock()
         hass.loop = MagicMock()
         hass.loop.is_running.return_value = True
+        scheduled: list[tuple[Any, tuple[Any, ...]]] = []
+        hass.loop.call_soon_threadsafe.side_effect = lambda func, *args: scheduled.append(
+            (func, args)
+        )
         coordinator = MagicMock()
-        coordinator.async_request_refresh = AsyncMock()
         coordinator._space_ids = []
 
         listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         future: asyncio.Future[str | None] = loop.create_future()
         listener._notification_id_callbacks["A1B2C3D4"] = future
 
@@ -396,10 +423,51 @@ class TestNotificationListener:
             {"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "persistent-n1"
         )
 
-        assert future.done()
+        # The (simulated) worker thread must not resolve the future inline.
+        assert not future.done()
+
+        for func, args in scheduled:
+            func(*args)
+
         assert future.result() == _EXPECTED_NOTIFICATION_ID
         assert listener._notification_id_callbacks == {}
         assert listener._last_notification_id == _EXPECTED_NOTIFICATION_ID
+
+    @pytest.mark.asyncio
+    async def test_scheduled_resolution_skips_future_cancelled_before_loop_runs(self) -> None:
+        """A `wait_for_*` timeout can cancel the future after the worker
+        thread matched it but before the loop runs the scheduled resolution
+        (#274). The loop-side callback must re-check the future state instead
+        of raising InvalidStateError.
+        """
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        scheduled: list[tuple[Any, tuple[Any, ...]]] = []
+        hass.loop.call_soon_threadsafe.side_effect = lambda func, *args: scheduled.append(
+            (func, args)
+        )
+        coordinator = MagicMock()
+        coordinator._space_ids = []
+
+        listener = AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[str | None] = loop.create_future()
+        listener._notification_id_callbacks["A1B2C3D4"] = future
+
+        listener._on_notification(
+            {"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "persistent-n2"
+        )
+
+        # Timeout fires on the loop before the scheduled resolution runs.
+        future.cancel()
+
+        for func, args in scheduled:
+            func(*args)  # must not raise InvalidStateError
+
+        assert future.cancelled()
+        assert "A1B2C3D4" not in listener._notification_id_callbacks
 
     @pytest.mark.asyncio
     async def test_wait_for_notification_id_timeout(self) -> None:
