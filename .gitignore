@@ -1,6 +1,7 @@
 # AI assistant config
 .claude/
 CLAUDE.md
+.gstack/
 
 # Python
 __pycache__/
