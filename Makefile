@@ -1,7 +1,11 @@
-.PHONY: check test test-e2e lint format typecheck dead-code proto cli build
+.PHONY: setup check test test-e2e lint format typecheck dead-code proto cli build
 
 DOCKER_IMAGE = aegis-ajax-dev
 DOCKER_RUN = docker run --rm -v $(PWD):/app -w /app $(DOCKER_IMAGE)
+
+setup:
+	git config --local core.hooksPath .githooks
+	@echo "Git hooks configured (core.hooksPath = .githooks); pre-push now runs the full CI pipeline."
 
 build-docker:
 	docker build -f Dockerfile.dev -t $(DOCKER_IMAGE) .

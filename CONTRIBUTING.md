@@ -10,6 +10,9 @@ Everything runs in Docker. No local dependencies needed.
 git clone https://github.com/bvis/aegis-hass.git
 cd aegis-hass
 
+# Configure git hooks (one-time; pre-push runs the full CI pipeline locally)
+make setup
+
 # Build dev container
 make build-docker
 
@@ -24,6 +27,7 @@ make check
 
 | Command | Description |
 |---|---|
+| `make setup` | One-time: configure git hooks (`core.hooksPath = .githooks`) |
 | `make check` | Run all checks (lint, format, typecheck, tests, dead code) |
 | `make test` | Run unit tests with coverage |
 | `make test-e2e` | Run E2E tests (requires AJAX_EMAIL + AJAX_PASSWORD) |
