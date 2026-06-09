@@ -2021,6 +2021,28 @@ class TestManualHubRefresh:
         hts.request_full_status.assert_any_await("hub-1")
         hts.request_full_status.assert_any_await("hub-2")
 
+    @pytest.mark.asyncio
+    async def test_poll_prunes_rate_limit_entries_for_removed_hubs(self) -> None:
+        """`_last_manual_refresh` keys must follow the account's hub set
+        (#276) — a hub removed from the account otherwise keeps its
+        rate-limit entry for the life of the session.
+        """
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._spaces_api = MagicMock()
+        # _make_space carries hub_id="hub-1" — the only hub still on the account.
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        coordinator._last_manual_refresh = {"hub-1": 100.0, "hub-gone": 50.0}
+
+        await coordinator._async_update_data()
+
+        assert coordinator._last_manual_refresh == {"hub-1": 100.0}
+
 
 class TestSmartLockProbeOrchestration:
     """#206 Bug B: the one-shot probe correlates lock hub-devices to their
