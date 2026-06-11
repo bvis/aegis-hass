@@ -191,6 +191,35 @@ class TestAlarmControlPanel:
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.alarm_state is None
 
+    def test_alarm_state_partially_armed_with_night_mode_is_armed_night(self) -> None:
+        # In group mode the server reports PARTIALLY_ARMED while night mode
+        # is active; `night_mode_enabled` is the discriminator (#284).
+        from dataclasses import replace
+
+        from homeassistant.components.alarm_control_panel import (
+            AlarmControlPanelState,  # type: ignore[attr-defined]
+        )
+
+        coordinator = MagicMock()
+        coordinator.spaces = {
+            "s1": replace(
+                self._make_space(SecurityState.PARTIALLY_ARMED),
+                night_mode_enabled=True,
+            )
+        }
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.alarm_state == AlarmControlPanelState.ARMED_NIGHT
+
+    def test_alarm_state_partially_armed_without_night_mode_is_custom_bypass(self) -> None:
+        from homeassistant.components.alarm_control_panel import (
+            AlarmControlPanelState,  # type: ignore[attr-defined]
+        )
+
+        coordinator = MagicMock()
+        coordinator.spaces = {"s1": self._make_space(SecurityState.PARTIALLY_ARMED)}
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.alarm_state == AlarmControlPanelState.ARMED_CUSTOM_BYPASS
+
     def test_extra_state_attributes(self) -> None:
         coordinator = MagicMock()
         coordinator.spaces = {"s1": self._make_space()}
@@ -235,6 +264,40 @@ class TestAlarmControlPanel:
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         await panel.async_alarm_arm_night()
         coordinator.security_api.arm_night_mode.assert_called_once_with("s1", ignore_alarms=False)
+
+    @pytest.mark.asyncio
+    async def test_alarm_arm_night_sets_night_mode_flag_optimistically(self) -> None:
+        # The optimistic Space write must carry night_mode_enabled too, so the
+        # debounced lite re-read (PARTIALLY_ARMED in group mode) maps back to
+        # armed_night instead of armed_custom_bypass (#284).
+        coordinator = MagicMock()
+        coordinator.security_api.arm_night_mode = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator.config_entry.options = {"use_pin_code": False}
+        coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
+        coordinator._optimistic_space_states = {}
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        await panel.async_alarm_arm_night()
+        assert coordinator.spaces["s1"].night_mode_enabled is True
+
+    @pytest.mark.asyncio
+    async def test_alarm_disarm_clears_night_mode_flag_optimistically(self) -> None:
+        from dataclasses import replace
+
+        coordinator = MagicMock()
+        coordinator.security_api.disarm = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator.config_entry.options = {"use_pin_code": False}
+        coordinator.spaces = {
+            "s1": replace(
+                self._make_space(SecurityState.NIGHT_MODE),
+                night_mode_enabled=True,
+            )
+        }
+        coordinator._optimistic_space_states = {}
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        await panel.async_alarm_disarm()
+        assert coordinator.spaces["s1"].night_mode_enabled is False
 
     @pytest.mark.asyncio
     async def test_alarm_disarm(self) -> None:

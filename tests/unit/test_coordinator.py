@@ -415,6 +415,67 @@ class TestAsyncUpdateData:
         assert coordinator.spaces["s1"].group_mode_enabled is True
 
     @pytest.mark.asyncio
+    async def test_update_data_preserves_night_mode_enabled_between_snapshot_refreshes(
+        self,
+    ) -> None:
+        """`list_spaces()` (LiteSpace) doesn't carry `night_mode_enabled`; the
+        coordinator must keep the cached flag or the panel flips from
+        `armed_night` to `armed_custom_bypass` on every plain poll (#284).
+        """
+        from custom_components.aegis_ajax.api.models import Group
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            groups=(
+                Group(
+                    id="g1",
+                    space_id="s1",
+                    name="Villa",
+                    security_state=SecurityState.ARMED,
+                    sorting_key="01",
+                ),
+            ),
+            group_mode_enabled=True,
+            night_mode_enabled=True,
+        )
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator.spaces["s1"].night_mode_enabled is True
+
+    @pytest.mark.asyncio
+    async def test_snapshot_refresh_applies_night_mode_enabled(self) -> None:
+        """The hourly/forced snapshot is the authoritative source for
+        `night_mode_enabled` — it must overwrite the cached flag (#284)."""
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        coordinator.spaces["s1"] = replace(_make_space("s1"), night_mode_enabled=False)
+        coordinator._force_snapshot_refresh = True
+
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(
+            return_value=SpaceSnapshot(group_mode_enabled=True, night_mode_enabled=True)
+        )
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator.spaces["s1"].night_mode_enabled is True
+
+    @pytest.mark.asyncio
     async def test_space_event_forces_group_state_refresh_within_the_hour(self) -> None:
         """A space arm/disarm HTS event (#266) sets `_force_snapshot_refresh`, so
         the next poll re-reads group security states from the heavier snapshot
@@ -1408,6 +1469,48 @@ class TestApplyPushSecurityState:
 
         assert coordinator.spaces["s1"].security_state == SecurityState.ARMED
         coordinator.async_set_updated_data.assert_called_once()
+
+    def test_night_mode_push_sets_night_mode_enabled(self) -> None:
+        # The push is the only real-time night-mode signal in group mode —
+        # the debounced lite re-read that follows reports PARTIALLY_ARMED,
+        # so the flag must flip here for the panel to keep `armed_night` (#284).
+        coordinator = self._make_coordinator_with_space(SecurityState.DISARMED)
+
+        coordinator.apply_push_security_state("s1", SecurityState.NIGHT_MODE)
+
+        assert coordinator.spaces["s1"].night_mode_enabled is True
+
+    def test_disarm_push_clears_night_mode_enabled(self) -> None:
+        from dataclasses import replace as dc_replace
+
+        coordinator = self._make_coordinator_with_space(SecurityState.NIGHT_MODE)
+        coordinator.spaces["s1"] = dc_replace(coordinator.spaces["s1"], night_mode_enabled=True)
+
+        coordinator.apply_push_security_state("s1", SecurityState.DISARMED)
+
+        assert coordinator.spaces["s1"].night_mode_enabled is False
+
+    def test_full_arm_push_clears_night_mode_enabled(self) -> None:
+        from dataclasses import replace as dc_replace
+
+        coordinator = self._make_coordinator_with_space(SecurityState.NIGHT_MODE)
+        coordinator.spaces["s1"] = dc_replace(coordinator.spaces["s1"], night_mode_enabled=True)
+
+        coordinator.apply_push_security_state("s1", SecurityState.ARMED)
+
+        assert coordinator.spaces["s1"].night_mode_enabled is False
+
+    def test_partial_push_keeps_night_mode_enabled(self) -> None:
+        # PARTIALLY_ARMED is ambiguous (night mode vs subset of groups armed),
+        # so it must not clobber a known night-mode flag.
+        from dataclasses import replace as dc_replace
+
+        coordinator = self._make_coordinator_with_space(SecurityState.NIGHT_MODE)
+        coordinator.spaces["s1"] = dc_replace(coordinator.spaces["s1"], night_mode_enabled=True)
+
+        coordinator.apply_push_security_state("s1", SecurityState.PARTIALLY_ARMED)
+
+        assert coordinator.spaces["s1"].night_mode_enabled is True
 
 
 class TestApplyPushDeviceMotion:

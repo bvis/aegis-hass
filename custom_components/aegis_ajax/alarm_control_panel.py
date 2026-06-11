@@ -396,6 +396,11 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         space = self._space
         if space is None:
             return None
+        # In group mode the server reports PARTIALLY_ARMED while night mode
+        # is active — identical to "some groups armed" in the lite state.
+        # `night_mode_enabled` (snapshot + push events) disambiguates (#284).
+        if space.security_state == SecurityState.PARTIALLY_ARMED and space.night_mode_enabled:
+            return AlarmControlPanelState.ARMED_NIGHT
         return map_security_state(space.security_state)
 
     @property
@@ -464,8 +469,18 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         space = self._space
         if space is None:
             return
+        # Mirror the push-event rule (#284): arming night sets the flag,
+        # full arm / disarm clears it, so the debounced lite re-read
+        # (PARTIALLY_ARMED in group mode) still maps to armed_night.
+        night_mode_enabled = space.night_mode_enabled
+        if new_state == SecurityState.NIGHT_MODE:
+            night_mode_enabled = True
+        elif new_state in (SecurityState.ARMED, SecurityState.DISARMED):
+            night_mode_enabled = False
         try:
-            self.coordinator.spaces[self._space_id] = replace(space, security_state=new_state)
+            self.coordinator.spaces[self._space_id] = replace(
+                space, security_state=new_state, night_mode_enabled=night_mode_enabled
+            )
         except TypeError:
             return  # space is not a real dataclass (e.g., during tests)
         expiry = asyncio.get_running_loop().time() + 10

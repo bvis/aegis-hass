@@ -41,6 +41,7 @@ async def async_get_config_entry_diagnostics(
                 "online": s.is_online,
                 "malfunctions": s.malfunctions_count,
                 "group_mode_enabled": s.group_mode_enabled,
+                "night_mode_enabled": s.night_mode_enabled,
                 "chime_status": s.chime_status.name,
                 "groups": [
                     {
