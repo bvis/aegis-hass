@@ -496,17 +496,90 @@ class TestFcmPushClientSupervision:
         coordinator = MagicMock()
         return AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
 
+    @staticmethod
+    def _running_task() -> MagicMock:
+        task = MagicMock()
+        task.done.return_value = False
+        return task
+
+    @staticmethod
+    def _finished_task() -> MagicMock:
+        task = MagicMock()
+        task.done.return_value = True
+        return task
+
     @pytest.mark.asyncio
     async def test_alive_client_is_left_alone(self) -> None:
         listener = self._make_listener()
         client = MagicMock()
         client.do_listen = True
+        client.tasks = [self._running_task(), self._running_task()]
         listener._push_client = client
 
         await listener._async_supervise_push_client(now=1000.0)
 
         assert listener._push_client is client
         assert listener._fcm_restart_at is None
+
+    @pytest.mark.asyncio
+    async def test_zombie_client_with_dead_listen_task_schedules_restart(self) -> None:
+        """`_listen()` early-returns when the INITIAL connect exhausts its
+        retries — `do_listen` stays True (only `_terminate()` and the reset
+        path lower it) and `run_state` parks in STARTING_CONNECTION, where
+        the library's own `_do_monitor` never acts. The flag alone would
+        report this zombie as healthy forever; a finished task in
+        `client.tasks` is the tell.
+        """
+        listener = self._make_listener()
+        client = MagicMock()
+        client.do_listen = True
+        client.tasks = [self._finished_task(), self._running_task()]
+        client.stop = AsyncMock()
+        listener._push_client = client
+
+        await listener._async_supervise_push_client(now=1000.0)
+
+        assert listener._push_client is None
+        assert listener._fcm_restart_at == 1000.0 + 300.0
+
+    @pytest.mark.asyncio
+    async def test_client_with_no_tasks_yet_is_not_a_zombie(self) -> None:
+        # `tasks` is [] until start() runs — an empty list must not read as
+        # "listen task finished".
+        listener = self._make_listener()
+        client = MagicMock()
+        client.do_listen = True
+        client.tasks = []
+        listener._push_client = client
+
+        await listener._async_supervise_push_client(now=1000.0)
+
+        assert listener._push_client is client
+        assert listener._fcm_restart_at is None
+
+    @pytest.mark.asyncio
+    async def test_initial_start_failure_still_supervises_and_schedules_retry(self) -> None:
+        """A failed first start must not leave push dead until the next HA
+        restart — the supervisor is installed regardless and a delayed retry
+        is seeded with the same backoff the death path uses.
+        """
+        hass = MagicMock()
+        listener = AjaxNotificationListener(hass=hass, coordinator=MagicMock(), **_FCM_KWARGS)
+        listener._store.async_load = AsyncMock(
+            return_value={"fcm": {"registration": {"token": "tok"}}}
+        )
+        listener._register_push_token = AsyncMock()
+        listener._async_start_push_client = AsyncMock(return_value=False)
+        fake_unsub = MagicMock()
+
+        with patch(
+            "homeassistant.helpers.event.async_track_time_interval",
+            MagicMock(return_value=fake_unsub),
+        ):
+            await listener.async_start()
+
+        assert listener._fcm_supervisor_unsub is fake_unsub
+        assert listener._fcm_restart_at is not None
 
     @pytest.mark.asyncio
     async def test_dead_client_schedules_delayed_restart(self) -> None:
@@ -579,6 +652,7 @@ class TestFcmPushClientSupervision:
         listener = self._make_listener()
         client = MagicMock()
         client.do_listen = True
+        client.tasks = [self._running_task()]
         listener._push_client = client
         listener._fcm_restart_backoff = 900.0
         listener._fcm_client_started_at = 0.0

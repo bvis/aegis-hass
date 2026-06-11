@@ -378,10 +378,17 @@ class AjaxNotificationListener:
                 "integration README and re-enter them in Options."
             )
 
-        # Start push client (supervised, #285)
+        # Start push client (supervised, #285). The supervisor is installed
+        # even when the first start fails: "push silently dead until the next
+        # HA restart" is exactly the state #285 eliminates, so a failed
+        # initial start seeds a delayed retry with the regular backoff
+        # instead of giving up. (The failure already logged a WARNING and,
+        # on the initial path, raised the credentials Repair.)
         self._fcm_config = fcm_config
-        if await self._async_start_push_client():
-            self._start_push_client_supervisor()
+        started = await self._async_start_push_client()
+        self._start_push_client_supervisor()
+        if not started:
+            self._schedule_fcm_restart(time.monotonic())
 
     async def _async_start_push_client(self, *, register_repair_on_failure: bool = True) -> bool:
         """Create and start the FcmPushClient; True when it started.
@@ -440,32 +447,49 @@ class AjaxNotificationListener:
             self._hass, _tick, timedelta(seconds=FCM_SUPERVISE_INTERVAL_SECONDS)
         )
 
-    async def _async_supervise_push_client(self, now: float | None = None) -> None:
-        """Detect a self-terminated FCM client and restart it with backoff (#285).
+    def _schedule_fcm_restart(self, now: float) -> float:
+        """Arm the next restart attempt and advance the backoff; returns the delay."""
+        delay = self._fcm_restart_backoff
+        self._fcm_restart_at = now + delay
+        self._fcm_restart_backoff = min(
+            self._fcm_restart_backoff * 2, FCM_RESTART_BACKOFF_MAX_SECONDS
+        )
+        return delay
 
-        `do_listen` is the library's own "I gave up" signal — it goes False
-        when `_terminate()` fires (sequential-error abort, exhausted
-        reconnects) and stays True through normal RESETTING cycles, so a
-        routine reconnect never triggers a restart here. Tearing the client
-        down also flips `is_fcm_connected`, so the hub reachability logic
-        (#236) correctly reports push as down during the backoff window.
+    async def _async_supervise_push_client(self, now: float | None = None) -> None:
+        """Detect a dead FCM client and restart it with backoff (#285).
+
+        firebase-messaging 0.4.5 has two distinct death modes:
+
+        - `_terminate()` lowers `do_listen` (sequential-error abort, or
+          reconnect exhaustion inside `_reset()`).
+        - `_listen()` silently returns when the INITIAL `_connect_with_retry`
+          exhausts its tries — `do_listen` stays True and `run_state` parks in
+          STARTING_CONNECTION, where the library's own `_do_monitor` never
+          acts. The only observable signal is the finished listen task in
+          `client.tasks` ([] until `start()` runs, so pre-start ticks don't
+          read as dead).
+
+        Liveness therefore requires `do_listen` AND no finished task. Routine
+        RESETTING cycles keep both, so a normal reconnect never triggers a
+        restart here. Tearing the client down also flips `is_fcm_connected`,
+        so the hub reachability logic (#236) correctly reports push as down
+        during the backoff window.
         """
         if now is None:
             now = time.monotonic()
         client = self._push_client
         if client is not None:
-            if getattr(client, "do_listen", True):
+            tasks = getattr(client, "tasks", None) or []
+            task_finished = any(task.done() for task in tasks)
+            if getattr(client, "do_listen", True) and not task_finished:
                 if (
                     self._fcm_client_started_at is not None
                     and now - self._fcm_client_started_at >= FCM_HEALTHY_RUN_RESET_SECONDS
                 ):
                     self._fcm_restart_backoff = FCM_RESTART_BACKOFF_INITIAL_SECONDS
                 return
-            delay = self._fcm_restart_backoff
-            self._fcm_restart_at = now + delay
-            self._fcm_restart_backoff = min(
-                self._fcm_restart_backoff * 2, FCM_RESTART_BACKOFF_MAX_SECONDS
-            )
+            delay = self._schedule_fcm_restart(now)
             _LOGGER.warning(
                 "FCM push client terminated after repeated connection errors — "
                 "restarting in %.0f minutes. Until then real-time events "
@@ -486,11 +510,7 @@ class AjaxNotificationListener:
         if await self._async_start_push_client(register_repair_on_failure=False):
             _LOGGER.info("FCM push client restarted — push notifications active again")
         else:
-            delay = self._fcm_restart_backoff
-            self._fcm_restart_at = now + delay
-            self._fcm_restart_backoff = min(
-                self._fcm_restart_backoff * 2, FCM_RESTART_BACKOFF_MAX_SECONDS
-            )
+            delay = self._schedule_fcm_restart(now)
             _LOGGER.warning(
                 "FCM push client restart failed — next attempt in %.0f minutes.",
                 delay / 60,
