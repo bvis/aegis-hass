@@ -481,6 +481,126 @@ class TestNotificationListener:
         assert "dev-99" not in listener._notification_id_callbacks
 
 
+class TestFcmPushClientSupervision:
+    """Supervised restart of a self-terminated FCM client (#285).
+
+    firebase-messaging shuts itself down (`do_listen = False`) after
+    `abort_on_sequential_error_count` sequential errors or repeated failed
+    reconnects. Without supervision push silently stays dead until the next
+    HA restart; with it, the client is restarted with a delayed backoff so
+    a Google-side outage can't turn into a reconnect storm.
+    """
+
+    def _make_listener(self) -> AjaxNotificationListener:
+        hass = MagicMock()
+        coordinator = MagicMock()
+        return AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+
+    @pytest.mark.asyncio
+    async def test_alive_client_is_left_alone(self) -> None:
+        listener = self._make_listener()
+        client = MagicMock()
+        client.do_listen = True
+        listener._push_client = client
+
+        await listener._async_supervise_push_client(now=1000.0)
+
+        assert listener._push_client is client
+        assert listener._fcm_restart_at is None
+
+    @pytest.mark.asyncio
+    async def test_dead_client_schedules_delayed_restart(self) -> None:
+        listener = self._make_listener()
+        client = MagicMock()
+        client.do_listen = False
+        client.stop = AsyncMock()
+        listener._push_client = client
+
+        await listener._async_supervise_push_client(now=1000.0)
+
+        # Torn down (also flips `is_fcm_connected` → reachability shows
+        # "push down") and scheduled, NOT restarted inline.
+        assert listener._push_client is None
+        assert listener._fcm_restart_at == 1000.0 + 300.0
+
+    @pytest.mark.asyncio
+    async def test_restart_fires_only_after_backoff_elapses(self) -> None:
+        listener = self._make_listener()
+        listener._fcm_restart_at = 1300.0
+        listener._async_start_push_client = AsyncMock(return_value=True)
+
+        await listener._async_supervise_push_client(now=1299.0)
+        listener._async_start_push_client.assert_not_awaited()
+
+        await listener._async_supervise_push_client(now=1300.0)
+        listener._async_start_push_client.assert_awaited_once()
+        assert listener._fcm_restart_at is None
+
+    @pytest.mark.asyncio
+    async def test_backoff_doubles_and_caps(self) -> None:
+        listener = self._make_listener()
+
+        def _dead_client() -> MagicMock:
+            client = MagicMock()
+            client.do_listen = False
+            client.stop = AsyncMock()
+            return client
+
+        listener._push_client = _dead_client()
+        await listener._async_supervise_push_client(now=0.0)
+        assert listener._fcm_restart_at == 300.0
+
+        listener._push_client = _dead_client()
+        await listener._async_supervise_push_client(now=2000.0)
+        assert listener._fcm_restart_at == 2000.0 + 600.0
+
+        listener._push_client = _dead_client()
+        await listener._async_supervise_push_client(now=4000.0)
+        assert listener._fcm_restart_at == 4000.0 + 900.0
+
+        # Capped: never exceeds 15 minutes.
+        listener._push_client = _dead_client()
+        await listener._async_supervise_push_client(now=6000.0)
+        assert listener._fcm_restart_at == 6000.0 + 900.0
+
+    @pytest.mark.asyncio
+    async def test_failed_restart_reschedules(self) -> None:
+        listener = self._make_listener()
+        listener._fcm_restart_at = 1000.0
+        listener._fcm_restart_backoff = 600.0
+        listener._async_start_push_client = AsyncMock(return_value=False)
+
+        await listener._async_supervise_push_client(now=1000.0)
+
+        assert listener._fcm_restart_at == 1000.0 + 600.0
+
+    @pytest.mark.asyncio
+    async def test_long_healthy_run_resets_backoff(self) -> None:
+        listener = self._make_listener()
+        client = MagicMock()
+        client.do_listen = True
+        listener._push_client = client
+        listener._fcm_restart_backoff = 900.0
+        listener._fcm_client_started_at = 0.0
+
+        await listener._async_supervise_push_client(now=1800.0)
+
+        assert listener._fcm_restart_backoff == 300.0
+
+    @pytest.mark.asyncio
+    async def test_async_stop_cancels_supervisor(self) -> None:
+        listener = self._make_listener()
+        unsub = MagicMock()
+        listener._fcm_supervisor_unsub = unsub
+        listener._fcm_restart_at = 123.0
+
+        await listener.async_stop()
+
+        unsub.assert_called_once()
+        assert listener._fcm_supervisor_unsub is None
+        assert listener._fcm_restart_at is None
+
+
 class TestAsyncStartFcmRepairs:
     """The FCM listener raises a Repair when registration / push start fails."""
 
