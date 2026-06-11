@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from custom_components.aegis_ajax.api.models import (
     Group,
@@ -34,6 +34,14 @@ _FIND_SPACES_METHOD = (
     "/systems.ajax.api.ecosystem.v3.mobilegwsvc.service"
     ".find_user_spaces_with_pagination.FindUserSpacesWithPaginationService/execute"
 )
+
+
+class ParsedGroups(NamedTuple):
+    """Result of `SpacesApi.parse_groups` over a `SpaceSecurity` proto."""
+
+    groups: tuple[Group, ...]
+    group_mode_enabled: bool
+    night_mode_enabled: bool
 
 
 class SpacesApi:
@@ -77,8 +85,8 @@ class SpacesApi:
         return ChimeStatus.UNSPECIFIED
 
     @staticmethod
-    def parse_groups(proto_security: Any, space_id: str) -> tuple[tuple[Group, ...], bool]:  # noqa: ANN401
-        """Extract groups + group-mode flag from a `SpaceSecurity` proto.
+    def parse_groups(proto_security: Any, space_id: str) -> ParsedGroups:  # noqa: ANN401
+        """Extract groups + group-mode + night-mode flags from a `SpaceSecurity` proto.
 
         Combines the group definitions in `security.groups[]` (id, name,
         sorting_key) with the per-group security states in
@@ -86,13 +94,19 @@ class SpacesApi:
         space is in regular mode (no group_mode oneof), returns an empty
         tuple regardless of whether group definitions exist — the official
         Ajax UI does the same.
+
+        `night_mode_enabled` is `mode.group_mode.night_mode_enabled`: whether
+        night mode is currently active. It matters because in group mode the
+        lite `DisplayedSpaceSecurityState` reports PARTIALLY_ARMED while night
+        mode is on, and this flag is the only wire signal that distinguishes
+        that from "some groups armed" (#284).
         """
         if not hasattr(proto_security, "groups") or not hasattr(proto_security, "mode"):
-            return (), False
+            return ParsedGroups((), False, False)
         mode = proto_security.mode
         group_mode_active = hasattr(mode, "WhichOneof") and mode.WhichOneof("mode") == "group_mode"
         if not group_mode_active:
-            return (), False
+            return ParsedGroups((), False, False)
 
         # Per-group state map keyed by group_id.
         states: dict[str, SecurityState] = {}
@@ -119,7 +133,8 @@ class SpacesApi:
                 )
             )
         groups.sort(key=lambda g: (g.sorting_key, g.name))
-        return tuple(groups), True
+        night_mode_enabled = bool(getattr(mode.group_mode, "night_mode_enabled", False))
+        return ParsedGroups(tuple(groups), True, night_mode_enabled)
 
     @staticmethod
     def parse_monitoring_company(proto_company: Any) -> MonitoringCompany:  # noqa: ANN401
@@ -235,6 +250,7 @@ class SpacesApi:
         monitoring_companies: list[MonitoringCompany] = []
         groups: tuple[Group, ...] = ()
         group_mode_enabled: bool = False
+        night_mode_enabled: bool = False
         chime_status = ChimeStatus.UNSPECIFIED
         try:
             async for msg in stream:
@@ -251,7 +267,9 @@ class SpacesApi:
                 for proto_company in snapshot.monitoring_companies:
                     monitoring_companies.append(self.parse_monitoring_company(proto_company))
                 if hasattr(snapshot, "security"):
-                    groups, group_mode_enabled = self.parse_groups(snapshot.security, space_id)
+                    groups, group_mode_enabled, night_mode_enabled = self.parse_groups(
+                        snapshot.security, space_id
+                    )
                 chime_status = self.extract_chime_status(snapshot)
                 break
         finally:
@@ -275,6 +293,7 @@ class SpacesApi:
             monitoring_companies_loaded=True,
             groups=groups,
             group_mode_enabled=group_mode_enabled,
+            night_mode_enabled=night_mode_enabled,
             chime_status=chime_status,
         )
 

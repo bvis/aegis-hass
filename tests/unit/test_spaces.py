@@ -142,6 +142,7 @@ class TestParseGroups:
         groups: list[tuple[str, str, str]] | None = None,
         states: dict[str, int] | None = None,
         mode: str = "group_mode",
+        night_mode_enabled: bool = False,
     ):
         # Imports inside the method so they don't pollute sys.modules with
         # real proto packages at collection time — that breaks unrelated tests
@@ -171,6 +172,7 @@ class TestParseGroups:
             mode_msg = space_security_mode_pb2.SpaceSecurityMode(
                 group_mode=group_mode_space_security_pb2.GroupModeSpaceSecurity(
                     groups=group_securities,
+                    night_mode_enabled=night_mode_enabled,
                 )
             )
         else:
@@ -184,7 +186,7 @@ class TestParseGroups:
             groups=[("g1", "Villa", "01"), ("g2", "Apartment", "02")],
             states={"g1": 1, "g2": 2},  # ARMED, DISARMED
         )
-        groups, enabled = SpacesApi.parse_groups(security, space_id="space-1")
+        groups, enabled, _ = SpacesApi.parse_groups(security, space_id="space-1")
 
         assert enabled is True
         assert [g.id for g in groups] == ["g1", "g2"]
@@ -200,7 +202,7 @@ class TestParseGroups:
             ],
             states={"g1": 2, "g2": 2},
         )
-        groups, _ = SpacesApi.parse_groups(security, space_id="space-1")
+        groups, _, _ = SpacesApi.parse_groups(security, space_id="space-1")
         assert [g.sorting_key for g in groups] == ["01", "02"]
         assert groups[0].name == "A-Second-Insertion"
 
@@ -209,7 +211,7 @@ class TestParseGroups:
             groups=[("g1", "Villa", "01")],
             states={},  # no per-group state in mode.group_mode.groups
         )
-        groups, enabled = SpacesApi.parse_groups(security, space_id="s")
+        groups, enabled, _ = SpacesApi.parse_groups(security, space_id="s")
         assert enabled is True
         assert groups[0].security_state == SecurityState.NONE
 
@@ -218,7 +220,7 @@ class TestParseGroups:
             groups=[("g1", "Villa", "01")],  # definitions exist but mode is regular
             mode="regular_mode",
         )
-        groups, enabled = SpacesApi.parse_groups(security, space_id="s")
+        groups, enabled, _ = SpacesApi.parse_groups(security, space_id="s")
         assert groups == ()
         assert enabled is False
 
@@ -227,8 +229,31 @@ class TestParseGroups:
             groups=[("", "Bad", "00"), ("g1", "Good", "01")],
             states={"g1": 1},
         )
-        groups, _ = SpacesApi.parse_groups(security, space_id="s")
+        groups, _, _ = SpacesApi.parse_groups(security, space_id="s")
         assert [g.id for g in groups] == ["g1"]
+
+    def test_night_mode_enabled_parsed_from_group_mode(self) -> None:
+        # In group mode the lite `DisplayedSpaceSecurityState` reports
+        # PARTIALLY_ARMED while night mode is active — the only wire signal
+        # that distinguishes "night mode" from "some groups armed" is
+        # `mode.group_mode.night_mode_enabled` on the full snapshot (#284).
+        security = self._build_security(
+            groups=[("g1", "Villa", "01")],
+            states={"g1": 1},
+            night_mode_enabled=True,
+        )
+        result = SpacesApi.parse_groups(security, space_id="s")
+        assert result.night_mode_enabled is True
+
+    def test_night_mode_disabled_by_default(self) -> None:
+        security = self._build_security(groups=[("g1", "Villa", "01")], states={"g1": 1})
+        result = SpacesApi.parse_groups(security, space_id="s")
+        assert result.night_mode_enabled is False
+
+    def test_night_mode_false_in_regular_mode(self) -> None:
+        security = self._build_security(groups=[("g1", "Villa", "01")], mode="regular_mode")
+        result = SpacesApi.parse_groups(security, space_id="s")
+        assert result.night_mode_enabled is False
 
 
 class TestListSpaces:

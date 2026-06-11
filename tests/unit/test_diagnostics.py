@@ -174,12 +174,17 @@ class TestAsyncGetConfigEntryDiagnostics:
             ),
         )
         entry.runtime_data.spaces = {
-            "space-1": replace(_make_space(), groups=groups, group_mode_enabled=True)
+            "space-1": replace(
+                _make_space(), groups=groups, group_mode_enabled=True, night_mode_enabled=True
+            )
         }
 
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         space_info = result["spaces"]["space-1"]
         assert space_info["group_mode_enabled"] is True
+        # Drives the panel's armed_night-vs-custom_bypass discrimination (#284),
+        # so it must be dumped — a missing key must mean "stale integration".
+        assert space_info["night_mode_enabled"] is True
         assert len(space_info["groups"]) == 2
         assert space_info["groups"][0] == {
             "id": "g1",
@@ -203,4 +208,5 @@ class TestAsyncGetConfigEntryDiagnostics:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         space_info = result["spaces"]["space-1"]
         assert space_info["group_mode_enabled"] is False
+        assert space_info["night_mode_enabled"] is False
         assert space_info["groups"] == []

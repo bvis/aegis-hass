@@ -79,6 +79,10 @@ class Space:
     monitoring_companies_loaded: bool = False
     groups: tuple[Group, ...] = field(default_factory=tuple)
     group_mode_enabled: bool = False
+    # Night mode currently active (#284). In group mode the server's
+    # DisplayedSpaceSecurityState reports PARTIALLY_ARMED while night mode is
+    # on — this flag is the only wire signal that tells the two apart.
+    night_mode_enabled: bool = False
     # Hub-wide Chime on/off setting (#239). UNSPECIFIED = the hub doesn't
     # expose the feature, so no Chime switch is created for it.
     chime_status: ChimeStatus = ChimeStatus.UNSPECIFIED
@@ -129,6 +133,8 @@ class SpaceSnapshot:
     monitoring_companies_loaded: bool = False
     groups: tuple[Group, ...] = field(default_factory=tuple)
     group_mode_enabled: bool = False
+    # Night mode currently active, read off `mode.group_mode` (#284).
+    night_mode_enabled: bool = False
     # Hub-wide Chime status read off the full snapshot's hub device (#239).
     chime_status: ChimeStatus = ChimeStatus.UNSPECIFIED
 

@@ -461,12 +461,16 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Group definitions + group_mode_enabled only come from the
                 # hourly snapshot path; without preservation across plain
                 # `list_spaces` polls, per-group alarm panels go
-                # `unavailable` for the rest of the hour.
+                # `unavailable` for the rest of the hour. `night_mode_enabled`
+                # rides along: LiteSpace doesn't carry it either, and losing
+                # it flips the panel from armed_night to armed_custom_bypass
+                # on every plain poll while night mode is on (#284).
                 if previous.groups or previous.group_mode_enabled:
                     s = dc_replace(
                         s,
                         groups=previous.groups,
                         group_mode_enabled=previous.group_mode_enabled,
+                        night_mode_enabled=previous.night_mode_enabled,
                     )
                 # Chime status (#239) also only comes from the hourly snapshot;
                 # `list_spaces` (LiteSpace) doesn't carry it, so preserve the
@@ -539,6 +543,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     monitoring_companies_loaded=snapshot.monitoring_companies_loaded,
                     groups=snapshot.groups,
                     group_mode_enabled=snapshot.group_mode_enabled,
+                    night_mode_enabled=snapshot.night_mode_enabled,
                     chime_status=snapshot.chime_status,
                 )
         self.rooms = refreshed_rooms
@@ -1161,6 +1166,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         import time  # noqa: PLC0415
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
+        from custom_components.aegis_ajax.const import SecurityState  # noqa: PLC0415
+
         space = self.spaces.get(space_id)
         if space is None:
             return
@@ -1170,9 +1177,21 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         opt = self._optimistic_space_states.get(space_id)
         if opt and opt[0] > now:
             return
-        if space.security_state == new_state:
+        # Track night-mode activity off the push itself: the debounced lite
+        # re-read that follows reports PARTIALLY_ARMED in group mode, and the
+        # flag is what keeps the panel on `armed_night` (#284). PARTIALLY_ARMED
+        # pushes are ambiguous (night mode vs subset of groups) and leave the
+        # flag untouched; the hourly snapshot reconciles.
+        night_mode_enabled = space.night_mode_enabled
+        if new_state == SecurityState.NIGHT_MODE:
+            night_mode_enabled = True
+        elif new_state in (SecurityState.ARMED, SecurityState.DISARMED):
+            night_mode_enabled = False
+        if space.security_state == new_state and space.night_mode_enabled == night_mode_enabled:
             return
-        self.spaces[space_id] = dc_replace(space, security_state=new_state)
+        self.spaces[space_id] = dc_replace(
+            space, security_state=new_state, night_mode_enabled=night_mode_enabled
+        )
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def apply_push_group_security_state(
