@@ -21,6 +21,7 @@ from custom_components.aegis_ajax.const import (
     RAW_TAG_TO_GROUP_SECURITY_STATE,
     RAW_TAG_TO_SECURITY_STATE,
 )
+from custom_components.aegis_ajax.notification_fcm_guard import attach_fcm_log_guard
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
     async_clear_fcm_credentials_malformed,
@@ -51,6 +52,19 @@ STORAGE_VERSION = 1
 # Both share the same Ajax notification_id, so we suppress duplicate event-fire
 # and refresh paths within this window. See #80.
 NOTIFICATION_DEDUPE_WINDOW_SECONDS = 5.0
+
+# #285: supervision of the FCM push client. firebase-messaging terminates
+# itself (`do_listen = False`) after `abort_on_sequential_error_count`
+# sequential errors or repeated failed reconnects; without supervision push
+# silently stays dead until the next HA restart. The restart is delayed with
+# a doubling backoff (5 → 10 → 15 min cap) so a Google-side outage can't be
+# turned into a reconnect storm by our own retries.
+FCM_SUPERVISE_INTERVAL_SECONDS = 60
+FCM_RESTART_BACKOFF_INITIAL_SECONDS = 300.0
+FCM_RESTART_BACKOFF_MAX_SECONDS = 900.0
+# A client that has stayed alive this long earns the backoff reset, so the
+# next incident starts again at the 5-minute delay.
+FCM_HEALTHY_RUN_RESET_SECONDS = 1800.0
 
 # Issue #174: when the underlying TCP socket against `mtalk.google.com:5228`
 # (FCM's MCS endpoint) gets reset, Google replays any push that wasn't acked
@@ -137,6 +151,12 @@ class AjaxNotificationListener:
         self._app_label = app_label
         self._disable_push_warning = disable_push_warning
         self._push_client: Any = None
+        # FCM register config kept for supervised client restarts (#285).
+        self._fcm_config: Any = None
+        self._fcm_supervisor_unsub: Callable[[], None] | None = None
+        self._fcm_restart_at: float | None = None
+        self._fcm_restart_backoff: float = FCM_RESTART_BACKOFF_INITIAL_SECONDS
+        self._fcm_client_started_at: float | None = None
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._rejected_store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, REJECTED_STORAGE_KEY
@@ -239,7 +259,6 @@ class AjaxNotificationListener:
             return
 
         try:
-            from firebase_messaging import FcmPushClient  # noqa: PLC0415
             from firebase_messaging.fcmregister import (  # noqa: PLC0415
                 FcmRegister,
                 FcmRegisterConfig,
@@ -359,23 +378,123 @@ class AjaxNotificationListener:
                 "integration README and re-enter them in Options."
             )
 
-        # Start push client
+        # Start push client (supervised, #285)
+        self._fcm_config = fcm_config
+        if await self._async_start_push_client():
+            self._start_push_client_supervisor()
+
+    async def _async_start_push_client(self, *, register_repair_on_failure: bool = True) -> bool:
+        """Create and start the FcmPushClient; True when it started.
+
+        Shared by the initial `async_start` path and supervised restarts
+        (#285). Restarts pass `register_repair_on_failure=False`: a transient
+        network failure during a backoff retry must not raise the
+        "credentials invalid" Repair card — the credentials already worked.
+        """
+        try:
+            from firebase_messaging import (  # noqa: PLC0415
+                FcmPushClient,
+                FcmPushClientConfig,
+            )
+        except ImportError:
+            return False
+
+        # Defuse the traceback CPU bomb before the listen loop exists (#285).
+        attach_fcm_log_guard()
         try:
             self._push_client = FcmPushClient(
                 callback=self._on_notification,
-                fcm_config=fcm_config,
+                fcm_config=self._fcm_config,
                 credentials=self._credentials,
+                # Explicit so supervision can rely on the library terminating
+                # itself (do_listen → False) instead of erroring forever; the
+                # supervisor then owns the restart cadence (#285).
+                config=FcmPushClientConfig(abort_on_sequential_error_count=3),
             )
             if asyncio.iscoroutinefunction(self._push_client.start):
                 await self._push_client.start()
             else:
                 await self._hass.async_add_executor_job(self._push_client.start)
+            self._fcm_client_started_at = time.monotonic()
             _LOGGER.info("FCM push client started — push notifications active")
         except Exception as exc:
             _LOGGER.warning(_classify_fcm_failure(exc), exc_info=True)
             self._push_client = None
-            if self._entry_id:
+            if register_repair_on_failure and self._entry_id:
                 async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
+            return False
+        return True
+
+    def _start_push_client_supervisor(self) -> None:
+        """Start the periodic liveness check for the push client (#285)."""
+        if self._fcm_supervisor_unsub is not None:
+            return
+        from datetime import timedelta  # noqa: PLC0415
+
+        from homeassistant.helpers.event import async_track_time_interval  # noqa: PLC0415
+
+        async def _tick(_now: Any) -> None:  # noqa: ANN401
+            await self._async_supervise_push_client()
+
+        self._fcm_supervisor_unsub = async_track_time_interval(
+            self._hass, _tick, timedelta(seconds=FCM_SUPERVISE_INTERVAL_SECONDS)
+        )
+
+    async def _async_supervise_push_client(self, now: float | None = None) -> None:
+        """Detect a self-terminated FCM client and restart it with backoff (#285).
+
+        `do_listen` is the library's own "I gave up" signal — it goes False
+        when `_terminate()` fires (sequential-error abort, exhausted
+        reconnects) and stays True through normal RESETTING cycles, so a
+        routine reconnect never triggers a restart here. Tearing the client
+        down also flips `is_fcm_connected`, so the hub reachability logic
+        (#236) correctly reports push as down during the backoff window.
+        """
+        if now is None:
+            now = time.monotonic()
+        client = self._push_client
+        if client is not None:
+            if getattr(client, "do_listen", True):
+                if (
+                    self._fcm_client_started_at is not None
+                    and now - self._fcm_client_started_at >= FCM_HEALTHY_RUN_RESET_SECONDS
+                ):
+                    self._fcm_restart_backoff = FCM_RESTART_BACKOFF_INITIAL_SECONDS
+                return
+            delay = self._fcm_restart_backoff
+            self._fcm_restart_at = now + delay
+            self._fcm_restart_backoff = min(
+                self._fcm_restart_backoff * 2, FCM_RESTART_BACKOFF_MAX_SECONDS
+            )
+            _LOGGER.warning(
+                "FCM push client terminated after repeated connection errors — "
+                "restarting in %.0f minutes. Until then real-time events "
+                "(doorbell ring, arm/disarm, alarm) fall back to polling.",
+                delay / 60,
+            )
+            try:
+                stop_result = client.stop()
+                if hasattr(stop_result, "__await__"):
+                    await stop_result
+            except Exception:
+                _LOGGER.debug("Error stopping terminated FCM client", exc_info=True)
+            self._push_client = None
+            return
+        if self._fcm_restart_at is None or now < self._fcm_restart_at:
+            return
+        self._fcm_restart_at = None
+        if await self._async_start_push_client(register_repair_on_failure=False):
+            _LOGGER.info("FCM push client restarted — push notifications active again")
+        else:
+            delay = self._fcm_restart_backoff
+            self._fcm_restart_at = now + delay
+            self._fcm_restart_backoff = min(
+                self._fcm_restart_backoff * 2, FCM_RESTART_BACKOFF_MAX_SECONDS
+            )
+            _LOGGER.warning(
+                "FCM push client restart failed — next attempt in %.0f minutes.",
+                delay / 60,
+            )
 
     async def _register_push_token(self, fcm_token: str) -> None:
         """Register the FCM token with Ajax servers via gRPC."""
@@ -879,6 +998,10 @@ class AjaxNotificationListener:
 
     async def async_stop(self) -> None:
         """Stop the FCM push client."""
+        if self._fcm_supervisor_unsub is not None:
+            self._fcm_supervisor_unsub()
+            self._fcm_supervisor_unsub = None
+        self._fcm_restart_at = None
         if self._push_client:
             try:
                 stop_result = self._push_client.stop()
