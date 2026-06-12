@@ -20,6 +20,13 @@ if TYPE_CHECKING:
     from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 
 
+# device_type → model display overrides for names `.title()` mangles
+# (acronyms). Everything else keeps the generic title-cased fallback.
+_MODEL_OVERRIDES: dict[str, str] = {
+    "video_edge_nvr": "Video Edge NVR",
+}
+
+
 def build_device_info(
     device: Device,
     rooms: Mapping[str, Room] | None = None,
@@ -35,7 +42,9 @@ def build_device_info(
         identifiers={(DOMAIN, device.id)},
         name=device.name,
         manufacturer=MANUFACTURER,
-        model=device.device_type.replace("_", " ").title(),
+        model=_MODEL_OVERRIDES.get(
+            device.device_type, device.device_type.replace("_", " ").title()
+        ),
         serial_number=device.id,
     )
     if not is_hub:

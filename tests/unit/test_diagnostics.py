@@ -131,6 +131,38 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert bat["low"] is False
 
     @pytest.mark.asyncio
+    async def test_video_device_includes_raw_type_and_sources(self, entry: MagicMock) -> None:
+        # #282/#290: the raw `About.Type` value and the source list are
+        # what diagnostics-driven triage of duplicated / unknown video
+        # devices runs on — they must survive into the dump (the
+        # `statuses` block only lists keys, not values).
+        from dataclasses import replace
+
+        device = replace(
+            _make_device(did="cam-1"),
+            statuses={
+                "video_edge_type": 7,
+                "video_sources": [
+                    {"kind": "nvr", "video_edge_id": "ve-nvr", "channel_id": "3", "type": 7}
+                ],
+            },
+        )
+        entry.runtime_data.devices = {"cam-1": device}
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        dev_info = result["devices"]["cam-1"]
+        assert dev_info["video_edge_type"] == 7
+        assert dev_info["video_sources"] == [
+            {"kind": "nvr", "video_edge_id": "ve-nvr", "channel_id": "3", "type": 7}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_non_video_device_omits_video_keys(self, entry: MagicMock) -> None:
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        dev_info = result["devices"]["dev-1"]
+        assert "video_edge_type" not in dev_info
+        assert "video_sources" not in dev_info
+
+    @pytest.mark.asyncio
     async def test_stream_tasks_count(self, entry: MagicMock) -> None:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert result["stream_tasks"] == 2

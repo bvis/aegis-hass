@@ -406,12 +406,17 @@ class TestRedactProtoBytesToHex:
         assert device is not None
         assert device.device_type == "video_edge_indoor"
 
-    def test_parse_video_edge_channel_unknown_type(self) -> None:
+    def test_parse_video_edge_channel_unknown_type(self, caplog: pytest.LogCaptureFixture) -> None:
         # `About.Type` is open-ended; new firmwares can introduce
         # values we don't know yet. Emit a generic `video_edge_unknown`
         # so the device still surfaces as a HA card with at least the
         # device-agnostic sensors (battery, signal_strength). Beats
-        # silently dropping the device.
+        # silently dropping the device. The raw enum value is kept in
+        # `statuses` (and surfaced via diagnostics) and a WARNING names
+        # it, so a reporter's default-level log already identifies the
+        # missing mapping without a debug-log round-trip (#290).
+        import logging
+
         from v3.mobilegwsvc.commonmodels.space.device.light import (
             light_device_pb2,
             light_device_profile_pb2,
@@ -433,9 +438,135 @@ class TestRedactProtoBytesToHex:
             )
         )
 
-        device = DevicesApi.parse_device(light_device)
+        with caplog.at_level(logging.WARNING):
+            device = DevicesApi.parse_device(light_device)
         assert device is not None
         assert device.device_type == "video_edge_unknown"
+        assert device.statuses["video_edge_type"] == 999
+        warning = next(
+            (r for r in caplog.records if r.levelno == logging.WARNING and "999" in r.message),
+            None,
+        )
+        assert warning is not None
+        assert "cam-mystery" in warning.message
+
+    def test_parse_video_edge_channel_nvr_types_collapse(self) -> None:
+        # #290: an NVR HAC re-publishes bridged cameras as channels typed
+        # with the NVR's own `About.Type` variant (NVR=1, NVR_H_AC=7,
+        # NVR_H_DC=8, NVR_H_2D_*=9..16). None of those were in
+        # `_VIDEO_EDGE_TYPE_MAP`, so every one fell through to
+        # `video_edge_unknown` — despite the map's comment promising they
+        # collapse to `video_edge_nvr`. Make the comment true.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        for type_value in (1, 7, 8, 9, 11, 12, 13, 15, 16):
+            light_device = light_device_pb2.LightDevice(
+                video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                    profile=light_device_profile_pb2.LightDeviceProfile(
+                        id="nvr-ch", name="NVR Channel"
+                    ),
+                    video_edge_channel_properties=(
+                        light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                            video_edge_type=type_value,
+                        )
+                    ),
+                )
+            )
+
+            device = DevicesApi.parse_device(light_device)
+            assert device is not None
+            assert device.device_type == "video_edge_nvr", f"type {type_value}"
+            assert device.statuses["video_edge_type"] == type_value
+
+    def test_parse_video_edge_channel_records_source_aliases(self) -> None:
+        # #282/#290: `source_aliases` says HOW a channel is reachable —
+        # `primary` (the camera itself), `nvr` (bridged through a
+        # recorder), `cloud_archive`. Recording kind + ids in `statuses`
+        # (dumped via diagnostics) is what lets us link a duplicated
+        # doorbell card to the NVR channel re-publishing it, without a
+        # debug capture.
+        from systems.ajax.api.mobile.v2.common.video.videoedge.channel import (
+            channel_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(
+                    id="cam-front-door", name="Front Door Doorbell"
+                ),
+                video_edge_channel_properties=(
+                    light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                        video_edge_type=5,  # DOORBELL
+                        source_aliases=channel_pb2.SourceAliases(
+                            sources=[
+                                channel_pb2.VideoSource(
+                                    primary_source=channel_pb2.PrimarySource(
+                                        video_edge_id="ve-doorbell",
+                                        channel_id="0",
+                                        type=5,
+                                    )
+                                ),
+                                channel_pb2.VideoSource(
+                                    nvr_source=channel_pb2.NvrSource(
+                                        video_edge_id="ve-nvr",
+                                        channel_id="3",
+                                        type=7,  # NVR_H_AC
+                                    )
+                                ),
+                            ]
+                        ),
+                    )
+                ),
+            )
+        )
+
+        device = DevicesApi.parse_device(light_device)
+        assert device is not None
+        assert device.statuses["video_sources"] == [
+            {"kind": "primary", "video_edge_id": "ve-doorbell", "channel_id": "0", "type": 5},
+            {"kind": "nvr", "video_edge_id": "ve-nvr", "channel_id": "3", "type": 7},
+        ]
+
+    def test_parse_video_edge_channel_no_source_aliases_no_key(self) -> None:
+        # Channels without `source_aliases` (every pre-NVR capture) must
+        # not grow an empty `video_sources` key — absent key means "the
+        # cloud didn't send it", same convention as the rest of statuses.
+        from v3.mobilegwsvc.commonmodels.space.device.light import (
+            light_device_pb2,
+            light_device_profile_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.light import (
+            light_video_edge_pb2,
+        )
+
+        light_device = light_device_pb2.LightDevice(
+            video_edge_channel=light_video_edge_pb2.LightVideoEdgeChannel(
+                profile=light_device_profile_pb2.LightDeviceProfile(id="cam", name="Cam"),
+                video_edge_channel_properties=(
+                    light_video_edge_pb2.LightVideoEdgeChannel.VideoEdgeChannelProperties(
+                        video_edge_type=5,
+                    )
+                ),
+            )
+        )
+
+        device = DevicesApi.parse_device(light_device)
+        assert device is not None
+        assert "video_sources" not in device.statuses
+        assert device.statuses["video_edge_type"] == 5
 
     def test_parse_video_edge_channel_no_properties_returns_none(self) -> None:
         # If the channel comes without `video_edge_channel_properties`,

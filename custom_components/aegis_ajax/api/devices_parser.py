@@ -225,11 +225,20 @@ _STATE_MAP: dict[int, DeviceState] = {
 # so the device still appears as a HA card with the device-agnostic
 # sensors instead of silently disappearing.
 _VIDEO_EDGE_TYPE_MAP: dict[int, str] = {
+    1: "video_edge_nvr",
     2: "video_edge_turret",
     3: "video_edge_bullet",
     4: "video_edge_minidome",
     5: "video_edge_doorbell",  # #119: @Permudious's MotionCam Video Doorbell
     6: "video_edge_indoor",
+    7: "video_edge_nvr",  # NVR_H_AC (#290: brunovdw68's 8-channel recorder)
+    8: "video_edge_nvr",  # NVR_H_DC
+    9: "video_edge_nvr",  # NVR_H_2D_AC
+    11: "video_edge_nvr",  # NVR_H_2D_8P_AC
+    12: "video_edge_nvr",  # NVR_H_2D_16P_AC
+    13: "video_edge_nvr",  # NVR_H_2D_AI_2G_AC
+    15: "video_edge_nvr",  # NVR_H_2D_AI_8P_AC
+    16: "video_edge_nvr",  # NVR_H_2D_AI_16P_AC
     17: "video_edge_turret",  # TURRET_HL
     18: "video_edge_turret",  # TURRET_HL_VF
     19: "video_edge_turret",  # S_TURRET_HL_VF
@@ -660,8 +669,44 @@ def _parse_video_edge_channel(channel: Any) -> Device | None:  # noqa: ANN401
         return None
 
     profile = channel.profile
-    type_value = int(channel.video_edge_channel_properties.video_edge_type)
-    device_type = _VIDEO_EDGE_TYPE_MAP.get(type_value, "video_edge_unknown")
+    properties = channel.video_edge_channel_properties
+    type_value = int(properties.video_edge_type)
+    device_type = _VIDEO_EDGE_TYPE_MAP.get(type_value)
+    if device_type is None:
+        device_type = "video_edge_unknown"
+        _LOGGER.warning(
+            "Unmapped video_edge_type %s on channel %s — surfacing as "
+            "video_edge_unknown; please report the value on "
+            "https://github.com/bvis/aegis-hass/issues/290",
+            type_value,
+            profile.id,
+        )
+
+    statuses = _parse_statuses(profile.statuses)
+    # Raw `About.Type` value + per-channel source list, surfaced through
+    # diagnostics (#282/#290). `source_aliases` says HOW the channel is
+    # reachable — `primary` (the camera itself), `nvr` (bridged through
+    # a recorder), `cloud_archive` — and its ids link a camera channel
+    # to the NVR channel re-publishing it.
+    statuses["video_edge_type"] = type_value
+    if properties.HasField("source_aliases"):
+        sources: list[dict[str, Any]] = []
+        for source in properties.source_aliases.sources:
+            kind = source.WhichOneof("kind")
+            if kind is None:
+                continue
+            sub = getattr(source, kind)
+            sources.append(
+                {
+                    "kind": kind.removesuffix("_source"),
+                    "video_edge_id": sub.video_edge_id,
+                    "channel_id": sub.channel_id,
+                    # CloudArchiveSource carries no `type` field.
+                    "type": int(sub.type) if hasattr(sub, "type") else None,
+                }
+            )
+        if sources:
+            statuses["video_sources"] = sources
 
     # No hub_id on the channel side — Ajax models the video bridge
     # as a sibling of the hub, not a child. Falling back to the
@@ -677,6 +722,6 @@ def _parse_video_edge_channel(channel: Any) -> Device | None:  # noqa: ANN401
         state=_parse_device_state(profile.states),
         malfunctions=profile.malfunctions,
         bypassed=profile.bypassed,
-        statuses=_parse_statuses(profile.statuses),
+        statuses=statuses,
         battery=_parse_battery(profile.statuses),
     )

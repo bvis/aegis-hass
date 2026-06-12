@@ -66,6 +66,21 @@ async def async_get_config_entry_diagnostics(
                     {"level": d.battery.level, "low": d.battery.is_low} if d.battery else None
                 ),
                 "statuses": list(d.statuses.keys()),
+                # Raw video-channel identity (#282/#290): the `About.Type`
+                # value behind a `video_edge_*` device_type and the
+                # source list (primary / nvr / cloud_archive + ids) that
+                # links a camera channel to the NVR re-publishing it.
+                # Keys absent on non-video devices.
+                **(
+                    {"video_edge_type": d.statuses["video_edge_type"]}
+                    if "video_edge_type" in d.statuses
+                    else {}
+                ),
+                **(
+                    {"video_sources": d.statuses["video_sources"]}
+                    if "video_sources" in d.statuses
+                    else {}
+                ),
             }
             for did, d in coordinator.devices.items()
         },
