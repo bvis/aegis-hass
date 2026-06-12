@@ -46,6 +46,9 @@ blueprint:
 triggers:
   - trigger: state
     entity_id: !input door_sensor
+    not_from:
+      - "unavailable"
+      - "unknown"
     to: "on"
 
 conditions:

@@ -27,6 +27,9 @@
   triggers:
     - trigger: state
       entity_id: alarm_control_panel.my_hub
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "triggered"
   actions:
     - action: button.press
@@ -57,6 +60,9 @@
   triggers:
     - trigger: state
       entity_id: alarm_control_panel.my_hub
+      not_from:
+        - "unavailable"
+        - "unknown"
       to:
         - "armed_away"
         - "armed_night"
@@ -87,6 +93,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_connectivity
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "off"
       for:
         minutes: 2
@@ -116,6 +125,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_connectivity
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   conditions:
     - condition: template
@@ -183,6 +195,9 @@
   triggers:
     - trigger: state
       entity_id: "{{ label_entities('aegis_door') | list }}"
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
       for:
         minutes: 10
@@ -204,6 +219,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.main_door_door
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   conditions:
     - condition: state
@@ -240,6 +258,9 @@
   triggers:
     - trigger: state
       entity_id: "{{ label_entities('aegis_tamper') | list }}"
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   actions:
     - action: notify.mobile_app_user
@@ -266,6 +287,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_lid_opened
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   actions:
     - action: notify.mobile_app_user
@@ -292,6 +316,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_cra_connection
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "off"
       for:
         minutes: 1
@@ -321,6 +348,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_cra_connection
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   conditions:
     - condition: template
@@ -342,6 +372,9 @@
   triggers:
     - trigger: state
       entity_id: binary_sensor.my_hub_cellular_connected
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "off"
       for:
         minutes: 5
@@ -434,6 +467,9 @@
   triggers:
     - trigger: state
       entity_id: zone.home
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "0"
       for:
         minutes: 5
@@ -485,6 +521,9 @@
   triggers:
     - trigger: state
       entity_id: "{{ label_entities('aegis_connectivity') | list }}"
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "off"
       for:
         minutes: 10
@@ -516,6 +555,9 @@
         - binary_sensor.dining_problem
         - binary_sensor.keypad_problem
         - binary_sensor.my_hub_problem
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "on"
   actions:
     - action: notify.mobile_app_user
@@ -598,6 +640,9 @@
     - trigger: state
       entity_id: event.my_hub_security_event
       attribute: event_type
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "alarm"
   action:
     - parallel:
@@ -631,6 +676,9 @@
     - trigger: state
       entity_id: event.my_hub_security_event
       attribute: event_type
+      not_from:
+        - "unavailable"
+        - "unknown"
       to: "tamper"
   action:
     - action: notify.mobile_app_user

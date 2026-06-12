@@ -63,6 +63,9 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input person_entities
+    not_from:
+      - "unavailable"
+      - "unknown"
     to: "not_home"
     for:
       minutes: !input delay_minutes

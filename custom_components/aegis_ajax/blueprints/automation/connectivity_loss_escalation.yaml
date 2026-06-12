@@ -49,12 +49,18 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input connectivity_entity
+    not_from:
+      - "unavailable"
+      - "unknown"
     to: "off"
     for:
       minutes: !input warning_delay
     id: warning
   - trigger: state
     entity_id: !input connectivity_entity
+    not_from:
+      - "unavailable"
+      - "unknown"
     to: "off"
     for:
       minutes: !input critical_delay

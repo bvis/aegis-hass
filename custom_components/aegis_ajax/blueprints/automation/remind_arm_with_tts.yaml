@@ -75,6 +75,9 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input alarm_entity
+    not_from:
+      - "unavailable"
+      - "unknown"
     to: "disarmed"
     for:
       minutes: !input delay_minutes
