@@ -952,6 +952,29 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             async_dispatcher_send(self.hass, SIGNAL_NEW_DEVICE, device_id_hex)
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
+    def request_security_snapshot_refresh(self) -> None:
+        """Nudge the authoritative security re-read, group states included.
+
+        Forces the next refresh to re-read group security states and
+        `night_mode_enabled` via `get_space_snapshot` (#266) — arming or
+        disarming can flip several groups at once plus the night flag, none
+        of which the lighter `list_spaces` poll carries — and routes the
+        re-read through the dedicated short-cooldown debouncer (#270), NOT
+        the shared 10 s request-refresh debouncer (whose cooldown coalesced a
+        rapid arm→disarm→arm burst into one trailing re-read that lagged the
+        panel ~10 s).
+
+        Called from the HTS 0x08 space-event path and, since #284/#287, from
+        FCM security events: a push tells (at most) one group's new state, so
+        a scenario / keypad / fob action that changes other groups or night
+        mode would otherwise wait for the hourly snapshot (~9 min lag
+        observed live on a scenario-driven group arm).
+
+        Runs on the event loop.
+        """
+        self._force_snapshot_refresh = True
+        self.hass.async_create_task(self._security_refresh_debouncer.async_call())
+
     def _on_hts_space_event(self, hub_id: str, payload_hex: str, candidate: int | None) -> None:
         """React to a hub `type=0x08` space event pushed over HTS in real time.
 
@@ -995,16 +1018,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "none" if candidate is None else f"0x{candidate:02X}",
                 payload_hex,
             )
-            # Force the next refresh to re-read group security states too (#266):
-            # arming/disarming a single group changes only per-group state, which
-            # the lighter `list_spaces` poll doesn't carry. Without this the group
-            # panel would lag until the hourly snapshot when push is off.
-            self._force_snapshot_refresh = True
-            # Route through the dedicated short-cooldown debouncer (#270), NOT the
-            # shared 10 s request-refresh debouncer — the latter coalesced a rapid
-            # arm→disarm→arm burst into one trailing re-read that left the panel on
-            # the stale state for up to ~10 s when FCM push didn't arrive first.
-            self.hass.async_create_task(self._security_refresh_debouncer.async_call())
+            self.request_security_snapshot_refresh()
             return
 
         _LOGGER.debug(

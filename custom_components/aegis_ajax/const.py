@@ -351,6 +351,15 @@ RAW_TAG_TO_GROUP_SECURITY_STATE: dict[str, SecurityState] = {
     "space_group_duress_disarmed": SecurityState.DISARMED,
 }
 
+# HA event types that signal a security-state change. Used by the FCM event
+# path to nudge the snapshot-backed re-read (#284/#287): a push tells (at
+# most) one group's new state, while a scenario / keypad / fob action can
+# flip several groups at once plus `night_mode_enabled` — both only carried
+# by the heavier `get_space_snapshot`.
+SECURITY_STATE_EVENT_TYPES: frozenset[str] = frozenset(
+    {"arm", "disarm", "arm_night", "disarm_night"}
+)
+
 
 # Map HubEventTag oneof field names to simplified HA event types
 HUB_EVENT_TAG_MAP: dict[str, str] = {

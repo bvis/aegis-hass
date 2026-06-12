@@ -2013,6 +2013,59 @@ class TestParseAndFireEventLogging:
             for r in caplog.records
         )
 
+
+class TestSecurityEventSnapshotNudge:
+    """FCM security events must nudge the snapshot-backed re-read (#284/#287).
+
+    `apply_push_security_state` keeps the space panel instant, but a scenario /
+    keypad / fob action can flip several groups at once plus
+    `night_mode_enabled` — state only `get_space_snapshot` carries. Before this
+    nudge, only the HTS 0x08 path forced the snapshot, so on push-only signals
+    the group panels lagged until the hourly snapshot (~9 min observed on a
+    scenario-driven arm, wip3out3r in #287).
+    """
+
+    def _make_listener(self) -> AjaxNotificationListener:
+        hass = MagicMock()
+        hass.loop = MagicMock()
+        hass.loop.is_running.return_value = True
+        hass.loop.call_soon_threadsafe.side_effect = lambda cb, *a: cb(*a)
+        coordinator = MagicMock()
+        coordinator._space_ids = []
+        return AjaxNotificationListener(hass=hass, coordinator=coordinator, **_FCM_KWARGS)
+
+    def _fire(self, listener: AjaxNotificationListener, event_type: str, raw_tag: str) -> None:
+        encoded = base64.b64encode(b"any-payload").decode()
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=(event_type, {"raw_tag": raw_tag}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded)
+
+    def test_arm_event_nudges_snapshot_refresh(self) -> None:
+        listener = self._make_listener()
+        self._fire(listener, "arm", "arm")
+        listener._coordinator.request_security_snapshot_refresh.assert_called_once()
+
+    def test_all_security_event_types_nudge(self) -> None:
+        from custom_components.aegis_ajax.const import SECURITY_STATE_EVENT_TYPES
+
+        assert {"arm", "disarm", "arm_night", "disarm_night"} == SECURITY_STATE_EVENT_TYPES
+        for event_type in sorted(SECURITY_STATE_EVENT_TYPES):
+            listener = self._make_listener()
+            self._fire(listener, event_type, "whatever_tag")
+            listener._coordinator.request_security_snapshot_refresh.assert_called_once()
+
+    def test_non_security_event_does_not_nudge(self) -> None:
+        listener = self._make_listener()
+        self._fire(listener, "doorbell_pressed", "doorbell_press")
+        listener._coordinator.request_security_snapshot_refresh.assert_not_called()
+
     def test_group_event_without_group_id_logs_warning_with_hex(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

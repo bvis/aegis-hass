@@ -560,6 +560,25 @@ class TestAsyncUpdateData:
         # `async_request_refresh` whose 10 s cooldown caused the lag.
         coordinator.hass.async_create_task.assert_called_once()
 
+    def test_request_security_snapshot_refresh_public_nudge(self) -> None:
+        """The snapshot nudge must be callable on its own (#284/#287): the FCM
+        event path needs the same forced-snapshot + dedicated-debouncer combo
+        the HTS 0x08 handler uses, without faking an HTS event. A scenario /
+        keypad / fob action can flip several groups at once plus
+        `night_mode_enabled` — state only `get_space_snapshot` carries, which
+        a push event alone never refreshes (wip3out3r's group panel lagged
+        ~9 minutes on a scenario-driven arm).
+        """
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator.hass = MagicMock()
+
+        coordinator.request_security_snapshot_refresh()
+
+        coordinator._security_refresh_debouncer.async_call.assert_called_once()
+        assert coordinator._force_snapshot_refresh is True
+        coordinator.hass.async_create_task.assert_called_once()
+
     @pytest.mark.asyncio
     async def test_update_data_raises_update_failed_on_error(self) -> None:
         from homeassistant.helpers.update_coordinator import UpdateFailed

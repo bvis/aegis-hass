@@ -20,6 +20,7 @@ from custom_components.aegis_ajax.const import (
     MOTION_EVENT_TYPE,
     RAW_TAG_TO_GROUP_SECURITY_STATE,
     RAW_TAG_TO_SECURITY_STATE,
+    SECURITY_STATE_EVENT_TYPES,
 )
 from custom_components.aegis_ajax.notification_fcm_guard import attach_fcm_log_guard
 from custom_components.aegis_ajax.repairs import (
@@ -820,6 +821,15 @@ class AjaxNotificationListener:
                             self._coordinator.fire_push_event, space_id, event_type, event_data
                         )
                         self._apply_security_state_from_event(space_id, event_data)
+                # A security-state event can change several groups at once
+                # (scenario / keypad / fob) plus `night_mode_enabled` — state
+                # only the heavier snapshot carries. Nudge the same
+                # authoritative re-read the HTS 0x08 path uses (#284/#287):
+                # the push state applied above keeps the space panel instant;
+                # the nudge settles group panels + armed_night ~1 s later
+                # instead of waiting for the hourly snapshot.
+                if event_type in SECURITY_STATE_EVENT_TYPES:
+                    self._dispatch_to_loop(self._coordinator.request_security_snapshot_refresh)
                 # Surface doorbell ring / motion on the source device's own
                 # card, in addition to the hub-level event entity (#173).
                 self._dispatch_event_to_device(event_type, event_data, raw)
