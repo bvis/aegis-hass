@@ -81,19 +81,31 @@ MAX_FRAME_BUFFER_BYTES = 256 * 1024
 # Chime frame by signature and use it only as a trigger to re-read the
 # authoritative gRPC chime_status.
 _MSG_TYPE_EVENT = 0x08
-# A `type=0x08` space event (chime toggle #239, arm/disarm #258) starts with
-# params[0]=0x02, params[1]=0x22, then params[2]=the 4-byte SOURCE id that
-# triggered it (the keypad/keyfob/app device — VARIES per hub and per trigger,
-# NOT a fixed signature). params[3] is the 1-byte state discriminator (chime
-# 0x38/0x39; security 0x00 disarm / 0x01 arm / 0x02 night). The coordinator
-# decodes params[3]; here we only gate the forward.
+# A `type=0x08` space event (chime toggle #239, arm/disarm #258/#284) starts
+# with params[0]=0x02, params[1]=<event family>, then params[2]=the 4-byte
+# SOURCE id that triggered it (the keypad/keyfob/app device — VARIES per hub
+# and per trigger, NOT a fixed signature). params[3] is the 1-byte state
+# discriminator (family 0x22: chime 0x38/0x39, security 0x00 disarm / 0x01
+# arm / 0x02 night; family 0x30: 0x22 arm / 0x28 disarm observed). The
+# coordinator decodes params[3]; here we only gate the forward.
 #
-# NOTE: an earlier version hardcoded params[2]==0x33 80 41 a4 (BadFlo's source
-# id from the #239 capture), so the matcher only fired on his hub — chime AND
-# the #258 arm/disarm decode silently no-op'd everywhere else. Match the
-# constant 2-byte prefix + a 4-byte source id instead (#258, bvis-home capture
-# showed source id 0x77 dd 6a 14).
-_SPACE_EVENT_PREFIX: tuple[bytes, bytes] = (b"\x02", b"\x22")
+# NOTE: this matcher has been too narrow TWICE. First it hardcoded
+# params[2]==0x33 80 41 a4 (BadFlo's source id from the #239 capture), so it
+# only fired on his hub (#258 fixed that: any 4-byte source id). Then it
+# required params[1]==0x22, which silently dropped the whole
+# peripheral-originated family (#284 keypad capture). Prefer matching on
+# structure (params[0] + known family + 4-byte id + state byte) over exact
+# values from a single capture.
+_SPACE_EVENT_PREFIX: bytes = b"\x02"
+# params[1] is the event FAMILY. 0x22 = hub/app-originated (chime #239,
+# arm/disarm #258). 0x30 = peripheral-originated: dheuts90's #284 capture
+# showed [0x02, 0x30, <keypad id>, 0x22/0x28] for a Keypad Plus night
+# arm/disarm that produced NO FCM push at all — gating on 0x22 alone dropped
+# the family and the authoritative re-read never fired, so the panel lagged
+# until the next poll. SpaceControl fobs (#287) most likely use it too.
+# The same capture also held an [0x0b, 0x21, …] frame (≈30 s after the arm,
+# plausibly exit-delay completion) — left unmapped until more samples.
+_SPACE_EVENT_FAMILIES: frozenset[int] = frozenset({0x22, 0x30})
 
 
 def _redact_payload_hex(data: bytes) -> str:
@@ -890,7 +902,14 @@ class HtsClient:
         hub_id = self._hub_id_from_message(msg)
         if not hub_id:
             return
-        candidate = params[3][0] if len(params) >= 4 and params[3] else None
+        # The state-byte vocabulary is per-family: chime 0x38/0x39 only exists
+        # in the 0x22 family. Forward the byte only there, so a peripheral
+        # (0x30) event whose byte happens to collide can never be mis-decoded
+        # as a chime toggle — it falls through to the authoritative-refresh
+        # nudge instead (the full payload is already DEBUG-logged above).
+        candidate = (
+            params[3][0] if len(params) >= 4 and params[3] and params[1] == b"\x22" else None
+        )
         try:
             self._on_chime_event(hub_id, redacted, candidate)
         except Exception:  # noqa: BLE001
@@ -900,13 +919,17 @@ class HtsClient:
     def _is_space_event(params: list[bytes]) -> bool:
         """Recognise a `type=0x08` space event (chime #239 / arm-disarm #258).
 
-        Matches the constant 2-byte prefix (0x02, 0x22) plus a 4-byte source id
-        at params[2] — deliberately NOT a fixed params[2] value, which varies by
-        hub/trigger (#258). params[3] (the state byte) is left for the coordinator.
+        Matches params[0]=0x02 + a known event family at params[1] (0x22
+        hub/app-originated, 0x30 peripheral-originated — keypads #284, likely
+        fobs #287) plus a 4-byte source id at params[2] — deliberately NOT a
+        fixed params[2] value, which varies by hub/trigger (#258). params[3]
+        (the state byte) is left for the coordinator.
         """
         return (
             len(params) >= 4
-            and tuple(params[:2]) == _SPACE_EVENT_PREFIX
+            and params[0] == _SPACE_EVENT_PREFIX
+            and len(params[1]) == 1
+            and params[1][0] in _SPACE_EVENT_FAMILIES
             and len(params[2]) == 4
             and len(params[3]) >= 1
         )

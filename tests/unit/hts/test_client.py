@@ -1438,10 +1438,66 @@ class TestChimeEvent:
         )
         assert HtsClient._is_space_event(params) is True
 
+    def test_is_space_event_true_for_peripheral_family(self) -> None:
+        # #284 follow-up: arm/disarm performed ON a peripheral (Keypad Plus
+        # user code; likely SpaceControl fobs too, #287) emits params[1]=0x30
+        # with the PERIPHERAL's id as source — dheuts90's capture showed
+        # [0x02, 0x30, <keypad id>, 0x22] on night arm and [..., 0x28] on
+        # disarm. The old 0x22-only gate dropped the whole family, so the
+        # authoritative re-read never fired and the panel lagged until the
+        # next poll/snapshot. Both observed state bytes must pass the gate
+        # (the coordinator treats any non-chime byte as a nudge, never as a
+        # decoded state).
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        for state_byte in (b"\x22", b"\x28"):
+            params = tlv_decode(
+                tlv_encode(
+                    [b"\x02", b"\x30", b"\x30\x9f\x84\xe5", state_byte, b"\xfd\xfd\x1a", b"\x00"]
+                )
+            )
+            assert HtsClient._is_space_event(params) is True, state_byte.hex()
+
     def test_is_space_event_false_for_other_event(self) -> None:
         from custom_components.aegis_ajax.api.hts.messages import tlv_decode
 
         params = tlv_decode(tlv_encode([b"\x02", b"\x99", b"\x00"]))
+        assert HtsClient._is_space_event(params) is False
+
+    def test_peripheral_family_forwards_none_candidate(self) -> None:
+        # The state-byte vocabulary is per-family (chime 0x38/0x39 lives in
+        # 0x22 only). A 0x30-family event must reach the callback as a
+        # candidate-less nudge, so a colliding byte can never flip
+        # chime_status — route by shape before content.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        cb = MagicMock()
+        client._on_chime_event = cb
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=0x08,
+            payload=tlv_encode(
+                [b"\x02", b"\x30", b"\x30\x9f\x84\xe5", b"\x38", b"\xfd\xfd\x1a", b"\x00"]
+            ),
+        )
+
+        client._handle_event_message(msg)
+
+        cb.assert_called_once()
+        hub_id, _payload_hex, candidate = cb.call_args[0]
+        assert hub_id == "12345678"
+        assert candidate is None
+
+    def test_is_space_event_false_for_unknown_first_param(self) -> None:
+        # The 17:21:55 frame in the same capture opened with params[0]=0x0b —
+        # a different (still unmapped) family. Stay out until more samples.
+        from custom_components.aegis_ajax.api.hts.messages import tlv_decode
+
+        params = tlv_decode(tlv_encode([b"\x0b", b"\x21", b"\x00\x2c\xa0\x06", b"\x68"]))
         assert HtsClient._is_space_event(params) is False
 
     def test_is_space_event_false_for_non_4byte_source(self) -> None:
