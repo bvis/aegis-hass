@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -423,11 +424,20 @@ async def async_setup_entry(
             seen_keyfobs.update(e._keyfob_id for e in new)
             async_add_entities(new)
 
+    # MUST be a @callback: the dispatcher classifies a plain function as
+    # HassJobType.Executor and runs it on a SyncWorker thread, where
+    # async_add_entities' eager task creation raises "loop is not the
+    # running loop" and the entity is silently lost. Boot usually escapes
+    # (platform setup finishes after HTS discovery, so keyfobs go through
+    # the direct call above), but every config-entry RELOAD hit it: keyfob
+    # entities vanished until the next restart. Found via #284's report.
+    @callback
+    def _async_add_discovered_keyfob(device_id: str) -> None:
+        _add_keyfobs([device_id])
+
     _add_keyfobs(list(coordinator.keyfobs))
     entry.async_on_unload(
-        async_dispatcher_connect(
-            hass, SIGNAL_NEW_DEVICE, lambda device_id: _add_keyfobs([device_id])
-        )
+        async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_discovered_keyfob)
     )
 
 

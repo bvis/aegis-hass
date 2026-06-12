@@ -1303,6 +1303,16 @@ class TestKeyfobActiveSensor:
         assert not [e for e in added if isinstance(e, AjaxKeyfobActiveSensor)]
         assert captured["signal"].endswith("_new_device")
 
+        # The dispatcher target MUST be a HA @callback: a plain function is
+        # classified as HassJobType.Executor and runs on a SyncWorker thread,
+        # where async_add_entities' eager task creation raises "RuntimeError:
+        # loop is not the running loop" and the entity is silently lost.
+        # Bites on every config-entry reload (boot escapes it only because
+        # platform setup usually finishes after HTS discovery). #284 report.
+        from homeassistant.core import is_callback
+
+        assert is_callback(captured["cb"])
+
         # Keyfob discovered at runtime → dispatcher callback adds exactly one.
         coordinator.keyfobs = {"2ACCB91C": self._keyfob()}
         captured["cb"]("2ACCB91C")
