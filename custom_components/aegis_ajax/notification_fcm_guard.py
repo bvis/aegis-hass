@@ -11,6 +11,11 @@ HA event loop. Result: event loop pegged at 100%, watchdog kill, crash loop.
 Logging filters run before handlers format the record, so stripping
 `exc_info` here defuses the CPU bomb regardless of what the library does.
 The one-line message still gets through, keeping a trace for operators.
+
+Revisit when the upstream fix ships (sdb9696/firebase-messaging#39 logs the
+first occurrence only and yields per iteration): once the requirement is
+bumped past a release carrying it, this throttle may be slimmable — tracked
+in #297.
 """
 
 from __future__ import annotations

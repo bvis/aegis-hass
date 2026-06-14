@@ -9,6 +9,10 @@ license = "MIT"
 dependencies = [
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
+    # When bumping past a release carrying sdb9696/firebase-messaging#39 (the
+    # upstream reconnect-storm fix), revisit the local hardening — see #297.
+    # Mirror any change in custom_components/aegis_ajax/manifest.json (JSON, no
+    # comments — the source of truth HA reads).
     "firebase-messaging>=0.4.5",
     "pycryptodome>=3.20",
 ]
