@@ -2788,6 +2788,74 @@ class TestOnHtsDeviceKvKeyfob:
         mock_send.assert_not_called()
 
 
+class TestOnHtsDeviceKvSpaceSecurity:
+    """#284: keypad full-arm of a group reaches us only as a STATUS_UPDATE arm-flag
+    flip on a hub-internal space-security object (00000001/00000002) — no type=0x08
+    space event, and no FCM push on no-FCM installs. A *change* in the 0x06 arm flag
+    must nudge the authoritative re-read so the central panel follows; an unchanged
+    flag (re-reported on every 60s STATUS_BODY probe) must NOT, or it would force a
+    snapshot every cycle and defeat the hourly cadence.
+    """
+
+    def test_arm_flag_change_nudges_authoritative_refresh(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        # Boot/poll already saw the disarmed flag; seed it so the next is a change.
+        coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x00"})
+        coordinator._force_snapshot_refresh = False
+        # Keypad full-arm: 0x06 flips 0 -> 1 in a lone STATUS_UPDATE delta.
+        coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x01"})
+        assert coordinator._force_snapshot_refresh is True
+        coordinator._security_refresh_debouncer.async_call.assert_called_once()
+
+    def test_disarm_flag_change_nudges_authoritative_refresh(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator._on_hts_device_kv("002CA005", "00000002", {0x06: b"\x01"})
+        coordinator._force_snapshot_refresh = False
+        coordinator._on_hts_device_kv("002CA005", "00000002", {0x06: b"\x00"})
+        assert coordinator._force_snapshot_refresh is True
+
+    def test_first_sighting_does_not_nudge(self) -> None:
+        # The initial snapshot is already authoritative — the first time we see the
+        # flag (boot STATUS_BODY) must not force a redundant refresh.
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x01"})
+        assert coordinator._force_snapshot_refresh is False
+        coordinator._security_refresh_debouncer.async_call.assert_not_called()
+
+    def test_unchanged_arm_flag_does_not_nudge(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x01"})
+        coordinator._force_snapshot_refresh = False
+        # 60s STATUS_BODY probe re-reports the same flag.
+        coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x01"})
+        assert coordinator._force_snapshot_refresh is False
+        coordinator._security_refresh_debouncer.async_call.assert_not_called()
+
+    def test_space_security_object_not_treated_as_keyfob(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator.async_set_updated_data = MagicMock()
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send") as mock_send:
+            coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x00"})
+            coordinator._on_hts_device_kv("002CA005", "00000001", {0x06: b"\x01"})
+        assert coordinator.keyfobs == {}
+        mock_send.assert_not_called()
+
+    def test_real_device_arm_like_byte_does_not_nudge(self) -> None:
+        # A real Jeweller device (random 8-hex id, not 6 leading zeros) reporting a
+        # 0x06 value must never be mistaken for a space-security object.
+        coordinator = _make_coordinator()
+        coordinator._security_refresh_debouncer = MagicMock()
+        coordinator._on_hts_device_kv("002CA005", "30E3131A", {0x06: b"\x00"})
+        coordinator._on_hts_device_kv("002CA005", "30E3131A", {0x06: b"\x01"})
+        assert coordinator._force_snapshot_refresh is False
+        coordinator._security_refresh_debouncer.async_call.assert_not_called()
+
+
 class TestHtsDeviceTemperature:
     """HTS 0x02 → temperature for gRPC-temp-less device families (#229)."""
 
