@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.4] - 2026-06-15
+
+Group/zone night-mode arming correctness and FCM connection resilience. Consolidates the 1.11.4-beta series.
+
+### Fixed
+- **Partial (Night) arming from the Ajax app or a keypad now reports `armed_night`, not `armed_custom_bypass` (#284).** On a space in group / zone mode, the panel derived its state from the per-group arm flags and treated a partial arm as a custom-bypass arm, so an app-side or keypad Night arm left the Home Assistant panel showing `armed_custom_bypass`. The panel now recognises the night-mode flag and settles to `armed_night`, matching whole-space behaviour and the Ajax app.
+- **Group panels now follow an arm/disarm driven from a keyfob, keypad or scenario, without push (#287, #284).** Group-level arm/disarm initiated from a peripheral (rather than the app) arrived only as a hub status update with no `type=0x08` space event, so per-group panels didn't re-read and could stay on the previous state until the next snapshot. The integration now recognises these peripheral-originated space events and nudges an immediate group/night snapshot re-read on the matching FCM security event, so group panels update within about a second on installs without push (and stay instant with push).
+- **A keypad *Full Arm* of a single group is now picked up (#284).** Arm Away / Full Arm of a group via the Keypad Plus reaches the integration purely as a local hub status update (the internal arm flag flipping), with no space event and no clear trigger to re-read — so the group panel didn't follow. That arm flag in the STATUS_UPDATE stream now drives the re-read.
+- **Keyfobs no longer disappear from Home Assistant after an integration reload (#284).** The keyfob discovery dispatch ran off the event loop, which dropped the entities on reload; it now runs on the loop so keyfob entities survive a reload.
+- **The FCM push client no longer pegs the Home Assistant event loop during a reconnect storm (#285).** A burst of firebase-messaging reconnects could saturate the loop; the client is now throttled, restarts under supervision, and detects a zombie client and retries a failed initial start instead of silently giving up.
+- **Example/blueprint state triggers no longer false-fire on reload (#293).** Bare `to:` state triggers in the shipped automation blueprints fired on the `unavailable → state` transition that happens on every integration reload; they now guard against `unavailable`/`unknown` transitions.
+
+### Changed
+- **Video channels republished by an Ajax NVR are now identified for diagnostics (#290, #282).** When an NVR (e.g. the NVR HAC) republishes a doorbell or camera, the channel arrives as a video type the integration didn't recognise, producing a second generic card that the device's activity followed. The NVR `About.Type` variants are now mapped and the raw video-channel identity is exposed, as the groundwork for de-duplicating the republished device (full dedup pending a diagnostics dump).
+
+### Documentation
+- **Clarified that the MotionCam Video Doorbell has no photo capture or live view in Home Assistant yet (#283).** The Supported Devices doorbell row and trade-offs note now state this explicitly and point to the video-support exploration (#282).
+
 ## [1.11.3] - 2026-06-10
 
 ### Fixed
