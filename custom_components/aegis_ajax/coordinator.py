@@ -240,6 +240,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # device + experimental "Active" sensor per entry, added at runtime via
         # the `SIGNAL_NEW_DEVICE` dispatcher as keyfobs are discovered.
         self.keyfobs: dict[str, Keyfob] = {}
+        # Last-seen arm flag (HTS sub-key 0x06) per hub-internal space-security
+        # object (00000001/00000002…). A keypad full-arm of a group reaches us
+        # only as a STATUS_UPDATE flip of this flag — no type=0x08 space event
+        # and no FCM push on no-FCM installs (#284) — so a *change* nudges the
+        # authoritative re-read. Tracking the last value avoids re-nudging on
+        # every 60s STATUS_BODY probe (which re-reports the same flag).
+        self._space_security_arm_flags: dict[str, int] = {}
         # One-shot guard for the #206 Bug-B SmartLock id probe (DEBUG-only).
         self._smart_lock_probe_done = False
         # Per-space monotonic timestamp of when the hub first reported
@@ -845,6 +852,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         device = self.devices.get(device_id_hex)
         if device is None:
+            # A hub-internal space/group security object reporting an arm-flag
+            # transition (#284) — nudge the authoritative re-read. Checked before
+            # the keyfob path because these objects are never keyfobs.
+            if self._maybe_nudge_space_security(hub_id, device_id_hex, kv):
+                return
             # Not a gRPC-modeled device — it may be a SpaceControl keyfob, which
             # only ever appears in the HTS SETTINGS_BODY (never in the gRPC
             # snapshot). Classify and surface it; everything else (users,
@@ -870,6 +882,53 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_readings[device_id_hex] = readings
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
         _ = hub_id  # currently unused; kept in the signature for symmetry with on_state_update
+
+    def _maybe_nudge_space_security(
+        self, hub_id: str, device_id_hex: str, kv: dict[int, bytes]
+    ) -> bool:
+        """Nudge the authoritative re-read on a space-security arm-flag flip (#284).
+
+        Hub-internal space/group security objects use low reserved ids
+        (00000001..0000000F — six leading zero nibbles, unlike a real Jeweller
+        device's random id or a keyfob's 2A.. id) and report the space/group arm
+        state on HTS sub-key 0x06 (01 armed / 00 disarmed). A keypad full-arm of a
+        group is delivered ONLY as a STATUS_UPDATE flip of this flag: it emits no
+        type=0x08 space event (which app arm and keypad night/disarm do) and no FCM
+        push on no-FCM installs, so without this the central panel sat on its stale
+        state until the 300s poll.
+
+        Returns True when the row is a space-security object — handled here, so the
+        caller skips the keyfob path (these objects are never keyfobs). Only a
+        *change* of the flag nudges; the first sighting (the boot snapshot is
+        already authoritative) and an unchanged flag (re-reported on every 60s
+        STATUS_BODY probe) do not, so the snapshot keeps its hourly cadence. The
+        flag is never decoded into the panel — same rationale as
+        `_on_hts_space_event`: it's a nudge to re-read ground truth, not a state.
+
+        Runs on the event loop (HTS listen task).
+        """
+        if (
+            len(device_id_hex) != 8
+            or not device_id_hex.startswith("000000")
+            or device_id_hex == "00000000"
+            or 0x06 not in kv
+            or not kv[0x06]
+        ):
+            return False
+        arm = kv[0x06][0]
+        previous = self._space_security_arm_flags.get(device_id_hex)
+        self._space_security_arm_flags[device_id_hex] = arm
+        if previous is not None and previous != arm:
+            _LOGGER.debug(
+                "Space security object %s arm flag 0x06 %02X->%02X on hub %s: "
+                "requesting authoritative refresh",
+                device_id_hex,
+                previous,
+                arm,
+                hub_id,
+            )
+            self.request_security_snapshot_refresh()
+        return True
 
     def _maybe_apply_hts_device_temperature(
         self, device_id_hex: str, device: Device, kv: dict[int, bytes]
