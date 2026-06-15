@@ -1429,6 +1429,118 @@ class TestDeduplicateNvrRepublishedChannels:
         assert {d.id for d in deduped} == {"9c756e2bca39-0", "bullet-0"}
 
 
+class TestVideoEdgeOnvifRtspProbe:
+    """Issue #282: a diagnostic read of the VideoEdge ONVIF/RTSP settings, so
+    we can map what's available towards a real camera entity. Returns a flat,
+    PII-free dict (ports, auth flag, user *count*) for the diagnostics dump —
+    never raises, so a probe failure can't break diagnostics generation."""
+
+    @staticmethod
+    def _make_api() -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_success_returns_flat_settings(self) -> None:
+        from v3.mobilegwsvc.commonmodels.video.videoedge.onvif import (
+            onvif_settings_pb2,
+            onvif_user_pb2,
+        )
+        from v3.mobilegwsvc.commonmodels.video.videoedge.rtsp import rtsp_settings_pb2
+        from v3.mobilegwsvc.service.get_video_edge_onvif_and_rtsp_settings import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ok = response_pb2.GetVideoEdgeOnvifAndRtspSettingsResponse(
+            success=response_pb2.GetVideoEdgeOnvifAndRtspSettingsResponse.Success(
+                onvif_settings=onvif_settings_pb2.OnvifSettings(
+                    user_auth_enabled=True,
+                    http_port=8000,
+                    max_users_number=8,
+                    users=[onvif_user_pb2.OnvifUser(), onvif_user_pb2.OnvifUser()],
+                ),
+                rtsp_settings=rtsp_settings_pb2.RtspSettings(http_port=554),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return ok
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(
+            endpoint_pb2_grpc, "GetVideoEdgeOnvifAndRtspSettingsServiceStub", _StubFactory
+        ):
+            result = await api.get_video_edge_onvif_rtsp_settings("space-1", "310A8DF4")
+
+        assert isinstance(captured[0], request_pb2.GetVideoEdgeOnvifAndRtspSettingsRequest)
+        assert captured[0].space_id == "space-1"
+        assert captured[0].video_edge_id == "310A8DF4"
+        assert result == {
+            "onvif": {
+                "user_auth_enabled": True,
+                "http_port": 8000,
+                "max_users_number": 8,
+                "users_count": 2,
+            },
+            "rtsp": {"http_port": 554},
+        }
+
+    @pytest.mark.asyncio
+    async def test_failure_response_reports_error_reason(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.get_video_edge_onvif_and_rtsp_settings import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        failure = response_pb2.GetVideoEdgeOnvifAndRtspSettingsResponse(
+            failure=response_pb2.GetVideoEdgeOnvifAndRtspSettingsResponse.Failure(
+                video_edge_is_offline=common_response_pb2.Error(),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(return_value=failure)
+
+        with patch.object(
+            endpoint_pb2_grpc, "GetVideoEdgeOnvifAndRtspSettingsServiceStub", _StubFactory
+        ):
+            result = await api.get_video_edge_onvif_rtsp_settings("space-1", "310B121D")
+
+        assert result == {"error": "video_edge_is_offline"}
+
+    @pytest.mark.asyncio
+    async def test_rpc_exception_reports_error_not_raises(self) -> None:
+        from v3.mobilegwsvc.service.get_video_edge_onvif_and_rtsp_settings import (
+            endpoint_pb2_grpc,
+        )
+
+        api = self._make_api()
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(side_effect=RuntimeError("boom"))
+
+        with patch.object(
+            endpoint_pb2_grpc, "GetVideoEdgeOnvifAndRtspSettingsServiceStub", _StubFactory
+        ):
+            result = await api.get_video_edge_onvif_rtsp_settings("space-1", "310A8DF4")
+
+        assert result == {"error": "rpc_error"}
+
+
 class TestDevicesApiInit:
     def test_init(self) -> None:
         client = MagicMock()
