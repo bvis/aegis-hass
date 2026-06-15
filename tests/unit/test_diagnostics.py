@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -68,6 +68,9 @@ class TestAsyncGetConfigEntryDiagnostics:
         coord.devices = {"dev-1": _make_device()}
         coord._stream_tasks = [MagicMock(), MagicMock()]
         coord.notification_listener = MagicMock()
+        # The ONVIF/RTSP probe (#282) is only called for video_edge devices;
+        # default it to a no-op so non-video fixtures don't await a MagicMock.
+        coord.devices_api.get_video_edge_onvif_rtsp_settings = AsyncMock(return_value=None)
         return coord
 
     @pytest.fixture
@@ -154,6 +157,37 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert dev_info["video_sources"] == [
             {"kind": "nvr", "video_edge_id": "ve-nvr", "channel_id": "3", "type": 7}
         ]
+
+    @pytest.mark.asyncio
+    async def test_video_edge_onvif_rtsp_probe_included(self, entry: MagicMock) -> None:
+        # #282: diagnostics probes the VideoEdge ONVIF/RTSP settings for each
+        # distinct video_edge_id seen across the devices' source lists, so a
+        # dump shows what's available towards a camera entity. Keyed by
+        # video_edge_id, with the probe result (and the kinds it appears as).
+        from dataclasses import replace
+
+        device = replace(
+            _make_device(did="cam-1"),
+            statuses={
+                "video_sources": [
+                    {"kind": "primary", "video_edge_id": "310A8DF4", "channel_id": "0", "type": 5},
+                    {"kind": "nvr", "video_edge_id": "310B121D", "channel_id": "x-0", "type": 7},
+                ],
+            },
+        )
+        entry.runtime_data.devices = {"cam-1": device}
+        entry.runtime_data.devices_api.get_video_edge_onvif_rtsp_settings = AsyncMock(
+            return_value={"onvif": {"http_port": 8000}, "rtsp": {"http_port": 554}}
+        )
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        probe = result["video_edge_onvif_rtsp"]
+        assert set(probe) == {"310A8DF4", "310B121D"}
+        assert probe["310A8DF4"]["onvif"] == {"http_port": 8000}
+        assert probe["310A8DF4"]["rtsp"] == {"http_port": 554}
+        assert sorted(probe["310A8DF4"]["kinds"]) == ["primary"]
+        assert sorted(probe["310B121D"]["kinds"]) == ["nvr"]
 
     @pytest.mark.asyncio
     async def test_non_video_device_omits_video_keys(self, entry: MagicMock) -> None:

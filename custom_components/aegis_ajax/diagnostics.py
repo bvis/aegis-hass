@@ -32,6 +32,33 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data
+
+    # Probe the VideoEdge ONVIF/RTSP settings for each distinct video_edge_id
+    # seen across the devices' source lists (#282). Read-only and best-effort:
+    # it maps what's available towards a real camera entity without affecting
+    # normal operation. Skipped entirely when there are no video devices.
+    video_edge_kinds: dict[str, set[str]] = {}
+    for device in coordinator.devices.values():
+        for source in device.statuses.get("video_sources", []):
+            ve_id = source.get("video_edge_id")
+            if ve_id:
+                video_edge_kinds.setdefault(ve_id, set()).add(source.get("kind"))
+
+    video_edge_probe: dict[str, Any] = {}
+    for ve_id, kinds in video_edge_kinds.items():
+        settings: dict[str, Any] | None = None
+        for space_id in coordinator.spaces:
+            settings = await coordinator.devices_api.get_video_edge_onvif_rtsp_settings(
+                space_id, ve_id
+            )
+            # Stop at the space that actually owns this VideoEdge.
+            if settings is not None and "error" not in settings:
+                break
+        video_edge_probe[ve_id] = {
+            "kinds": sorted(k for k in kinds if k),
+            **(settings or {"error": "not_probed"}),
+        }
+
     return {
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
         "spaces": {
@@ -93,6 +120,7 @@ async def async_get_config_entry_diagnostics(
             }
             for kid, k in coordinator.keyfobs.items()
         },
+        "video_edge_onvif_rtsp": video_edge_probe,
         "stream_tasks": len(coordinator._stream_tasks),
         "notification_listener": coordinator.notification_listener is not None,
     }

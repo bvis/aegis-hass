@@ -285,6 +285,59 @@ class DevicesApi:
                 break
         return None
 
+    async def get_video_edge_onvif_rtsp_settings(
+        self, space_id: str, video_edge_id: str
+    ) -> dict[str, Any] | None:
+        """Read a VideoEdge's ONVIF/RTSP settings for diagnostics (#282).
+
+        Wraps `GetVideoEdgeOnvifAndRtspSettingsService.execute`. This is the
+        most realistic first step toward a real `camera` entity: it reports
+        whether ONVIF/RTSP are reachable and on which ports, so a diagnostics
+        dump shows what's available (the stream itself is local RTSP/ONVIF,
+        not carried over gRPC). Returns a flat, **PII-free** dict — ports, the
+        auth flag and the user *count*, never usernames. Never raises: a probe
+        failure (offline VideoEdge, ONVIF disabled, RPC error) is reported as
+        an ``{"error": reason}`` dict so it can't break diagnostics generation.
+        """
+        from v3.mobilegwsvc.service.get_video_edge_onvif_and_rtsp_settings import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.GetVideoEdgeOnvifAndRtspSettingsServiceStub(channel)
+        request = request_pb2.GetVideoEdgeOnvifAndRtspSettingsRequest(
+            space_id=space_id,
+            video_edge_id=video_edge_id,
+        )
+        try:
+            response = await stub.execute(request, metadata=metadata, timeout=15)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "GetVideoEdgeOnvifAndRtspSettings RPC failed for video_edge %s",
+                video_edge_id,
+                exc_info=True,
+            )
+            return {"error": "rpc_error"}
+
+        which = response.WhichOneof("response") if hasattr(response, "WhichOneof") else None
+        if which != "success":
+            reason = response.failure.WhichOneof("error") if which == "failure" else None
+            return {"error": reason or which or "unknown"}
+
+        onvif = response.success.onvif_settings
+        rtsp = response.success.rtsp_settings
+        return {
+            "onvif": {
+                "user_auth_enabled": onvif.user_auth_enabled,
+                "http_port": onvif.http_port,
+                "max_users_number": onvif.max_users_number,
+                "users_count": len(onvif.users),
+            },
+            "rtsp": {"http_port": rtsp.http_port},
+        }
+
     def _handle_update(
         self,
         update: Any,  # noqa: ANN401
