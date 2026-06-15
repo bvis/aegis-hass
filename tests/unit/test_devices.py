@@ -1322,6 +1322,113 @@ class TestDeduplicateVideoDoorbells:
         assert api.doorbell_twin_aliases == {}
 
 
+class TestDeduplicateNvrRepublishedChannels:
+    """Issue #290: adding an Ajax NVR makes it re-publish an existing
+    camera/doorbell channel as its own `video_edge_nvr` device, so the one
+    physical device appears twice. The republished `video_edge_nvr` twin
+    carries no sensors and no doorbell `event` entity, yet the doorbell/motion
+    pushes attribute to it — so after the #291 type-mapping the activity
+    vanished entirely (brunovdw68). Drop the NVR republish and alias its id to
+    the primary channel (the one with the sensors) so pushes land there.
+
+    The linkage is the primary channel's `video_sources`: it lists an `nvr`
+    source whose `channel_id` equals the NVR twin's device id."""
+
+    @staticmethod
+    def _make(
+        device_id: str,
+        name: str,
+        device_type: str,
+        *,
+        video_sources: list[dict[str, object]] | None = None,
+    ) -> Device:
+        statuses: dict[str, object] = {}
+        if video_sources is not None:
+            statuses["video_sources"] = video_sources
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name=name,
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses=statuses,
+            battery=None,
+        )
+
+    # The exact shape from brunovdw68's diagnostics (#290): one doorbell, both
+    # the primary channel and the NVR republish carry the same source list.
+    _SOURCES = [
+        {"kind": "primary", "video_edge_id": "310A8DF4", "channel_id": "9c756e2bca39-0", "type": 5},
+        {
+            "kind": "nvr",
+            "video_edge_id": "310B121D",
+            "channel_id": "gRdWkZna2l-9c756e2bca39-0",
+            "type": 7,
+        },
+    ]
+
+    def test_drops_nvr_channel_republishing_a_primary(self) -> None:
+        primary = self._make(
+            "9c756e2bca39-0", "Deurbel", "video_edge_doorbell", video_sources=self._SOURCES
+        )
+        nvr_twin = self._make(
+            "gRdWkZna2l-9c756e2bca39-0", "Deurbel", "video_edge_nvr", video_sources=self._SOURCES
+        )
+        deduped = DevicesApi._dedupe_video_doorbells([primary, nvr_twin])
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+
+    def test_aliases_nvr_channel_id_to_primary(self) -> None:
+        """The dropped NVR twin's id is aliased to the surviving primary so the
+        doorbell/motion push (which lands on the NVR twin id) resolves to the
+        device that actually owns the sensors."""
+        primary = self._make(
+            "9c756e2bca39-0", "Deurbel", "video_edge_doorbell", video_sources=self._SOURCES
+        )
+        nvr_twin = self._make(
+            "gRdWkZna2l-9c756e2bca39-0", "Deurbel", "video_edge_nvr", video_sources=self._SOURCES
+        )
+        api = DevicesApi(MagicMock())
+
+        deduped = api._dedupe_and_track_aliases([primary, nvr_twin])
+
+        assert [d.id for d in deduped] == ["9c756e2bca39-0"]
+        assert api.doorbell_twin_aliases == {"gRdWkZna2l-9c756e2bca39-0": "9c756e2bca39-0"}
+
+    def test_keeps_standalone_nvr_channel_not_republishing(self) -> None:
+        """A genuine NVR-native channel (no primary lists it as an `nvr`
+        source) must be kept — only republished duplicates get dropped."""
+        native = self._make("nvr-cam-7", "Garage Cam", "video_edge_nvr")
+        deduped = DevicesApi._dedupe_video_doorbells([native])
+        assert [d.id for d in deduped] == ["nvr-cam-7"]
+
+    def test_bullet_and_doorbell_both_deduped(self) -> None:
+        """One NVR republishes several channels; each republish is matched to
+        its own primary and dropped."""
+        door_sources = self._SOURCES
+        bullet_sources = [
+            {"kind": "primary", "video_edge_id": "310C0001", "channel_id": "bullet-0", "type": 4},
+            {"kind": "nvr", "video_edge_id": "310B121D", "channel_id": "nvr-bullet-0", "type": 7},
+        ]
+        door = self._make(
+            "9c756e2bca39-0", "Deurbel", "video_edge_doorbell", video_sources=door_sources
+        )
+        door_nvr = self._make(
+            "gRdWkZna2l-9c756e2bca39-0", "Deurbel", "video_edge_nvr", video_sources=door_sources
+        )
+        bullet = self._make(
+            "bullet-0", "BulletCam", "video_edge_bullet", video_sources=bullet_sources
+        )
+        bullet_nvr = self._make(
+            "nvr-bullet-0", "BulletCam", "video_edge_nvr", video_sources=bullet_sources
+        )
+        deduped = DevicesApi._dedupe_video_doorbells([door, door_nvr, bullet, bullet_nvr])
+        assert {d.id for d in deduped} == {"9c756e2bca39-0", "bullet-0"}
+
+
 class TestDevicesApiInit:
     def test_init(self) -> None:
         client = MagicMock()

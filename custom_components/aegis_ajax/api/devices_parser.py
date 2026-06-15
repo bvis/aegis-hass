@@ -263,6 +263,7 @@ _VIDEO_EDGE_TYPE_MAP: dict[int, str] = {
 # `_dedupe_video_doorbells` below.
 _MOTION_CAM_VIDEO_HUB_PREFIX = "motion_cam_video_"
 _VIDEO_EDGE_PREFIX = "video_edge_"
+_VIDEO_EDGE_NVR = "video_edge_nvr"
 
 
 def _parse_device_state(states: Any) -> DeviceState:  # noqa: ANN401
@@ -620,6 +621,56 @@ def _dedupe_video_doorbells(devices: list[Device]) -> tuple[list[Device], dict[s
                 d.id,
                 d.device_type,
                 sibling_id,
+            )
+            continue
+        result.append(d)
+
+    # Second pass (#290): an Ajax NVR re-publishes an existing camera/doorbell
+    # channel as its own `video_edge_nvr` device, so the one physical device
+    # surfaces twice. The republished twin carries no sensors and no doorbell
+    # `event` entity, yet doorbell/motion pushes attribute to it (its id is the
+    # composite NVR channel id the push carries) — so the activity lands on a
+    # bare card. Drop the republish and alias its id to the primary channel.
+    result, nvr_aliases = _dedupe_nvr_republished_channels(result)
+    aliases.update(nvr_aliases)
+    return result, aliases
+
+
+def _dedupe_nvr_republished_channels(
+    devices: list[Device],
+) -> tuple[list[Device], dict[str, str]]:
+    """Drop `video_edge_nvr` devices that merely re-publish a primary channel.
+
+    The linkage is the primary channel's `video_sources` (#291): it lists an
+    `nvr` source whose `channel_id` equals the NVR twin's device id. A genuine
+    NVR-native channel (one no primary references) is left untouched.
+
+    Returns the filtered list plus `{dropped nvr id: primary id}` so the
+    doorbell/motion push that currently lands on the NVR twin resolves onto the
+    primary device that owns the sensors. Only the channel id is aliased — the
+    NVR's `video_edge_id` is shared across all its republished channels, so it
+    can't disambiguate which primary a push belongs to.
+    """
+    nvr_channel_to_primary: dict[str, str] = {}
+    for d in devices:
+        if not d.device_type.startswith(_VIDEO_EDGE_PREFIX) or d.device_type == _VIDEO_EDGE_NVR:
+            continue
+        for source in d.statuses.get("video_sources", []):
+            if source.get("kind") == "nvr" and source.get("channel_id"):
+                nvr_channel_to_primary[source["channel_id"]] = d.id
+
+    result: list[Device] = []
+    aliases: dict[str, str] = {}
+    for d in devices:
+        primary_id = nvr_channel_to_primary.get(d.id)
+        if d.device_type == _VIDEO_EDGE_NVR and primary_id is not None:
+            aliases[d.id] = primary_id
+            _LOGGER.debug(
+                "Dropping NVR-republished video channel %s (%s) — re-publishes "
+                "primary channel %s in this snapshot (#290); aliasing pushes to it",
+                d.id,
+                d.device_type,
+                primary_id,
             )
             continue
         result.append(d)
