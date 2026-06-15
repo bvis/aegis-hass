@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.5] - unreleased
+
+### Fixed
+- **An Ajax NVR no longer makes a doorbell or camera appear twice, with the activity on the empty card (#290).** When an NVR (e.g. the NVR HAC) is added, it re-publishes an existing camera/doorbell channel as a second device. That republished twin carries no sensors and no doorbell event entity, yet the doorbell-ring and motion pushes attributed to it — so after 1.11.4 named the NVR channel properly, the doorbell card showed all the sensors but no activity, while a second bare card had the activity. The republished channel is now recognised (via the channel-source linkage exposed in 1.11.4) and collapsed into the primary device, and its pushes are redirected there, so a single card shows both the sensors and the ring/motion activity. A genuine NVR-native channel (one that isn't a republish of an existing device) is unaffected.
+
 ## [1.11.4] - 2026-06-15
 
 Group/zone night-mode arming correctness and FCM connection resilience. Consolidates the 1.11.4-beta series.
