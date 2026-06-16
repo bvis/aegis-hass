@@ -190,20 +190,20 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert sorted(probe["310B121D"]["kinds"]) == ["nvr"]
 
     @pytest.mark.asyncio
-    async def test_life_quality_readings_dumped_with_values(self, entry: MagicMock) -> None:
-        # #302: the lq_* readings must appear with their VALUES in the dump
-        # (the generic `statuses` block only lists keys), so a reporter can
-        # sanity-check temperature/humidity/CO₂ against the Ajax app.
+    async def test_life_quality_threshold_flags_dumped_with_values(self, entry: MagicMock) -> None:
+        # #302: temperature/humidity/CO₂ are real sensors now (canonical keys),
+        # but the diagnostic-only threshold/fault flags (`lq_*`) must still
+        # appear with their VALUES in the dump — the generic `statuses` block
+        # only lists keys, which can't convey a fault/out-of-range state.
         from dataclasses import replace
 
         device = replace(
             _make_device(did="lq-1"),
             statuses={
-                "signal_strength": "High",
-                "lq_temperature": 21.5,
-                "lq_humidity": 48.0,
-                "lq_co2": 620,
+                "temperature": 23.9,
+                "co2": 2215,
                 "lq_co2_statuses": [3],
+                "lq_hardware_malfunctions": [2],
             },
         )
         entry.runtime_data.devices = {"lq-1": device}
@@ -211,10 +211,11 @@ class TestAsyncGetConfigEntryDiagnostics:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
 
         dev_info = result["devices"]["lq-1"]
-        assert dev_info["lq_temperature"] == 21.5
-        assert dev_info["lq_humidity"] == 48.0
-        assert dev_info["lq_co2"] == 620
         assert dev_info["lq_co2_statuses"] == [3]
+        assert dev_info["lq_hardware_malfunctions"] == [2]
+        # canonical readings show in the statuses key list (they're sensors now)
+        assert "temperature" in dev_info["statuses"]
+        assert "co2" in dev_info["statuses"]
 
     @pytest.mark.asyncio
     async def test_non_video_device_omits_video_keys(self, entry: MagicMock) -> None:

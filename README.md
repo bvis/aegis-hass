@@ -188,6 +188,7 @@ You can type any custom label during setup if yours is not listed.
 | Combi | CombiProtect, CombiProtect S, CombiProtect Fibra | Motion, glass break, tamper, battery |
 | Fire/Smoke | FireProtect, FireProtect Plus, FireProtect 2 (all sub-models — heat-only `*hrb`/`*hsb`, CO-only `*crb`/`*csb`, multi-sensor `*hcrb`/`*hcsb`, AC-powered `*_ac`, UL-listed `*_ul`) | Smoke, steam (FireProtect 2 only — chamber discriminator), CO, high temperature, tamper, battery — sub-models without a given sensor expose only the relevant entity |
 | Water Leak | LeaksProtect | Leak detected, tamper, battery |
+| Air Quality | LifeQuality | Temperature (°C), humidity (%), CO₂ (ppm), battery, signal |
 | Relays/Switches | Relay, WallSwitch, Socket (and outlet variants) | On/off per channel; electrical readings (current, voltage, energy) across the WallSwitch / Socket family. Power is exposed as a direct reading on the Outlet Type E / F family (the firmware reports it natively) and as a derived `current × voltage` reading on the WallSwitch family. |
 | Light switches | LightSwitch (Jeweller / Fibra) | On/off per channel |
 | Lights | LightSwitch Dimmer | Brightness control |

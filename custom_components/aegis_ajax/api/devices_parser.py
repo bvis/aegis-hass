@@ -330,21 +330,21 @@ def _parse_statuses(statuses: Any) -> dict[str, Any]:  # noqa: ANN401
         elif which == "temperature":
             result["temperature"] = status.temperature.value
         elif which == "life_quality":
-            # #302 diagnostic: LifeQuality can also report readings here in the
-            # status oneof (as ints), separately from the float values in
+            # #302 LifeQuality: environmental readings can also arrive here in
+            # the status oneof (as ints), separately from the float values in
             # `spread_properties.life_quality_info`. The actual_* fields are
             # `optional` — guard with HasField, NOT hasattr (always true for a
             # defined proto field, which would report a phantom 0 for an unset
-            # measurement). Distinct `lq_status_*` keys + the threshold/fault
-            # enums so a single diagnostics dump reveals which path a real
-            # device uses and in what units, before we commit to sensors.
+            # measurement). Written to the canonical `temperature`/`humidity`/
+            # `co2` keys so the device-agnostic sensors pick them up; the
+            # threshold/fault enums stay diagnostic-only (`lq_*`).
             lq = status.life_quality
             if lq.HasField("actual_temperature"):
-                result["lq_status_temperature"] = lq.actual_temperature
+                result["temperature"] = lq.actual_temperature
             if lq.HasField("actual_humidity"):
-                result["lq_status_humidity"] = lq.actual_humidity
+                result["humidity"] = lq.actual_humidity
             if lq.HasField("actual_co2"):
-                result["lq_status_co2"] = lq.actual_co2
+                result["co2"] = lq.actual_co2
             for key, vals in (
                 ("lq_temperature_statuses", lq.temperature_statuses),
                 ("lq_humidity_statuses", lq.humidity_statuses),
@@ -520,21 +520,21 @@ def _parse_spread_properties(hub_dev: Any) -> dict[str, Any]:  # noqa: ANN401
             if 2 in [int(m) for m in getattr(wsc, "malfunctions", [])]:
                 result[f"valve_ch{channel_id}_stuck"] = True
         elif which == "life_quality_info":
-            # #302 diagnostic probe: LifeQuality's environmental readings ride
-            # here in the lite stream (alongside the switch channels), not in
+            # #302 LifeQuality: environmental readings ride here in the lite
+            # stream (alongside the switch channels), not in
             # `LightDeviceStatus.statuses`. The three measurements are
             # `optional` (explicit presence) — guard each with `HasField` so an
             # unset one leaves its key absent rather than reporting a phantom 0.
-            # Surfaced under diagnostic `lq_*` keys for now; promoted to real
-            # temperature / humidity / CO₂ sensors once the values + units are
-            # confirmed against a real device.
+            # mroleh-confirmed units vs the Ajax app: temperature °C, humidity
+            # %, CO₂ ppm. Written to the canonical `temperature`/`humidity`/
+            # `co2` keys so the device-agnostic sensors create the entities.
             lq = entry.life_quality_info
             if lq.HasField("actual_temperature"):
-                result["lq_temperature"] = lq.actual_temperature
+                result["temperature"] = lq.actual_temperature
             if lq.HasField("actual_humidity"):
-                result["lq_humidity"] = lq.actual_humidity
+                result["humidity"] = lq.actual_humidity
             if lq.HasField("actual_co2"):
-                result["lq_co2"] = lq.actual_co2
+                result["co2"] = lq.actual_co2
     return result
 
 
