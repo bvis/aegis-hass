@@ -190,6 +190,33 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert sorted(probe["310B121D"]["kinds"]) == ["nvr"]
 
     @pytest.mark.asyncio
+    async def test_life_quality_readings_dumped_with_values(self, entry: MagicMock) -> None:
+        # #302: the lq_* readings must appear with their VALUES in the dump
+        # (the generic `statuses` block only lists keys), so a reporter can
+        # sanity-check temperature/humidity/CO₂ against the Ajax app.
+        from dataclasses import replace
+
+        device = replace(
+            _make_device(did="lq-1"),
+            statuses={
+                "signal_strength": "High",
+                "lq_temperature": 21.5,
+                "lq_humidity": 48.0,
+                "lq_co2": 620,
+                "lq_co2_statuses": [3],
+            },
+        )
+        entry.runtime_data.devices = {"lq-1": device}
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        dev_info = result["devices"]["lq-1"]
+        assert dev_info["lq_temperature"] == 21.5
+        assert dev_info["lq_humidity"] == 48.0
+        assert dev_info["lq_co2"] == 620
+        assert dev_info["lq_co2_statuses"] == [3]
+
+    @pytest.mark.asyncio
     async def test_non_video_device_omits_video_keys(self, entry: MagicMock) -> None:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         dev_info = result["devices"]["dev-1"]
