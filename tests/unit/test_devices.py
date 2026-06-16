@@ -717,11 +717,12 @@ class TestSpreadPropertiesParser:
         assert result == {}
 
     def test_life_quality_info_values_extracted(self) -> None:
-        # #302 diagnostic probe: LifeQuality's environmental readings ride in
-        # spread_properties (same lite stream as the switch channels), under
-        # the `life_quality_info` oneof case. Surface them under diagnostic
-        # `lq_*` keys so a dump confirms the values + units before we commit
-        # to real sensor entities.
+        # #302: LifeQuality's environmental readings ride in spread_properties
+        # (same lite stream as the switch channels), under the
+        # `life_quality_info` oneof case. mroleh-confirmed units against the
+        # Ajax app: temperature °C (float), humidity % (float), CO₂ ppm (int).
+        # Surfaced under the canonical `temperature`/`humidity`/`co2` keys so
+        # the device-agnostic sensors in sensor.py create the entities.
         from v3.mobilegwsvc.commonmodels.hub.device.light import light_hub_device_pb2
         from v3.mobilegwsvc.commonmodels.hub.device.light.properties import (
             life_quality_info_pb2,
@@ -731,14 +732,14 @@ class TestSpreadPropertiesParser:
         spread = hub_dev.spread_properties.add()
         spread.life_quality_info.CopyFrom(
             life_quality_info_pb2.LifeQualityInfo(
-                actual_temperature=21.5,
-                actual_humidity=48.0,
-                actual_co2=620,
+                actual_temperature=23.9,
+                actual_humidity=55.4,
+                actual_co2=2215,
             )
         )
 
         result = DevicesApi._parse_spread_properties(hub_dev)
-        assert result == {"lq_temperature": 21.5, "lq_humidity": 48.0, "lq_co2": 620}
+        assert result == {"temperature": 23.9, "humidity": 55.4, "co2": 2215}
 
     def test_life_quality_info_unset_fields_omitted(self) -> None:
         # The three measurements are `optional` (explicit presence) — an unset
@@ -755,7 +756,7 @@ class TestSpreadPropertiesParser:
         )
 
         result = DevicesApi._parse_spread_properties(hub_dev)
-        assert result == {"lq_temperature": 19.0}
+        assert result == {"temperature": 19.0}
 
     def test_water_stop_channel_state_on_populates_valve_ch1_open(self) -> None:
         # Read-only valve path (#117). `STATE_ON` means the channel is
@@ -998,13 +999,14 @@ class TestStatusParser:
         lds = _LDS()
         status = lds(life_quality=lds.LifeQualityStatus(actual_temperature=21))
         result = DevicesApi._parse_statuses([status])
-        assert result["lq_status_temperature"] == 21
-        assert "lq_status_humidity" not in result
-        assert "lq_status_co2" not in result
+        assert result["temperature"] == 21
+        assert "humidity" not in result
+        assert "co2" not in result
 
     def test_life_quality_status_threshold_enums_captured(self) -> None:
         # Sensor fault / out-of-range threshold flags are diagnostically
-        # useful (e.g. CO₂ lightly polluted, CO₂ sensor malfunction).
+        # useful (e.g. CO₂ lightly polluted, CO₂ sensor malfunction). Kept as
+        # diagnostic-only `lq_*` keys (no sensor entity).
         lds = _LDS()
         status = lds(
             life_quality=lds.LifeQualityStatus(
@@ -1067,9 +1069,9 @@ class TestStatusParser:
             )
         )
         result = DevicesApi._parse_statuses([status])
-        assert result.get("lq_status_temperature") == 21
-        assert result.get("lq_status_humidity") == 55
-        assert result.get("lq_status_co2") == 400
+        assert result.get("temperature") == 21
+        assert result.get("humidity") == 55
+        assert result.get("co2") == 400
 
     def test_none_which_oneof_skipped(self) -> None:
         status = MagicMock()
