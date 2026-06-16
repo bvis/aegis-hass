@@ -47,16 +47,24 @@ async def async_get_config_entry_diagnostics(
     video_edge_probe: dict[str, Any] = {}
     for ve_id, kinds in video_edge_kinds.items():
         settings: dict[str, Any] | None = None
+        owning_space: str | None = None
         for space_id in coordinator.spaces:
             settings = await coordinator.devices_api.get_video_edge_onvif_rtsp_settings(
                 space_id, ve_id
             )
             # Stop at the space that actually owns this VideoEdge.
             if settings is not None and "error" not in settings:
+                owning_space = space_id
                 break
+        # Read the LAN IP / MAC (#282) so the dump has the full connection info
+        # (IP + ONVIF/RTSP ports) to point HA's native ONVIF integration at.
+        network = await coordinator.devices_api.get_video_edge_network(
+            owning_space or next(iter(coordinator.spaces), ""), ve_id
+        )
         video_edge_probe[ve_id] = {
             "kinds": sorted(k for k in kinds if k),
             **(settings or {"error": "not_probed"}),
+            "network": network,
         }
 
     return {

@@ -1590,6 +1590,159 @@ class TestVideoEdgePushAliases:
         assert api.doorbell_twin_aliases == {}
 
 
+class TestVideoEdgeNetworkProbe:
+    """Issue #282: read a VideoEdge's LAN IP (+ MAC) via stream_video_edge, the
+    last piece needed to point Home Assistant's native ONVIF integration at the
+    camera. `IpAddressV4.data` is an int in network byte order. Never raises —
+    a probe failure is reported as `{"error": …}`."""
+
+    @staticmethod
+    def _make_api() -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_success_returns_interface_ip_and_mac(self) -> None:
+        from systems.ajax.api.mobile.v2.common.video import types_pb2
+        from systems.ajax.api.mobile.v2.common.video.videoedge import video_edge_pb2
+        from systems.ajax.api.mobile.v2.common.video.videoedge.network import (
+            network_interface_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_video_edge import (
+            endpoint_pb2_grpc,
+            request_pb2,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ve = video_edge_pb2.VideoEdge(
+            network_interfaces=[
+                network_interface_pb2.NetworkInterface(
+                    name="eth0",
+                    mac_address=types_pb2.MacAddress(
+                        data=bytes([0x9C, 0x75, 0x6E, 0x81, 0x0C, 0x6E])
+                    ),
+                    configuration=network_interface_pb2.NetworkConfiguration(
+                        v4=network_interface_pb2.NetworkConfigurationIPv4(
+                            address=types_pb2.IpAddressV4(data=0xC0A80164),  # 192.168.1.100
+                        )
+                    ),
+                )
+            ]
+        )
+        msg = response_pb2.StreamVideoEdgeResponse(
+            success=response_pb2.StreamVideoEdgeResponse.Success(
+                initial_state=response_pb2.StreamVideoEdgeResponse.Success.InitialState(
+                    video_edge=ve
+                )
+            )
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return _aiter()
+
+                self.execute = _execute
+
+        with patch.object(endpoint_pb2_grpc, "StreamVideoEdgeServiceStub", _StubFactory):
+            result = await api.get_video_edge_network("space-1", "30BE4400")
+
+        assert isinstance(captured[0], request_pb2.StreamVideoEdgeRequest)
+        assert captured[0].space_id == "space-1"
+        assert captured[0].video_edge_id == "30BE4400"
+        assert result == {
+            "interfaces": [{"name": "eth0", "mac": "9c:75:6e:81:0c:6e", "ip": "192.168.1.100"}]
+        }
+
+    @pytest.mark.asyncio
+    async def test_interface_without_ipv4_is_skipped(self) -> None:
+        from systems.ajax.api.mobile.v2.common.video.videoedge import video_edge_pb2
+        from systems.ajax.api.mobile.v2.common.video.videoedge.network import (
+            network_interface_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_video_edge import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        ve = video_edge_pb2.VideoEdge(
+            network_interfaces=[network_interface_pb2.NetworkInterface(name="wlan0")]
+        )
+        msg = response_pb2.StreamVideoEdgeResponse(
+            success=response_pb2.StreamVideoEdgeResponse.Success(
+                initial_state=response_pb2.StreamVideoEdgeResponse.Success.InitialState(
+                    video_edge=ve
+                )
+            )
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = lambda *a, **k: _aiter()
+
+        with patch.object(endpoint_pb2_grpc, "StreamVideoEdgeServiceStub", _StubFactory):
+            result = await api.get_video_edge_network("space-1", "30BE4400")
+
+        assert result == {"interfaces": []}
+
+    @pytest.mark.asyncio
+    async def test_failure_response_reports_error(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.stream_video_edge import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        msg = response_pb2.StreamVideoEdgeResponse(
+            failure=response_pb2.StreamVideoEdgeResponse.Failure(
+                video_edge_not_found=common_response_pb2.Error(),
+            )
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = lambda *a, **k: _aiter()
+
+        with patch.object(endpoint_pb2_grpc, "StreamVideoEdgeServiceStub", _StubFactory):
+            result = await api.get_video_edge_network("space-1", "bad")
+
+        assert result == {"error": "video_edge_not_found"}
+
+    @pytest.mark.asyncio
+    async def test_rpc_exception_reports_error(self) -> None:
+        from v3.mobilegwsvc.service.stream_video_edge import endpoint_pb2_grpc
+
+        api = self._make_api()
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                def _execute(*_a: object, **_k: object) -> object:
+                    raise RuntimeError("boom")
+
+                self.execute = _execute
+
+        with patch.object(endpoint_pb2_grpc, "StreamVideoEdgeServiceStub", _StubFactory):
+            result = await api.get_video_edge_network("space-1", "30BE4400")
+
+        assert result == {"error": "rpc_error"}
+
+
 class TestVideoEdgeOnvifRtspProbe:
     """Issue #282: a diagnostic read of the VideoEdge ONVIF/RTSP settings, so
     we can map what's available towards a real camera entity. Returns a flat,

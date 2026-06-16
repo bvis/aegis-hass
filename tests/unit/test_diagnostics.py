@@ -68,9 +68,10 @@ class TestAsyncGetConfigEntryDiagnostics:
         coord.devices = {"dev-1": _make_device()}
         coord._stream_tasks = [MagicMock(), MagicMock()]
         coord.notification_listener = MagicMock()
-        # The ONVIF/RTSP probe (#282) is only called for video_edge devices;
-        # default it to a no-op so non-video fixtures don't await a MagicMock.
+        # The VideoEdge probes (#282) are only called for video_edge devices;
+        # default them to no-ops so non-video fixtures don't await a MagicMock.
         coord.devices_api.get_video_edge_onvif_rtsp_settings = AsyncMock(return_value=None)
+        coord.devices_api.get_video_edge_network = AsyncMock(return_value=None)
         return coord
 
     @pytest.fixture
@@ -179,12 +180,16 @@ class TestAsyncGetConfigEntryDiagnostics:
         entry.runtime_data.devices_api.get_video_edge_onvif_rtsp_settings = AsyncMock(
             return_value={"onvif": {"http_port": 8000}, "rtsp": {"http_port": 554}}
         )
+        entry.runtime_data.devices_api.get_video_edge_network = AsyncMock(
+            return_value={"interfaces": [{"name": "eth0", "mac": "aa:bb", "ip": "192.168.1.50"}]}
+        )
 
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
 
         probe = result["video_edge_onvif_rtsp"]
         assert set(probe) == {"310A8DF4", "310B121D"}
         assert probe["310A8DF4"]["onvif"] == {"http_port": 8000}
+        assert probe["310A8DF4"]["network"]["interfaces"][0]["ip"] == "192.168.1.50"
         assert probe["310A8DF4"]["rtsp"] == {"http_port": 554}
         assert sorted(probe["310A8DF4"]["kinds"]) == ["primary"]
         assert sorted(probe["310B121D"]["kinds"]) == ["nvr"]
