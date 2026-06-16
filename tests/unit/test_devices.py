@@ -1396,7 +1396,12 @@ class TestDeduplicateNvrRepublishedChannels:
         deduped = api._dedupe_and_track_aliases([primary, nvr_twin])
 
         assert [d.id for d in deduped] == ["9c756e2bca39-0"]
-        assert api.doorbell_twin_aliases == {"gRdWkZna2l-9c756e2bca39-0": "9c756e2bca39-0"}
+        # The dropped NVR channel id aliases to the primary, AND the primary's
+        # own video_edge_id aliases to its channel-id key (#290 motion fix).
+        assert api.doorbell_twin_aliases == {
+            "gRdWkZna2l-9c756e2bca39-0": "9c756e2bca39-0",
+            "310A8DF4": "9c756e2bca39-0",
+        }
 
     def test_keeps_standalone_nvr_channel_not_republishing(self) -> None:
         """A genuine NVR-native channel (no primary lists it as an `nvr`
@@ -1427,6 +1432,94 @@ class TestDeduplicateNvrRepublishedChannels:
         )
         deduped = DevicesApi._dedupe_video_doorbells([door, door_nvr, bullet, bullet_nvr])
         assert {d.id for d in deduped} == {"9c756e2bca39-0", "bullet-0"}
+
+
+class TestVideoEdgePushAliases:
+    """Issue #290 (motion): a doorbell/motion push carries the source's
+    Jeweller hardware id, which for a video_edge device is its *primary*
+    `video_edge_id` — NOT the MAC-style `channel_id` the device is keyed on.
+    On an NVR-bridged camera there's no `hub_device` twin, so the #173 dedup
+    alias never gets created and the push id resolves to nothing. The doorbell
+    ring survives on the single-doorbell fallback, but motion (no fallback)
+    is lost. Alias every video_edge device's primary `video_edge_id` to its
+    device id so both resolve directly."""
+
+    @staticmethod
+    def _make(
+        device_id: str,
+        device_type: str,
+        video_sources: list[dict[str, object]] | None = None,
+    ) -> Device:
+        statuses: dict[str, object] = {}
+        if video_sources is not None:
+            statuses["video_sources"] = video_sources
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name="Deurbel",
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses=statuses,
+            battery=None,
+        )
+
+    def test_primary_video_edge_id_aliased_to_device_id(self) -> None:
+        doorbell = self._make(
+            "9c756e2bca39-0",
+            "video_edge_doorbell",
+            video_sources=[
+                {"kind": "primary", "video_edge_id": "310A8DF4", "channel_id": "9c756e2bca39-0"},
+                {"kind": "nvr", "video_edge_id": "310B121D", "channel_id": "gRdWk-9c756e2bca39-0"},
+            ],
+        )
+        api = DevicesApi(MagicMock())
+
+        api._dedupe_and_track_aliases([doorbell])
+
+        assert api.doorbell_twin_aliases.get("310A8DF4") == "9c756e2bca39-0"
+
+    def test_nvr_source_video_edge_id_not_aliased(self) -> None:
+        """The `nvr` source's video_edge_id is the recorder's, shared across all
+        its republished channels — it must not alias to one camera."""
+        doorbell = self._make(
+            "9c756e2bca39-0",
+            "video_edge_doorbell",
+            video_sources=[
+                {"kind": "primary", "video_edge_id": "310A8DF4", "channel_id": "9c756e2bca39-0"},
+                {"kind": "nvr", "video_edge_id": "310B121D", "channel_id": "gRdWk-9c756e2bca39-0"},
+            ],
+        )
+        api = DevicesApi(MagicMock())
+
+        api._dedupe_and_track_aliases([doorbell])
+
+        assert "310B121D" not in api.doorbell_twin_aliases
+
+    def test_no_alias_when_video_edge_id_equals_device_id(self) -> None:
+        doorbell = self._make(
+            "310A8DF4",
+            "video_edge_doorbell",
+            video_sources=[
+                {"kind": "primary", "video_edge_id": "310A8DF4", "channel_id": "310A8DF4"},
+            ],
+        )
+        api = DevicesApi(MagicMock())
+
+        api._dedupe_and_track_aliases([doorbell])
+
+        assert "310A8DF4" not in api.doorbell_twin_aliases
+
+    def test_non_video_device_gets_no_alias(self) -> None:
+        door_sensor = self._make("dp-1", "door_protect_plus")
+        api = DevicesApi(MagicMock())
+
+        api._dedupe_and_track_aliases([door_sensor])
+
+        assert api.doorbell_twin_aliases == {}
 
 
 class TestVideoEdgeOnvifRtspProbe:
