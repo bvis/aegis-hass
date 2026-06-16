@@ -193,9 +193,13 @@ class DevicesApi:
         return devices_parser._dedupe_video_doorbells(devices)[0]
 
     def _dedupe_and_track_aliases(self, devices: list[Device]) -> list[Device]:
-        """Dedupe video-doorbell twins and record the twin→sibling alias map
-        (#173) so doorbell/motion pushes carrying the twin id still resolve."""
+        """Dedupe video-doorbell twins and record the alias maps so
+        doorbell/motion pushes resolve onto the device the user sees:
+        the #173 twin→sibling map, the #290 NVR-republish map, and each
+        video_edge device's primary video_edge_id → channel-id key (#290
+        motion — the id a push actually carries)."""
         deduped, aliases = devices_parser._dedupe_video_doorbells(devices)
+        aliases.update(devices_parser._video_edge_push_aliases(deduped))
         self.doorbell_twin_aliases.update(aliases)
         return deduped
 

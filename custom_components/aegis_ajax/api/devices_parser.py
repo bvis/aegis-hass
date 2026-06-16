@@ -636,6 +636,34 @@ def _dedupe_video_doorbells(devices: list[Device]) -> tuple[list[Device], dict[s
     return result, aliases
 
 
+def _video_edge_push_aliases(devices: list[Device]) -> dict[str, str]:
+    """Map each video_edge device's primary `video_edge_id` to its device id.
+
+    A doorbell-ring / motion push carries the source's Jeweller hardware id,
+    which for a video_edge device is its *primary* `video_edge_id` — not the
+    MAC-style `channel_id` the device is keyed on. On an NVR-bridged camera
+    there's no `hub_device` twin, so the #173 twin→sibling alias is never
+    created and the push id resolves to nothing: the ring survives on the
+    single-doorbell fallback, but motion (which has no fallback) is lost.
+    Aliasing the primary `video_edge_id` to the device id fixes both (#290).
+
+    Only the `primary` source is used — the `nvr` source's `video_edge_id` is
+    the recorder's, shared across every channel it republishes, so it can't
+    identify a single camera.
+    """
+    aliases: dict[str, str] = {}
+    for d in devices:
+        if not d.device_type.startswith(_VIDEO_EDGE_PREFIX):
+            continue
+        for source in d.statuses.get("video_sources", []):
+            if source.get("kind") == "primary":
+                ve_id = source.get("video_edge_id")
+                if ve_id and ve_id != d.id:
+                    aliases[ve_id] = d.id
+                break
+    return aliases
+
+
 def _dedupe_nvr_republished_channels(
     devices: list[Device],
 ) -> tuple[list[Device], dict[str, str]]:
