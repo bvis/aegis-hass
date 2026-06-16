@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.11.5] - unreleased
 
 ### Added
+- **Diagnostics now surface LifeQuality's environmental readings for triage (#302).** LifeQuality currently only exposes battery and signal — its temperature, humidity and CO₂ aren't shown as sensors yet. The diagnostics download now reports those raw values (and any sensor threshold/fault flags) so the data path and units can be confirmed against a real device before the sensors are added. Read-only; no change to existing entities.
 - **Diagnostics now probe the VideoEdge ONVIF/RTSP settings (#282).** As a first step towards real camera support, the diagnostics download now reports, per VideoEdge, whether ONVIF/RTSP are reachable and on which ports (the auth flag and user count, never usernames). This is read-only and best-effort — it maps what's available for a future camera entity and never affects normal operation; the video stream itself is local RTSP/ONVIF, not carried over the Ajax cloud.
 
 ### Fixed
