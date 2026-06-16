@@ -108,6 +108,11 @@ async def async_get_config_entry_diagnostics(
                     if "video_sources" in d.statuses
                     else {}
                 ),
+                # LifeQuality environmental readings (#302): dump the actual
+                # `lq_*` values (temperature / humidity / CO₂ + threshold/fault
+                # enums) so a diagnostics download confirms which data path a
+                # real device uses and in what units, before sensors are added.
+                **{k: v for k, v in d.statuses.items() if k.startswith("lq_")},
             }
             for did, d in coordinator.devices.items()
         },
