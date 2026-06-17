@@ -1626,8 +1626,11 @@ class TestVideoEdgeNetworkProbe:
                         data=bytes([0x9C, 0x75, 0x6E, 0x81, 0x0C, 0x6E])
                     ),
                     configuration=network_interface_pb2.NetworkConfiguration(
+                        # Despite the proto comment ("network byte order"),
+                        # real devices store the int little-endian: 0x6E00A8C0
+                        # = 192.168.0.110 (mroleh #282, not 110.0.168.192).
                         v4=network_interface_pb2.NetworkConfigurationIPv4(
-                            address=types_pb2.IpAddressV4(data=0xC0A80164),  # 192.168.1.100
+                            address=types_pb2.IpAddressV4(data=0x6E00A8C0),
                         )
                     ),
                 )
@@ -1659,7 +1662,7 @@ class TestVideoEdgeNetworkProbe:
         assert captured[0].space_id == "space-1"
         assert captured[0].video_edge_id == "30BE4400"
         assert result == {
-            "interfaces": [{"name": "eth0", "mac": "9c:75:6e:81:0c:6e", "ip": "192.168.1.100"}]
+            "interfaces": [{"name": "eth0", "mac": "9c:75:6e:81:0c:6e", "ip": "192.168.0.110"}]
         }
 
     @pytest.mark.asyncio

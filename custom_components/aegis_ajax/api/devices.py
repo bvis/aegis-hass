@@ -147,9 +147,12 @@ def _encode_varint_field(field_number: int, value: int) -> bytes:
 def _video_edge_interfaces(video_edge: Any) -> list[dict[str, Any]]:  # noqa: ANN401
     """Extract `{name, mac, ip}` for each VideoEdge interface with an IPv4 (#282).
 
-    `IpAddressV4.data` is a uint32 in network byte order → dotted quad.
-    MacAddress.data is raw bytes → colon-hex. Interfaces without a configured
-    IPv4 (address unset / 0) are skipped — we only want reachable endpoints.
+    `IpAddressV4.data` is a uint32. NOTE: despite the proto comment claiming
+    "network byte order", real devices store it **little-endian** — byte 0 is
+    the first octet (mroleh #282: 0x6E00A8C0 → 192.168.0.110, not the
+    big-endian 110.0.168.192). MacAddress.data is raw bytes → colon-hex.
+    Interfaces without a configured IPv4 (address unset / 0) are skipped — we
+    only want reachable endpoints.
     """
     interfaces: list[dict[str, Any]] = []
     for ni in getattr(video_edge, "network_interfaces", []):
@@ -158,7 +161,7 @@ def _video_edge_interfaces(video_edge: Any) -> list[dict[str, Any]]:  # noqa: AN
         raw = int(ni.configuration.v4.address.data)
         if not raw:
             continue
-        ip = ".".join(str((raw >> (8 * (3 - i))) & 0xFF) for i in range(4))
+        ip = ".".join(str((raw >> (8 * i)) & 0xFF) for i in range(4))
         mac_bytes = bytes(ni.mac_address.data)
         mac = ":".join(f"{b:02x}" for b in mac_bytes) if mac_bytes else None
         interfaces.append({"name": ni.name, "mac": mac, "ip": ip})
