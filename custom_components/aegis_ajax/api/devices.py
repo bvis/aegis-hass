@@ -144,6 +144,27 @@ def _encode_varint_field(field_number: int, value: int) -> bytes:
     return bytes([tag]) + bytes(varint)
 
 
+def _video_edge_interfaces(video_edge: Any) -> list[dict[str, Any]]:  # noqa: ANN401
+    """Extract `{name, mac, ip}` for each VideoEdge interface with an IPv4 (#282).
+
+    `IpAddressV4.data` is a uint32 in network byte order → dotted quad.
+    MacAddress.data is raw bytes → colon-hex. Interfaces without a configured
+    IPv4 (address unset / 0) are skipped — we only want reachable endpoints.
+    """
+    interfaces: list[dict[str, Any]] = []
+    for ni in getattr(video_edge, "network_interfaces", []):
+        if not ni.HasField("configuration") or not ni.configuration.HasField("v4"):
+            continue
+        raw = int(ni.configuration.v4.address.data)
+        if not raw:
+            continue
+        ip = ".".join(str((raw >> (8 * (3 - i))) & 0xFF) for i in range(4))
+        mac_bytes = bytes(ni.mac_address.data)
+        mac = ":".join(f"{b:02x}" for b in mac_bytes) if mac_bytes else None
+        interfaces.append({"name": ni.name, "mac": mac, "ip": ip})
+    return interfaces
+
+
 class DevicesApi:
     """API operations for devices."""
 
@@ -341,6 +362,52 @@ class DevicesApi:
             },
             "rtsp": {"http_port": rtsp.http_port},
         }
+
+    async def get_video_edge_network(
+        self, space_id: str, video_edge_id: str
+    ) -> dict[str, Any] | None:
+        """Read a VideoEdge's LAN network interfaces for diagnostics (#282).
+
+        Wraps the `StreamVideoEdgeService` server stream and reads only the
+        first `initial_state` snapshot. Returns each interface's IPv4 address
+        and MAC — the last piece needed to point Home Assistant's native ONVIF
+        integration at the camera (combined with the ports from
+        `get_video_edge_onvif_rtsp_settings`). `IpAddressV4.data` is an int in
+        network byte order. Never raises: any failure is reported as an
+        ``{"error": reason}`` dict so it can't break diagnostics generation.
+        """
+        from v3.mobilegwsvc.service.stream_video_edge import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.StreamVideoEdgeServiceStub(channel)
+        request = request_pb2.StreamVideoEdgeRequest(
+            space_id=space_id,
+            video_edge_id=video_edge_id,
+        )
+        try:
+            # Read only the first message: the stream is long-lived (it keeps
+            # pushing change deltas), but the snapshot we need is the leading
+            # `initial_state`.
+            async for msg in stub.execute(request, metadata=metadata, timeout=15):
+                which = msg.WhichOneof("response") if hasattr(msg, "WhichOneof") else None
+                if which == "failure":
+                    return {"error": msg.failure.WhichOneof("error") or "failure"}
+                if which == "success" and msg.success.WhichOneof("update") == "initial_state":
+                    video_edge = msg.success.initial_state.video_edge
+                    return {"interfaces": _video_edge_interfaces(video_edge)}
+                return {"error": "no_initial_state"}
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "StreamVideoEdge RPC failed for video_edge %s",
+                video_edge_id,
+                exc_info=True,
+            )
+            return {"error": "rpc_error"}
+        return {"error": "empty_stream"}
 
     def _handle_update(
         self,
