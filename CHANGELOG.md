@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.11.5] - unreleased
+## [1.11.5] - 2026-06-18
+
+LifeQuality air-quality sensors, NVR-bridged camera fixes, and groundwork for camera support. Consolidates the 1.11.5-beta series.
 
 ### Added
 - **LifeQuality now exposes temperature, humidity and CO₂ sensors (#302).** Previously the LifeQuality air-quality monitor only surfaced battery and signal. Its temperature (°C), humidity (%) and CO₂ (ppm) readings are now created as standard Home Assistant sensors, confirmed against the Ajax app on real hardware. Any sensor threshold/fault flags the device reports are included in the diagnostics download.
