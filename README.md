@@ -194,7 +194,7 @@ You can type any custom label during setup if yours is not listed.
 | Lights | LightSwitch Dimmer | Brightness control |
 | Locks | SmartLock, LockBridge (Yale) | Lock and unlock; state surfaces locked / unlocked. Hub-attached Jeweller locks (e.g. installer-added Yale modules on a third-party backend) are commanded over the generic device on/off path ([#206](https://github.com/bvis/aegis-hass/issues/206) / [#219](https://github.com/bvis/aegis-hass/issues/219)). _Note:_ unlatch (`lock.open`) isn't exposed on these — it's only available through Ajax's cloud SmartLock service, which they aren't registered with (the Ajax app can't unlatch them either) |
 | Hub Chime | Hubs that expose the chime setting | `switch.<hub>_chime` toggles the hub-wide chime tone (door-open alert while disarmed); reflects app-side changes instantly. Requires the account's chime-edit permission |
-| Doorbells | Wireless DoorBell (standalone Jeweller ring button), MotionCam Video Doorbell, SmartLock / LockBridge variants with integrated ring button | `doorbell_pressed` on the hub's security event entity, plus a **per-device `event` entity** (`device_class: doorbell`) that emits Home Assistant's canonical `ring` event; a doorbell motion push also flips the doorbell's `motion_detected` on (30 s auto-off). SmartLock variant exposes lock state on the lock entity. Requires FCM credentials configured. _Note:_ the video doorbell has no photo capture or live view in Home Assistant yet — see [#282](https://github.com/bvis/aegis-hass/issues/282) |
+| Doorbells | Wireless DoorBell (standalone Jeweller ring button), MotionCam Video Doorbell, SmartLock / LockBridge variants with integrated ring button | `doorbell_pressed` on the hub's security event entity, plus a **per-device `event` entity** (`device_class: doorbell`) that emits Home Assistant's canonical `ring` event; a doorbell motion push also flips the doorbell's `motion_detected` on (30 s auto-off). SmartLock variant exposes lock state on the lock entity. Requires FCM credentials configured. _Note:_ the video doorbell has no photo capture in Home Assistant. For **live view**, if the doorbell is bridged through an Ajax NVR you can reach its stream over ONVIF — see [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). |
 | Keypads | Keypad, KeypadPlus, KeypadCombi, KeypadTouchscreen | Battery, tamper, temperature, signal, NFC status |
 | Keyfobs (experimental) | SpaceControl, SpaceControl S | Grouped under a single **Keyfobs** device, with one **Active** binary sensor per keyfob (diagnostic). The active/inactive value is **experimental and not yet confirmed** — see [Keyfobs (experimental)](#keyfobs-experimental). Who armed/disarmed via a keyfob already appears in the logbook regardless |
 | Sirens | HomeSiren, HomeSiren S, HomeSiren Fibra, HomeSiren G3, StreetSiren, StreetSiren S, StreetSiren Plus, StreetSiren Plus Fibra/G3, StreetSiren Fibra, StreetSiren Double Deck (& S / Fibra) | Battery, tamper, signal, internal temperature (HomeSiren / StreetSiren family) |
@@ -215,6 +215,26 @@ MotionCam **PhOD** (Photo on Demand) models support capturing photos remotely:
 > **Note**: Regular MotionCam models (without PhOD) do not support on-demand photo capture. The button entity is only created for PhOD models.
 
 Photos are automatically cleaned up based on your retention settings (configurable in integration options).
+
+## Video cameras (ONVIF / RTSP)
+
+Ajax video hardware (the **NVR** and the IP cameras / doorbell channels bridged through it) exposes a **local** ONVIF/RTSP service. This integration does **not** stream or proxy that video itself — instead it reads the connection details so you can point **Home Assistant's built-in [ONVIF integration](https://www.home-assistant.io/integrations/onvif/)** at each camera and get a real `camera` entity with live view.
+
+> **Local network only.** The stream goes straight from Home Assistant to the camera/NVR on your LAN — it never travels through the Ajax cloud. Home Assistant must be on the same network (or reachable to it over a VPN). There is no cloud/remote live view.
+
+**Steps:**
+
+1. **Enable ONVIF in the Ajax app** for the NVR (and/or each camera). It's off by default. Create an **ONVIF username and password** there — Home Assistant will need them, and the integration never sees them.
+2. **Find each camera's IP and ports** from the integration diagnostics: **Settings → Devices & services → Aegis for Ajax → ⋮ → Download diagnostics**. Look under the `video_edge_onvif_rtsp` section. Each VideoEdge lists:
+   - `network` → the camera's LAN `ip` (and `mac`)
+   - `onvif.http_port` → the ONVIF port (typically `8080`)
+   - `rtsp.http_port` → the RTSP port (typically `8554`)
+   - `onvif.user_auth_enabled` → `true` once you've created an ONVIF user (if `false`, finish step 1 first)
+3. **Add the ONVIF integration in Home Assistant** (**Settings → Devices & services → Add Integration → ONVIF**) using that **IP**, the **ONVIF port** (`8080`), and the **ONVIF user/password** you created. Home Assistant discovers the camera's profiles and creates the `camera` entity with live view.
+
+That's it — from there the camera behaves like any other ONVIF camera in Home Assistant (live view, snapshots, recording, use in automations), while Aegis keeps providing the device's motion/tamper sensors and the doorbell `ring` event.
+
+> If your Home Assistant can't reach the camera on its LAN IP, ONVIF discovery will fail — this is a network reachability issue, not an integration one. As a fallback you can also point the **Generic Camera** integration at the RTSP stream directly (port `8554`).
 
 ## Custom Services
 
@@ -405,7 +425,7 @@ If a specific group of sensors stops working:
 
 ## Roadmap
 
-- [ ] Video stream support (VideoEdge, RTSP)
+- [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). Native/proxied streaming and the radio MotionCam Video family (not behind an NVR) are still open
 - [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.3.0`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
 - [ ] Per-device firmware update entities. Hub-level entity ships in `1.4.0` via `streamHubObject` field 201; field 200 (`device_firmware_updates`) carries the same shape per device for the per-device entities, same read-only-by-design pattern
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
@@ -417,7 +437,7 @@ This integration covers the hardware I personally own and can validate against a
 
 Areas where the integration could grow with community input:
 
-- **Video streaming** (live view on MotionCam Video, Video Edge cameras) — the biggest open gap.
+- **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR, and any in-integration (proxied) streaming.
 - **Bidirectional WaterStop control** — read-only valve entity ships since `1.3.0`; full open / close is still pending.
 - **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. If yours has one deactivated by your installer/CRA, a diagnostics dump + debug log would let us finalize the indicator.
 - **Per-device firmware updates**, **device settings** (sensitivity, brightness, alert thresholds).
