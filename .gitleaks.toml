@@ -11,6 +11,13 @@ description = "Known non-secrets and test fixtures"
 paths = [
   '''tests/.*''',
   '''scripts/test_.*\.py''',
+  # Protobuf schema definitions and the code generated from them. These are
+  # API schema / machine-generated stubs, never operational secrets. The
+  # default ruleset flags enum-value names and descriptor bytes as
+  # "generic-api-key" / "aws-access-token" false positives, which only the
+  # full-history (scheduled) scan surfaces.
+  '''proto_src/.*''',
+  '''custom_components/aegis_ajax/proto/.*''',
 ]
 
 # The Firebase Web API key shipped inside the public Ajax cobranded APKs is a

@@ -29,7 +29,7 @@ message FindAllAudioSampleOnHubResponse {
     v3.mobilegwsvc.commonmodels.resource.audio.AudioFormat audio_format = 4;    // Format of the audio file (as for now always AUDIO_FORMAT_MP3)
     google.protobuf.Duration duration = 5;                                      // Audio file duration, alternatively we can send iso string of duration
     google.protobuf.Timestamp expiration_time = 6;                              // When the link expires
-    string url = 7;                                                             // Full url to file. Example - https://staging-hubs-uploaded-resources-6vauz.s3.eu-west-1.amazonaws.com/000D763D_1746176958055_7571e94d-462e-4a59-bdd5-4410684cd52e_0000b00960a73032_01.mp3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20250502T091911Z&X-Amz-SignedHeaders=host&X-Amz-Credential=AKIASDYOU5NDYDTOH7K4%2F20250502%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Expires=604800&X-Amz-Signature=f39c2c31d81554daf554627ccee6d27943c1c170de4f51f616364a8699f8defe
+    string url = 7;                                                             // Full (pre-signed) url to the audio file
   }
 
   message Failure {
