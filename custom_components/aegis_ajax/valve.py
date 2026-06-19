@@ -1,16 +1,13 @@
-"""Valve entities for Ajax WaterStop devices (read-only — #117).
+"""Valve entities for Ajax WaterStop devices (#117, open/close #308).
 
-Read-only on purpose: the v3 protos we have don't expose a
-`SwitchWaterStopService`, so the integration cannot toggle the valve
-from HA. Surfacing OPEN / CLOSE features would just attach buttons that
-silently fail. The entity therefore declares `supported_features = 0`
-and `reports_position = False`; automations can still react to the
-valve closing (leak event) via the standard `valve.closed` state
-trigger.
+State comes from `WaterStopChannel.state`. Open/close ride the generic
+device on/off command path the integration already uses for relays and
+sockets — there's no dedicated WaterStop command service. The valve is a
+single-channel device, so commands target channel 1: opening the valve
+sends device-on, closing sends device-off (the same polarity as the
+`valve_ch1` state read, where a truthy channel means the valve is open).
 
-When someone with a WaterStop captures the wire calls the official
-mobile app makes when toggling, extending this entity with an
-`async_open_valve` / `async_close_valve` pair is straightforward.
+`reports_position` stays False — the WaterStop is binary, not positional.
 """
 
 from __future__ import annotations
@@ -25,8 +22,9 @@ from homeassistant.components.valve import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
-from custom_components.aegis_ajax.entity import build_device_info
+from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -41,6 +39,9 @@ _LOGGER = logging.getLogger(__name__)
 # default wireless variant) and `water_stop_base` (Fibra, wired). Same
 # `WaterStopChannel` payload, same parser path, same entity surface.
 VALVE_DEVICE_TYPES: frozenset[str] = frozenset({"water_stop", "water_stop_base"})
+
+# The WaterStop exposes a single valve channel; on/off commands target it.
+_VALVE_CHANNEL = 1
 
 
 async def async_setup_entry(
@@ -60,7 +61,7 @@ class AjaxValve(CoordinatorEntity[AjaxCobrandedCoordinator], ValveEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_device_class = ValveDeviceClass.WATER
-    _attr_supported_features = ValveEntityFeature(0)
+    _attr_supported_features = ValveEntityFeature.OPEN | ValveEntityFeature.CLOSE
     _attr_reports_position = False
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
@@ -117,3 +118,22 @@ class AjaxValve(CoordinatorEntity[AjaxCobrandedCoordinator], ValveEntity):
         if device is None:
             return {}
         return {"stuck": bool(device.statuses.get("valve_ch1_stuck"))}
+
+    async def async_open_valve(self, **kwargs: object) -> None:
+        await self._send("on")
+
+    async def async_close_valve(self, **kwargs: object) -> None:
+        await self._send("off")
+
+    async def _send(self, action: str) -> None:
+        device = self._device
+        if device is None:
+            return
+        factory = DeviceCommand.on if action == "on" else DeviceCommand.off
+        cmd = factory(
+            hub_id=device.hub_id,
+            device_id=self._device_id,
+            device_type=device.device_type,
+            channels=[_VALVE_CHANNEL],
+        )
+        await async_send_device_command(self.coordinator, cmd)

@@ -33,7 +33,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Lights**: Dimmers with absolute brightness control via `DeviceCommandBrightness`
 - **Locks**: Ajax SmartLock and LockBridge (Yale) — lock and unlock. Hub-attached Jeweller locks (e.g. installer-added Yale modules) are commanded over the generic device on/off path. Unlatch (`lock.open`) isn't exposed: it requires Ajax's cloud SmartLock service, which the hub-attached locks seen so far aren't registered with — the Ajax app can't unlatch them either
 - **Hub Chime switch**: a per-hub `Chime` switch toggles the hub-wide chime — the tone the hub plays when a monitored door/window opens while disarmed (the Ajax app's bottom-left toggle). Only created for hubs that expose the feature, and requires the account's chime-edit permission. Changes made from the Ajax app are reflected in Home Assistant immediately.
-- **Valves** (read-only): Ajax WaterStop and WaterStop Fibra surface as native `valve.*` entities reflecting `WaterStopChannel.state` (open / closed), `is_transitioning`, and a `stuck` attribute pulled from the channel-level `MALFUNCTION_IS_STUCK`. Bidirectional control isn't wired yet — open an issue if you have a WaterStop and we'll work with you to add the open / close path
+- **Valves**: Ajax WaterStop and WaterStop Fibra surface as native `valve.*` entities reflecting `WaterStopChannel.state` (open / closed), `is_transitioning`, and a `stuck` attribute pulled from the channel-level `MALFUNCTION_IS_STUCK`. **Open and close are supported** — the valve can be controlled from Home Assistant and automations
 - **Hub firmware update** (read-only): each hub exposes an `update.<hub>_firmware` entity that shows whether Ajax has queued a firmware update for the hub, with download progress when the cloud is pushing bytes. No install button is exposed on purpose — firmware updates remain Ajax-scheduled and the entity is informational. Click the entity for a short explainer of what "Up-to-date" actually means here.
 - **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention
@@ -426,7 +426,7 @@ If a specific group of sensors stops working:
 ## Roadmap
 
 - [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). Native/proxied streaming and the radio MotionCam Video family (not behind an NVR) are still open
-- [ ] Valve platform — bidirectional control. Read-only `valve` entity ships in `1.3.0`; full open / close still waits on capturing the official app's command-side calls (no `SwitchWaterStopService` in the v3 protos)
+- [x] Valve platform — bidirectional control. Read-only `valve` entity shipped in `1.3.0`; open / close added in `1.12.0` over the generic device on/off command path
 - [ ] Per-device firmware update entities. Hub-level entity ships in `1.4.0` via `streamHubObject` field 201; field 200 (`device_firmware_updates`) carries the same shape per device for the per-device entities, same read-only-by-design pattern
 - [ ] Number/Select platforms for device settings (sensitivity, brightness)
 - [x] SpaceControl (keyfob) detection — keyfobs surface as a **Keyfobs** device with an experimental per-keyfob active sensor (`1.10.0`); the active/inactive value still awaits confirmation from a deactivated-keyfob log. (Who armed/disarmed via a keyfob was already attributed in the logbook.)
@@ -438,7 +438,6 @@ This integration covers the hardware I personally own and can validate against a
 Areas where the integration could grow with community input:
 
 - **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR, and any in-integration (proxied) streaming.
-- **Bidirectional WaterStop control** — read-only valve entity ships since `1.3.0`; full open / close is still pending.
 - **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. If yours has one deactivated by your installer/CRA, a diagnostics dump + debug log would let us finalize the indicator.
 - **Per-device firmware updates**, **device settings** (sensitivity, brightness, alert thresholds).
 - **Co-branded apps** the integration doesn't yet recognise in the `App Label` dropdown.

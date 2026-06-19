@@ -165,13 +165,15 @@ class TestAjaxValveAvailability:
 
 
 class TestAjaxValveSupportedFeatures:
-    def test_no_supported_features(self) -> None:
-        # Read-only path: no `SwitchWaterStopService` in v3 protos, so
-        # exposing OPEN/CLOSE features would surface controls that fail
-        # silently. Keep features at 0 until the command path is captured.
+    def test_open_and_close_features_supported(self) -> None:
+        # Open/close ride the generic device on/off command path (#308),
+        # so the entity advertises OPEN | CLOSE.
+        from homeassistant.components.valve import ValveEntityFeature
+
         device = _make_device(valve_ch1=True)
         valve = AjaxValve(coordinator=_make_coordinator(device), device_id=device.id)
-        assert int(valve.supported_features) == 0
+        assert valve.supported_features & ValveEntityFeature.OPEN
+        assert valve.supported_features & ValveEntityFeature.CLOSE
 
     def test_reports_position_disabled(self) -> None:
         # WaterStop is binary, not positional. HA renders a position bar
@@ -179,6 +181,71 @@ class TestAjaxValveSupportedFeatures:
         device = _make_device(valve_ch1=True)
         valve = AjaxValve(coordinator=_make_coordinator(device), device_id=device.id)
         assert valve.reports_position is False
+
+
+class TestAjaxValveCommands:
+    """Open/close go through the generic device on/off command (#308):
+    open = device-on, close = device-off, on the WaterStop's single
+    channel (1). Polarity matches the state read (`valve_ch1` truthy =
+    open). No new RPC — reuses the relay/socket switch path.
+    """
+
+    @pytest.mark.asyncio
+    async def test_async_open_valve_sends_device_on_channel_1(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        device = _make_device(valve_ch1=False)
+        coordinator = _make_coordinator(device)
+        valve = AjaxValve(coordinator=coordinator, device_id=device.id)
+        with patch(
+            "custom_components.aegis_ajax.valve.async_send_device_command",
+            new=AsyncMock(),
+        ) as send:
+            await valve.async_open_valve()
+        send.assert_awaited_once()
+        sent_coordinator, cmd = send.await_args.args
+        assert sent_coordinator is coordinator
+        assert cmd.action == "on"
+        assert cmd.hub_id == "hub-1"
+        assert cmd.device_id == "valve-1"
+        assert cmd.device_type == "water_stop"
+        assert cmd.channels == [1]
+
+    @pytest.mark.asyncio
+    async def test_async_close_valve_sends_device_off_channel_1(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        device = _make_device(valve_ch1=True)
+        coordinator = _make_coordinator(device)
+        valve = AjaxValve(coordinator=coordinator, device_id=device.id)
+        with patch(
+            "custom_components.aegis_ajax.valve.async_send_device_command",
+            new=AsyncMock(),
+        ) as send:
+            await valve.async_close_valve()
+        send.assert_awaited_once()
+        _, cmd = send.await_args.args
+        assert cmd.action == "off"
+        assert cmd.channels == [1]
+        assert cmd.device_type == "water_stop"
+
+    @pytest.mark.asyncio
+    async def test_commands_noop_when_device_missing(self) -> None:
+        # Device dropped from the snapshot between polls: don't raise,
+        # don't fire a command with empty hub/device ids.
+        from unittest.mock import AsyncMock, patch
+
+        device = _make_device(valve_ch1=True)
+        coordinator = _make_coordinator(device)
+        valve = AjaxValve(coordinator=coordinator, device_id=device.id)
+        coordinator.devices = {}
+        with patch(
+            "custom_components.aegis_ajax.valve.async_send_device_command",
+            new=AsyncMock(),
+        ) as send:
+            await valve.async_open_valve()
+            await valve.async_close_valve()
+        send.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - unreleased
+
+### Added
+- **WaterStop valves can now be opened and closed from Home Assistant (#308).** The Ajax WaterStop (and WaterStop Fibra) valve entity was read-only; it now supports open and close, so you can shut off or restore the water supply from the dashboard or an automation. State, transition and the `stuck` attribute keep working as before.
+
 ## [1.11.5] - 2026-06-18
 
 LifeQuality air-quality sensors, NVR-bridged camera fixes, and groundwork for camera support. Consolidates the 1.11.5-beta series.
