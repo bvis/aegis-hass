@@ -427,9 +427,8 @@ If a specific group of sensors stops working:
 
 - [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). Native/proxied streaming and the radio MotionCam Video family (not behind an NVR) are still open
 - [x] Valve platform — bidirectional control. Read-only `valve` entity shipped in `1.3.0`; open / close added in `1.12.0` over the generic device on/off command path
-- [ ] Per-device firmware update entities. Hub-level entity ships in `1.4.0` via `streamHubObject` field 201; field 200 (`device_firmware_updates`) carries the same shape per device for the per-device entities, same read-only-by-design pattern
-- [ ] Number/Select platforms for device settings (sensitivity, brightness)
-- [x] SpaceControl (keyfob) detection — keyfobs surface as a **Keyfobs** device with an experimental per-keyfob active sensor (`1.10.0`); the active/inactive value still awaits confirmation from a deactivated-keyfob log. (Who armed/disarmed via a keyfob was already attributed in the logbook.)
+- [ ] Number/Select platforms for device settings (sensitivity, brightness, alert thresholds) — community input wanted, see #310
+- [x] SpaceControl (keyfob) detection — keyfobs surface as a **Keyfobs** device with an experimental per-keyfob active sensor (`1.10.0`); the active/inactive value still awaits confirmation from a deactivated-keyfob log (#311). (Who armed/disarmed via a keyfob was already attributed in the logbook.)
 
 ## Help Wanted
 
@@ -438,8 +437,8 @@ This integration covers the hardware I personally own and can validate against a
 Areas where the integration could grow with community input:
 
 - **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR, and any in-integration (proxied) streaming.
-- **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. If yours has one deactivated by your installer/CRA, a diagnostics dump + debug log would let us finalize the indicator.
-- **Per-device firmware updates**, **device settings** (sensitivity, brightness, alert thresholds).
+- **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. If yours has one deactivated by your installer/CRA, a diagnostics dump + debug log would let us finalize the indicator — see #311.
+- **Device settings** (sensitivity, brightness, alert thresholds) — see #310.
 - **Co-branded apps** the integration doesn't yet recognise in the `App Label` dropdown.
 - **Any new device family** that shows up in the snapshot without entities.
 
