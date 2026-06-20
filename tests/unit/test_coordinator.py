@@ -2228,27 +2228,13 @@ def _make_siren(
 
 class TestHubDeviceTemperatureRefresh:
     @pytest.mark.asyncio
-    async def test_merges_temperature_into_siren_statuses(self) -> None:
-        coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {"s1d": _make_siren("s1d")}
-        coordinator.async_set_updated_data = MagicMock()
-        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
-
-        await coordinator._async_refresh_hub_device_temperatures()
-
-        assert coordinator.devices["s1d"].statuses["temperature"] == 21.0
-        coordinator._devices_api.get_hub_device_temperature.assert_awaited_once_with("hub-1", "s1d")
-        # The merge must be pushed to listeners or the sensor never materialises.
-        coordinator.async_set_updated_data.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_merges_temperature_into_curtain_outdoor_statuses(self) -> None:
-        # #229: outdoor curtain PIRs are gated for the StreamHubDevice
-        # temperature fetch just like sirens — the light stream omits their
-        # temperature, so the sensor only materialises via this path.
+    async def test_merges_temperature_into_curtain_mini_statuses(self) -> None:
+        # The Curtain Outdoor Mini is the only family still sourced over gRPC
+        # (it carries device_temperature and has no confirmed HTS 0x02). The
+        # light stream omits its temperature, so the sensor materialises here.
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {
-            "c1d": _make_siren("c1d", device_type="motion_protect_curtain_outdoor_plus")
+            "c1d": _make_siren("c1d", device_type="motion_protect_curtain_outdoor_mini")
         }
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=17.0)
@@ -2260,7 +2246,28 @@ class TestHubDeviceTemperatureRefresh:
         coordinator.async_set_updated_data.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_skips_non_siren_devices(self) -> None:
+    async def test_skips_grpc_fetch_for_hts_sourced_families(self) -> None:
+        # #312/#269: sirens (and Curtain Plus/Base) are sourced from HTS 0x02,
+        # which is authoritative and matches the Ajax app. They must NOT be
+        # fetched over the gRPC StreamHubDevice path (that returns the board
+        # temperature and wastes an RPC).
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {
+            "s1d": _make_siren("s1d"),
+            "cpd": _make_siren("cpd", device_type="motion_protect_curtain_outdoor_plus"),
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=99.0)
+
+        await coordinator._async_refresh_hub_device_temperatures()
+
+        coordinator._devices_api.get_hub_device_temperature.assert_not_called()
+        assert "temperature" not in coordinator.devices["s1d"].statuses
+        assert "temperature" not in coordinator.devices["cpd"].statuses
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_non_temperature_devices(self) -> None:
         coordinator = _make_coordinator(["s1"])
         coordinator.devices = {"d1": _make_device("d1")}  # door_protect
         coordinator.async_set_updated_data = MagicMock()
@@ -2273,34 +2280,64 @@ class TestHubDeviceTemperatureRefresh:
         coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_skips_siren_that_already_has_temperature(self) -> None:
+    async def test_changed_grpc_temperature_updates(self) -> None:
+        # #312: a gRPC-sourced reading must not freeze after the first fetch —
+        # a different value updates the stored temperature and notifies.
         coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {"s1d": _make_siren("s1d", statuses={"temperature": 18.0})}
+        coordinator.devices = {
+            "c1d": _make_siren(
+                "c1d",
+                device_type="motion_protect_curtain_outdoor_mini",
+                statuses={"temperature": 18.0},
+            )
+        }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=99.0)
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
 
         await coordinator._async_refresh_hub_device_temperatures()
 
-        coordinator._devices_api.get_hub_device_temperature.assert_not_called()
-        assert coordinator.devices["s1d"].statuses["temperature"] == 18.0
+        assert coordinator.devices["c1d"].statuses["temperature"] == 21.0
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unchanged_grpc_temperature_is_noop(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {
+            "c1d": _make_siren(
+                "c1d",
+                device_type="motion_protect_curtain_outdoor_mini",
+                statuses={"temperature": 21.0},
+            )
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=21.0)
+
+        await coordinator._async_refresh_hub_device_temperatures()
+
+        assert coordinator.devices["c1d"].statuses["temperature"] == 21.0
         coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_none_result_leaves_statuses_untouched(self) -> None:
         coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.devices = {
+            "c1d": _make_siren("c1d", device_type="motion_protect_curtain_outdoor_mini")
+        }
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_temperature = AsyncMock(return_value=None)
 
         await coordinator._async_refresh_hub_device_temperatures()
 
-        assert "temperature" not in coordinator.devices["s1d"].statuses
+        assert "temperature" not in coordinator.devices["c1d"].statuses
         coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_one_device_error_does_not_abort_others(self) -> None:
         coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {"bad": _make_siren("bad"), "good": _make_siren("good")}
+        coordinator.devices = {
+            "bad": _make_siren("bad", device_type="motion_protect_curtain_outdoor_mini"),
+            "good": _make_siren("good", device_type="motion_protect_curtain_outdoor_mini"),
+        }
         coordinator.async_set_updated_data = MagicMock()
 
         async def _temp(hub_id: str, device_id: str) -> float:
@@ -2326,7 +2363,9 @@ class TestHubDeviceTemperatureRefresh:
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True
         coordinator._streams_started = True
-        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.devices = {
+            "c1d": _make_siren("c1d", device_type="motion_protect_curtain_outdoor_mini")
+        }
         coordinator._stream_tasks = [MagicMock(done=MagicMock(return_value=False))]
         coordinator._hts_client = MagicMock()
         coordinator._hts_task = MagicMock(done=MagicMock(return_value=False))
@@ -2875,13 +2914,28 @@ class TestHtsDeviceTemperature:
         assert coordinator.devices["d1"].statuses["temperature"] == 27.0
         coordinator.async_set_updated_data.assert_called_once()
 
-    def test_existing_grpc_temperature_not_overwritten(self) -> None:
-        # gRPC wins: an already-present temperature is left untouched.
-        coordinator = self._coordinator_with_device(
-            "motion_protect_curtain_outdoor_plus", statuses={"temperature": 21.0}
-        )
-        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x1b"})
-        assert coordinator.devices["d1"].statuses["temperature"] == 21.0
+    def test_siren_temperature_merged_from_0x02(self) -> None:
+        # #312/#269: sirens are sourced from HTS 0x02 (matches the Ajax app),
+        # not the gRPC board temperature.
+        coordinator = self._coordinator_with_device("street_siren")
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x19"})
+        assert coordinator.devices["d1"].statuses["temperature"] == 25.0
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_changed_0x02_updates_existing_temperature(self) -> None:
+        # #312: the reading must not freeze after the first value. A different
+        # 0x02 updates the stored temperature and notifies listeners.
+        coordinator = self._coordinator_with_device("street_siren", statuses={"temperature": 28.0})
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x1a"})
+        assert coordinator.devices["d1"].statuses["temperature"] == 26.0
+        coordinator.async_set_updated_data.assert_called_once()
+
+    def test_unchanged_0x02_is_noop(self) -> None:
+        # An identical 0x02 (re-reported on every STATUS_BODY probe) must not
+        # churn listeners.
+        coordinator = self._coordinator_with_device("street_siren", statuses={"temperature": 25.0})
+        coordinator._on_hts_device_kv("hub-1", "d1", {0x02: b"\x19"})
+        assert coordinator.devices["d1"].statuses["temperature"] == 25.0
         coordinator.async_set_updated_data.assert_not_called()
 
     def test_non_gated_device_not_given_hts_temperature(self) -> None:
