@@ -262,6 +262,18 @@ HTS_TEMPERATURE_DEVICE_TYPES: frozenset[str] = frozenset(
     {
         "motion_protect_curtain_outdoor_plus",
         "motion_protect_curtain_outdoor_base",
+        # Sirens (#312, #269). They also expose a gRPC `device_temperature`, but
+        # that is the internal *board* temperature (runs hotter than ambient and
+        # only refreshes on the slow per-device snapshot). HTS 0x02 is the value
+        # the Ajax app shows and updates live, confirmed for both the indoor
+        # HomeSiren and the outdoor StreetSiren, so sirens are sourced from 0x02
+        # and excluded from the gRPC fetch.
+        "street_siren",
+        "street_siren_plus_g3",
+        "home_siren",
+        "home_siren_g3",
+        "home_siren_s",
+        "home_siren_fibra",
     }
 )
 

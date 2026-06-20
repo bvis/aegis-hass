@@ -621,4 +621,27 @@ class TestParseDeviceTemperatureC:
     def test_gated_types_present(self) -> None:
         assert "motion_protect_curtain_outdoor_plus" in HTS_TEMPERATURE_DEVICE_TYPES
         assert "motion_protect_curtain_outdoor_base" in HTS_TEMPERATURE_DEVICE_TYPES
+        # Mini stays gRPC-only — it carries device_temperature in its HubDevice
+        # message and has no confirmed HTS 0x02 sample.
         assert "motion_protect_curtain_outdoor_mini" not in HTS_TEMPERATURE_DEVICE_TYPES
+
+    def test_sirens_decode_from_0x02(self) -> None:
+        # #312/#269: sirens carry their internal temperature on HTS 0x02 (the
+        # value the Ajax app shows), confirmed for both the indoor HomeSiren and
+        # the outdoor StreetSiren. They are sourced from 0x02, not the gRPC
+        # board temperature, so the reading matches the app and updates live.
+        assert (
+            parse_device_temperature_c("street_siren", {DEVICE_KEY_TEMPERATURE_C: b"\x19"}) == 25.0
+        )
+        assert parse_device_temperature_c("home_siren", {DEVICE_KEY_TEMPERATURE_C: b"\x17"}) == 23.0
+
+    def test_siren_types_in_gated_set(self) -> None:
+        for siren_type in (
+            "street_siren",
+            "street_siren_plus_g3",
+            "home_siren",
+            "home_siren_g3",
+            "home_siren_s",
+            "home_siren_fibra",
+        ):
+            assert siren_type in HTS_TEMPERATURE_DEVICE_TYPES

@@ -592,11 +592,18 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
+        from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
+            HTS_TEMPERATURE_DEVICE_TYPES,
+        )
+
         changed = False
         for device_id, device in list(self.devices.items()):
+            # Families sourced from HTS 0x02 (sirens #312, Curtain Plus/Base
+            # #229) are authoritative there — don't fetch their gRPC board
+            # temperature, which is wrong (runs hotter) and a wasted RPC.
             if (
                 device.device_type not in HUB_DEVICE_TEMPERATURE_DEVICE_TYPES
-                or "temperature" in device.statuses
+                or device.device_type in HTS_TEMPERATURE_DEVICE_TYPES
             ):
                 continue
             try:
@@ -610,6 +617,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             current = self.devices.get(device_id)
             if current is None:
+                continue
+            # Refresh on change, not once: the temperature must not freeze at the
+            # first reading (#312). An unchanged value is skipped to avoid
+            # churning listeners every interval.
+            if current.statuses.get("temperature") == temperature:
                 continue
             self.devices[device_id] = dc_replace(
                 current, statuses={**current.statuses, "temperature": temperature}
@@ -943,9 +955,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         merge in `_async_refresh_hub_device_temperatures`; the carry-forward in
         the device-snapshot path keeps it across gRPC refreshes.
 
-        Additive and safe: skips devices that already carry a temperature (gRPC
-        wins) and devices not in `HTS_TEMPERATURE_DEVICE_TYPES`. Returns True
-        when a value was applied. Runs on the loop (HTS listen task).
+        Safe and live: only applies to families in `HTS_TEMPERATURE_DEVICE_TYPES`
+        (0x02 is authoritative for them) and refreshes on change so the reading
+        tracks the device rather than freezing at the first value (#312). An
+        unchanged 0x02 (re-reported on every STATUS_BODY probe) is a no-op.
+        Returns True when a value was applied. Runs on the loop (HTS listen task).
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
@@ -955,8 +969,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         if device.device_type not in HTS_TEMPERATURE_DEVICE_TYPES:
-            return False
-        if "temperature" in device.statuses:
             return False
         temperature = parse_device_temperature_c(device.device_type, kv)
         if temperature is None:
@@ -968,6 +980,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device.device_type,
                 sorted(kv),
             )
+            return False
+        if device.statuses.get("temperature") == temperature:
+            # Unchanged value re-reported on a routine probe — no listener churn.
             return False
         self.devices[device_id_hex] = dc_replace(
             device, statuses={**device.statuses, "temperature": temperature}

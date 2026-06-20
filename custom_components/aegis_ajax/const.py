@@ -155,16 +155,22 @@ MAX_RETRIES = 3
 RATE_LIMIT_REQUESTS = 60
 RATE_LIMIT_WINDOW = 60  # seconds
 
-# Per-device internal temperature (#220, #229). Some devices report their
-# temperature only in the rich per-device `StreamHubDevice` snapshot, not in
-# the lighter `StreamLightDevices` stream we run continuously: sirens (#220)
-# and outdoor curtain motion detectors (#229). We pull it with a throttled
-# one-shot snapshot per device — temperature is slow-moving and a persistent
-# per-device stream would contradict how the Ajax app uses that endpoint.
+# Per-device internal temperature (#220, #229, #312). Some devices report their
+# temperature only in the rich per-device `StreamHubDevice` snapshot, not in the
+# lighter `StreamLightDevices` stream we run continuously: sirens (#220) and
+# outdoor curtain motion detectors (#229). The Curtain Outdoor *Mini* is the
+# only family still pulled over gRPC (a throttled one-shot snapshot — temperature
+# is slow-moving and a persistent per-device stream would contradict how the
+# Ajax app uses that endpoint). Sirens and the Curtain Plus/Base are sourced from
+# HTS sub-key 0x02 instead (see api/hts/hub_state.HTS_TEMPERATURE_DEVICE_TYPES),
+# which matches the Ajax app and updates live.
 HUB_DEVICE_TEMP_REFRESH_INTERVAL = 900  # seconds (15 min)
-# Device types whose `HubDevice` oneof case carries a `device_temperature`
-# that the `StreamLightDevices` stream omits. Indoor motion/door sensors are
-# NOT here — they already carry `temperature` in the light stream.
+# Device types whose temperature comes from a per-device source (gRPC or HTS)
+# rather than the `StreamLightDevices` stream. Used as the carry-forward set so
+# the merged value survives a fresh stream snapshot that lacks it. The gRPC fetch
+# only runs for the members NOT in `HTS_TEMPERATURE_DEVICE_TYPES` (i.e. the Mini).
+# Indoor motion/door sensors are NOT here — they carry `temperature` in the
+# light stream.
 HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
     {
         "street_siren",
@@ -173,12 +179,6 @@ HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
         "home_siren_g3",
         "home_siren_s",
         "home_siren_fibra",
-        # Outdoor curtain PIRs (#229). Only the *Mini* carries
-        # `device_temperature` in its gRPC `HubDevice` message; the Plus/Base
-        # messages are stubs with no temperature field, so their temperature is
-        # sourced from HTS sub-key 0x02 instead (see
-        # api/hts/hub_state.HTS_TEMPERATURE_DEVICE_TYPES). All three stay in
-        # this set so the merged temperature carries across gRPC snapshots.
         "motion_protect_curtain_outdoor_base",
         "motion_protect_curtain_outdoor_mini",
         "motion_protect_curtain_outdoor_plus",
