@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.12.1] - unreleased
+## [1.12.1] - 2026-06-20
+
+Siren temperature fix. Consolidates the 1.12.1-beta series.
 
 ### Fixed
 - **Siren temperature is no longer stuck and now matches the Ajax app (#312).** The HomeSiren/StreetSiren temperature was read once at startup and then frozen for the lifetime of the integration (both the per-device gRPC refresh and the HTS path skipped any device that already had a value), and the gRPC source was the internal board sensor, which reads a few degrees high on a sun-exposed StreetSiren. Sirens are now sourced from the same live internal-temperature value the Ajax app shows (HTS sub-key 0x02), so the reading matches the app and updates over the push channel. The freeze is fixed for every per-device temperature source, so the Curtain Outdoor family also updates live now.
