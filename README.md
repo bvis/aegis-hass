@@ -225,12 +225,14 @@ Ajax video hardware (the **NVR** and the IP cameras / doorbell channels bridged 
 **Steps:**
 
 1. **Enable ONVIF in the Ajax app** for the NVR (and/or each camera). It's off by default. Create an **ONVIF username and password** there — Home Assistant will need them, and the integration never sees them.
-2. **Find each camera's IP and ports** from the integration diagnostics: **Settings → Devices & services → Aegis for Ajax → ⋮ → Download diagnostics**. Look under the `video_edge_onvif_rtsp` section. Each VideoEdge lists:
+2. **Add the ONVIF integration in Home Assistant** (**Settings → Devices & services → Add Integration → ONVIF**). Home Assistant usually **auto-discovers** the Ajax cameras on your LAN, so you can just pick the discovered device and enter the **ONVIF user/password** from step 1 — no need to type the IP. Home Assistant then creates the `camera` entity with live view.
+3. **If a camera isn't auto-discovered** (or to verify the connection details), get its IP and ports from the integration diagnostics: **Settings → Devices & services → Aegis for Ajax → ⋮ → Download diagnostics**, under the `video_edge_onvif_rtsp` section. Each VideoEdge lists:
    - `network` → the camera's LAN `ip` (and `mac`)
    - `onvif.http_port` → the ONVIF port (typically `8080`)
    - `rtsp.http_port` → the RTSP port (typically `8554`)
    - `onvif.user_auth_enabled` → `true` once you've created an ONVIF user (if `false`, finish step 1 first)
-3. **Add the ONVIF integration in Home Assistant** (**Settings → Devices & services → Add Integration → ONVIF**) using that **IP**, the **ONVIF port** (`8080`), and the **ONVIF user/password** you created. Home Assistant discovers the camera's profiles and creates the `camera` entity with live view.
+
+   Then add the ONVIF integration manually with that **IP**, the **ONVIF port** (`8080`), and the **ONVIF user/password**.
 
 That's it — from there the camera behaves like any other ONVIF camera in Home Assistant (live view, snapshots, recording, use in automations), while Aegis keeps providing the device's motion/tamper sensors and the doorbell `ring` event.
 
