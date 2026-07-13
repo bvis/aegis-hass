@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - unreleased
+
+### Added
+- **MotionProtect Outdoor now exposes its internal temperature (#269).** The outdoor motion detector doesn't report temperature on the device stream the integration reads for most families, so no temperature sensor was created for it. It is now sourced from the same live internal-temperature value the Ajax app shows (HTS sub-key 0x02, the same path already used for the Curtain Outdoor Plus/Base and the sirens), confirmed against a reporter's capture of a MotionProtect Outdoor Jeweller.
+
 ## [1.12.1] - 2026-06-20
 
 Siren temperature fix. Consolidates the 1.12.1-beta series.

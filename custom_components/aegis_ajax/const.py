@@ -155,10 +155,11 @@ MAX_RETRIES = 3
 RATE_LIMIT_REQUESTS = 60
 RATE_LIMIT_WINDOW = 60  # seconds
 
-# Per-device internal temperature (#220, #229, #312). Some devices report their
-# temperature only in the rich per-device `StreamHubDevice` snapshot, not in the
-# lighter `StreamLightDevices` stream we run continuously: sirens (#220) and
-# outdoor curtain motion detectors (#229). The Curtain Outdoor *Mini* is the
+# Per-device internal temperature (#220, #229, #269, #312). Some devices report
+# their temperature only in the rich per-device `StreamHubDevice` snapshot, not
+# in the lighter `StreamLightDevices` stream we run continuously: sirens (#220),
+# outdoor curtain motion detectors (#229) and the MotionProtect Outdoor (#269).
+# The Curtain Outdoor *Mini* is the
 # only family still pulled over gRPC (a throttled one-shot snapshot — temperature
 # is slow-moving and a persistent per-device stream would contradict how the
 # Ajax app uses that endpoint). Sirens and the Curtain Plus/Base are sourced from
@@ -182,6 +183,7 @@ HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
         "motion_protect_curtain_outdoor_base",
         "motion_protect_curtain_outdoor_mini",
         "motion_protect_curtain_outdoor_plus",
+        "motion_protect_outdoor",
     }
 )
 

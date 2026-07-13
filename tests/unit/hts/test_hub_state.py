@@ -645,3 +645,35 @@ class TestParseDeviceTemperatureC:
             "home_siren_fibra",
         ):
             assert siren_type in HTS_TEMPERATURE_DEVICE_TYPES
+
+    def test_motion_protect_outdoor_decodes_from_0x02(self) -> None:
+        # #269: MotionProtect Outdoor Jeweller carries no temperature on the
+        # light stream. A reporter's STATUS_BODY capture showed 0x02 on every
+        # candidate row with plausible ambient values (0x1d = 29 °C, 0x1a =
+        # 26 °C in July), so the family is sourced from HTS like the Curtain
+        # Outdoor Plus/Base.
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_outdoor", {DEVICE_KEY_TEMPERATURE_C: b"\x1d"}
+            )
+            == 29.0
+        )
+        assert (
+            parse_device_temperature_c(
+                "motion_protect_outdoor", {DEVICE_KEY_TEMPERATURE_C: b"\x1a"}
+            )
+            == 26.0
+        )
+
+    def test_motion_protect_outdoor_in_gated_set(self) -> None:
+        assert "motion_protect_outdoor" in HTS_TEMPERATURE_DEVICE_TYPES
+
+    def test_hts_set_is_subset_of_carry_forward_set(self) -> None:
+        # Every HTS-sourced family must also be in the coordinator's
+        # carry-forward set, or the merged temperature would be dropped on the
+        # next gRPC device snapshot (see the hub_state / const.py comments).
+        from custom_components.aegis_ajax.const import (
+            HUB_DEVICE_TEMPERATURE_DEVICE_TYPES,
+        )
+
+        assert HTS_TEMPERATURE_DEVICE_TYPES <= HUB_DEVICE_TEMPERATURE_DEVICE_TYPES

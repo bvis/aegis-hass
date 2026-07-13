@@ -262,6 +262,11 @@ HTS_TEMPERATURE_DEVICE_TYPES: frozenset[str] = frozenset(
     {
         "motion_protect_curtain_outdoor_plus",
         "motion_protect_curtain_outdoor_base",
+        # MotionProtect Outdoor (#269). No temperature on the light stream; a
+        # reporter's STATUS_BODY capture showed 0x02 with plausible ambient
+        # values on every candidate row (26–29 °C in July), matching the
+        # Curtain Outdoor Plus/Base behaviour on the same protocol.
+        "motion_protect_outdoor",
         # Sirens (#312, #269). They also expose a gRPC `device_temperature`, but
         # that is the internal *board* temperature (runs hotter than ambient and
         # only refreshes on the slow per-device snapshot). HTS 0x02 is the value
