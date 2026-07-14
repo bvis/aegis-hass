@@ -44,7 +44,7 @@ from custom_components.aegis_ajax.api.hts.protocol import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -257,6 +257,24 @@ class HtsClient:
     def hub_states(self) -> dict[str, HubNetworkState]:
         """Current hub network states, keyed by hub_id."""
         return self._hub_states
+
+    def seed_hub_states(self, states: Mapping[str, HubNetworkState]) -> None:
+        """Pre-populate hub states from a prior client's last-known values.
+
+        A fresh client is created on every HTS (re)connect, so its
+        ``_hub_states`` starts empty. Without seeding, the first snapshot
+        after a reconnect is parsed with ``existing=None`` and every field
+        *not* carried in that particular frame silently resets to its
+        dataclass default — most visibly ``externally_powered`` flips to
+        ``False`` ("Unplugged") whenever a post-reconnect frame happens to
+        omit ``KEY_HUB_POWERED``. During a power/network brownout the hub
+        reconnects repeatedly, producing a burst of spurious
+        Unplugged/Plugged-in toggles (#323). Seeding the states so merges
+        preserve last-known values fixes the root cause; only an explicit
+        key in a later frame can change a field.
+        """
+        for hub_id, state in states.items():
+            self._hub_states.setdefault(hub_id, state)
 
     # ------------------------------------------------------------------
     # Sequence number
@@ -787,6 +805,13 @@ class HtsClient:
                 )
                 existing = self._hub_states.get(hub_id)
                 new_state = parse_hub_params(kv, existing)
+                self._log_power_source(
+                    hub_id,
+                    "SETTINGS_BODY" if sub_key == 5 else "STATUS_BODY",
+                    kv,
+                    existing,
+                    new_state,
+                )
                 self._hub_states[hub_id] = new_state
                 if self._on_state_update:
                     self._on_state_update(hub_id, new_state)
@@ -813,6 +838,16 @@ class HtsClient:
 
         if not is_per_device_shape:
             kv = self._extract_direct_kv(params[1:])
+            # #323: never trust the mains-power flag from this positionally
+            # paired delta path. A mis-aligned per-device delta (see the
+            # #179 note above; escape handling can also shift byte
+            # boundaries) can surface a stray 0x03 (`KEY_HUB_POWERED`) and
+            # flip "Mains power" to "Plugged in" while the hub is genuinely
+            # stable — the Ajax app shows no change. Authoritative power
+            # comes only from the full STATUS/SETTINGS body, which locates
+            # the hub section by an exact hub-id marker and is re-requested
+            # frequently, so a real change is still reflected within seconds.
+            kv.pop(KEY_HUB_POWERED, None)
             if kv and self._is_network_state_delta(kv):
                 _LOGGER.debug(
                     "Hub %s: parsed %d keys from delta sub-key %d",
@@ -822,6 +857,7 @@ class HtsClient:
                 )
                 existing = self._hub_states.get(hub_id)
                 new_state = parse_hub_params(kv, existing)
+                self._log_power_source(hub_id, f"delta sub-key {sub_key}", kv, existing, new_state)
                 self._hub_states[hub_id] = new_state
                 if self._on_state_update:
                     self._on_state_update(hub_id, new_state)
@@ -970,6 +1006,40 @@ class HtsClient:
                 KEY_GPRS_ENABLED,
                 KEY_HUB_POWERED,
             )
+        )
+
+    def _log_power_source(
+        self,
+        hub_id: str,
+        source: str,
+        kv: dict[int, bytes],
+        existing: HubNetworkState | None,
+        new_state: HubNetworkState,
+    ) -> None:
+        """Diagnostic for #323: trace every write to the mains-power flag.
+
+        Logs at DEBUG whenever the parsed hub externally_powered value differs
+        from the last-known one, together with the frame source and the raw
+        KEY_HUB_POWERED bytes. This pins down which frame type flips "Mains
+        power" while the Ajax app shows a stable state, distinguishing a
+        genuine hub report from a mis-parsed delta. Kept at DEBUG (opt-in via
+        logger config) so it never floods the default log during the exact
+        flapping scenario it diagnoses.
+        """
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
+            return
+        prev = existing.externally_powered if existing is not None else None
+        if prev == new_state.externally_powered:
+            return
+        raw = kv.get(KEY_HUB_POWERED)
+        _LOGGER.debug(
+            "Hub %s: externally_powered %s -> %s via %s (KEY_HUB_POWERED raw=%s, keys=%s)",
+            hub_id,
+            prev,
+            new_state.externally_powered,
+            source,
+            raw.hex() if raw is not None else "absent",
+            sorted(kv),
         )
 
     def _schedule_hub_refresh(self, hub_id: str, reason: str) -> None:
