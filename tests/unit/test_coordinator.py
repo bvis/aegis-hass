@@ -1972,6 +1972,33 @@ class TestHubFirmwareRefresh:
         assert stored.progress == 30
         assert stored.is_critical is True
 
+    async def test_sim_and_firmware_refresh_dedupes_shared_hub(self) -> None:
+        """Multiple spaces backed by one hub (group mode) trigger only a
+
+        single per-hub `streamHubObject` fetch per cycle (2.1 review).
+        """
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._sim_info_last_fetch = -10_000.0
+        # Two spaces sharing the default hub_id "hub-1".
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(
+            return_value=[_make_space("s1"), _make_space("s2")]
+        )
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+        coordinator._hub_object_api = MagicMock()
+        coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_firmware_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_device_firmware_updates = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        coordinator._hub_object_api.get_firmware_info.assert_awaited_once_with("hub-1")
+        coordinator._hub_object_api.get_device_firmware_updates.assert_awaited_once_with("hub-1")
+
 
 class TestOnHtsDeviceKv:
     """Coordinator translates HTS per-device kv into DeviceReadings."""

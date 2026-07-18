@@ -509,9 +509,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # completed/cleared update (Ajax-scheduled installs finish between
         # cycles) drops out instead of lingering.
         device_updates: dict[str, DeviceFirmwareUpdateInfo] = {}
+        # Multiple spaces can share one hub (group mode); dedupe so the
+        # per-hub `streamHubObject` snapshot is fetched once per cycle.
+        seen_hubs: set[str] = set()
         for space in self.spaces.values():
-            if not space.hub_id:
+            if not space.hub_id or space.hub_id in seen_hubs:
                 continue
+            seen_hubs.add(space.hub_id)
             if space.hub_id not in self.sim_info:
                 sim = await self._hub_object_api.get_sim_info(space.hub_id)
                 if sim:

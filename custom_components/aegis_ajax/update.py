@@ -194,7 +194,7 @@ class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], Upda
         if info is None or not info.target_version:
             # No pending update — mirror installed_version so HA renders
             # "Up to date" (STATE_OFF) rather than "unknown".
-            return _INSTALLED_VERSION_PLACEHOLDER
+            return self.installed_version
         return info.target_version
 
     @property
