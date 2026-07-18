@@ -371,9 +371,14 @@ class TestHandleUpdate:
         assert state.wifi_connected is True
 
     @pytest.mark.asyncio
-    async def test_direct_delta_with_only_hub_powered_is_skipped(self) -> None:
+    async def test_direct_delta_with_changed_hub_powered_schedules_refresh(
+        self,
+    ) -> None:
         # #323: a direct delta whose only network key is the (untrusted)
-        # power flag must not update state at all — no spurious event.
+        # power flag must not update state directly — no spurious event —
+        # but when the flag *differs* from the last-known state it must
+        # request one authoritative snapshot so a genuine change is
+        # confirmed within seconds instead of waiting for the periodic poll.
         client = _make_client()
         client._hubs = [MagicMock(hub_id="12345678")]
         client._hub_states["12345678"] = HubNetworkState(externally_powered=False)
@@ -390,10 +395,46 @@ class TestHandleUpdate:
         )
 
         await client._handle_update(msg)
+        # Let the single-flight refresh task run.
+        await asyncio.sleep(0)
 
+        # State is not written directly from the untrusted delta ...
         assert client.hub_states["12345678"].externally_powered is False
         client._on_state_update.assert_not_called()
+        # ... but an authoritative refresh was requested.
+        client.request_hub_data.assert_awaited_once_with("12345678")
 
+    @pytest.mark.asyncio
+    async def test_direct_delta_with_unchanged_hub_powered_skips_refresh(
+        self,
+    ) -> None:
+        # #323: when the untrusted power flag matches the last-known state
+        # there is nothing to confirm, so no refresh is scheduled — the
+        # #323 delta storm must not turn into a request storm.
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+        client._hub_states["12345678"] = HubNetworkState(externally_powered=True)
+        client._on_state_update = MagicMock()
+        client.request_hub_data = AsyncMock()
+        msg = HtsMessage(
+            sender=0x12345678,
+            receiver=client._sender_id,
+            seq_num=1,
+            link=10,
+            flags=0,
+            msg_type=MsgType.UPDATES,
+            payload=tlv_encode([b"\x0b", b"\x03", b"\x01"]),
+        )
+
+        await client._handle_update(msg)
+        await asyncio.sleep(0)
+
+        assert client.hub_states["12345678"].externally_powered is True
+        client._on_state_update.assert_not_called()
+        client.request_hub_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_malformed_payload_drops_message_without_raising(self) -> None:
         # Regression for #108: @uddinr's hub firmware emitted a payload
         # containing 0x06 0x6A inside a TLV segment which our escape
         # table didn't recognise. The lenient `tlv_unescape_param`

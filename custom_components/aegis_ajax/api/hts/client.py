@@ -22,6 +22,7 @@ from custom_components.aegis_ajax.api.hts.hub_state import (
     KEY_HUB_POWERED,
     KEY_WIFI_ENABLED,
     HubNetworkState,
+    _bool_val,
     parse_hub_params,
 )
 from custom_components.aegis_ajax.api.hts.messages import (
@@ -845,9 +846,25 @@ class HtsClient:
             # flip "Mains power" to "Plugged in" while the hub is genuinely
             # stable — the Ajax app shows no change. Authoritative power
             # comes only from the full STATUS/SETTINGS body, which locates
-            # the hub section by an exact hub-id marker and is re-requested
-            # frequently, so a real change is still reflected within seconds.
-            kv.pop(KEY_HUB_POWERED, None)
+            # the hub section by an exact hub-id marker.
+            #
+            # But a *genuine* power change can also arrive here (e.g. the
+            # power-loss delta `[0x0b, 0x03, 0x00]` at the start of an
+            # outage). Simply dropping the flag would leave the sensor
+            # waiting for the periodic STATUS_BODY poll (~STATUS_REFRESH_
+            # INTERVAL seconds), and on firmware whose body omits key 0x03
+            # a real change would become permanently invisible. So when the
+            # popped flag *differs* from the last-known state, request one
+            # authoritative snapshot. `_schedule_hub_refresh` is single-
+            # flight per hub, so the #323 delta storm still can't turn into
+            # a request storm — the body then confirms the change within a
+            # couple of seconds.
+            powered_raw = kv.pop(KEY_HUB_POWERED, None)
+            if powered_raw is not None:
+                existing = self._hub_states.get(hub_id)
+                prev_powered = existing.externally_powered if existing is not None else None
+                if _bool_val(powered_raw) != prev_powered:
+                    self._schedule_hub_refresh(hub_id, "untrusted power delta")
             if kv and self._is_network_state_delta(kv):
                 _LOGGER.debug(
                     "Hub %s: parsed %d keys from delta sub-key %d",
@@ -996,7 +1013,14 @@ class HtsClient:
 
     @staticmethod
     def _is_network_state_delta(kv: dict[int, bytes]) -> bool:
-        """Return True when the parsed delta contains HTS hub-network keys."""
+        """Return True when the parsed delta contains HTS hub-network keys.
+
+        `KEY_HUB_POWERED` is intentionally *not* listed here: its only caller
+        (`_handle_update`) pops the power flag from the direct-delta kv before
+        this check (#323), so a power-only delta never needs to classify as a
+        network-state delta. Keeping it out avoids misleading a future reader
+        into thinking the untrusted power flag still drives a state update.
+        """
         return any(
             key in kv
             for key in (
@@ -1004,7 +1028,6 @@ class HtsClient:
                 KEY_ETH_ENABLED,
                 KEY_WIFI_ENABLED,
                 KEY_GPRS_ENABLED,
-                KEY_HUB_POWERED,
             )
         )
 
