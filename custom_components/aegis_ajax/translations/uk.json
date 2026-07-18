@@ -431,6 +431,9 @@
         "update": {
             "hub_firmware": {
                 "name": "Прошивка"
+            },
+            "device_firmware": {
+                "name": "Прошивка"
             }
         }
     },

@@ -431,6 +431,9 @@
         "update": {
             "hub_firmware": {
                 "name": "Donanım yazılımı"
+            },
+            "device_firmware": {
+                "name": "Donanım yazılımı"
             }
         }
     },

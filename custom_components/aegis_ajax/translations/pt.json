@@ -431,6 +431,9 @@
         "update": {
             "hub_firmware": {
                 "name": "Firmware"
+            },
+            "device_firmware": {
+                "name": "Firmware"
             }
         }
     },
