@@ -72,6 +72,7 @@ class TestAsyncGetConfigEntryDiagnostics:
         # default them to no-ops so non-video fixtures don't await a MagicMock.
         coord.devices_api.get_video_edge_onvif_rtsp_settings = AsyncMock(return_value=None)
         coord.devices_api.get_video_edge_network = AsyncMock(return_value=None)
+        coord.devices_api.probe_webrtc_initiate = AsyncMock(return_value=None)
         return coord
 
     @pytest.fixture
@@ -183,6 +184,15 @@ class TestAsyncGetConfigEntryDiagnostics:
         entry.runtime_data.devices_api.get_video_edge_network = AsyncMock(
             return_value={"interfaces": [{"name": "eth0", "mac": "aa:bb", "ip": "192.168.1.50"}]}
         )
+        entry.runtime_data.devices_api.probe_webrtc_initiate = AsyncMock(
+            return_value={
+                "authorized": True,
+                "first_message": "init",
+                "ice_servers_count": 2,
+                "ice_schemes": ["stun", "turn"],
+                "streams_count": 1,
+            }
+        )
 
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
 
@@ -193,6 +203,10 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert probe["310A8DF4"]["rtsp"] == {"http_port": 554}
         assert sorted(probe["310A8DF4"]["kinds"]) == ["primary"]
         assert sorted(probe["310B121D"]["kinds"]) == ["nvr"]
+        # #322: the WebRTC live-video feasibility probe rides alongside the
+        # ONVIF/network probe, keyed under the same video_edge_id.
+        assert probe["310A8DF4"]["webrtc"]["authorized"] is True
+        assert probe["310A8DF4"]["webrtc"]["ice_schemes"] == ["stun", "turn"]
 
     @pytest.mark.asyncio
     async def test_life_quality_threshold_flags_dumped_with_values(self, entry: MagicMock) -> None:

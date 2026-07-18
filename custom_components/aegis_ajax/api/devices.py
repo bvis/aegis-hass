@@ -412,6 +412,72 @@ class DevicesApi:
             return {"error": "rpc_error"}
         return {"error": "empty_stream"}
 
+    async def probe_webrtc_initiate(self, space_id: str, video_edge_id: str) -> dict[str, Any]:
+        """Read-only WebRTC signalling probe for live-video feasibility (#322).
+
+        The Ajax app pulls remote live video **exclusively over WebRTC**: a
+        ``WebrtcService.initiate`` signalling stream that returns ICE/TURN
+        servers and an SDP offer from the camera. Before investing in a real
+        ``camera`` entity we need to know whether a normal account is even
+        authorised to start that session, or whether it is permission-walled
+        server-side the way photo-on-demand v3 was.
+
+        This opens the signalling stream, reads **only the first** server
+        message and closes it — it never sends an SDP offer/answer, so no media
+        is negotiated and no session is actually established (the same benign
+        shape as opening then immediately dismissing a camera in the app).
+        Returns a **PII-free** summary: whether we got past the permission gate,
+        the first signalling message type, and the count/schemes of the offered
+        ICE servers — never their credentials, URLs or any SDP. ``authorized``
+        is ``False`` only on an explicit ``permission_denied``; any other
+        failure (offline/not-found) still means the permission gate was passed,
+        so it reports ``authorized: True`` with the reason. Never raises; any
+        failure → ``{"error": reason}``.
+        """
+        from systems.ajax.api.mobile.v2.common.space import space_locator_pb2  # noqa: PLC0415
+        from systems.ajax.api.mobile.v2.video.webrtc import (  # noqa: PLC0415
+            initiate_request_pb2,
+            webrtc_endpoints_pb2_grpc,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = webrtc_endpoints_pb2_grpc.WebrtcServiceStub(channel)
+        request = initiate_request_pb2.InitiateWebRtcRequest(
+            video_edge_id=video_edge_id,
+            space_locator=space_locator_pb2.SpaceLocator(space_id=space_id),
+        )
+        try:
+            # First message only: the stream would carry the full SDP handshake,
+            # but we deliberately stop before answering so nothing is negotiated.
+            async for msg in stub.initiate(request, metadata=metadata, timeout=15):
+                which = msg.WhichOneof("response") if hasattr(msg, "WhichOneof") else None
+                if which == "failure":
+                    reason = msg.failure.WhichOneof("error") or "failure"
+                    return {"authorized": reason != "permission_denied", "error": reason}
+                if which == "success":
+                    sig = msg.success.WhichOneof("signaling_message")
+                    result: dict[str, Any] = {"authorized": True, "first_message": sig}
+                    if sig == "init":
+                        init = msg.success.init
+                        schemes: set[str] = set()
+                        for server in init.ice_servers:
+                            for url in server.urls:
+                                schemes.add(url.split(":", 1)[0].lower())
+                        result["ice_servers_count"] = len(init.ice_servers)
+                        result["ice_schemes"] = sorted(schemes)
+                        result["streams_count"] = len(init.streams)
+                    return result
+                return {"error": "unexpected_message"}
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "WebRtc initiate probe failed for video_edge %s",
+                video_edge_id,
+                exc_info=True,
+            )
+            return {"error": "rpc_error"}
+        return {"error": "empty_stream"}
+
     def _handle_update(
         self,
         update: Any,  # noqa: ANN401

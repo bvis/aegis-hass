@@ -61,10 +61,18 @@ async def async_get_config_entry_diagnostics(
         network = await coordinator.devices_api.get_video_edge_network(
             owning_space or next(iter(coordinator.spaces), ""), ve_id
         )
+        # Read-only WebRTC feasibility probe (#322): does the account get past
+        # the permission gate to start the app-style remote live stream? PII-free
+        # (no credentials/URLs/SDP); no media is negotiated. This is the go/no-go
+        # signal for a future camera entity for cloud-only (VPS) Home Assistant.
+        webrtc = await coordinator.devices_api.probe_webrtc_initiate(
+            owning_space or next(iter(coordinator.spaces), ""), ve_id
+        )
         video_edge_probe[ve_id] = {
             "kinds": sorted(k for k in kinds if k),
             **(settings or {"error": "not_probed"}),
             "network": network,
+            "webrtc": webrtc,
         }
 
     return {
