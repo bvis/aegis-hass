@@ -8,8 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.aegis_ajax.api.hub_object import (
+    DEVICE_FW_STATE_DOWNLOADING,
+    DEVICE_FW_STATE_INSTALLING,
+    DEVICE_FW_STATE_NONE,
+    DEVICE_FW_STATE_NOT_STARTED,
     HUB_FW_STATE_DOWNLOADING,
     HUB_FW_STATE_NOT_STARTED,
+    DeviceFirmwareUpdateInfo,
     HubFirmwareUpdateInfo,
     HubObjectApi,
     SimCardInfo,
@@ -386,3 +391,207 @@ class TestGetFirmwareInfo:
 
         result = await api.get_firmware_info("ABCD")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Per-device firmware update parser (2.1 — read-only, disabled-by-default)
+# ---------------------------------------------------------------------------
+
+
+def _build_device_firmware_snapshot(
+    updates: list[tuple[str, str, str, int | None, bool]],
+) -> bytes:
+    """Build a StreamHubObject snapshot carrying per-device firmware updates.
+
+    Each tuple is (device_id, version, status_name, download_pct, is_critical).
+    ``download_pct`` is only meaningful when status_name == "downloading".
+    """
+    from google.protobuf.empty_pb2 import Empty  # noqa: PLC0415
+    from google.protobuf.wrappers_pb2 import BoolValue  # noqa: PLC0415
+    from systems.ajax.api.mobile.v2.common.resource_id_pb2 import ResourceId  # noqa: PLC0415
+    from systems.ajax.api.mobile.v2.hubobject.model.firmware.device_firmware_update_pb2 import (  # noqa: PLC0415
+        DeviceFirmwareUpdate,
+    )
+    from systems.ajax.api.mobile.v2.hubobject.model.hub_object_pb2 import (  # noqa: PLC0415
+        HubObject,
+    )
+    from systems.ajax.api.mobile.v2.hubobject.stream_hub_object_request_pb2 import (  # noqa: PLC0415
+        StreamHubObject,
+    )
+
+    dfus = []
+    for device_id, version, status_name, pct, is_critical in updates:
+        if status_name == "downloading":
+            status = DeviceFirmwareUpdate.Status(downloading=pct or 0)
+        else:
+            status = DeviceFirmwareUpdate.Status(**{status_name: Empty()})
+        dfu = DeviceFirmwareUpdate(
+            device_id=device_id,
+            resource_id=ResourceId(firmware_id=ResourceId.FirmwareId(firmware_version=version)),
+            status=status,
+            is_critical=BoolValue(value=is_critical),
+        )
+        dfus.append(dfu)
+    hub_obj = HubObject(
+        hex_id="ABCD1234",
+        device_firmware_updates=HubObject.DeviceFirmwareUpdates(device_firmware_update=dfus),
+    )
+    return StreamHubObject(snapshot=hub_obj).SerializeToString()
+
+
+class TestParseDeviceFirmwareFromHubObject:
+    def test_parses_multiple_updates(self) -> None:
+        raw = _build_device_firmware_snapshot(
+            [
+                ("AA11BB22", "6.62.3", "not_started", None, False),
+                ("CC33DD44", "6.62.3", "downloading", 42, True),
+            ]
+        )
+        result = HubObjectApi._parse_device_firmware_from_hub_object(raw)
+        assert result == [
+            DeviceFirmwareUpdateInfo(
+                device_id="AA11BB22",
+                target_version="6.62.3",
+                state=DEVICE_FW_STATE_NOT_STARTED,
+                progress=None,
+                is_critical=False,
+            ),
+            DeviceFirmwareUpdateInfo(
+                device_id="CC33DD44",
+                target_version="6.62.3",
+                state=DEVICE_FW_STATE_DOWNLOADING,
+                progress=42,
+                is_critical=True,
+            ),
+        ]
+
+    def test_installing_state_has_no_progress(self) -> None:
+        raw = _build_device_firmware_snapshot([("AA11BB22", "6.62.3", "installing", None, False)])
+        result = HubObjectApi._parse_device_firmware_from_hub_object(raw)
+        assert len(result) == 1
+        assert result[0].state == DEVICE_FW_STATE_INSTALLING
+        assert result[0].progress is None
+
+    def test_skips_entry_without_device_id(self) -> None:
+        raw = _build_device_firmware_snapshot([("", "6.62.3", "not_started", None, False)])
+        assert HubObjectApi._parse_device_firmware_from_hub_object(raw) == []
+
+    def test_snapshot_without_device_updates_returns_empty(self) -> None:
+        from systems.ajax.api.mobile.v2.hubobject.model.hub_object_pb2 import (  # noqa: PLC0415
+            HubObject,
+        )
+        from systems.ajax.api.mobile.v2.hubobject.stream_hub_object_request_pb2 import (  # noqa: PLC0415
+            StreamHubObject,
+        )
+
+        raw = StreamHubObject(snapshot=HubObject(hex_id="ABCD")).SerializeToString()
+        assert HubObjectApi._parse_device_firmware_from_hub_object(raw) == []
+
+    def test_delta_frame_returns_empty(self) -> None:
+        from systems.ajax.api.mobile.v2.hubobject.model.firmware.device_firmware_update_pb2 import (  # noqa: PLC0415
+            DeviceFirmwareUpdate,
+        )
+        from systems.ajax.api.mobile.v2.hubobject.model.hub_object_pb2 import (  # noqa: PLC0415
+            HubObject,
+        )
+        from systems.ajax.api.mobile.v2.hubobject.stream_hub_object_request_pb2 import (  # noqa: PLC0415
+            StreamHubObject,
+        )
+
+        hub_obj = HubObject(
+            hex_id="ABCD",
+            device_firmware_updates=HubObject.DeviceFirmwareUpdates(
+                device_firmware_update=[DeviceFirmwareUpdate(device_id="AA11")]
+            ),
+        )
+        raw = StreamHubObject(update=hub_obj).SerializeToString()
+        assert HubObjectApi._parse_device_firmware_from_hub_object(raw) == []
+
+    def test_garbage_bytes_returns_empty(self) -> None:
+        assert HubObjectApi._parse_device_firmware_from_hub_object(b"\xff\xff\xff") == []
+
+    def test_missing_firmware_version_defaults_empty(self) -> None:
+        from systems.ajax.api.mobile.v2.hubobject.model.firmware.device_firmware_update_pb2 import (  # noqa: PLC0415
+            DeviceFirmwareUpdate,
+        )
+        from systems.ajax.api.mobile.v2.hubobject.model.hub_object_pb2 import (  # noqa: PLC0415
+            HubObject,
+        )
+        from systems.ajax.api.mobile.v2.hubobject.stream_hub_object_request_pb2 import (  # noqa: PLC0415
+            StreamHubObject,
+        )
+
+        hub_obj = HubObject(
+            hex_id="ABCD",
+            device_firmware_updates=HubObject.DeviceFirmwareUpdates(
+                device_firmware_update=[DeviceFirmwareUpdate(device_id="AA11")]
+            ),
+        )
+        raw = StreamHubObject(snapshot=hub_obj).SerializeToString()
+        result = HubObjectApi._parse_device_firmware_from_hub_object(raw)
+        assert result == [
+            DeviceFirmwareUpdateInfo(
+                device_id="AA11",
+                target_version="",
+                state=DEVICE_FW_STATE_NONE,
+                progress=None,
+                is_critical=False,
+            )
+        ]
+
+
+class TestGetDeviceFirmwareUpdates:
+    def _make_api(self) -> HubObjectApi:
+        client = MagicMock()
+        return HubObjectApi(client)
+
+    @pytest.mark.asyncio
+    async def test_returns_updates_from_snapshot(self) -> None:
+        api = self._make_api()
+        raw = _build_device_firmware_snapshot([("AA11BB22", "6.62.3", "downloading", 15, True)])
+
+        async def _fake_stream() -> AsyncGenerator[bytes, None]:
+            yield raw
+
+        mock_method = MagicMock(return_value=_fake_stream())
+        api._client._get_channel().unary_stream.return_value = mock_method
+        api._client._session.get_call_metadata.return_value = []
+
+        result = await api.get_device_firmware_updates("ABCD1234")
+        assert result == [
+            DeviceFirmwareUpdateInfo(
+                device_id="AA11BB22",
+                target_version="6.62.3",
+                state=DEVICE_FW_STATE_DOWNLOADING,
+                progress=15,
+                is_critical=True,
+            )
+        ]
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_on_stream_exception(self) -> None:
+        api = self._make_api()
+
+        async def _raising_stream() -> AsyncGenerator[bytes, None]:
+            raise RuntimeError("stream error")
+            yield
+
+        mock_method = MagicMock(return_value=_raising_stream())
+        api._client._get_channel().unary_stream.return_value = mock_method
+        api._client._session.get_call_metadata.return_value = []
+
+        assert await api.get_device_firmware_updates("ABCD") == []
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_stream_empty(self) -> None:
+        api = self._make_api()
+
+        async def _empty_stream() -> AsyncGenerator[bytes, None]:
+            return
+            yield
+
+        mock_method = MagicMock(return_value=_empty_stream())
+        api._client._get_channel().unary_stream.return_value = mock_method
+        api._client._session.get_call_metadata.return_value = []
+
+        assert await api.get_device_firmware_updates("ABCD") == []
