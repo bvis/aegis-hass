@@ -438,6 +438,22 @@
             "chime": {
                 "name": "Chime"
             }
+        },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Alarm duration"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Siren volume",
+                "state": {
+                    "very_loud": "Very loud",
+                    "loud": "Loud",
+                    "quiet": "Quiet",
+                    "disabled": "Disabled"
+                }
+            }
         }
     },
     "device_automation": {

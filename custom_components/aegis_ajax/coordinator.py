@@ -42,6 +42,9 @@ from custom_components.aegis_ajax.const import (
     MOTION_PUSH_AUTO_OFF_SECONDS,
     SECURITY_EVENT_REFRESH_COOLDOWN,
     SIGNAL_NEW_DEVICE,
+    SIREN_ALARM_DURATION_KEY,
+    SIREN_DEVICE_TYPES,
+    SIREN_VOLUME_LEVEL_KEY,
     ChimeStatus,
     ConnectionStatus,
 )
@@ -593,10 +596,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         self._unsub_hub_device_temp = async_track_time_interval(
             self.hass,
-            self._async_refresh_hub_device_temperatures,
+            self._async_refresh_per_device_snapshots,
             timedelta(seconds=HUB_DEVICE_TEMP_REFRESH_INTERVAL),
         )
-        self.hass.async_create_task(self._async_refresh_hub_device_temperatures())
+        self.hass.async_create_task(self._async_refresh_per_device_snapshots())
+
+    async def _async_refresh_per_device_snapshots(self, _now: datetime | None = None) -> None:
+        """Timer-driven refresh of values sourced from `StreamHubDevice` (#220, #310).
+
+        Both the per-device internal temperature (#220, #229) and the writable
+        siren settings (#310) live only in the rich per-device snapshot, not the
+        continuous `StreamLightDevices` stream, so they share one throttled timer.
+        """
+        await self._async_refresh_hub_device_temperatures(_now)
+        await self._async_refresh_siren_settings(_now)
 
     async def _async_refresh_hub_device_temperatures(self, _now: datetime | None = None) -> None:
         """Fetch + merge per-device internal temperature (#220, #229), timer-driven.
@@ -648,6 +661,45 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.devices[device_id] = dc_replace(
                 current, statuses={**current.statuses, "temperature": temperature}
             )
+            changed = True
+        if changed:
+            self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    async def _async_refresh_siren_settings(self, _now: datetime | None = None) -> None:
+        """Fetch + merge each siren's writable settings (#310), timer-driven.
+
+        Sirens expose their alarm duration and volume level only in the rich
+        per-device `StreamHubDevice` snapshot, not the continuous
+        `StreamLightDevices` stream, so — like the per-device temperature
+        (#220) — a dedicated read merges them into `device.statuses`
+        (`siren_alarm_duration` / `siren_volume_level`). Their presence is what
+        the `number`/`select` platforms use to materialise the entities. Only
+        siren families are streamed; an unchanged snapshot skips the listener
+        push so we don't churn every interval.
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        changed = False
+        for device_id, device in list(self.devices.items()):
+            if device.device_type not in SIREN_DEVICE_TYPES:
+                continue
+            try:
+                settings = await self._devices_api.get_hub_device_siren_settings(
+                    device.hub_id, device_id
+                )
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug(
+                    "Failed to fetch siren settings for device %s", device_id, exc_info=True
+                )
+                continue
+            if not settings:
+                continue
+            current = self.devices.get(device_id)
+            if current is None:
+                continue
+            if all(current.statuses.get(k) == v for k, v in settings.items()):
+                continue
+            self.devices[device_id] = dc_replace(current, statuses={**current.statuses, **settings})
             changed = True
         if changed:
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
@@ -1386,6 +1438,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "temperature": existing.statuses["temperature"],
                     },
                 )
+            # Siren settings (#310) likewise come from the per-device snapshot,
+            # not this stream — carry the merged values forward so a fresh light
+            # snapshot doesn't wipe them (and the number/select entities) until
+            # the next timer fire.
+            if existing is not None and device.device_type in SIREN_DEVICE_TYPES:
+                carried = {
+                    key: existing.statuses[key]
+                    for key in (SIREN_ALARM_DURATION_KEY, SIREN_VOLUME_LEVEL_KEY)
+                    if key not in device.statuses and key in existing.statuses
+                }
+                if carried:
+                    from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+                    device = dc_replace(device, statuses={**device.statuses, **carried})
             self.devices[device.id] = device
         # `DevicesApi` dedups video-doorbell twins per snapshot, but the merge
         # above only ever *adds* keys — a `motion_cam_video_*` ghost that was
