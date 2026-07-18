@@ -64,8 +64,12 @@ except TypeError as exc:
 from custom_components.aegis_ajax.const import (  # noqa: E402
     CONF_AUTO_CREATE_LABELS,
     CONF_DISABLE_PUSH_WARNING,
+    CONF_PERSISTENT_NOTIFICATION_EVENTS,
+    CONF_PERSISTENT_NOTIFICATIONS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_DISABLE_PUSH_WARNING,
+    DEFAULT_PERSISTENT_NOTIFICATION_EVENTS,
+    DEFAULT_PERSISTENT_NOTIFICATIONS,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     LABELS,
@@ -369,6 +373,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         await client.close()
         raise
     entry.runtime_data = coordinator
+
+    # Attach the persistent-notification manager (2.2). Reads the current
+    # options; the entry reloads on any options change, so this is rebuilt with
+    # fresh settings each setup. Attach None when the feature is off or no event
+    # types are selected, so the coordinator's `_persistent_notifier is None`
+    # fast-path skips all per-event work.
+    pn_enabled = bool(
+        entry.options.get(CONF_PERSISTENT_NOTIFICATIONS, DEFAULT_PERSISTENT_NOTIFICATIONS)
+    )
+    pn_event_types = entry.options.get(
+        CONF_PERSISTENT_NOTIFICATION_EVENTS, DEFAULT_PERSISTENT_NOTIFICATION_EVENTS
+    )
+    if pn_enabled and pn_event_types:
+        from custom_components.aegis_ajax.persistent_notification import (  # noqa: PLC0415
+            AjaxPersistentNotifier,
+        )
+
+        # Only disambiguate the notification title with the account email
+        # when more than one Ajax account is configured — on the common
+        # single-account install it's pure noise in every card.
+        account_name = ""
+        if len(hass.config_entries.async_entries(DOMAIN)) > 1:
+            account_name = str(entry.data.get("email", ""))
+        coordinator.set_persistent_notifier(
+            AjaxPersistentNotifier(
+                hass,
+                entry.entry_id,
+                enabled=True,
+                event_types=pn_event_types,
+                account_name=account_name,
+            )
+        )
+    else:
+        coordinator.set_persistent_notifier(None)
 
     # Start FCM push notifications if configured (credentials live in data since v2).
     # Run as a background task — FCM registration + push-client start is a

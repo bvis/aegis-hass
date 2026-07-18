@@ -88,12 +88,16 @@
                     "photo_retention_days": "Uchovávání fotografií (dny)",
                     "photo_max_per_device": "Max fotografií na zařízení (0 = neomezeno)",
                     "auto_create_labels": "Automaticky vytvářet a přiřazovat štítky Aegis entitám",
-                    "bypass_switches": "Vytvořit přepínače vyřazení zařízení"
+                    "bypass_switches": "Vytvořit přepínače vyřazení zařízení",
+                    "persistent_notifications": "Zobrazovat bezpečnostní události jako trvalá oznámení",
+                    "persistent_notification_events": "Události, které vytvoří trvalé oznámení"
                 },
                 "data_description": {
                     "bypass_switches": "Přepínače vyřazení umožňují deaktivovat zařízení před zastřežením. 'Auto' je vytvoří jen tehdy, má-li tvůj účet Ajax oprávnění deaktivovat zařízení.",
                     "expose_arm_home": "Přidá na panel alarmu režim Aktivovat doma. Kopíruje noční režim a je potřeba hlavně pro Amazon Alexa nebo Nabu Casa Cloud. Vypněte pro skrytí duplicitního tlačítka, pokud je nepoužíváte.",
-                    "disable_push_warning": "Zapněte, pokud záměrně běžíte bez push. Skryje opakující se připomínku „FCM není nakonfigurováno“ i kartu opravy. Události v reálném čase (zvonek, aktivace/deaktivace, poplach) se do Home Assistant nedostanou, dokud nenastavíte FCM."
+                    "disable_push_warning": "Zapněte, pokud záměrně běžíte bez push. Skryje opakující se připomínku „FCM není nakonfigurováno“ i kartu opravy. Události v reálném čase (zvonek, aktivace/deaktivace, poplach) se do Home Assistant nedostanou, dokud nenastavíte FCM.",
+                    "persistent_notifications": "Po zapnutí se vybrané události zobrazí jako trvalá oznámení Home Assistant, která zůstanou viditelná, dokud je nezavřete nebo se Home Assistant nerestartuje. Tyto události přicházejí přes push (FCM), takže push musí být nakonfigurován, aby dorazily.",
+                    "persistent_notification_events": "Které události vyvolají trvalé oznámení. Výchozí jsou skutečné incidenty (alarm, panika, sabotáž, požár, CO, zaplavení, rozbití skla). Přidejte zapnutí/vypnutí ostrahy, pohyb nebo zvonek, pokud je chcete také."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (jen pokud tvůj účet může deaktivovat zařízení)",
                 "always": "Vždy",
                 "never": "Nikdy"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Zastřeženo",
+                "arm_night": "Noční režim zapnut",
+                "battery_low": "Nízká baterie",
+                "co_alarm": "Alarm CO",
+                "connection_lost": "Spojení ztraceno",
+                "disarm": "Odstřeženo",
+                "disarm_night": "Noční režim vypnut",
+                "door_open": "Dveře otevřeny",
+                "doorbell_pressed": "Stisknutí zvonku",
+                "fire": "Požár",
+                "flood": "Záplava",
+                "glass_break": "Rozbití skla",
+                "malfunction": "Porucha",
+                "motion": "Pohyb",
+                "panic": "Panika",
+                "tamper": "Sabotáž"
             }
         }
     }

@@ -47,6 +47,23 @@ class TestAjaxSecurityEvent:
         entity.async_write_ha_state.assert_called_once()
         entity.hass.bus.async_fire.assert_called_once()
 
+    def test_handle_event_forwards_to_persistent_notifier(self) -> None:
+        # The hub-level entity is the single choke point that also drives the
+        # optional persistent-notification feature (2.2).
+        entity = self._make_event_entity()
+        entity._trigger_event = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity.hass = MagicMock()
+
+        data = {"raw_tag": "intrusion_alarm"}
+        entity.handle_event("alarm", data)
+
+        # The entity enriches the forwarded payload with its own space_id so
+        # the notifier can key space-scoped events per space (#331 review).
+        entity.coordinator.notify_persistent_event.assert_called_once_with(
+            "alarm", {"raw_tag": "intrusion_alarm", "space_id": "space-1"}
+        )
+
     def test_handle_event_with_source_info(self) -> None:
         entity = self._make_event_entity()
         entity._trigger_event = MagicMock()
@@ -235,6 +252,47 @@ class TestCoordinatorEventDispatch:
 
         # Should not raise
         AjaxCobrandedCoordinator.fire_push_event(coordinator, "space-999", "alarm", {})
+
+
+class TestCoordinatorPersistentNotification:
+    def test_notify_forwards_to_notifier(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        notifier = MagicMock()
+        coordinator._persistent_notifier = notifier
+
+        AjaxCobrandedCoordinator.notify_persistent_event(coordinator, "alarm", {"x": 1})
+        notifier.notify.assert_called_once_with("alarm", {"x": 1})
+
+    def test_notify_noop_when_no_notifier(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        coordinator._persistent_notifier = None
+
+        # Should not raise
+        AjaxCobrandedCoordinator.notify_persistent_event(coordinator, "alarm", {})
+
+    def test_notify_swallows_notifier_errors(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        notifier = MagicMock()
+        notifier.notify.side_effect = RuntimeError("boom")
+        coordinator._persistent_notifier = notifier
+
+        # A failing notification must never break event dispatch.
+        AjaxCobrandedCoordinator.notify_persistent_event(coordinator, "alarm", {})
+
+    def test_set_persistent_notifier(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock(spec=AjaxCobrandedCoordinator)
+        notifier = MagicMock()
+
+        AjaxCobrandedCoordinator.set_persistent_notifier(coordinator, notifier)
+        assert coordinator._persistent_notifier is notifier
 
 
 class TestNotificationEventParsing:

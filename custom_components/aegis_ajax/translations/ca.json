@@ -88,12 +88,16 @@
                     "photo_retention_days": "Retenció de fotos (dies)",
                     "photo_max_per_device": "Màxim de fotos per dispositiu (0 = il·limitat)",
                     "auto_create_labels": "Crear i assignar automàticament etiquetes Aegis a les entitats",
-                    "bypass_switches": "Crear switches de bypass de dispositius"
+                    "bypass_switches": "Crear switches de bypass de dispositius",
+                    "persistent_notifications": "Mostra els esdeveniments de seguretat com a notificacions persistents",
+                    "persistent_notification_events": "Esdeveniments que creen una notificació persistent"
                 },
                 "data_description": {
                     "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius.",
                     "expose_arm_home": "Afegeix un mode Arma a casa al tauler d'alarma. Replica el mode Nit i només cal per a Amazon Alexa o Nabu Casa Cloud. Desactiva'l per amagar el botó duplicat si no els fas servir.",
-                    "disable_push_warning": "Activa'l si funciones expressament sense push. Amaga el recordatori recurrent \"FCM no configurat\" i la targeta de reparació. Els esdeveniments en temps real (timbre, armar/desarmar, alarma) continuaran sense arribar a Home Assistant fins que configuris FCM."
+                    "disable_push_warning": "Activa'l si funciones expressament sense push. Amaga el recordatori recurrent \"FCM no configurat\" i la targeta de reparació. Els esdeveniments en temps real (timbre, armar/desarmar, alarma) continuaran sense arribar a Home Assistant fins que configuris FCM.",
+                    "persistent_notifications": "Quan s'activa, els esdeveniments seleccionats apareixen com a notificacions persistents de Home Assistant que romanen visibles fins que es descarten o Home Assistant es reinicia. Aquests esdeveniments arriben per push (FCM), així que el push ha d'estar configurat perquè arribin.",
+                    "persistent_notification_events": "Quins esdeveniments generen una notificació persistent. Per defecte, incidents reals (alarma, pànic, sabotatge, foc, CO, inundació, trencament de vidre). Afegeix armat/desarmat, moviment o timbre si també els vols."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (només si el teu compte pot desactivar dispositius)",
                 "always": "Sempre",
                 "never": "Mai"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarma",
+                "arm": "Armat",
+                "arm_night": "Armat nocturn",
+                "battery_low": "Bateria baixa",
+                "co_alarm": "Alarma CO",
+                "connection_lost": "Connexio perduda",
+                "disarm": "Desarmat",
+                "disarm_night": "Desarmat nocturn",
+                "door_open": "Porta oberta",
+                "doorbell_pressed": "Timbre premut",
+                "fire": "Foc",
+                "flood": "Inundacio",
+                "glass_break": "Trencament de vidre",
+                "malfunction": "Avaria",
+                "motion": "Moviment",
+                "panic": "Panic",
+                "tamper": "Manipulacio"
             }
         }
     }

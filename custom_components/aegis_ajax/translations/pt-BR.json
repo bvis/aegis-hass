@@ -88,12 +88,16 @@
                     "photo_retention_days": "Retenção de fotos (dias)",
                     "photo_max_per_device": "Máx. fotos por dispositivo (0 = ilimitado)",
                     "auto_create_labels": "Criar e atribuir automaticamente etiquetas Aegis às entidades",
-                    "bypass_switches": "Criar interruptores de bypass de dispositivos"
+                    "bypass_switches": "Criar interruptores de bypass de dispositivos",
+                    "persistent_notifications": "Mostrar eventos de segurança como notificações persistentes",
+                    "persistent_notification_events": "Eventos que criam uma notificação persistente"
                 },
                 "data_description": {
                     "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos.",
                     "expose_arm_home": "Adiciona um modo Armar em casa ao painel de alarme. Ele espelha o modo Noturno e é necessário principalmente para Amazon Alexa ou Nabu Casa Cloud. Desative para ocultar o botão duplicado se você não os usa.",
-                    "disable_push_warning": "Ative se você roda de propósito sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparo. Eventos em tempo real (campainha, armar/desarmar, alarme) ainda não chegarão ao Home Assistant até você configurar o FCM."
+                    "disable_push_warning": "Ative se você roda de propósito sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparo. Eventos em tempo real (campainha, armar/desarmar, alarme) ainda não chegarão ao Home Assistant até você configurar o FCM.",
+                    "persistent_notifications": "Quando ativado, os eventos selecionados aparecem como notificações persistentes do Home Assistant que permanecem visíveis até serem dispensadas ou o Home Assistant reiniciar. Esses eventos são entregues via push (FCM), então o push precisa estar configurado para que cheguem.",
+                    "persistent_notification_events": "Quais eventos geram uma notificação persistente. O padrão são incidentes reais (alarme, pânico, violação, incêndio, CO, inundação, quebra de vidro). Adicione armar/desarmar, movimento ou campainha se também os quiser."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (apenas se sua conta puder desativar dispositivos)",
                 "always": "Sempre",
                 "never": "Nunca"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarme",
+                "arm": "Armado",
+                "arm_night": "Modo noturno ativado",
+                "battery_low": "Bateria fraca",
+                "co_alarm": "Alarme CO",
+                "connection_lost": "Conexão perdida",
+                "disarm": "Desarmado",
+                "disarm_night": "Modo noturno desativado",
+                "door_open": "Porta aberta",
+                "doorbell_pressed": "Campainha tocada",
+                "fire": "Incêndio",
+                "flood": "Inundação",
+                "glass_break": "Quebra de vidro",
+                "malfunction": "Falha",
+                "motion": "Movimento",
+                "panic": "Pânico",
+                "tamper": "Violação"
             }
         }
     }

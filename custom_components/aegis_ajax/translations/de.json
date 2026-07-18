@@ -88,12 +88,16 @@
                     "photo_retention_days": "Foto-Aufbewahrung (Tage)",
                     "photo_max_per_device": "Max. Fotos pro Gerät (0 = unbegrenzt)",
                     "auto_create_labels": "Aegis-Labels automatisch erstellen und Entitäten zuweisen",
-                    "bypass_switches": "Geräte-Überbrückungsschalter erstellen"
+                    "bypass_switches": "Geräte-Überbrückungsschalter erstellen",
+                    "persistent_notifications": "Sicherheitsereignisse als dauerhafte Benachrichtigungen anzeigen",
+                    "persistent_notification_events": "Ereignisse, die eine dauerhafte Benachrichtigung erzeugen"
                 },
                 "data_description": {
                     "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat.",
                     "expose_arm_home": "Fügt dem Alarmfeld einen Modus „Zu Hause scharfschalten“ hinzu. Er entspricht dem Nachtmodus und wird hauptsächlich für Amazon Alexa oder Nabu Casa Cloud benötigt. Deaktivieren, um die doppelte Schaltfläche auszublenden, wenn Sie diese nicht verwenden.",
-                    "disable_push_warning": "Aktivieren, wenn Sie absichtlich ohne Push arbeiten. Blendet die wiederkehrende Erinnerung „FCM nicht konfiguriert“ und die Reparaturkarte aus. Echtzeit-Ereignisse (Türklingel, Scharf-/Unscharfschalten, Alarm) erreichen Home Assistant erst, wenn FCM konfiguriert ist."
+                    "disable_push_warning": "Aktivieren, wenn Sie absichtlich ohne Push arbeiten. Blendet die wiederkehrende Erinnerung „FCM nicht konfiguriert“ und die Reparaturkarte aus. Echtzeit-Ereignisse (Türklingel, Scharf-/Unscharfschalten, Alarm) erreichen Home Assistant erst, wenn FCM konfiguriert ist.",
+                    "persistent_notifications": "Wenn aktiviert, erscheinen die ausgewählten Ereignisse als dauerhafte Home-Assistant-Benachrichtigungen, die sichtbar bleiben, bis sie verworfen werden oder Home Assistant neu startet. Diese Ereignisse werden per Push (FCM) zugestellt — Push muss also konfiguriert sein, damit sie ankommen.",
+                    "persistent_notification_events": "Welche Ereignisse eine dauerhafte Benachrichtigung auslösen. Standard sind echte Vorfälle (Alarm, Panik, Sabotage, Feuer, CO, Überflutung, Glasbruch). Füge Scharf-/Unscharfschalten, Bewegung oder Türklingel hinzu, wenn du diese auch möchtest."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (nur wenn dein Konto Geräte deaktivieren darf)",
                 "always": "Immer",
                 "never": "Nie"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Scharfgeschaltet",
+                "arm_night": "Nachtmodus aktiviert",
+                "battery_low": "Batterie schwach",
+                "co_alarm": "CO-Alarm",
+                "connection_lost": "Verbindung verloren",
+                "disarm": "Unscharfgeschaltet",
+                "disarm_night": "Nachtmodus deaktiviert",
+                "door_open": "Tür geöffnet",
+                "doorbell_pressed": "Klingel gedrückt",
+                "fire": "Feuer",
+                "flood": "Überflutung",
+                "glass_break": "Glasbruch",
+                "malfunction": "Fehlfunktion",
+                "motion": "Bewegung",
+                "panic": "Panik",
+                "tamper": "Sabotage"
             }
         }
     }

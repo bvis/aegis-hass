@@ -34,6 +34,7 @@ from custom_components.aegis_ajax.api.session import (
 )
 from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import (
+    ALL_EVENT_TYPES,
     APPLICATION_LABEL,
     BYPASS_SWITCHES_ALWAYS,
     BYPASS_SWITCHES_AUTO,
@@ -43,12 +44,16 @@ from custom_components.aegis_ajax.const import (
     CONF_DISABLE_PUSH_WARNING,
     CONF_EXPOSE_ARM_HOME,
     CONF_FORCE_ARM,
+    CONF_PERSISTENT_NOTIFICATION_EVENTS,
+    CONF_PERSISTENT_NOTIFICATIONS,
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
     DEFAULT_DISABLE_PUSH_WARNING,
     DEFAULT_EXPOSE_ARM_HOME,
+    DEFAULT_PERSISTENT_NOTIFICATION_EVENTS,
+    DEFAULT_PERSISTENT_NOTIFICATIONS,
     DEFAULT_PHOTO_MAX_PER_DEVICE,
     DEFAULT_PHOTO_RETENTION_DAYS,
     DEFAULT_POLL_INTERVAL,
@@ -629,6 +634,26 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                             ],
                             mode=SelectSelectorMode.DROPDOWN,
                             translation_key="bypass_switches",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_PERSISTENT_NOTIFICATIONS,
+                        default=self._entry.options.get(
+                            CONF_PERSISTENT_NOTIFICATIONS, DEFAULT_PERSISTENT_NOTIFICATIONS
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_PERSISTENT_NOTIFICATION_EVENTS,
+                        default=self._entry.options.get(
+                            CONF_PERSISTENT_NOTIFICATION_EVENTS,
+                            DEFAULT_PERSISTENT_NOTIFICATION_EVENTS,
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=ALL_EVENT_TYPES,
+                            multiple=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key="persistent_notification_events",
                         )
                     ),
                 }
