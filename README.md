@@ -96,9 +96,11 @@ Click the button above, or manually:
 > Instead of your primary admin login, create a separate Ajax account, invite it to
 > your space (Ajax app → space → Users → Invite) and grant it only what the
 > integration needs. A non-admin **User** role is enough to read device state and
-> arm / disarm — but to also receive **push events**, the account must be allowed to
-> receive event notifications (a very restricted role can register for push yet never
-> get events; see the FCM troubleshooting note below). You can also revoke its
+> arm / disarm — but to also receive **push events**, the role's notifications toggle
+> is **not** enough: Ajax filters event delivery server-side by permission level, and
+> a User role with notifications turned on still receives zero events (#234, #319);
+> in practice the account needs admin / full access (see the FCM troubleshooting
+> note below). You can also revoke its
 > **photo / video** access if you don't use
 > Photo on Demand, so Home Assistant never has access to camera images. This keeps
 > your main credentials out of HA and limits what a compromised HA host could reach
@@ -473,9 +475,14 @@ Once entered, the values are stored on the config entry and persist across resta
 >   push to two sessions at once, so an actively-used phone app can leave HA's push
 >   channel starved even though FCM reports connected. Give HA its own account (see
 >   [Configuration](#configuration)).
-> - **The HA account can't receive event notifications.** A very limited invited role
->   may register for push yet never get events — one user found a full-access role was
->   needed. Make sure the account is allowed to receive notifications for the space.
+> - **The HA account's role is below the level Ajax delivers events to.** Ajax gates
+>   event delivery server-side by the account's permission level, not by the
+>   notifications toggle — an invited **User** role with notifications turned **on**
+>   still registers for push fine yet receives zero events (#234, #319). In practice,
+>   switching the HA account to **admin / full access** is what unlocks delivery. The
+>   exact minimum permission is unknown; if you find a narrower combination that still
+>   receives events, please report it on the tracker so this can document a
+>   least-privilege setup.
 >
 > Either way you'd still get changes on the next poll, just not instantly.
 

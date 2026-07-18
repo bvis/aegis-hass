@@ -5,11 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.14.0] - unreleased
+## [1.14.0] - 2026-07-18
+
+Cloud live-video feasibility probe in diagnostics and mains-power flapping fixes. Consolidates the 1.14.0-beta series.
 
 ### Added
 - **Per-device firmware update entities (2.1).** The hub-level firmware update entity (1.4.0-beta.5) now has a per-device counterpart: each non-hub device gets an `update.<device>_firmware` entity sourced from the same read-only `streamHubObject` snapshot (field 200, `device_firmware_updates`). It surfaces the pending target version, download progress (during the download phase) and a security-critical flag, and renders "Up to date" when Ajax has no update queued for that device. Like the hub entity it is informational only — no install button and the integration never calls the install RPC. Entities are **disabled by default** (a typical install has 10-30 devices); enable the ones you want to watch.
 - **Diagnostics now probe whether Ajax's cloud live-video stream is available to the account (#322).** Groundwork for possible camera support on cloud-hosted Home Assistant (where the local ONVIF/RTSP path isn't reachable): the diagnostics download now includes a read-only, best-effort check of the WebRTC signalling the Ajax app uses for remote live view. It reports only whether the account is authorised to start a session and a summary of the offered connection servers — never any credentials, addresses or video — and negotiates no actual stream. It has no effect on normal operation and is skipped when there are no video devices.
+
+### Fixed
+- **Mains power no longer flips to "Plugged in" from a mis-parsed delta while the hub is on battery (#323).** During an outage the hub emits many small update frames; the fragile positionally-paired "direct delta" path could surface a stray `0x03` byte (the power key) from a mis-aligned per-device delta (escape handling can also shift byte boundaries) and wrongly report mains power restored — even though the Ajax app showed a stable "no power". The mains-power flag is now only trusted from the authoritative full STATUS/SETTINGS snapshot (which locates the hub section by an exact hub-id marker). When a direct delta *does* carry a power flag that differs from the last-known state, an immediate authoritative snapshot refresh is requested (single-flight per hub, so the outage delta burst can't turn into a request storm), so a genuine change is confirmed within a couple of seconds rather than waiting for the periodic poll. A DEBUG diagnostic logs the source frame and raw bytes whenever the power flag changes.
+- **Mains power no longer resets to "Unplugged" on every HTS reconnect (#323).** A fresh streaming client is created on each (re)connect, and the first snapshot after reconnecting was parsed from scratch — so any field the hub didn't repeat in that frame (most visibly the mains-power flag) silently fell back to its default of "Unplugged". During an outage the hub reconnects repeatedly, which turned into a burst of spurious Unplugged/Plugged-in events. The client now carries the last-known hub state across reconnects, so a field only changes when the hub actually reports a new value.
 
 ## [1.13.0] - 2026-07-14
 

@@ -1311,6 +1311,42 @@ class TestStreamHandlers:
         assert "ConnectionRefusedError" in caplog.text
         assert coordinator._hts_client is None
 
+    @pytest.mark.asyncio
+    async def test_run_hts_lifecycle_seeds_last_known_hub_states(self) -> None:
+        # #323 — the last-known hub state must be seeded into the client
+        # before connect() so a reconnect doesn't reset fields (most
+        # visibly externally_powered) to their dataclass defaults. The
+        # unit tests for HtsClient call seed_hub_states directly, so this
+        # asserts the coordinator actually wires it into the lifecycle.
+        state = HubNetworkState(externally_powered=True)
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.hub_network = {"hub-1": state}
+        client = MagicMock()
+        client.seed_hub_states = MagicMock()
+        # connect() raising is fine — seeding happens first, and it lets us
+        # avoid driving the full listen loop.
+        client.connect = AsyncMock(side_effect=ConnectionRefusedError("stop after seed"))
+        coordinator._hts_client = client
+
+        await coordinator._run_hts_lifecycle()
+
+        client.seed_hub_states.assert_called_once_with({"hub-1": state})
+
+    @pytest.mark.asyncio
+    async def test_run_hts_lifecycle_skips_seed_when_no_hub_network(self) -> None:
+        # #323 — with no cached hub state there is nothing to preserve, so
+        # seeding is skipped (a fresh client starts from defaults).
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.hub_network = {}
+        client = MagicMock()
+        client.seed_hub_states = MagicMock()
+        client.connect = AsyncMock(side_effect=ConnectionRefusedError("stop after seed"))
+        coordinator._hts_client = client
+
+        await coordinator._run_hts_lifecycle()
+
+        client.seed_hub_states.assert_not_called()
+
     def test_handle_hts_task_done_drops_client_and_broadcasts(self) -> None:
         """Task-done routes through `_handle_hts_disconnect` (#146).
 
