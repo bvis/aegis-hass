@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.14.0] - unreleased
+## [1.14.0] - 2026-07-18
+
+Cloud live-video feasibility probe in diagnostics and mains-power flapping fixes. Consolidates the 1.14.0-beta series.
 
 ### Added
 - **Diagnostics now probe whether Ajax's cloud live-video stream is available to the account (#322).** Groundwork for possible camera support on cloud-hosted Home Assistant (where the local ONVIF/RTSP path isn't reachable): the diagnostics download now includes a read-only, best-effort check of the WebRTC signalling the Ajax app uses for remote live view. It reports only whether the account is authorised to start a session and a summary of the offered connection servers — never any credentials, addresses or video — and negotiates no actual stream. It has no effect on normal operation and is skipped when there are no video devices.
