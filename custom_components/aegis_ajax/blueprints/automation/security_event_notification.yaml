@@ -69,6 +69,13 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input event_entity
+    # Do not fire when the entity is restored on integration reload or HA
+    # restart (the transition from unavailable/unknown re-delivers the last
+    # event state with a fresh last_changed, so time-based conditions can't
+    # catch it). Same guard as the state-trigger blueprints (#293).
+    not_from:
+      - unavailable
+      - unknown
 
 conditions:
   - condition: template
