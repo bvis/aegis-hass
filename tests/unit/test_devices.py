@@ -1858,6 +1858,174 @@ class TestVideoEdgeOnvifRtspProbe:
         assert result == {"error": "rpc_error"}
 
 
+class TestWebRtcInitiateProbe:
+    """Issue #322: a read-only WebRTC signalling probe. The Ajax app pulls
+    remote live video only over WebRTC, so before building a camera entity we
+    need to know whether a normal account is authorised to start that session
+    or whether it is permission-walled server-side (like photo v3). The probe
+    reads only the first `initiate` message and never sends an SDP offer, so no
+    media is negotiated. Returns a PII-free summary — never credentials, URLs
+    or SDP — and never raises."""
+
+    @staticmethod
+    def _make_api() -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_success_init_reports_authorized_and_ice_summary(self) -> None:
+        from systems.ajax.api.mobile.v2.common.video.webrtc import (
+            ice_server_pb2,
+            stream_pb2,
+        )
+        from systems.ajax.api.mobile.v2.video.webrtc import (
+            initiate_request_pb2,
+            webrtc_endpoints_pb2_grpc,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        init = initiate_request_pb2.InitiateWebRtcResponse.Success.WebRtcInit(
+            session_id="sess-1",
+            ice_servers=[
+                ice_server_pb2.IceServer(urls=["stun:stun.example:3478"]),
+                ice_server_pb2.IceServer(
+                    urls=["turn:turn.example:3478"],
+                    username="secret-user",
+                    credential="secret-cred",
+                ),
+            ],
+            streams=[stream_pb2.Stream(id="s1"), stream_pb2.Stream(id="s2")],
+        )
+        msg = initiate_request_pb2.InitiateWebRtcResponse(
+            success=initiate_request_pb2.InitiateWebRtcResponse.Success(init=init)
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                def _initiate(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return _aiter()
+
+                self.initiate = _initiate
+
+        with patch.object(webrtc_endpoints_pb2_grpc, "WebrtcServiceStub", _StubFactory):
+            result = await api.probe_webrtc_initiate("space-1", "30BE4400")
+
+        assert isinstance(captured[0], initiate_request_pb2.InitiateWebRtcRequest)
+        assert captured[0].video_edge_id == "30BE4400"
+        assert captured[0].space_locator.space_id == "space-1"
+        assert result == {
+            "authorized": True,
+            "first_message": "init",
+            "ice_servers_count": 2,
+            "ice_schemes": ["stun", "turn"],
+            "streams_count": 2,
+        }
+        # PII guard: TURN credentials must never reach the diagnostics dump.
+        assert "secret-user" not in str(result)
+        assert "secret-cred" not in str(result)
+
+    @pytest.mark.asyncio
+    async def test_permission_denied_reports_unauthorized(self) -> None:
+        from systems.ajax.api.mobile.v2.common.response import response_pb2 as webrtc_err_pb2
+        from systems.ajax.api.mobile.v2.video.webrtc import (
+            initiate_request_pb2,
+            webrtc_endpoints_pb2_grpc,
+        )
+
+        api = self._make_api()
+        msg = initiate_request_pb2.InitiateWebRtcResponse(
+            failure=initiate_request_pb2.InitiateWebRtcResponse.Failure(
+                permission_denied=webrtc_err_pb2.DefaultError(),
+            )
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.initiate = lambda *a, **k: _aiter()
+
+        with patch.object(webrtc_endpoints_pb2_grpc, "WebrtcServiceStub", _StubFactory):
+            result = await api.probe_webrtc_initiate("space-1", "30BE4400")
+
+        assert result == {"authorized": False, "error": "permission_denied"}
+
+    @pytest.mark.asyncio
+    async def test_offline_edge_is_authorized_but_reports_error(self) -> None:
+        # A non-permission failure means we passed the permission gate; the
+        # camera is just unreachable right now. authorized stays True so the
+        # go/no-go signal isn't a false negative.
+        from systems.ajax.api.mobile.v2.common.response import response_pb2 as webrtc_err_pb2
+        from systems.ajax.api.mobile.v2.video.webrtc import (
+            initiate_request_pb2,
+            webrtc_endpoints_pb2_grpc,
+        )
+
+        api = self._make_api()
+        msg = initiate_request_pb2.InitiateWebRtcResponse(
+            failure=initiate_request_pb2.InitiateWebRtcResponse.Failure(
+                video_edge_is_offline=webrtc_err_pb2.DefaultError(),
+            )
+        )
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            yield msg
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.initiate = lambda *a, **k: _aiter()
+
+        with patch.object(webrtc_endpoints_pb2_grpc, "WebrtcServiceStub", _StubFactory):
+            result = await api.probe_webrtc_initiate("space-1", "30BE4400")
+
+        assert result == {"authorized": True, "error": "video_edge_is_offline"}
+
+    @pytest.mark.asyncio
+    async def test_rpc_exception_reports_error(self) -> None:
+        from systems.ajax.api.mobile.v2.video.webrtc import webrtc_endpoints_pb2_grpc
+
+        api = self._make_api()
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                def _initiate(*_a: object, **_k: object) -> object:
+                    raise RuntimeError("boom")
+
+                self.initiate = _initiate
+
+        with patch.object(webrtc_endpoints_pb2_grpc, "WebrtcServiceStub", _StubFactory):
+            result = await api.probe_webrtc_initiate("space-1", "30BE4400")
+
+        assert result == {"error": "rpc_error"}
+
+    @pytest.mark.asyncio
+    async def test_empty_stream_reports_error(self) -> None:
+        from systems.ajax.api.mobile.v2.video.webrtc import webrtc_endpoints_pb2_grpc
+
+        api = self._make_api()
+
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+            return
+            yield  # pragma: no cover
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.initiate = lambda *a, **k: _aiter()
+
+        with patch.object(webrtc_endpoints_pb2_grpc, "WebrtcServiceStub", _StubFactory):
+            result = await api.probe_webrtc_initiate("space-1", "30BE4400")
+
+        assert result == {"error": "empty_stream"}
+
+
 class TestDevicesApiInit:
     def test_init(self) -> None:
         client = MagicMock()
