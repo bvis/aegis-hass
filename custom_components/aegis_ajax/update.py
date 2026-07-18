@@ -29,7 +29,9 @@ from homeassistant.components.update import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.hub_object import (
+    DEVICE_FW_STATE_COMPLETED,
     DEVICE_FW_STATE_DOWNLOADING,
+    DEVICE_FW_STATE_FAILED,
     DEVICE_FW_STATE_INSTALLING,
     HUB_FW_STATE_DOWNLOADING,
     DeviceFirmwareUpdateInfo,
@@ -77,8 +79,12 @@ async def async_setup_entry(
     # Per-device firmware update entities (2.1). One per non-hub device,
     # disabled-by-default: a typical install has 10-30 devices and most
     # users only care when a specific device is stuck on old firmware.
+    # `device_id in seen` also guards a hub model newer than the vendored
+    # proto: it parses as device_type "unknown", escapes the name filter,
+    # and would otherwise get a second entity with the hub entity's
+    # unique_id (HA then drops one of the two).
     for device_id, device in coordinator.devices.items():
-        if device.device_type.startswith("hub"):
+        if device_id in seen or device.device_type.startswith("hub"):
             continue
         entities.append(AjaxDeviceFirmwareUpdate(coordinator, device_id))
     async_add_entities(entities)
@@ -90,8 +96,11 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], UpdateE
     _attr_has_entity_name = True
     _attr_translation_key = "hub_firmware"
     _attr_device_class = UpdateDeviceClass.FIRMWARE
-    # No `INSTALL` feature — the entity is informational only.
-    _attr_supported_features = UpdateEntityFeature(0)
+    # No `INSTALL` feature — the entity is informational only. `PROGRESS`
+    # is required for HA to honor the `in_progress` property at all:
+    # without it, `UpdateEntity.state_attributes` ignores the property
+    # and reports the internal install flag (always False here).
+    _attr_supported_features = UpdateEntityFeature.PROGRESS
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
         super().__init__(coordinator)
@@ -164,7 +173,10 @@ class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], Upda
     _attr_has_entity_name = True
     _attr_translation_key = "device_firmware"
     _attr_device_class = UpdateDeviceClass.FIRMWARE
-    _attr_supported_features = UpdateEntityFeature(0)
+    # No `INSTALL` (informational only); `PROGRESS` so HA honors the
+    # `in_progress`/`update_percentage` properties — without the flag
+    # `UpdateEntity.state_attributes` ignores both.
+    _attr_supported_features = UpdateEntityFeature.PROGRESS
     # Disabled-by-default: opt-in per device to avoid 10-30 entities most
     # users don't want.
     _attr_entity_registry_enabled_default = False
@@ -178,8 +190,20 @@ class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], Upda
             self._attr_device_info = build_device_info(device, coordinator.rooms)
 
     @property
+    def available(self) -> bool:
+        # A device deleted from the hub drops out of `coordinator.devices`
+        # but its (opt-in) entity stays in the registry — HA never evicts
+        # orphans on its own. Without this gate the orphan would keep
+        # reporting a confident "Up to date" forever.
+        return super().available and self._device_id in self.coordinator.devices
+
+    @property
     def _info(self) -> DeviceFirmwareUpdateInfo | None:
-        return self.coordinator.device_firmware_updates.get(self._device_id)
+        # `.upper()` on both sides (see coordinator write): the update map
+        # comes from `streamHubObject` while `Device.id` comes from the
+        # devices snapshot — two services whose hex-id casing is not
+        # guaranteed to match.
+        return self.coordinator.device_firmware_updates.get(self._device_id.upper())
 
     @property
     def installed_version(self) -> str | None:
@@ -191,9 +215,11 @@ class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], Upda
     @property
     def latest_version(self) -> str | None:
         info = self._info
-        if info is None or not info.target_version:
-            # No pending update — mirror installed_version so HA renders
-            # "Up to date" (STATE_OFF) rather than "unknown".
+        if info is None or not info.target_version or info.state == DEVICE_FW_STATE_COMPLETED:
+            # No pending update (or the install just finished and the
+            # entry hasn't dropped from the snapshot yet) — mirror
+            # installed_version so HA renders "Up to date" (STATE_OFF)
+            # rather than "unknown" or a stale "update available".
             return self.installed_version
         return info.target_version
 
@@ -225,6 +251,18 @@ class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], Upda
                 "the absence of a queued update."
             )
         critical = " (security-critical)" if info.is_critical else ""
+        if info.state == DEVICE_FW_STATE_COMPLETED:
+            return (
+                f"Firmware {info.target_version} was just installed on "
+                "this device; Ajax will clear the entry shortly."
+            )
+        if info.state == DEVICE_FW_STATE_FAILED:
+            return (
+                f"The last attempt to install firmware {info.target_version}"
+                f"{critical} on this device FAILED. Ajax retries on its "
+                "own schedule; if it stays failed, check the device in "
+                "the Ajax app."
+            )
         return (
             f"Ajax has queued firmware {info.target_version} for this "
             f"device{critical}. The device will install it on its own; "

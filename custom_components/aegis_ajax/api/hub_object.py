@@ -233,7 +233,7 @@ class HubObjectApi:
             async for raw_msg in stream:
                 return self._parse_device_firmware_from_hub_object(raw_msg)
         except Exception:
-            _LOGGER.debug("Failed to get device firmware updates for %s", hub_id)
+            _LOGGER.debug("Failed to get device firmware updates for %s", hub_id, exc_info=True)
 
         return []
 

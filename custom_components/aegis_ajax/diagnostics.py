@@ -142,6 +142,23 @@ async def async_get_config_entry_diagnostics(
             for kid, k in coordinator.keyfobs.items()
         },
         "video_edge_onvif_rtsp": video_edge_probe,
+        # Firmware update state feeding the `update.*` entities (project
+        # rule: every entity-driving field is dumped here). Both maps are
+        # empty most of the time — Ajax only lists a hub/device while an
+        # update is queued or in flight.
+        "hub_firmware_updates": {
+            hid: {"target_version": fw.target_version, "state": fw.state}
+            for hid, fw in coordinator.hub_firmware_updates.items()
+        },
+        "device_firmware_updates": {
+            did: {
+                "target_version": dfu.target_version,
+                "state": dfu.state,
+                "progress": dfu.progress,
+                "is_critical": dfu.is_critical,
+            }
+            for did, dfu in coordinator.device_firmware_updates.items()
+        },
         "stream_tasks": len(coordinator._stream_tasks),
         "notification_listener": coordinator.notification_listener is not None,
     }

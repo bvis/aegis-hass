@@ -526,7 +526,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 self.hub_firmware_updates[space.hub_id] = fw
             for dfu in await self._hub_object_api.get_device_firmware_updates(space.hub_id):
-                device_updates[dfu.device_id] = dfu
+                # `.upper()` on write (and on the entity's read): the hex
+                # device id here comes from `streamHubObject` while the
+                # entities key off `Device.id` from the devices snapshot —
+                # two services whose id casing is not guaranteed to match.
+                device_updates[dfu.device_id.upper()] = dfu
         self.device_firmware_updates = device_updates
         self._sim_info_last_fetch = now
 

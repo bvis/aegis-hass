@@ -1972,6 +1972,46 @@ class TestHubFirmwareRefresh:
         assert stored.progress == 30
         assert stored.is_critical is True
 
+    @pytest.mark.asyncio
+    async def test_device_firmware_updates_keyed_uppercase(self) -> None:
+        """Regression: the map key is normalized to uppercase because the
+
+        `streamHubObject` hex id casing is not guaranteed to match the
+        devices-snapshot `Device.id` the entities key off (the entity
+        lookup uppercases too).
+        """
+        from custom_components.aegis_ajax.api.hub_object import (
+            DEVICE_FW_STATE_NOT_STARTED,
+            DeviceFirmwareUpdateInfo,
+        )
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._sim_info_last_fetch = -10_000.0
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+        coordinator._hub_object_api = MagicMock()
+        coordinator._hub_object_api.get_sim_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_firmware_info = AsyncMock(return_value=None)
+        coordinator._hub_object_api.get_device_firmware_updates = AsyncMock(
+            return_value=[
+                DeviceFirmwareUpdateInfo(
+                    device_id="aa11bb22",
+                    target_version="6.62.3",
+                    state=DEVICE_FW_STATE_NOT_STARTED,
+                )
+            ]
+        )
+
+        await coordinator._async_update_data()
+
+        assert "AA11BB22" in coordinator.device_firmware_updates
+        assert "aa11bb22" not in coordinator.device_firmware_updates
+
     async def test_sim_and_firmware_refresh_dedupes_shared_hub(self) -> None:
         """Multiple spaces backed by one hub (group mode) trigger only a
 

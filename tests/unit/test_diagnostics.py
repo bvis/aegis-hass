@@ -126,6 +126,43 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert "door_opened" in dev_info["statuses"]
 
     @pytest.mark.asyncio
+    async def test_firmware_update_maps_included(self, entry: MagicMock) -> None:
+        # 2.1 / project rule (#148): every entity-driving field must land
+        # in the diagnostics dump — both `update.*` sources included.
+        from custom_components.aegis_ajax.api.hub_object import (
+            DEVICE_FW_STATE_DOWNLOADING,
+            HUB_FW_STATE_NOT_STARTED,
+            DeviceFirmwareUpdateInfo,
+            HubFirmwareUpdateInfo,
+        )
+
+        entry.runtime_data.hub_firmware_updates = {
+            "002B1A51": HubFirmwareUpdateInfo(
+                target_version="2.17.0", state=HUB_FW_STATE_NOT_STARTED
+            )
+        }
+        entry.runtime_data.device_firmware_updates = {
+            "AA11BB22": DeviceFirmwareUpdateInfo(
+                device_id="AA11BB22",
+                target_version="6.62.3",
+                state=DEVICE_FW_STATE_DOWNLOADING,
+                progress=42,
+                is_critical=True,
+            )
+        }
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert result["hub_firmware_updates"]["002B1A51"] == {
+            "target_version": "2.17.0",
+            "state": HUB_FW_STATE_NOT_STARTED,
+        }
+        assert result["device_firmware_updates"]["AA11BB22"] == {
+            "target_version": "6.62.3",
+            "state": DEVICE_FW_STATE_DOWNLOADING,
+            "progress": 42,
+            "is_critical": True,
+        }
+
+    @pytest.mark.asyncio
     async def test_device_with_battery(self, entry: MagicMock) -> None:
         battery = BatteryInfo(level=85, is_low=False)
         entry.runtime_data.devices = {"dev-1": _make_device(battery=battery)}
