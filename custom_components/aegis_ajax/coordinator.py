@@ -820,6 +820,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._hts_client is None:
             return
         try:
+            # Seed last-known hub states so a reconnect doesn't reset fields
+            # (e.g. externally_powered) to their defaults when the first
+            # post-reconnect frame omits their TLV key (#323).
+            if self.hub_network:
+                self._hts_client.seed_hub_states(self.hub_network)
             result = await self._hts_client.connect()
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
             self._clear_hts_chronic_failure()
