@@ -64,8 +64,12 @@ except TypeError as exc:
 from custom_components.aegis_ajax.const import (  # noqa: E402
     CONF_AUTO_CREATE_LABELS,
     CONF_DISABLE_PUSH_WARNING,
+    CONF_PERSISTENT_NOTIFICATION_EVENTS,
+    CONF_PERSISTENT_NOTIFICATIONS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_DISABLE_PUSH_WARNING,
+    DEFAULT_PERSISTENT_NOTIFICATION_EVENTS,
+    DEFAULT_PERSISTENT_NOTIFICATIONS,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     LABELS,
@@ -369,6 +373,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         await client.close()
         raise
     entry.runtime_data = coordinator
+
+    # Attach the persistent-notification manager (2.2). Reads the current
+    # options; the entry reloads on any options change, so this is rebuilt with
+    # fresh settings each setup. When disabled it's still attached but no-ops.
+    from custom_components.aegis_ajax.persistent_notification import (  # noqa: PLC0415
+        AjaxPersistentNotifier,
+    )
+
+    coordinator.set_persistent_notifier(
+        AjaxPersistentNotifier(
+            hass,
+            entry.entry_id,
+            enabled=bool(
+                entry.options.get(CONF_PERSISTENT_NOTIFICATIONS, DEFAULT_PERSISTENT_NOTIFICATIONS)
+            ),
+            event_types=entry.options.get(
+                CONF_PERSISTENT_NOTIFICATION_EVENTS, DEFAULT_PERSISTENT_NOTIFICATION_EVENTS
+            ),
+            account_name=str(entry.data.get("email", "")),
+        )
+    )
 
     # Start FCM push notifications if configured (credentials live in data since v2).
     # Run as a background task — FCM registration + push-client start is a

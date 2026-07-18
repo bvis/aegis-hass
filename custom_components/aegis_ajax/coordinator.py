@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from custom_components.aegis_ajax.api.hts.keyfobs import Keyfob
     from custom_components.aegis_ajax.api.models import Device, Room, Space
     from custom_components.aegis_ajax.notification import AjaxNotificationListener
+    from custom_components.aegis_ajax.persistent_notification import AjaxPersistentNotifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -172,6 +173,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # install RPC even though the proto exposes one.
         self.hub_firmware_updates: dict[str, HubFirmwareUpdateInfo] = {}
         self._notification_listener: AjaxNotificationListener | None = None
+        # Optional persistent-notification manager (2.2). Attached by
+        # async_setup_entry from the config-entry options; None means the
+        # feature is off (the default) and event dispatch skips it.
+        self._persistent_notifier: AjaxPersistentNotifier | None = None
         self._stream_tasks: list[asyncio.Task[None]] = []
         self._streams_started: bool = False
         self._event_entities: dict[str, Any] = {}
@@ -1473,6 +1478,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def register_event_entity(self, space_id: str, entity: object) -> None:
         """Register an event entity for a space."""
         self._event_entities[space_id] = entity
+
+    def set_persistent_notifier(self, notifier: AjaxPersistentNotifier | None) -> None:
+        """Attach the persistent-notification manager (2.2), or None to disable."""
+        self._persistent_notifier = notifier
+
+    def notify_persistent_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """Forward a dispatched event to the persistent-notification manager.
+
+        No-op when the feature is disabled. The manager owns the event-type
+        filtering, so the event-entity dispatch path can call this
+        unconditionally. Best-effort: a notification failure must never break
+        event dispatch or state updates.
+        """
+        notifier = self._persistent_notifier
+        if notifier is None:
+            return
+        try:
+            notifier.notify(event_type, data)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Persistent notification for %s failed", event_type, exc_info=True)
 
     def fire_push_event(self, space_id: str, event_type: str, data: dict[str, Any]) -> None:
         """Dispatch a push event to the corresponding event entity."""
