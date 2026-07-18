@@ -88,12 +88,16 @@
                     "photo_retention_days": "Foto bewaarperiode (dagen)",
                     "photo_max_per_device": "Max foto's per apparaat (0 = onbeperkt)",
                     "auto_create_labels": "Aegis-labels automatisch aanmaken en aan entiteiten toewijzen",
-                    "bypass_switches": "Apparaat-overbrugschakelaars aanmaken"
+                    "bypass_switches": "Apparaat-overbrugschakelaars aanmaken",
+                    "persistent_notifications": "Beveiligingsgebeurtenissen tonen als blijvende meldingen",
+                    "persistent_notification_events": "Gebeurtenissen die een blijvende melding aanmaken"
                 },
                 "data_description": {
                     "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren.",
                     "expose_arm_home": "Voegt een modus Thuis inschakelen toe aan het alarmpaneel. Dit is gelijk aan de Nachtmodus en is voornamelijk nodig voor Amazon Alexa of Nabu Casa Cloud. Schakel uit om de dubbele knop te verbergen als je deze niet gebruikt.",
-                    "disable_push_warning": "Schakel dit in als je bewust zonder push werkt. Verbergt de terugkerende herinnering \"FCM niet geconfigureerd\" en de reparatiekaart. Realtime gebeurtenissen (deurbel, in-/uitschakelen, alarm) bereiken Home Assistant pas als je FCM configureert."
+                    "disable_push_warning": "Schakel dit in als je bewust zonder push werkt. Verbergt de terugkerende herinnering \"FCM niet geconfigureerd\" en de reparatiekaart. Realtime gebeurtenissen (deurbel, in-/uitschakelen, alarm) bereiken Home Assistant pas als je FCM configureert.",
+                    "persistent_notifications": "Indien ingeschakeld verschijnen de geselecteerde gebeurtenissen als blijvende Home Assistant-meldingen die zichtbaar blijven totdat ze worden gesloten of Home Assistant opnieuw start. Deze gebeurtenissen komen binnen via push (FCM), dus push moet geconfigureerd zijn om ze te ontvangen.",
+                    "persistent_notification_events": "Welke gebeurtenissen een blijvende melding veroorzaken. Standaard echte incidenten (alarm, paniek, sabotage, brand, CO, overstroming, glasbreuk). Voeg in-/uitschakelen, beweging of deurbel toe als je die ook wilt."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (alleen als je account apparaten kan deactiveren)",
                 "always": "Altijd",
                 "never": "Nooit"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Ingeschakeld",
+                "arm_night": "Nachtmodus ingeschakeld",
+                "battery_low": "Batterij laag",
+                "co_alarm": "CO-alarm",
+                "connection_lost": "Verbinding verloren",
+                "disarm": "Uitgeschakeld",
+                "disarm_night": "Nachtmodus uitgeschakeld",
+                "door_open": "Deur geopend",
+                "doorbell_pressed": "Bel ingedrukt",
+                "fire": "Brand",
+                "flood": "Overstroming",
+                "glass_break": "Glasbreuk",
+                "malfunction": "Storing",
+                "motion": "Beweging",
+                "panic": "Paniek",
+                "tamper": "Sabotage"
             }
         }
     }

@@ -88,12 +88,16 @@
                     "photo_retention_days": "Fotoğraf saklama süresi (gün)",
                     "photo_max_per_device": "Cihaz başına maks. fotoğraf (0 = sınırsız)",
                     "auto_create_labels": "Aegis etiketlerini otomatik olarak oluştur ve varlıklara ata",
-                    "bypass_switches": "Cihaz atlama anahtarları oluştur"
+                    "bypass_switches": "Cihaz atlama anahtarları oluştur",
+                    "persistent_notifications": "Güvenlik olaylarını kalıcı bildirim olarak göster",
+                    "persistent_notification_events": "Kalıcı bildirim oluşturan olaylar"
                 },
                 "data_description": {
                     "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
                     "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın.",
-                    "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz."
+                    "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz.",
+                    "persistent_notifications": "Açıldığında, seçilen olaylar kapatılana veya Home Assistant yeniden başlatılana kadar görünür kalan kalıcı Home Assistant bildirimleri olarak gösterilir. Bu olaylar push (FCM) üzerinden iletilir; ulaşmaları için push yapılandırılmış olmalıdır.",
+                    "persistent_notification_events": "Hangi olayların kalıcı bildirim oluşturacağı. Varsayılan olarak gerçek olaylar (alarm, panik, kurcalama, yangın, CO, su baskını, cam kırılması). Kurma/çözme, hareket veya zili de istiyorsanız ekleyin."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Otomatik (yalnızca hesabın cihazları devre dışı bırakabiliyorsa)",
                 "always": "Her zaman",
                 "never": "Asla"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Kuruldu",
+                "arm_night": "Gece modu etkin",
+                "battery_low": "Düşük pil",
+                "co_alarm": "CO alarmı",
+                "connection_lost": "Bağlantı kesildi",
+                "disarm": "Devre dışı",
+                "disarm_night": "Gece modu devre dışı",
+                "door_open": "Kapı açıldı",
+                "doorbell_pressed": "Zile basıldı",
+                "fire": "Yangın",
+                "flood": "Su baskını",
+                "glass_break": "Cam kırılması",
+                "malfunction": "Arıza",
+                "motion": "Hareket",
+                "panic": "Panik",
+                "tamper": "Müdahale"
             }
         }
     }

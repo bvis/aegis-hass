@@ -88,12 +88,16 @@
                     "photo_retention_days": "Rétention des photos (jours)",
                     "photo_max_per_device": "Max photos par appareil (0 = illimité)",
                     "auto_create_labels": "Créer et attribuer automatiquement des étiquettes Aegis aux entités",
-                    "bypass_switches": "Créer des interrupteurs de contournement"
+                    "bypass_switches": "Créer des interrupteurs de contournement",
+                    "persistent_notifications": "Afficher les événements de sécurité comme notifications persistantes",
+                    "persistent_notification_events": "Événements qui créent une notification persistante"
                 },
                 "data_description": {
                     "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils.",
                     "expose_arm_home": "Ajoute un mode Armer à la maison au panneau d'alarme. Il reproduit le mode Nuit et n'est nécessaire que pour Amazon Alexa ou Nabu Casa Cloud. Désactivez-le pour masquer le bouton en double si vous ne les utilisez pas.",
-                    "disable_push_warning": "Activez si vous fonctionnez volontairement sans push. Masque le rappel récurrent « FCM non configuré » et la carte de réparation. Les événements en temps réel (sonnette, armement/désarmement, alarme) n'atteindront Home Assistant qu'une fois FCM configuré."
+                    "disable_push_warning": "Activez si vous fonctionnez volontairement sans push. Masque le rappel récurrent « FCM non configuré » et la carte de réparation. Les événements en temps réel (sonnette, armement/désarmement, alarme) n'atteindront Home Assistant qu'une fois FCM configuré.",
+                    "persistent_notifications": "Lorsque activé, les événements sélectionnés apparaissent comme des notifications persistantes de Home Assistant qui restent visibles jusqu'à leur fermeture ou au redémarrage de Home Assistant. Ces événements sont livrés via push (FCM), le push doit donc être configuré pour qu'ils arrivent.",
+                    "persistent_notification_events": "Quels événements déclenchent une notification persistante. Par défaut, les incidents réels (alarme, panique, sabotage, incendie, CO, inondation, bris de verre). Ajoutez armement/désarmement, mouvement ou sonnette si vous les voulez aussi."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (seulement si votre compte peut désactiver des appareils)",
                 "always": "Toujours",
                 "never": "Jamais"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarme",
+                "arm": "Armé",
+                "arm_night": "Mode nuit activé",
+                "battery_low": "Batterie faible",
+                "co_alarm": "Alarme CO",
+                "connection_lost": "Connexion perdue",
+                "disarm": "Désarmé",
+                "disarm_night": "Mode nuit désactivé",
+                "door_open": "Porte ouverte",
+                "doorbell_pressed": "Sonnette appuyée",
+                "fire": "Incendie",
+                "flood": "Inondation",
+                "glass_break": "Bris de verre",
+                "malfunction": "Dysfonctionnement",
+                "motion": "Mouvement",
+                "panic": "Panique",
+                "tamper": "Sabotage"
             }
         }
     }

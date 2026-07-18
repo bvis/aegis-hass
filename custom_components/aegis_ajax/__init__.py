@@ -390,13 +390,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
             AjaxPersistentNotifier,
         )
 
+        # Only disambiguate the notification title with the account email
+        # when more than one Ajax account is configured — on the common
+        # single-account install it's pure noise in every card.
+        account_name = ""
+        if len(hass.config_entries.async_entries(DOMAIN)) > 1:
+            account_name = str(entry.data.get("email", ""))
         coordinator.set_persistent_notifier(
             AjaxPersistentNotifier(
                 hass,
                 entry.entry_id,
                 enabled=True,
                 event_types=pn_event_types,
-                account_name=str(entry.data.get("email", "")),
+                account_name=account_name,
             )
         )
     else:

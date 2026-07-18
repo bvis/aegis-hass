@@ -88,12 +88,16 @@
                     "photo_retention_days": "Conservazione foto (giorni)",
                     "photo_max_per_device": "Max foto per dispositivo (0 = illimitato)",
                     "auto_create_labels": "Crea e assegna automaticamente etichette Aegis alle entità",
-                    "bypass_switches": "Crea interruttori di esclusione dispositivo"
+                    "bypass_switches": "Crea interruttori di esclusione dispositivo",
+                    "persistent_notifications": "Mostra gli eventi di sicurezza come notifiche persistenti",
+                    "persistent_notification_events": "Eventi che creano una notifica persistente"
                 },
                 "data_description": {
                     "bypass_switches": "Gli interruttori di esclusione permettono di disattivare un dispositivo prima di inserire l'allarme. 'Auto' li crea solo se il tuo account Ajax ha il permesso di disattivare i dispositivi.",
                     "expose_arm_home": "Aggiunge una modalità Attiva in casa al pannello dell'allarme. Replica la modalità Notte ed è necessaria principalmente per Amazon Alexa o Nabu Casa Cloud. Disattivala per nascondere il pulsante duplicato se non li usi.",
-                    "disable_push_warning": "Attiva se usi l'integrazione di proposito senza push. Nasconde il promemoria ricorrente \"FCM non configurato\" e la scheda di riparazione. Gli eventi in tempo reale (campanello, attivazione/disattivazione, allarme) non raggiungeranno Home Assistant finché non configuri FCM."
+                    "disable_push_warning": "Attiva se usi l'integrazione di proposito senza push. Nasconde il promemoria ricorrente \"FCM non configurato\" e la scheda di riparazione. Gli eventi in tempo reale (campanello, attivazione/disattivazione, allarme) non raggiungeranno Home Assistant finché non configuri FCM.",
+                    "persistent_notifications": "Quando attivo, gli eventi selezionati appaiono come notifiche persistenti di Home Assistant che restano visibili finché non vengono chiuse o Home Assistant si riavvia. Questi eventi arrivano via push (FCM), quindi il push deve essere configurato perché arrivino.",
+                    "persistent_notification_events": "Quali eventi generano una notifica persistente. Predefiniti: incidenti reali (allarme, panico, manomissione, incendio, CO, allagamento, rottura vetri). Aggiungi inserimento/disinserimento, movimento o campanello se li vuoi anche."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (solo se il tuo account può disattivare i dispositivi)",
                 "always": "Sempre",
                 "never": "Mai"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Allarme",
+                "arm": "Inserito",
+                "arm_night": "Modo notte attivato",
+                "battery_low": "Batteria scarica",
+                "co_alarm": "Allarme CO",
+                "connection_lost": "Connessione persa",
+                "disarm": "Disinserito",
+                "disarm_night": "Modo notte disattivato",
+                "door_open": "Porta aperta",
+                "doorbell_pressed": "Campanello premuto",
+                "fire": "Incendio",
+                "flood": "Allagamento",
+                "glass_break": "Rottura vetro",
+                "malfunction": "Malfunzionamento",
+                "motion": "Movimento",
+                "panic": "Panico",
+                "tamper": "Manomissione"
             }
         }
     }

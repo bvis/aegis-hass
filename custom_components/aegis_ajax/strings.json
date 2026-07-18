@@ -95,7 +95,7 @@
                     "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
                     "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them.",
                     "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM.",
-                    "persistent_notifications": "When on, the selected events appear as Home Assistant persistent notifications that stay visible until dismissed. These events are delivered over push (FCM), so push must be configured for them to arrive.",
+                    "persistent_notifications": "When on, the selected events appear as Home Assistant persistent notifications that stay visible until dismissed or Home Assistant restarts. These events are delivered over push (FCM), so push must be configured for them to arrive.",
                     "persistent_notification_events": "Which events raise a persistent notification. Defaults to real incidents (alarm, panic, tamper, fire, CO, flood, glass break). Add arm/disarm, motion or doorbell if you want those too."
                 }
             }
