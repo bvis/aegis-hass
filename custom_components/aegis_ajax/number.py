@@ -1,12 +1,14 @@
 """Number entities for writable Ajax device settings (#310).
 
-Currently exposes the siren **alarm duration** (seconds) for any siren whose
-snapshot carries a `common_siren_part`. Entities are created purely from the
-presence of the parser's `SIREN_ALARM_DURATION_KEY` status, so every siren SKU
-is covered without a per-device-type table. Writes go through the shared
-`UpdateHubDevice` command path (`DeviceCommand.set_siren_settings`), which the
-account can only perform with device-edit permission — a hub rejection is
-surfaced as a translated `HomeAssistantError`.
+Currently exposes the siren **alarm duration** (seconds). An entity is created
+for every siren device type the rich `StreamHubDevice` proto models a
+`common_siren_part` for (`SIREN_DEVICE_TYPES`) — the entity is created at setup
+regardless of whether its current value has been fetched yet, so it appears on
+first boot without waiting for the background settings refresh (it reads
+`unknown` until the first snapshot merges the value). Writes go through the
+shared `UpdateHubDevice` command path (`DeviceCommand.set_siren_settings`),
+which the account can only perform with device-edit permission — a hub
+rejection is surfaced as a translated `HomeAssistantError`.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from custom_components.aegis_ajax.const import (
     SIREN_ALARM_DURATION_MAX,
     SIREN_ALARM_DURATION_MIN,
     SIREN_ALARM_DURATION_STEP,
+    SIREN_DEVICE_TYPES,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
@@ -45,7 +48,7 @@ async def async_setup_entry(
     entities: list[NumberEntity] = [
         AjaxSirenAlarmDurationNumber(coordinator=coordinator, device_id=device_id)
         for device_id, device in coordinator.devices.items()
-        if SIREN_ALARM_DURATION_KEY in device.statuses
+        if device.device_type in SIREN_DEVICE_TYPES
     ]
     async_add_entities(entities)
 

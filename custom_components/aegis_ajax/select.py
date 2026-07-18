@@ -1,9 +1,11 @@
 """Select entities for writable Ajax device settings (#310).
 
-Currently exposes the siren **volume level** for any siren whose snapshot
-carries a `common_siren_part`. Entities are created purely from the presence of
-the parser's `SIREN_VOLUME_LEVEL_KEY` status, so every siren SKU is covered
-without a per-device-type table. Writes go through the shared `UpdateHubDevice`
+Currently exposes the siren **volume level**. An entity is created for every
+siren device type the rich `StreamHubDevice` proto models a `common_siren_part`
+for (`SIREN_DEVICE_TYPES`) — created at setup regardless of whether its current
+value has been fetched yet, so it appears on first boot without waiting for the
+background settings refresh (it reads no selected option until the first
+snapshot merges the value). Writes go through the shared `UpdateHubDevice`
 command path (`DeviceCommand.set_siren_settings`); a hub rejection (e.g. the
 account lacks device-edit permission) is surfaced as a translated
 `HomeAssistantError`.
@@ -20,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.const import (
+    SIREN_DEVICE_TYPES,
     SIREN_VOLUME_LEVEL_KEY,
     SIREN_VOLUME_LEVEL_VALUES,
     SIREN_VOLUME_LEVELS,
@@ -44,7 +47,7 @@ async def async_setup_entry(
     entities: list[SelectEntity] = [
         AjaxSirenVolumeSelect(coordinator=coordinator, device_id=device_id)
         for device_id, device in coordinator.devices.items()
-        if SIREN_VOLUME_LEVEL_KEY in device.statuses
+        if device.device_type in SIREN_DEVICE_TYPES
     ]
     async_add_entities(entities)
 

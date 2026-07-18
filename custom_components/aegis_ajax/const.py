@@ -276,9 +276,17 @@ BYPASS_REQUIRED_PERMISSION = "DEVICE_EDIT"
 
 # --- Siren settings entities (#310) -------------------------------------
 # Siren device families whose rich `StreamHubDevice` snapshot embeds a
-# writable `common_siren_part.siren_settings`. The settings refresh only
-# streams the snapshot for these types (same list the HTS temperature source
-# covers), so non-siren devices are never polled for settings.
+# writable `common_siren_part.siren_settings`. This is exactly the set of siren
+# `device` oneof cases our generated `HubDevice` proto models (verified: each
+# embeds `common_siren_part`). Other siren SKUs the integration recognises
+# elsewhere (`street_siren_plus`, `street_siren_fibra`, `street_siren_s`,
+# `street_siren_double_deck*`, …) are NOT in that proto oneof, so streaming
+# their snapshot yields an unknown case and no settings can be read — the same
+# proto-drift limitation as the outdoor curtain temperatures (#229). They are
+# deliberately excluded so we don't create permanently-empty entities; extend
+# this set only alongside the matching proto oneof case. The settings refresh
+# only streams the snapshot for these types, and the `number`/`select`
+# platforms create their entities for exactly these device types.
 SIREN_DEVICE_TYPES = frozenset(
     {
         "street_siren",

@@ -64,12 +64,17 @@ def _street_siren(*, alarm_duration: int | None = None, volume_level: int | None
     )
 
 
-def _make_device(statuses: dict, *, state: DeviceState = DeviceState.ONLINE) -> Device:
+def _make_device(
+    statuses: dict,
+    *,
+    state: DeviceState = DeviceState.ONLINE,
+    device_type: str = "street_siren",
+) -> Device:
     return Device(
         id="30EA219B",
         hub_id="hub-1",
         name="Siren",
-        device_type="street_siren",
+        device_type=device_type,
         room_id=None,
         group_id=None,
         state=state,
@@ -270,12 +275,14 @@ class TestAjaxSirenVolumeSelect:
 
 class TestSetupEntries:
     @pytest.mark.asyncio
-    async def test_number_created_only_when_key_present(self) -> None:
+    async def test_number_created_for_siren_types_only(self) -> None:
         coordinator = MagicMock()
         coordinator.rooms = {}
         coordinator.devices = {
-            "30EA219B": _make_device({SIREN_ALARM_DURATION_KEY: 90}),
-            "no-key": _make_device({}),
+            # No status key yet (first boot, before the timer merges it) — the
+            # entity must still be created so it doesn't need a reload (#310).
+            "30EA219B": _make_device({}, device_type="street_siren"),
+            "not-a-siren": _make_device({}, device_type="door_protect"),
         }
         entry = MagicMock()
         entry.runtime_data = coordinator
@@ -285,12 +292,12 @@ class TestSetupEntries:
         assert added[0].unique_id == "aegis_ajax_30EA219B_siren_alarm_duration"
 
     @pytest.mark.asyncio
-    async def test_select_created_only_when_key_present(self) -> None:
+    async def test_select_created_for_siren_types_only(self) -> None:
         coordinator = MagicMock()
         coordinator.rooms = {}
         coordinator.devices = {
-            "30EA219B": _make_device({SIREN_VOLUME_LEVEL_KEY: 18}),
-            "no-key": _make_device({}),
+            "30EA219B": _make_device({}, device_type="home_siren_g3"),
+            "not-a-siren": _make_device({}, device_type="door_protect"),
         }
         entry = MagicMock()
         entry.runtime_data = coordinator
