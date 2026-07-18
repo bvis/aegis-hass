@@ -5,12 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - unreleased
+
+### Added
+- **Per-device firmware update entities (2.1).** The hub-level firmware update entity (1.4.0-beta.5) now has a per-device counterpart: each non-hub device gets an `update.<device>_firmware` entity sourced from the same read-only `streamHubObject` snapshot (field 200, `device_firmware_updates`). It surfaces the pending target version, download progress (during the download phase) and a security-critical flag, and renders "Up to date" when Ajax has no update queued for that device. A failed install attempt is called out in the entity's summary, and both firmware maps are included in the diagnostics download. Like the hub entity it is informational only — no install button and the integration never calls the install RPC. Entities are **disabled by default** (a typical install has 10-30 devices); enable the ones you want to watch.
+
+### Fixed
+- **Hub firmware update entity now reports download progress.** The `PROGRESS` feature flag was missing, so Home Assistant silently ignored the entity's in-progress signal while the hub was downloading a queued firmware update.
+
 ## [1.14.0] - 2026-07-18
 
 Cloud live-video feasibility probe in diagnostics and mains-power flapping fixes. Consolidates the 1.14.0-beta series.
 
 ### Added
-- **Per-device firmware update entities (2.1).** The hub-level firmware update entity (1.4.0-beta.5) now has a per-device counterpart: each non-hub device gets an `update.<device>_firmware` entity sourced from the same read-only `streamHubObject` snapshot (field 200, `device_firmware_updates`). It surfaces the pending target version, download progress (during the download phase) and a security-critical flag, and renders "Up to date" when Ajax has no update queued for that device. Like the hub entity it is informational only — no install button and the integration never calls the install RPC. Entities are **disabled by default** (a typical install has 10-30 devices); enable the ones you want to watch.
 - **Diagnostics now probe whether Ajax's cloud live-video stream is available to the account (#322).** Groundwork for possible camera support on cloud-hosted Home Assistant (where the local ONVIF/RTSP path isn't reachable): the diagnostics download now includes a read-only, best-effort check of the WebRTC signalling the Ajax app uses for remote live view. It reports only whether the account is authorised to start a session and a summary of the offered connection servers — never any credentials, addresses or video — and negotiates no actual stream. It has no effect on normal operation and is skipped when there are no video devices.
 
 ### Fixed
