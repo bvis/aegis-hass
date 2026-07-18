@@ -89,6 +89,27 @@ class TestFormatting:
         _, kwargs = pn.async_create.call_args
         assert kwargs["notification_id"] == "aegis_ajax_entry-1_panic_space"
 
+    def test_notification_id_uses_group_when_no_device(self) -> None:
+        notifier = _make_notifier(event_types=["panic"])
+        with patch(_PN) as pn:
+            notifier.notify("panic", {"group_id": "g7", "space_id": "sp1"})
+        _, kwargs = pn.async_create.call_args
+        assert kwargs["notification_id"] == "aegis_ajax_entry-1_panic_group_g7"
+
+    def test_notification_id_uses_space_when_no_device_or_group(self) -> None:
+        notifier = _make_notifier(event_types=["panic"])
+        with patch(_PN) as pn:
+            notifier.notify("panic", {"space_id": "sp1"})
+        _, kwargs = pn.async_create.call_args
+        assert kwargs["notification_id"] == "aegis_ajax_entry-1_panic_space_sp1"
+
+    def test_device_id_takes_precedence_over_group_and_space(self) -> None:
+        notifier = _make_notifier(event_types=["alarm"])
+        with patch(_PN) as pn:
+            notifier.notify("alarm", {"device_id": "D1", "group_id": "g7", "space_id": "sp1"})
+        _, kwargs = pn.async_create.call_args
+        assert kwargs["notification_id"] == "aegis_ajax_entry-1_alarm_D1"
+
     def test_unknown_event_type_uses_generic_headline(self) -> None:
         notifier = _make_notifier(event_types=["some_new_event"])
         with patch(_PN) as pn:

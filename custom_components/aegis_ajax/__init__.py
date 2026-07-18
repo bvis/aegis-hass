@@ -376,24 +376,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
 
     # Attach the persistent-notification manager (2.2). Reads the current
     # options; the entry reloads on any options change, so this is rebuilt with
-    # fresh settings each setup. When disabled it's still attached but no-ops.
-    from custom_components.aegis_ajax.persistent_notification import (  # noqa: PLC0415
-        AjaxPersistentNotifier,
+    # fresh settings each setup. Attach None when the feature is off or no event
+    # types are selected, so the coordinator's `_persistent_notifier is None`
+    # fast-path skips all per-event work.
+    pn_enabled = bool(
+        entry.options.get(CONF_PERSISTENT_NOTIFICATIONS, DEFAULT_PERSISTENT_NOTIFICATIONS)
     )
-
-    coordinator.set_persistent_notifier(
-        AjaxPersistentNotifier(
-            hass,
-            entry.entry_id,
-            enabled=bool(
-                entry.options.get(CONF_PERSISTENT_NOTIFICATIONS, DEFAULT_PERSISTENT_NOTIFICATIONS)
-            ),
-            event_types=entry.options.get(
-                CONF_PERSISTENT_NOTIFICATION_EVENTS, DEFAULT_PERSISTENT_NOTIFICATION_EVENTS
-            ),
-            account_name=str(entry.data.get("email", "")),
+    pn_event_types = entry.options.get(
+        CONF_PERSISTENT_NOTIFICATION_EVENTS, DEFAULT_PERSISTENT_NOTIFICATION_EVENTS
+    )
+    if pn_enabled and pn_event_types:
+        from custom_components.aegis_ajax.persistent_notification import (  # noqa: PLC0415
+            AjaxPersistentNotifier,
         )
-    )
+
+        coordinator.set_persistent_notifier(
+            AjaxPersistentNotifier(
+                hass,
+                entry.entry_id,
+                enabled=True,
+                event_types=pn_event_types,
+                account_name=str(entry.data.get("email", "")),
+            )
+        )
+    else:
+        coordinator.set_persistent_notifier(None)
 
     # Start FCM push notifications if configured (credentials live in data since v2).
     # Run as a background task — FCM registration + push-client start is a

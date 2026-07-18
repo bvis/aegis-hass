@@ -93,8 +93,10 @@ class AjaxSecurityEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         )
         # Optionally surface the event as an HA persistent notification (2.2).
         # The coordinator no-ops when the feature is off or the type isn't in
-        # the configured filter.
-        self.coordinator.notify_persistent_event(event_type, data)
+        # the configured filter. Include this entity's space_id so the notifier
+        # can key space-scoped events (no device_id) per space instead of
+        # collapsing them onto one shared card.
+        self.coordinator.notify_persistent_event(event_type, {**data, "space_id": self._space_id})
 
 
 class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):

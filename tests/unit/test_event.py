@@ -58,7 +58,11 @@ class TestAjaxSecurityEvent:
         data = {"raw_tag": "intrusion_alarm"}
         entity.handle_event("alarm", data)
 
-        entity.coordinator.notify_persistent_event.assert_called_once_with("alarm", data)
+        # The entity enriches the forwarded payload with its own space_id so
+        # the notifier can key space-scoped events per space (#331 review).
+        entity.coordinator.notify_persistent_event.assert_called_once_with(
+            "alarm", {"raw_tag": "intrusion_alarm", "space_id": "space-1"}
+        )
 
     def test_handle_event_with_source_info(self) -> None:
         entity = self._make_event_entity()

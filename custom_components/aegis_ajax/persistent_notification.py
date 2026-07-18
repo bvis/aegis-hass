@@ -104,16 +104,21 @@ class AjaxPersistentNotifier:
     def _format(self, event_type: str, data: dict[str, Any]) -> tuple[str, str, str]:
         """Build ``(title, message, notification_id)`` for an event.
 
-        The id keys on ``entry_id + event_type + device`` so a repeat of the
-        same event on the same device refreshes the existing card (with a fresh
-        timestamp) instead of stacking duplicates, while different devices or
-        event types get their own card.
+        The id keys on ``entry_id + event_type + scope`` so a repeat of the
+        same event on the same scope refreshes the existing card (with a fresh
+        timestamp) instead of stacking duplicates, while different devices,
+        groups, spaces or event types get their own card. The scope is the
+        source device when known, else the group, else the space — falling back
+        to a bare ``"space"`` only when none is available — so events that only
+        carry a ``group_id`` or ``space_id`` don't collide on a single card.
         """
         headline = _headline(event_type)
         device_name = str(data.get("device_name") or "").strip()
         room_name = str(data.get("room_name") or "").strip()
         group_name = str(data.get("group_name") or "").strip()
         device_id = str(data.get("device_id") or "").strip()
+        group_id = str(data.get("group_id") or "").strip()
+        space_id = str(data.get("space_id") or "").strip()
 
         title = f"Ajax · {headline}"
         if self._account_name:
@@ -129,6 +134,13 @@ class AjaxPersistentNotifier:
         lines.append(f"Time: {dt_util.now().strftime('%Y-%m-%d %H:%M:%S')}")
         message = "\n".join(lines)
 
-        id_suffix = device_id or "space"
+        if device_id:
+            id_suffix = device_id
+        elif group_id:
+            id_suffix = f"group_{group_id}"
+        elif space_id:
+            id_suffix = f"space_{space_id}"
+        else:
+            id_suffix = "space"
         notification_id = f"{DOMAIN}_{self._entry_id}_{event_type}_{id_suffix}"
         return title, message, notification_id
