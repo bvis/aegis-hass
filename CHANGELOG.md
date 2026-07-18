@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.14.0] - unreleased
 
 ### Added
+- **Per-device firmware update entities (2.1).** The hub-level firmware update entity (1.4.0-beta.5) now has a per-device counterpart: each non-hub device gets an `update.<device>_firmware` entity sourced from the same read-only `streamHubObject` snapshot (field 200, `device_firmware_updates`). It surfaces the pending target version, download progress (during the download phase) and a security-critical flag, and renders "Up to date" when Ajax has no update queued for that device. Like the hub entity it is informational only — no install button and the integration never calls the install RPC. Entities are **disabled by default** (a typical install has 10-30 devices); enable the ones you want to watch.
 - **Diagnostics now probe whether Ajax's cloud live-video stream is available to the account (#322).** Groundwork for possible camera support on cloud-hosted Home Assistant (where the local ONVIF/RTSP path isn't reachable): the diagnostics download now includes a read-only, best-effort check of the WebRTC signalling the Ajax app uses for remote live view. It reports only whether the account is authorised to start a session and a summary of the offered connection servers — never any credentials, addresses or video — and negotiates no actual stream. It has no effect on normal operation and is skipped when there are no video devices.
 
 ## [1.13.0] - 2026-07-14

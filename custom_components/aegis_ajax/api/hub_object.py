@@ -55,6 +55,44 @@ class HubFirmwareUpdateInfo:
     state: str
 
 
+# Phase of an Ajax-side per-device firmware update. Mirrors the
+# `DeviceFirmwareUpdate.Status` oneof (field 200 of the hub object):
+# not_started → downloading(%) → downloaded → installing → completed
+# (or → failed). Unlike the hub `system_firmware_update`, this list is
+# populated whenever the Ajax cloud has queued an update for a specific
+# device, so absence of a device's entry means "device is up to date".
+DEVICE_FW_STATE_NONE = "none"  # no pending update (device absent from list)
+DEVICE_FW_STATE_NOT_STARTED = "not_started"  # queued, not begun
+DEVICE_FW_STATE_DOWNLOADING = "downloading"  # server pushing bytes (has %)
+DEVICE_FW_STATE_DOWNLOADED = "downloaded"  # bytes on device, not installing yet
+DEVICE_FW_STATE_INSTALLING = "installing"  # device flashing new firmware
+DEVICE_FW_STATE_COMPLETED = "completed"  # finished (transient, then entry drops)
+DEVICE_FW_STATE_FAILED = "failed"  # last attempt failed
+
+
+@dataclass(frozen=True)
+class DeviceFirmwareUpdateInfo:
+    """Pending firmware update for a single Ajax device.
+
+    Reported by `streamHubObject` (field 200, `device_firmware_updates`).
+    `device_id` is the Ajax hex hardware id (matching `Device.id`);
+    `target_version` is the version the device will move to; `state` is
+    one of the `DEVICE_FW_STATE_*` constants; `progress` is the 0-99
+    download percentage while `state == DEVICE_FW_STATE_DOWNLOADING`
+    (``None`` otherwise); `is_critical` flags a security-critical update.
+
+    As with the hub, Ajax does not expose the currently-installed
+    version in this stream and this integration never triggers the
+    install RPC — the entity is informational only.
+    """
+
+    device_id: str
+    target_version: str
+    state: str
+    progress: int | None = None
+    is_critical: bool = False
+
+
 class HubObjectApi:
     """API for hub-level data via streamHubObject."""
 
@@ -167,6 +205,93 @@ class HubObjectApi:
             target_version=sfu.firmware_version or "",
             state=state,
         )
+
+    async def get_device_firmware_updates(self, hub_id: str) -> list[DeviceFirmwareUpdateInfo]:
+        """Get pending per-device firmware updates from streamHubObject (field 200).
+
+        Returns an empty list when no device on the hub has a queued
+        update, when the stream errors, or when the payload omits the
+        field. Ajax only lists a device here while an update is queued
+        or in flight, so a device's absence from the list means it is
+        up to date from the cloud's perspective.
+        """
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+
+        tag = (1 << 3) | 2
+        encoded = hub_id.encode("utf-8")
+        request_bytes = bytes([tag, len(encoded)]) + encoded
+
+        method = channel.unary_stream(
+            "/systems.ajax.api.mobile.v2.hubobject.HubObjectService/streamHubObject",
+            request_serializer=lambda x: x,
+            response_deserializer=lambda x: x,
+        )
+
+        try:
+            stream = method(request_bytes, metadata=metadata, timeout=15)
+            async for raw_msg in stream:
+                return self._parse_device_firmware_from_hub_object(raw_msg)
+        except Exception:
+            _LOGGER.debug("Failed to get device firmware updates for %s", hub_id)
+
+        return []
+
+    @staticmethod
+    def _parse_device_firmware_from_hub_object(
+        raw_msg: bytes,
+    ) -> list[DeviceFirmwareUpdateInfo]:
+        """Parse the per-device firmware update list from a StreamHubObject frame.
+
+        Uses the generated proto class (same rationale as the hub
+        firmware path — the list hangs off field 200, a multi-byte tag
+        `FromString` handles for us).
+        """
+        from systems.ajax.api.mobile.v2.hubobject.stream_hub_object_request_pb2 import (  # noqa: PLC0415
+            StreamHubObject,
+        )
+
+        try:
+            response = StreamHubObject.FromString(raw_msg)
+        except Exception:
+            return []
+
+        # Only the snapshot (first stream message) carries the full
+        # firmware list; deltas omit unchanged fields.
+        if response.WhichOneof("item") != "snapshot":
+            return []
+        hub_object = response.snapshot
+
+        if not hub_object.HasField("device_firmware_updates"):
+            return []
+
+        updates: list[DeviceFirmwareUpdateInfo] = []
+        for dfu in hub_object.device_firmware_updates.device_firmware_update:
+            device_id = dfu.device_id
+            if not device_id:
+                continue
+            status_name = dfu.status.WhichOneof("status")
+            progress = (
+                dfu.status.downloading if status_name == DEVICE_FW_STATE_DOWNLOADING else None
+            )
+            # Unknown/future status names fall through as their raw label
+            # (or "none" when the oneof is unset) — the entity stays
+            # informational regardless.
+            state = status_name or DEVICE_FW_STATE_NONE
+            target_version = ""
+            if dfu.HasField("resource_id") and dfu.resource_id.HasField("firmware_id"):
+                target_version = dfu.resource_id.firmware_id.firmware_version or ""
+            is_critical = dfu.HasField("is_critical") and dfu.is_critical.value
+            updates.append(
+                DeviceFirmwareUpdateInfo(
+                    device_id=device_id,
+                    target_version=target_version,
+                    state=state,
+                    progress=progress,
+                    is_critical=is_critical,
+                )
+            )
+        return updates
 
     @staticmethod
     def _parse_sim_from_hub_object(raw_msg: bytes) -> SimCardInfo | None:

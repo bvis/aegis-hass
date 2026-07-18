@@ -431,6 +431,9 @@
         "update": {
             "hub_firmware": {
                 "name": "Microprogramari"
+            },
+            "device_firmware": {
+                "name": "Microprogramari"
             }
         }
     },

@@ -22,6 +22,7 @@ from custom_components.aegis_ajax.api import devices_parser
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import HtsClient
 from custom_components.aegis_ajax.api.hub_object import (
+    DeviceFirmwareUpdateInfo,
     HubFirmwareUpdateInfo,
     HubObjectApi,
     SimCardInfo,
@@ -171,6 +172,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # as `sim_info`. Read-only; the integration never calls the
         # install RPC even though the proto exposes one.
         self.hub_firmware_updates: dict[str, HubFirmwareUpdateInfo] = {}
+        # Pending per-device firmware updates keyed by device_id (2.1).
+        # Absent entry = the device reports no pending update. Rides the
+        # same hourly `streamHubObject` cycle as `hub_firmware_updates`.
+        # Read-only, disabled-by-default entities; the integration never
+        # triggers the install RPC.
+        self.device_firmware_updates: dict[str, DeviceFirmwareUpdateInfo] = {}
         self._notification_listener: AjaxNotificationListener | None = None
         self._stream_tasks: list[asyncio.Task[None]] = []
         self._streams_started: bool = False
@@ -498,6 +505,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         sim_refresh_interval = 3600.0
         if now - self._sim_info_last_fetch <= sim_refresh_interval:
             return
+        # Rebuild the per-device firmware map from scratch each cycle so a
+        # completed/cleared update (Ajax-scheduled installs finish between
+        # cycles) drops out instead of lingering.
+        device_updates: dict[str, DeviceFirmwareUpdateInfo] = {}
         for space in self.spaces.values():
             if not space.hub_id:
                 continue
@@ -510,6 +521,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.hub_firmware_updates.pop(space.hub_id, None)
             else:
                 self.hub_firmware_updates[space.hub_id] = fw
+            for dfu in await self._hub_object_api.get_device_firmware_updates(space.hub_id):
+                device_updates[dfu.device_id] = dfu
+        self.device_firmware_updates = device_updates
         self._sim_info_last_fetch = now
 
     async def _maybe_refresh_rooms(self, now: float) -> None:

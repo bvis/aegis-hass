@@ -29,7 +29,10 @@ from homeassistant.components.update import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.hub_object import (
+    DEVICE_FW_STATE_DOWNLOADING,
+    DEVICE_FW_STATE_INSTALLING,
     HUB_FW_STATE_DOWNLOADING,
+    DeviceFirmwareUpdateInfo,
     HubFirmwareUpdateInfo,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -59,7 +62,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
-    entities: list[AjaxHubFirmwareUpdate] = []
+    entities: list[UpdateEntity] = []
     seen: set[str] = set()
     for space in coordinator.spaces.values():
         hub_id = space.hub_id
@@ -70,6 +73,14 @@ async def async_setup_entry(
         if coordinator.devices.get(hub_id):
             entities.append(AjaxHubFirmwareUpdate(coordinator, hub_id))
             seen.add(hub_id)
+
+    # Per-device firmware update entities (2.1). One per non-hub device,
+    # disabled-by-default: a typical install has 10-30 devices and most
+    # users only care when a specific device is stuck on old firmware.
+    for device_id, device in coordinator.devices.items():
+        if device.device_type.startswith("hub"):
+            continue
+        entities.append(AjaxDeviceFirmwareUpdate(coordinator, device_id))
     async_add_entities(entities)
 
 
@@ -137,4 +148,86 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], UpdateE
             f"Ajax has queued firmware {info.target_version} for this hub. "
             "The hub will install it on its own; this entity is "
             "informational and cannot trigger or skip the update."
+        )
+
+
+class AjaxDeviceFirmwareUpdate(CoordinatorEntity[AjaxCobrandedCoordinator], UpdateEntity):
+    """Read-only firmware update entity for a single Ajax device (2.1).
+
+    Same design as `AjaxHubFirmwareUpdate`: informational only (no
+    `INSTALL` feature, no `async_install`), and Ajax does not expose the
+    currently-installed version, so `installed_version` is a constant
+    placeholder. Disabled by default — a typical install has many
+    devices and most users only enable this when chasing a stuck update.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "device_firmware"
+    _attr_device_class = UpdateDeviceClass.FIRMWARE
+    _attr_supported_features = UpdateEntityFeature(0)
+    # Disabled-by-default: opt-in per device to avoid 10-30 entities most
+    # users don't want.
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"aegis_ajax_{device_id}_firmware"
+        device = coordinator.devices.get(device_id)
+        if device:
+            self._attr_device_info = build_device_info(device, coordinator.rooms)
+
+    @property
+    def _info(self) -> DeviceFirmwareUpdateInfo | None:
+        return self.coordinator.device_firmware_updates.get(self._device_id)
+
+    @property
+    def installed_version(self) -> str | None:
+        # See `_INSTALLED_VERSION_PLACEHOLDER`: Ajax doesn't expose the
+        # device's current version, so a constant is used to let HA
+        # differentiate "up to date" from "unknown".
+        return _INSTALLED_VERSION_PLACEHOLDER
+
+    @property
+    def latest_version(self) -> str | None:
+        info = self._info
+        if info is None or not info.target_version:
+            # No pending update — mirror installed_version so HA renders
+            # "Up to date" (STATE_OFF) rather than "unknown".
+            return _INSTALLED_VERSION_PLACEHOLDER
+        return info.target_version
+
+    @property
+    def in_progress(self) -> bool:
+        info = self._info
+        return info is not None and info.state in (
+            DEVICE_FW_STATE_DOWNLOADING,
+            DEVICE_FW_STATE_INSTALLING,
+        )
+
+    @property
+    def update_percentage(self) -> int | None:
+        # Only the download phase carries a 0-99 percentage; the install
+        # phase has no progress signal, so HA shows an indeterminate bar.
+        info = self._info
+        if info is not None and info.state == DEVICE_FW_STATE_DOWNLOADING:
+            return info.progress
+        return None
+
+    @property
+    def release_summary(self) -> str | None:
+        info = self._info
+        if info is None:
+            return (
+                "Ajax has not queued a firmware update for this device. "
+                "The actual installed firmware version is not exposed by "
+                "Ajax to the integration, so 'Up-to-date' reflects only "
+                "the absence of a queued update."
+            )
+        critical = " (security-critical)" if info.is_critical else ""
+        return (
+            f"Ajax has queued firmware {info.target_version} for this "
+            f"device{critical}. The device will install it on its own; "
+            "this entity is informational and cannot trigger or skip the "
+            "update."
         )
