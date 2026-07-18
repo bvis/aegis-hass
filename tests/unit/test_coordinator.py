@@ -2640,9 +2640,7 @@ class TestSirenSettingsRefresh:
     @pytest.mark.asyncio
     async def test_unchanged_settings_is_noop(self) -> None:
         coordinator = _make_coordinator(["s1"])
-        coordinator.devices = {
-            "s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 90})
-        }
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 90})}
         coordinator.async_set_updated_data = MagicMock()
         coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
             return_value={SIREN_ALARM_DURATION_KEY: 90}
