@@ -432,6 +432,22 @@
                 "name": "Deurbel"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Alarmduur"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Sirenevolume",
+                "state": {
+                    "very_loud": "Zeer luid",
+                    "loud": "Luid",
+                    "quiet": "Zacht",
+                    "disabled": "Uitgeschakeld"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

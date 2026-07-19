@@ -432,6 +432,22 @@
                 "name": "Gong"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Alarmdauer"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Sirenenlautstärke",
+                "state": {
+                    "very_loud": "Sehr laut",
+                    "loud": "Laut",
+                    "quiet": "Leise",
+                    "disabled": "Deaktiviert"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

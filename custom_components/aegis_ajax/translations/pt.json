@@ -432,6 +432,22 @@
                 "name": "Campainha"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Duração do alarme"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volume da sirene",
+                "state": {
+                    "very_loud": "Muito alto",
+                    "loud": "Alto",
+                    "quiet": "Baixo",
+                    "disabled": "Desativado"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

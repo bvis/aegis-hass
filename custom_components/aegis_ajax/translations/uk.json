@@ -432,6 +432,22 @@
                 "name": "Гонг"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Тривалість тривоги"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Гучність сирени",
+                "state": {
+                    "very_loud": "Дуже гучно",
+                    "loud": "Гучно",
+                    "quiet": "Тихо",
+                    "disabled": "Вимкнено"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Прошивка"

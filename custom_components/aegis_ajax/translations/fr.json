@@ -432,6 +432,22 @@
                 "name": "Carillon"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Durée de l'alarme"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volume de la sirène",
+                "state": {
+                    "very_loud": "Très fort",
+                    "loud": "Fort",
+                    "quiet": "Faible",
+                    "disabled": "Désactivé"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Micrologiciel"

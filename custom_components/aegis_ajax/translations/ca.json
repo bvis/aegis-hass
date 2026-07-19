@@ -432,6 +432,22 @@
                 "name": "Timbre"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Durada de l'alarma"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volum de la sirena",
+                "state": {
+                    "very_loud": "Molt alt",
+                    "loud": "Alt",
+                    "quiet": "Baix",
+                    "disabled": "Desactivat"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Microprogramari"

@@ -432,6 +432,22 @@
                 "name": "Gong"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Doba trvání poplachu"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Hlasitost sirény",
+                "state": {
+                    "very_loud": "Velmi hlasitá",
+                    "loud": "Hlasitá",
+                    "quiet": "Tichá",
+                    "disabled": "Vypnuto"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

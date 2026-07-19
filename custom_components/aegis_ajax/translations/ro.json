@@ -432,6 +432,22 @@
                 "name": "Sonerie"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Durata alarmei"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volumul sirenei",
+                "state": {
+                    "very_loud": "Foarte tare",
+                    "loud": "Tare",
+                    "quiet": "Încet",
+                    "disabled": "Dezactivat"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

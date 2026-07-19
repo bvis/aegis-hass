@@ -432,6 +432,22 @@
                 "name": "Campanello"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Durata dell'allarme"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volume della sirena",
+                "state": {
+                    "very_loud": "Molto alto",
+                    "loud": "Alto",
+                    "quiet": "Basso",
+                    "disabled": "Disattivato"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"

@@ -432,6 +432,22 @@
                 "name": "Zil sesi"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Alarm süresi"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Siren ses düzeyi",
+                "state": {
+                    "very_loud": "Çok yüksek",
+                    "loud": "Yüksek",
+                    "quiet": "Düşük",
+                    "disabled": "Devre dışı"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Donanım yazılımı"

@@ -448,6 +448,22 @@
                 "name": "Timbre"
             }
         },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Duración de la alarma"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Volumen de la sirena",
+                "state": {
+                    "very_loud": "Muy alto",
+                    "loud": "Alto",
+                    "quiet": "Bajo",
+                    "disabled": "Desactivado"
+                }
+            }
+        },
         "update": {
             "hub_firmware": {
                 "name": "Firmware"
