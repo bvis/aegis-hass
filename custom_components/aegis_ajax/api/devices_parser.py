@@ -17,7 +17,11 @@ import logging
 from typing import Any
 
 from custom_components.aegis_ajax.api.models import BatteryInfo, Device
-from custom_components.aegis_ajax.const import DeviceState
+from custom_components.aegis_ajax.const import (
+    SIREN_ALARM_DURATION_KEY,
+    SIREN_VOLUME_LEVEL_KEY,
+    DeviceState,
+)
 
 # Logger name is pinned to the original `api.devices` module (not __name__) so
 # debug output keeps its existing namespace — callers and caplog-based tests
@@ -617,6 +621,46 @@ def parse_hub_device_temperature(hub_device: Any) -> float | None:  # noqa: ANN4
         return float(sub.device_temperature.value)
     except (ValueError, TypeError):
         return None
+
+
+# Status keys under which the writable siren settings are surfaced (#310) live
+# in `const` as the single source of truth (`SIREN_ALARM_DURATION_KEY`,
+# `SIREN_VOLUME_LEVEL_KEY`), shared with the `number`/`select` platforms.
+
+
+def parse_hub_device_siren_settings(hub_dev: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Extract the writable siren settings from a rich `HubDevice` proto (#310).
+
+    The `device` oneof selects a per-type message (`street_siren`,
+    `home_siren`, `street_siren_plus_g3`, …). Sirens embed a shared
+    `common_siren_part` (`CommonSirenPart`) whose `siren_settings` carries the
+    two user-configurable values the Ajax app exposes: alarm duration (seconds)
+    and siren volume level (an enum). The lookup is oneof-case-agnostic — any
+    device whose sub-message has a `common_siren_part` works — so it covers
+    every siren SKU without enumerating device types.
+
+    Returns a dict with `siren_alarm_duration` / `siren_volume_level` for the
+    values that are present, or an empty dict when the device isn't a siren or
+    carries no siren settings. Never raises — a shape surprise yields `{}`.
+    """
+    which = hub_dev.WhichOneof("device") if hasattr(hub_dev, "WhichOneof") else None
+    if which is None:
+        return {}
+    sub = getattr(hub_dev, which, None)
+    if sub is None or not hasattr(sub, "HasField"):
+        return {}
+    try:
+        if not sub.HasField("common_siren_part"):
+            return {}
+        settings = sub.common_siren_part.siren_settings
+        out: dict[str, Any] = {}
+        if settings.HasField("alarm_duration"):
+            out[SIREN_ALARM_DURATION_KEY] = int(settings.alarm_duration)
+        if settings.HasField("siren_volume_level"):
+            out[SIREN_VOLUME_LEVEL_KEY] = int(settings.siren_volume_level)
+    except (ValueError, TypeError, AttributeError):
+        return {}
+    return out
 
 
 def _dedupe_video_doorbells(devices: list[Device]) -> tuple[list[Device], dict[str, str]]:

@@ -313,6 +313,45 @@ class DevicesApi:
                 break
         return None
 
+    async def get_hub_device_siren_settings(
+        self, hub_id: str, hub_device_id: str
+    ) -> dict[str, Any]:
+        """Read a siren's writable settings via `StreamHubDevice` (#310).
+
+        The alarm duration and volume level the Ajax app exposes ride the rich
+        per-device `StreamHubDevice` snapshot (`common_siren_part.siren_settings`),
+        not the lighter `StreamLightDevices` stream, so — like the per-device
+        temperature (#220) — they need this dedicated one-shot read. We consume
+        the first `success.snapshot` and stop. Returns the parsed status dict
+        (`siren_alarm_duration` / `siren_volume_level`), or an empty dict on a
+        `failure` response, an empty stream, or a device that carries no siren
+        settings. gRPC errors propagate to the caller, which guards each device.
+        """
+        from v3.mobilegwsvc.service.stream_hub_device import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.StreamHubDeviceServiceStub(channel)
+        request = request_pb2.StreamHubDeviceRequest(hub_id=hub_id, hub_device_id=hub_device_id)
+        stream = stub.execute(request, metadata=metadata, timeout=10)
+
+        async for msg in stream:
+            if msg.HasField("success"):
+                if msg.success.WhichOneof("success") == "snapshot":
+                    hub_device = msg.success.snapshot.hub_device
+                    return devices_parser.parse_hub_device_siren_settings(hub_device)
+            elif msg.HasField("failure"):
+                _LOGGER.debug(
+                    "StreamHubDevice (siren settings) failed for device %s: %s",
+                    hub_device_id,
+                    msg.failure,
+                )
+                break
+        return {}
+
     async def get_video_edge_onvif_rtsp_settings(
         self, space_id: str, video_edge_id: str
     ) -> dict[str, Any] | None:
@@ -774,8 +813,60 @@ class DevicesApi:
             await self._device_brightness(command)
         elif command.action == "bypass":
             await self._device_bypass(command)
+        elif command.action == "siren_settings":
+            await self._update_siren_settings(command)
         else:
             raise DeviceCommandError(f"Unknown device command action: {command.action}")
+
+    async def _update_siren_settings(self, command: DeviceCommand) -> None:
+        """Change a siren's alarm duration and/or volume via UpdateHubDevice (#310).
+
+        Wraps `UpdateHubDeviceService`, the generic per-device settings write the
+        Ajax app uses. The two values ride a single `Update.siren_settings`
+        (`CommonSirenPart.SirenSettings`) part; whichever field the command
+        leaves as `None` is omitted so we never overwrite the other setting.
+        Requires the account to have device-edit permission (server replies
+        `permission_denied` otherwise), mirroring the bypass switch.
+        """
+        from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import (  # noqa: PLC0415
+            update_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device.common import (  # noqa: PLC0415
+            common_siren_part_pb2,
+        )
+        from v3.mobilegwsvc.service.update_hub_device import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        if command.alarm_duration is None and command.siren_volume_level is None:
+            raise DeviceCommandError("siren_settings command requires at least one value")
+
+        siren_settings = common_siren_part_pb2.CommonSirenPart.SirenSettings()
+        if command.alarm_duration is not None:
+            siren_settings.alarm_duration = command.alarm_duration
+        if command.siren_volume_level is not None:
+            siren_settings.siren_volume_level = command.siren_volume_level
+
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.UpdateHubDeviceServiceStub(channel)
+        request = request_pb2.UpdateHubDeviceRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            object_type=_build_object_type(command.device_type),
+            update=[update_pb2.Update(siren_settings=siren_settings)],
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"siren_settings: {error}", reason=error)
+        _LOGGER.debug(
+            "Device %s siren_settings (duration=%s, volume=%s) OK",
+            command.device_id,
+            command.alarm_duration,
+            command.siren_volume_level,
+        )
 
     async def _device_bypass(self, command: DeviceCommand) -> None:
         """Deactivate (bypass) or reactivate a device via DeviceCommandDeviceBypass.

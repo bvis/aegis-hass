@@ -181,6 +181,12 @@ class DeviceCommand:
     # True = deactivate (bypass) the device, False = reactivate it. Only set
     # for action="bypass".
     bypass_enable: bool | None = None
+    # Writable siren settings (#310). Only set for action="siren_settings";
+    # each is optional so a command can change one without touching the other.
+    # `alarm_duration` is seconds; `siren_volume_level` is the
+    # `CommonSirenPart.SirenVolumeLevel` enum value.
+    alarm_duration: int | None = None
+    siren_volume_level: int | None = None
 
     @classmethod
     def on(
@@ -233,4 +239,29 @@ class DeviceCommand:
             device_id=device_id,
             device_type=device_type,
             bypass_enable=enable,
+        )
+
+    @classmethod
+    def set_siren_settings(
+        cls,
+        hub_id: str,
+        device_id: str,
+        device_type: str,
+        *,
+        alarm_duration: int | None = None,
+        siren_volume_level: int | None = None,
+    ) -> DeviceCommand:
+        """Change a siren's alarm duration and/or volume level (#310).
+
+        Both values are optional so a single setting can be updated without
+        resending the other. `alarm_duration` is seconds; `siren_volume_level`
+        is the `CommonSirenPart.SirenVolumeLevel` enum value.
+        """
+        return cls(
+            action="siren_settings",
+            hub_id=hub_id,
+            device_id=device_id,
+            device_type=device_type,
+            alarm_duration=alarm_duration,
+            siren_volume_level=siren_volume_level,
         )

@@ -21,6 +21,8 @@ from custom_components.aegis_ajax.api.models import (
 )
 from custom_components.aegis_ajax.const import (
     HUB_DEVICE_TEMP_REFRESH_INTERVAL,
+    SIREN_ALARM_DURATION_KEY,
+    SIREN_VOLUME_LEVEL_KEY,
     ChimeStatus,
     ConnectionStatus,
     DeviceState,
@@ -2537,7 +2539,7 @@ class TestHubDeviceTemperatureRefresh:
     def test_schedule_registers_independent_timer_and_initial_kick(self) -> None:
         coordinator = _make_coordinator(["s1"])
         # Replace with a MagicMock so the initial-kick call returns a non-coro.
-        coordinator._async_refresh_hub_device_temperatures = MagicMock()
+        coordinator._async_refresh_per_device_snapshots = MagicMock()
         with patch(
             "custom_components.aegis_ajax.coordinator.async_track_time_interval",
             return_value=MagicMock(),
@@ -2600,6 +2602,103 @@ class TestHubDeviceTemperatureRefresh:
         coordinator._handle_devices_snapshot([_make_device("d1")])
 
         assert "temperature" not in coordinator.devices["d1"].statuses
+
+
+class TestSirenSettingsRefresh:
+    """Timer-driven merge of siren settings from StreamHubDevice (#310)."""
+
+    @pytest.mark.asyncio
+    async def test_merges_settings_into_siren_statuses(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90, SIREN_VOLUME_LEVEL_KEY: 18}
+        )
+
+        await coordinator._async_refresh_siren_settings()
+
+        assert coordinator.devices["s1d"].statuses[SIREN_ALARM_DURATION_KEY] == 90
+        assert coordinator.devices["s1d"].statuses[SIREN_VOLUME_LEVEL_KEY] == 18
+        coordinator._devices_api.get_hub_device_siren_settings.assert_awaited_once_with(
+            "hub-1", "s1d"
+        )
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_non_siren_devices(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"d1": _make_device("d1")}  # door_protect
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(return_value={})
+
+        await coordinator._async_refresh_siren_settings()
+
+        coordinator._devices_api.get_hub_device_siren_settings.assert_not_called()
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unchanged_settings_is_noop(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 90})}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90}
+        )
+
+        await coordinator._async_refresh_siren_settings()
+
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_empty_result_leaves_statuses_untouched(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(return_value={})
+
+        await coordinator._async_refresh_siren_settings()
+
+        assert SIREN_ALARM_DURATION_KEY not in coordinator.devices["s1d"].statuses
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_one_device_error_does_not_abort_others(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {
+            "bad": _make_siren("bad"),
+            "good": _make_siren("good"),
+        }
+        coordinator.async_set_updated_data = MagicMock()
+
+        async def _settings(hub_id: str, device_id: str) -> dict:
+            if device_id == "bad":
+                raise RuntimeError("boom")
+            return {SIREN_ALARM_DURATION_KEY: 45}
+
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(side_effect=_settings)
+
+        await coordinator._async_refresh_siren_settings()
+
+        assert coordinator.devices["good"].statuses[SIREN_ALARM_DURATION_KEY] == 45
+        assert SIREN_ALARM_DURATION_KEY not in coordinator.devices["bad"].statuses
+
+    def test_snapshot_preserves_merged_siren_settings(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._devices_cache = None
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.devices = {
+            "s1d": _make_siren(
+                "s1d",
+                statuses={SIREN_ALARM_DURATION_KEY: 90, SIREN_VOLUME_LEVEL_KEY: 18},
+            )
+        }
+
+        # Fresh light snapshot without the settings must not wipe them.
+        coordinator._handle_devices_snapshot([_make_siren("s1d")])
+
+        assert coordinator.devices["s1d"].statuses[SIREN_ALARM_DURATION_KEY] == 90
+        assert coordinator.devices["s1d"].statuses[SIREN_VOLUME_LEVEL_KEY] == 18
 
 
 class TestPollSafetyTimer:

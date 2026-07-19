@@ -274,6 +274,52 @@ DEFAULT_BYPASS_SWITCHES = BYPASS_SWITCHES_AUTO
 # `permission_denied` on the bypass command.
 BYPASS_REQUIRED_PERMISSION = "DEVICE_EDIT"
 
+# --- Siren settings entities (#310) -------------------------------------
+# Siren device families whose rich `StreamHubDevice` snapshot embeds a
+# writable `common_siren_part.siren_settings`. This is exactly the set of siren
+# `device` oneof cases our generated `HubDevice` proto models (verified: each
+# embeds `common_siren_part`). Other siren SKUs the integration recognises
+# elsewhere (`street_siren_plus`, `street_siren_fibra`, `street_siren_s`,
+# `street_siren_double_deck*`, …) are NOT in that proto oneof, so streaming
+# their snapshot yields an unknown case and no settings can be read — the same
+# proto-drift limitation as the outdoor curtain temperatures (#229). They are
+# deliberately excluded so we don't create permanently-empty entities; extend
+# this set only alongside the matching proto oneof case. The settings refresh
+# only streams the snapshot for these types, and the `number`/`select`
+# platforms create their entities for exactly these device types.
+SIREN_DEVICE_TYPES = frozenset(
+    {
+        "street_siren",
+        "street_siren_plus_g3",
+        "home_siren",
+        "home_siren_g3",
+        "home_siren_s",
+        "home_siren_fibra",
+    }
+)
+# Status keys under which the writable siren settings are surfaced by the
+# device parser. `number`/`select` create their entities from the presence of
+# these keys, so every siren SKU that embeds a `common_siren_part` is covered
+# without a per-device-type table.
+SIREN_ALARM_DURATION_KEY = "siren_alarm_duration"
+SIREN_VOLUME_LEVEL_KEY = "siren_volume_level"
+
+# `CommonSirenPart.SirenVolumeLevel` enum value → stable select option string
+# (also the translation key). Ordered loud→quiet→disabled for the UI.
+SIREN_VOLUME_LEVELS: dict[int, str] = {
+    1: "very_loud",
+    18: "loud",
+    29: "quiet",
+    32: "disabled",
+}
+SIREN_VOLUME_LEVEL_VALUES: dict[str, int] = {v: k for k, v in SIREN_VOLUME_LEVELS.items()}
+
+# Alarm-duration number bounds (seconds). Ajax's StreetSiren app UI offers
+# 3 s – 3 min; used as advisory slider limits (the hub accepts other values).
+SIREN_ALARM_DURATION_MIN = 3
+SIREN_ALARM_DURATION_MAX = 180
+SIREN_ALARM_DURATION_STEP = 1
+
 # Opt-out for users who deliberately run without push notifications. When set,
 # the integration does not raise the recurring `fcm_not_configured` Repair card
 # or the WARNING log when the four FCM fields are empty, and clears any card
