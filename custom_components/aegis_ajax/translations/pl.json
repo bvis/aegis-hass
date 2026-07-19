@@ -88,12 +88,16 @@
                     "photo_retention_days": "Przechowywanie zdjęć (dni)",
                     "photo_max_per_device": "Maks. zdjęć na urządzenie (0 = bez limitu)",
                     "auto_create_labels": "Automatycznie twórz i przypisuj etykiety Aegis do encji",
-                    "bypass_switches": "Twórz przełączniki pomijania urządzeń"
+                    "bypass_switches": "Twórz przełączniki pomijania urządzeń",
+                    "persistent_notifications": "Pokazuj zdarzenia bezpieczeństwa jako trwałe powiadomienia",
+                    "persistent_notification_events": "Zdarzenia tworzące trwałe powiadomienie"
                 },
                 "data_description": {
                     "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
                     "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz.",
-                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM."
+                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM.",
+                    "persistent_notifications": "Po włączeniu wybrane zdarzenia pojawiają się jako trwałe powiadomienia Home Assistant, widoczne do ich zamknięcia lub restartu Home Assistant. Zdarzenia te są dostarczane przez push (FCM), więc push musi być skonfigurowany, aby docierały.",
+                    "persistent_notification_events": "Które zdarzenia wywołują trwałe powiadomienie. Domyślnie rzeczywiste incydenty (alarm, panika, sabotaż, pożar, CO, zalanie, zbicie szyby). Dodaj uzbrojenie/rozbrojenie, ruch lub dzwonek, jeśli też ich chcesz."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (tylko jeśli Twoje konto może dezaktywować urządzenia)",
                 "always": "Zawsze",
                 "never": "Nigdy"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Uzbrojony",
+                "arm_night": "Tryb nocny włączony",
+                "battery_low": "Niski poziom baterii",
+                "co_alarm": "Alarm CO",
+                "connection_lost": "Połączenie utracone",
+                "disarm": "Rozbrojony",
+                "disarm_night": "Tryb nocny wyłączony",
+                "door_open": "Drzwi otwarte",
+                "doorbell_pressed": "Naciśnięto dzwonek",
+                "fire": "Pożar",
+                "flood": "Zalanie",
+                "glass_break": "Rozbicie szyby",
+                "malfunction": "Usterka",
+                "motion": "Ruch",
+                "panic": "Panika",
+                "tamper": "Sabotaż"
             }
         }
     }

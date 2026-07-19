@@ -88,12 +88,16 @@
                     "photo_retention_days": "Reținere fotografii (zile)",
                     "photo_max_per_device": "Max fotografii per dispozitiv (0 = nelimitat)",
                     "auto_create_labels": "Creează și atribuie automat etichete Aegis entităților",
-                    "bypass_switches": "Creează comutatoare de excludere dispozitiv"
+                    "bypass_switches": "Creează comutatoare de excludere dispozitiv",
+                    "persistent_notifications": "Afișează evenimentele de securitate ca notificări persistente",
+                    "persistent_notification_events": "Evenimente care creează o notificare persistentă"
                 },
                 "data_description": {
                     "bypass_switches": "Comutatoarele de excludere permit dezactivarea unui dispozitiv înainte de armare. „Auto” le creează doar dacă contul tău Ajax are permisiunea de a dezactiva dispozitive.",
                     "expose_arm_home": "Adaugă un mod Armare acasă în panoul de alarmă. Reproduce modul de noapte și este necesar în principal pentru Amazon Alexa sau Nabu Casa Cloud. Dezactivează pentru a ascunde butonul duplicat dacă nu le folosești.",
-                    "disable_push_warning": "Activează dacă rulezi intenționat fără push. Ascunde memento-ul recurent „FCM neconfigurat” și cardul de reparație. Evenimentele în timp real (sonerie, armare/dezarmare, alarmă) tot nu vor ajunge în Home Assistant până nu configurezi FCM."
+                    "disable_push_warning": "Activează dacă rulezi intenționat fără push. Ascunde memento-ul recurent „FCM neconfigurat” și cardul de reparație. Evenimentele în timp real (sonerie, armare/dezarmare, alarmă) tot nu vor ajunge în Home Assistant până nu configurezi FCM.",
+                    "persistent_notifications": "Când este activat, evenimentele selectate apar ca notificări persistente Home Assistant care rămân vizibile până sunt închise sau Home Assistant repornește. Aceste evenimente sosesc prin push (FCM), deci push trebuie configurat pentru a ajunge.",
+                    "persistent_notification_events": "Ce evenimente generează o notificare persistentă. Implicit, incidente reale (alarmă, panică, sabotaj, incendiu, CO, inundație, spargere de geam). Adaugă armare/dezarmare, mișcare sau sonerie dacă le vrei și pe acestea."
                 }
             }
         }
@@ -502,6 +506,27 @@
                 "auto": "Auto (doar dacă contul tău poate dezactiva dispozitive)",
                 "always": "Întotdeauna",
                 "never": "Niciodată"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarma",
+                "arm": "Armat",
+                "arm_night": "Mod noapte activat",
+                "battery_low": "Baterie slaba",
+                "co_alarm": "Alarma CO",
+                "connection_lost": "Conexiune pierduta",
+                "disarm": "Dezarmat",
+                "disarm_night": "Mod noapte dezactivat",
+                "door_open": "Usa deschisa",
+                "doorbell_pressed": "Sonerie apăsată",
+                "fire": "Incendiu",
+                "flood": "Inundatie",
+                "glass_break": "Spargere geam",
+                "malfunction": "Defectiune",
+                "motion": "Miscare",
+                "panic": "Panica",
+                "tamper": "Sabotaj"
             }
         }
     }

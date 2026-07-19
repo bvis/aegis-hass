@@ -344,6 +344,17 @@ DEFAULT_PHOTO_RETENTION_DAYS = 30
 DEFAULT_PHOTO_MAX_PER_DEVICE = 100
 DEFAULT_AUTO_CREATE_LABELS = True
 
+# Persistent-notification service (2.2). When enabled, selected security
+# events are surfaced as Home Assistant persistent notifications so an alarm
+# stays visible in the UI until dismissed — a lightweight alternative to
+# wiring a `persistent_notification.create` automation off the event entity.
+# Off by default so existing installs don't suddenly grow notifications; the
+# default event set (see `DEFAULT_PERSISTENT_NOTIFICATION_EVENTS` below) is
+# scoped to real incidents rather than routine arm/disarm/motion noise.
+CONF_PERSISTENT_NOTIFICATIONS = "persistent_notifications"
+DEFAULT_PERSISTENT_NOTIFICATIONS = False
+CONF_PERSISTENT_NOTIFICATION_EVENTS = "persistent_notification_events"
+
 EVENT_DOMAIN = f"{DOMAIN}_event"
 
 # Map HubEventTag oneof field names to the resulting space `security_state`
@@ -610,6 +621,26 @@ ALL_EVENT_TYPES: list[str] = sorted(
     | set(VIDEO_EVENT_TAG_MAP.values())
     | set(SMARTLOCK_EVENT_TAG_MAP.values())
 )
+
+# Default event types that trigger a persistent notification when the feature
+# (CONF_PERSISTENT_NOTIFICATIONS) is enabled. Scoped to genuine incidents a
+# user would want to keep seeing until acknowledged — not routine
+# arm/disarm/motion/doorbell traffic, which would bury the alarm ones. Users
+# can widen or narrow this via the multi-select in Options. Intersected with
+# ALL_EVENT_TYPES so a typo here can't ship an event type that never fires.
+DEFAULT_PERSISTENT_NOTIFICATION_EVENTS: list[str] = [
+    e
+    for e in (
+        "alarm",
+        "panic",
+        "tamper",
+        "fire",
+        "co_alarm",
+        "flood",
+        "glass_break",
+    )
+    if e in ALL_EVENT_TYPES
+]
 
 # Dispatcher signal for entities discovered at runtime (after platform setup),
 # rather than from the gRPC `coordinator.devices` snapshot available at setup.
