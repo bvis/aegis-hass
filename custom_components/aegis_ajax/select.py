@@ -8,7 +8,9 @@ background settings refresh (it reads no selected option until the first
 snapshot merges the value). Writes go through the shared `UpdateHubDevice`
 command path (`DeviceCommand.set_siren_settings`); a hub rejection (e.g. the
 account lacks device-edit permission) is surfaced as a translated
-`HomeAssistantError`.
+`HomeAssistantError`. On a successful write the selected option is confirmed by
+an authoritative per-device snapshot read-back within seconds (no optimistic
+state), so an accept-but-inert hub response is surfaced rather than hidden.
 """
 
 from __future__ import annotations
@@ -98,4 +100,10 @@ class AjaxSirenVolumeSelect(CoordinatorEntity[AjaxCobrandedCoordinator], SelectE
             device_type=device.device_type,
             siren_volume_level=level,
         )
-        await async_send_device_command(self.coordinator, cmd)
+        await async_send_device_command(
+            self.coordinator,
+            cmd,
+            post_refresh=lambda: self.coordinator.async_refresh_siren_settings_for_device(
+                self._device_id
+            ),
+        )

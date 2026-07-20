@@ -2701,6 +2701,105 @@ class TestSirenSettingsRefresh:
         assert coordinator.devices["s1d"].statuses[SIREN_VOLUME_LEVEL_KEY] == 18
 
 
+class TestSirenSettingsTargetedRefresh:
+    """Authoritative read-back of one siren after a write (#333 follow-up).
+
+    Without this the entity showed the pre-write value until the 900 s snapshot
+    timer fired (~15 min). `async_refresh_siren_settings_for_device` re-reads
+    that one device's settings and pushes the confirmed value within seconds.
+    """
+
+    @pytest.mark.asyncio
+    async def test_reads_back_and_pushes_single_device(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {
+            "s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 120}),
+            "s2d": _make_siren("s2d", statuses={SIREN_ALARM_DURATION_KEY: 120}),
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90}
+        )
+
+        await coordinator.async_refresh_siren_settings_for_device("s1d")
+
+        # Only the targeted device is read and merged.
+        coordinator._devices_api.get_hub_device_siren_settings.assert_awaited_once_with(
+            "hub-1", "s1d"
+        )
+        assert coordinator.devices["s1d"].statuses[SIREN_ALARM_DURATION_KEY] == 90
+        assert coordinator.devices["s2d"].statuses[SIREN_ALARM_DURATION_KEY] == 120
+        coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unchanged_value_does_not_push(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 90})}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90}
+        )
+
+        await coordinator.async_refresh_siren_settings_for_device("s1d")
+
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_siren_device_is_noop(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"d1": _make_device("d1")}  # door_protect
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(return_value={})
+
+        await coordinator.async_refresh_siren_settings_for_device("d1")
+
+        coordinator._devices_api.get_hub_device_siren_settings.assert_not_called()
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_single_flight_coalesces_concurrent_calls(self) -> None:
+        import asyncio
+
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 120})}
+        coordinator.async_set_updated_data = MagicMock()
+
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def _settings(hub_id: str, device_id: str) -> dict:
+            started.set()
+            await release.wait()
+            return {SIREN_ALARM_DURATION_KEY: 90}
+
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(side_effect=_settings)
+
+        first = asyncio.create_task(coordinator.async_refresh_siren_settings_for_device("s1d"))
+        await started.wait()
+        # A second call while the first is in flight must coalesce (no extra RPC).
+        await coordinator.async_refresh_siren_settings_for_device("s1d")
+        coordinator._devices_api.get_hub_device_siren_settings.assert_awaited_once()
+        release.set()
+        await first
+
+        coordinator._devices_api.get_hub_device_siren_settings.assert_awaited_once()
+        assert coordinator.devices["s1d"].statuses[SIREN_ALARM_DURATION_KEY] == 90
+
+    @pytest.mark.asyncio
+    async def test_inflight_cleared_after_error(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+
+        await coordinator.async_refresh_siren_settings_for_device("s1d")
+
+        # The guard is released even when the read raises, so a retry can run.
+        assert "s1d" not in coordinator._siren_refresh_inflight
+
+
 class TestPollSafetyTimer:
     """Independent poll safety-net timer (#178) — backstop when push is starved.
 

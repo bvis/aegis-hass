@@ -8,7 +8,10 @@ first boot without waiting for the background settings refresh (it reads
 `unknown` until the first snapshot merges the value). Writes go through the
 shared `UpdateHubDevice` command path (`DeviceCommand.set_siren_settings`),
 which the account can only perform with device-edit permission — a hub
-rejection is surfaced as a translated `HomeAssistantError`.
+rejection is surfaced as a translated `HomeAssistantError`. On a successful
+write the value is confirmed by an authoritative per-device snapshot read-back
+within seconds (no optimistic state), so an accept-but-inert hub response is
+surfaced rather than hidden.
 """
 
 from __future__ import annotations
@@ -100,4 +103,10 @@ class AjaxSirenAlarmDurationNumber(CoordinatorEntity[AjaxCobrandedCoordinator], 
             device_type=device.device_type,
             alarm_duration=int(value),
         )
-        await async_send_device_command(self.coordinator, cmd)
+        await async_send_device_command(
+            self.coordinator,
+            cmd,
+            post_refresh=lambda: self.coordinator.async_refresh_siren_settings_for_device(
+                self._device_id
+            ),
+        )

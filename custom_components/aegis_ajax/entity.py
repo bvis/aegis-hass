@@ -14,7 +14,7 @@ from custom_components.aegis_ajax.const import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Awaitable, Callable, Mapping
 
     from custom_components.aegis_ajax.api.models import Device, DeviceCommand, Room
     from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -57,15 +57,22 @@ def build_device_info(
 
 
 async def async_send_device_command(
-    coordinator: AjaxCobrandedCoordinator, command: DeviceCommand
+    coordinator: AjaxCobrandedCoordinator,
+    command: DeviceCommand,
+    *,
+    post_refresh: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """Send a device command and refresh, mapping hub rejections to a clear,
     translated `HomeAssistantError`.
 
     A failure the hub reports (permission denied, hub offline, …) is surfaced
     with a factual message keyed off the server's reason; any unmapped reason
-    falls back to `command_failed`, echoing the raw code. The coordinator is
-    only refreshed on success.
+    falls back to `command_failed`, echoing the raw code. On success the
+    coordinator is refreshed: `post_refresh` (when given) runs instead of the
+    generic `async_request_refresh`, letting a caller confirm a value from its
+    own authoritative read path (e.g. the per-device siren snapshot, #333)
+    rather than the light-stream poll — which doesn't carry that value. Either
+    way the refresh only runs on success.
     """
     from custom_components.aegis_ajax.api.devices import DeviceCommandError  # noqa: PLC0415
 
@@ -73,7 +80,10 @@ async def async_send_device_command(
         await coordinator.devices_api.send_command(command)
     except DeviceCommandError as err:
         _raise_translated_command_error(err)
-    await coordinator.async_request_refresh()
+    if post_refresh is not None:
+        await post_refresh()
+    else:
+        await coordinator.async_request_refresh()
 
 
 async def async_set_chimes_mode(

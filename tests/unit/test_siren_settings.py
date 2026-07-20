@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 # Wire up the proto search path before any `systems.*` import.
 from custom_components.aegis_ajax.api import _proto_path as _proto_path  # noqa: F401
@@ -230,11 +231,26 @@ class TestAjaxSirenAlarmDurationNumber:
         number, coordinator = self._make({SIREN_ALARM_DURATION_KEY: 90})
         coordinator.devices_api.send_command = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.async_refresh_siren_settings_for_device = AsyncMock()
         await number.async_set_native_value(45)
         cmd = coordinator.devices_api.send_command.call_args[0][0]
         assert cmd.action == "siren_settings"
         assert cmd.alarm_duration == 45
         assert cmd.siren_volume_level is None
+        # Confirm via an authoritative read-back, not the generic light poll (#333).
+        coordinator.async_refresh_siren_settings_for_device.assert_awaited_once_with("30EA219B")
+        coordinator.async_request_refresh.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_set_value_rejection_skips_read_back(self) -> None:
+        number, coordinator = self._make({SIREN_ALARM_DURATION_KEY: 90})
+        coordinator.devices_api.send_command = AsyncMock(
+            side_effect=DeviceCommandError("permission_denied")
+        )
+        coordinator.async_refresh_siren_settings_for_device = AsyncMock()
+        with pytest.raises(HomeAssistantError):
+            await number.async_set_native_value(45)
+        coordinator.async_refresh_siren_settings_for_device.assert_not_awaited()
 
 
 class TestAjaxSirenVolumeSelect:
@@ -266,11 +282,26 @@ class TestAjaxSirenVolumeSelect:
         select, coordinator = self._make({SIREN_VOLUME_LEVEL_KEY: 18})
         coordinator.devices_api.send_command = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.async_refresh_siren_settings_for_device = AsyncMock()
         await select.async_select_option("disabled")
         cmd = coordinator.devices_api.send_command.call_args[0][0]
         assert cmd.action == "siren_settings"
         assert cmd.siren_volume_level == 32
         assert cmd.alarm_duration is None
+        # Confirm via an authoritative read-back, not the generic light poll (#333).
+        coordinator.async_refresh_siren_settings_for_device.assert_awaited_once_with("30EA219B")
+        coordinator.async_request_refresh.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_select_option_rejection_skips_read_back(self) -> None:
+        select, coordinator = self._make({SIREN_VOLUME_LEVEL_KEY: 18})
+        coordinator.devices_api.send_command = AsyncMock(
+            side_effect=DeviceCommandError("permission_denied")
+        )
+        coordinator.async_refresh_siren_settings_for_device = AsyncMock()
+        with pytest.raises(HomeAssistantError):
+            await select.async_select_option("disabled")
+        coordinator.async_refresh_siren_settings_for_device.assert_not_awaited()
 
 
 class TestSetupEntries:
