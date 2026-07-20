@@ -236,6 +236,14 @@ class TestAjaxSirenAlarmDurationNumber:
         assert cmd.alarm_duration == 45
         assert cmd.siren_volume_level is None
 
+    @pytest.mark.asyncio
+    async def test_set_value_schedules_confirm_read(self) -> None:
+        number, coordinator = self._make({SIREN_ALARM_DURATION_KEY: 90})
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        await number.async_set_native_value(45)
+        coordinator.schedule_siren_settings_confirm.assert_called_once_with("30EA219B")
+
 
 class TestAjaxSirenVolumeSelect:
     def _make(self, statuses: dict) -> tuple[AjaxSirenVolumeSelect, MagicMock]:
@@ -271,6 +279,14 @@ class TestAjaxSirenVolumeSelect:
         assert cmd.action == "siren_settings"
         assert cmd.siren_volume_level == 32
         assert cmd.alarm_duration is None
+
+    @pytest.mark.asyncio
+    async def test_select_option_schedules_confirm_read(self) -> None:
+        select, coordinator = self._make({SIREN_VOLUME_LEVEL_KEY: 18})
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        await select.async_select_option("disabled")
+        coordinator.schedule_siren_settings_confirm.assert_called_once_with("30EA219B")
 
 
 class TestSetupEntries:

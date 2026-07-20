@@ -44,6 +44,7 @@ from custom_components.aegis_ajax.const import (
     SIGNAL_NEW_DEVICE,
     SIREN_ALARM_DURATION_KEY,
     SIREN_DEVICE_TYPES,
+    SIREN_SETTINGS_CONFIRM_DELAY,
     SIREN_VOLUME_LEVEL_KEY,
     ChimeStatus,
     ConnectionStatus,
@@ -230,6 +231,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # poll timer, so the scheduled poll never fires again after startup; a
         # poll-driven refresh would be starved.
         self._unsub_hub_device_temp: CALLBACK_TYPE | None = None
+        # Sirens with a post-write settings confirm read in flight (single-flight
+        # per device; see `schedule_siren_settings_confirm`).
+        self._siren_confirm_pending: set[str] = set()
         # Independent poll safety-net timer (#178). On active hubs every HTS
         # update reschedules HA's built-in poll timer faster than
         # `poll_interval`, starving the scheduled `_async_update_data`; this
@@ -682,32 +686,73 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         siren families are streamed; an unchanged snapshot skips the listener
         push so we don't churn every interval.
         """
-        from dataclasses import replace as dc_replace  # noqa: PLC0415
-
         changed = False
         for device_id, device in list(self.devices.items()):
             if device.device_type not in SIREN_DEVICE_TYPES:
                 continue
-            try:
-                settings = await self._devices_api.get_hub_device_siren_settings(
-                    device.hub_id, device_id
-                )
-            except Exception:  # noqa: BLE001
-                _LOGGER.debug(
-                    "Failed to fetch siren settings for device %s", device_id, exc_info=True
-                )
-                continue
-            if not settings:
-                continue
-            current = self.devices.get(device_id)
-            if current is None:
-                continue
-            if all(current.statuses.get(k) == v for k, v in settings.items()):
-                continue
-            self.devices[device_id] = dc_replace(current, statuses={**current.statuses, **settings})
-            changed = True
+            changed = await self._async_fetch_and_merge_siren_settings(device_id) or changed
         if changed:
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    async def _async_fetch_and_merge_siren_settings(self, device_id: str) -> bool:
+        """Fetch one siren's settings snapshot and merge it into `device.statuses`.
+
+        Shared by the 900 s timer sweep and the post-write confirm read. Returns
+        True when a value actually changed (the caller decides when to push to
+        listeners). A fetch failure or empty snapshot is swallowed with a debug
+        log — both callers treat it as "keep the current value; the timer will
+        retry".
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        device = self.devices.get(device_id)
+        if device is None:
+            return False
+        try:
+            settings = await self._devices_api.get_hub_device_siren_settings(
+                device.hub_id, device_id
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Failed to fetch siren settings for device %s", device_id, exc_info=True)
+            return False
+        if not settings:
+            return False
+        current = self.devices.get(device_id)
+        if current is None:
+            return False
+        if all(current.statuses.get(k) == v for k, v in settings.items()):
+            return False
+        self.devices[device_id] = dc_replace(current, statuses={**current.statuses, **settings})
+        return True
+
+    @callback
+    def schedule_siren_settings_confirm(self, device_id: str) -> None:
+        """Schedule a targeted settings re-read shortly after a successful write.
+
+        The siren-settings write path (#310) updates the hub, but the values are
+        only read back on the shared 900 s snapshot timer — so after an accepted
+        write the entity kept showing the previous value for up to ~15 minutes,
+        indistinguishable in the UI from a rejected write. Re-read just this
+        device after a short settle delay so the entity confirms the actual hub
+        value within seconds. Deliberately a read-back rather than an optimistic
+        set: `UpdateHubDevice` has a real accept-but-inert failure mode on this
+        service, so the entity must only ever show what an independent read
+        returns. Single-flight per device — a second write while a confirm is
+        pending rides the already-scheduled read (worst case the 900 s timer
+        corrects it).
+        """
+        if device_id in self._siren_confirm_pending:
+            return
+        self._siren_confirm_pending.add(device_id)
+        self.hass.async_create_task(self._async_confirm_siren_settings(device_id))
+
+    async def _async_confirm_siren_settings(self, device_id: str) -> None:
+        try:
+            await asyncio.sleep(SIREN_SETTINGS_CONFIRM_DELAY)
+            if await self._async_fetch_and_merge_siren_settings(device_id):
+                self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+        finally:
+            self._siren_confirm_pending.discard(device_id)
 
     def _schedule_poll_safety_refresh(self) -> None:
         """Start the independent poll safety-net timer (#178).
