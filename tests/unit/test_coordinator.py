@@ -2701,6 +2701,100 @@ class TestSirenSettingsRefresh:
         assert coordinator.devices["s1d"].statuses[SIREN_VOLUME_LEVEL_KEY] == 18
 
 
+class TestSirenSettingsConfirm:
+    """Targeted post-write settings re-read — the entity must confirm the real
+    hub value within seconds instead of showing the stale one until the 900 s
+    snapshot timer fires."""
+
+    def test_schedule_creates_confirm_task(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+
+        coordinator.schedule_siren_settings_confirm("s1d")
+
+        coordinator.hass.async_create_task.assert_called_once()
+        assert "s1d" in coordinator._siren_confirm_pending
+
+    def test_schedule_is_single_flight_per_device(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+
+        coordinator.schedule_siren_settings_confirm("s1d")
+        coordinator.schedule_siren_settings_confirm("s1d")
+
+        coordinator.hass.async_create_task.assert_called_once()
+
+    def test_schedule_distinct_devices_each_get_a_task(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+
+        coordinator.schedule_siren_settings_confirm("s1d")
+        coordinator.schedule_siren_settings_confirm("s2d")
+
+        assert coordinator.hass.async_create_task.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_confirm_merges_and_pushes(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 120})}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90}
+        )
+        coordinator._siren_confirm_pending.add("s1d")
+
+        with patch("custom_components.aegis_ajax.coordinator.SIREN_SETTINGS_CONFIRM_DELAY", 0):
+            await coordinator._async_confirm_siren_settings("s1d")
+
+        assert coordinator.devices["s1d"].statuses[SIREN_ALARM_DURATION_KEY] == 90
+        coordinator.async_set_updated_data.assert_called_once()
+        assert "s1d" not in coordinator._siren_confirm_pending
+
+    @pytest.mark.asyncio
+    async def test_confirm_unchanged_value_skips_push(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d", statuses={SIREN_ALARM_DURATION_KEY: 90})}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            return_value={SIREN_ALARM_DURATION_KEY: 90}
+        )
+        coordinator._siren_confirm_pending.add("s1d")
+
+        with patch("custom_components.aegis_ajax.coordinator.SIREN_SETTINGS_CONFIRM_DELAY", 0):
+            await coordinator._async_confirm_siren_settings("s1d")
+
+        coordinator.async_set_updated_data.assert_not_called()
+        assert "s1d" not in coordinator._siren_confirm_pending
+
+    @pytest.mark.asyncio
+    async def test_confirm_fetch_error_clears_pending(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {"s1d": _make_siren("s1d")}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+        coordinator._siren_confirm_pending.add("s1d")
+
+        with patch("custom_components.aegis_ajax.coordinator.SIREN_SETTINGS_CONFIRM_DELAY", 0):
+            await coordinator._async_confirm_siren_settings("s1d")
+
+        coordinator.async_set_updated_data.assert_not_called()
+        # Pending must clear so the next write can schedule a fresh confirm.
+        assert "s1d" not in coordinator._siren_confirm_pending
+
+    @pytest.mark.asyncio
+    async def test_confirm_vanished_device_is_noop(self) -> None:
+        coordinator = _make_coordinator(["s1"])
+        coordinator.devices = {}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._devices_api.get_hub_device_siren_settings = AsyncMock()
+        coordinator._siren_confirm_pending.add("gone")
+
+        with patch("custom_components.aegis_ajax.coordinator.SIREN_SETTINGS_CONFIRM_DELAY", 0):
+            await coordinator._async_confirm_siren_settings("gone")
+
+        coordinator._devices_api.get_hub_device_siren_settings.assert_not_called()
+        assert "gone" not in coordinator._siren_confirm_pending
+
+
 class TestPollSafetyTimer:
     """Independent poll safety-net timer (#178) — backstop when push is starved.
 

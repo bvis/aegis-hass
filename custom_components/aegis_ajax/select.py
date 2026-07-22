@@ -99,3 +99,6 @@ class AjaxSirenVolumeSelect(CoordinatorEntity[AjaxCobrandedCoordinator], SelectE
             siren_volume_level=level,
         )
         await async_send_device_command(self.coordinator, cmd)
+        # Accepted write: confirm the real hub value within seconds instead of
+        # showing the stale one until the 900 s snapshot timer fires.
+        self.coordinator.schedule_siren_settings_confirm(self._device_id)

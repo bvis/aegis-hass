@@ -320,6 +320,13 @@ SIREN_ALARM_DURATION_MIN = 3
 SIREN_ALARM_DURATION_MAX = 180
 SIREN_ALARM_DURATION_STEP = 1
 
+# Settle delay (seconds) before the targeted settings re-read that follows a
+# successful siren-settings write. An immediate re-read can still return the
+# pre-write snapshot (server-side propagation lag, same lesson as the #239
+# event re-reads), so give the hub a moment; the 900 s timer remains the
+# fallback if the confirm read still races the write.
+SIREN_SETTINGS_CONFIRM_DELAY = 5.0
+
 # Opt-out for users who deliberately run without push notifications. When set,
 # the integration does not raise the recurring `fcm_not_configured` Repair card
 # or the WARNING log when the four FCM fields are empty, and clears any card
