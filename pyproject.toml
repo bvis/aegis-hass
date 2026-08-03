@@ -30,7 +30,7 @@ dev = [
     # and a rebuilt image silently raises what the stubs demand of the user's
     # runtime (#354). 1.75.1 emits gencode 6.31.1. Bumping this means recompiling
     # the whole proto tree and raising the protobuf floor above to match.
-    "grpcio-tools==1.75.1",
+    "grpcio-tools==1.83.0",
     "homeassistant>=2024.1.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
