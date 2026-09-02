@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from systems.ajax.protobuf.v2.gw.session import session_pb2
 
 
 class TestForceArmService:
@@ -98,6 +99,51 @@ class TestDisarmNightModeService:
         mock_coordinator.async_request_refresh.assert_called_once()
 
 
+class TestClientSessionServices:
+    @staticmethod
+    def _session(session_id: int, device_id: str) -> session_pb2.Session:
+        session = session_pb2.Session()
+        session.session_id = session_id
+        session.client_device_id = device_id
+        return session
+
+    @pytest.mark.asyncio
+    async def test_current_session_cannot_be_terminated(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[self._session(1, "aegis-device")]
+        )
+        coordinator._client = MagicMock()
+        coordinator._client.session.device_id = "aegis-device"
+
+        with pytest.raises(ValueError, match="current Aegis session"):
+            await coordinator.async_terminate_client_session(1)
+        coordinator._hts_client.kill_client_sessions.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_terminate_other_sessions_excludes_current_session(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[
+                self._session(1, "aegis-device"),
+                self._session(2, "mobile-device"),
+                self._session(3, "desktop-device"),
+            ]
+        )
+        coordinator._hts_client.kill_client_sessions = AsyncMock()
+        coordinator._client = MagicMock()
+        coordinator._client.session.device_id = "aegis-device"
+
+        assert await coordinator.async_terminate_other_client_sessions() == 2
+        coordinator._hts_client.kill_client_sessions.assert_awaited_once_with([2, 3])
+
+
 class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_services_registered_on_setup(self) -> None:
@@ -149,6 +195,9 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in register_calls
         assert "press_panic_button" in register_calls
         assert "set_photo_on_demand_mode" in register_calls
+        assert "list_client_sessions" in register_calls
+        assert "terminate_client_session" in register_calls
+        assert "terminate_other_client_sessions" in register_calls
 
     @pytest.mark.asyncio
     async def test_services_removed_on_unload(self) -> None:
@@ -176,3 +225,6 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in remove_calls
         assert "press_panic_button" in remove_calls
         assert "set_photo_on_demand_mode" in remove_calls
+        assert "list_client_sessions" in remove_calls
+        assert "terminate_client_session" in remove_calls
+        assert "terminate_other_client_sessions" in remove_calls

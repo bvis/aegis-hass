@@ -7,6 +7,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from systems.ajax.protobuf.v2.gw.session import session_pb2
 
 from custom_components.aegis_ajax.api.hts.client import (
     AUTH_TIMEOUT,
@@ -22,6 +23,7 @@ from custom_components.aegis_ajax.api.hts.messages import (
     AUTH_KEY_AUTHENTICATION_REQUEST,
     HtsMessage,
     MsgType,
+    tlv_decode,
     tlv_encode,
 )
 from custom_components.aegis_ajax.api.hts.protocol import ETX, STX
@@ -40,6 +42,56 @@ def _make_client(**kwargs: object) -> HtsClient:
     }
     defaults.update(kwargs)
     return HtsClient(**defaults)
+
+
+class TestClientSessions:
+    @pytest.mark.asyncio
+    async def test_get_client_sessions_sends_expected_request_and_parses_response(self) -> None:
+        client = _make_client()
+        client._connected = True
+        client._send_message = AsyncMock()  # type: ignore[method-assign]
+
+        task = asyncio.create_task(client.get_client_sessions())
+        await asyncio.sleep(0)
+        msg_type, payload = client._send_message.await_args.args
+        assert msg_type == MsgType.USER_REGISTRATION
+        assert tlv_decode(payload) == [b"\x40"]
+
+        response = session_pb2.GetActiveSessionsResponse()
+        session = response.sessions.sessions.add()
+        session.session_id = 123
+        session.client_device_id = "other-device"
+        client._handle_user_registration_response(
+            _msg(
+                MsgType.USER_REGISTRATION,
+                tlv_encode([b"\x41", response.SerializeToString()]),
+            )
+        )
+
+        sessions = await task
+        assert [item.session_id for item in sessions] == [123]
+
+    @pytest.mark.asyncio
+    async def test_kill_client_sessions_sends_signed_eight_byte_session_id(self) -> None:
+        client = _make_client()
+        client._connected = True
+        client._send_message = AsyncMock()  # type: ignore[method-assign]
+
+        task = asyncio.create_task(client.kill_client_sessions([123]))
+        await asyncio.sleep(0)
+        msg_type, payload = client._send_message.await_args.args
+        assert msg_type == MsgType.USER_REGISTRATION
+        assert tlv_decode(payload) == [b"\x42", (123).to_bytes(8, "big", signed=True)]
+
+        response = session_pb2.DropUserSessionResponse()
+        response.response = session_pb2.SUCCESSFUL
+        client._handle_user_registration_response(
+            _msg(
+                MsgType.USER_REGISTRATION,
+                tlv_encode([b"\x42", response.SerializeToString()]),
+            )
+        )
+        await task
 
 
 # ---------------------------------------------------------------------------

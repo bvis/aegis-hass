@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import callback
+from homeassistant.core import SupportsResponse, callback
 from homeassistant.helpers import device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
@@ -116,6 +116,9 @@ _CUSTOM_SERVICE_NAMES = (
     "disarm_night_mode",
     "press_panic_button",
     "set_photo_on_demand_mode",
+    "list_client_sessions",
+    "terminate_client_session",
+    "terminate_other_client_sessions",
 )
 
 
@@ -160,6 +163,73 @@ def _resolve_target_space_ids(
                 results.append((coordinator, space_id))
                 break
     return results
+
+
+def _resolve_session_coordinator(
+    hass: HomeAssistant, call: ServiceCall
+) -> AjaxCobrandedCoordinator:
+    """Resolve one account for a session-management service call."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    entry_id = call.data.get("entry_id")
+    if entry_id is not None:
+        for entry in entries:
+            if entry.entry_id == entry_id:
+                return entry.runtime_data
+        raise ServiceValidationError("No Aegis account was found for the supplied entry_id.")
+    if len(entries) != 1:
+        raise ServiceValidationError(
+            "entry_id is required when more than one Aegis account is configured."
+        )
+    return entries[0].runtime_data
+
+
+async def _async_handle_list_client_sessions(
+    hass: HomeAssistant, call: ServiceCall
+) -> dict[str, object]:
+    """Return sessions for one configured Ajax account."""
+    coordinator = _resolve_session_coordinator(hass, call)
+    return {"sessions": await coordinator.async_list_client_sessions()}
+
+
+async def _async_handle_terminate_client_session(
+    hass: HomeAssistant, call: ServiceCall
+) -> None:
+    """Terminate one selected non-current Ajax account session."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    if not call.data.get("confirm"):
+        raise ServiceValidationError(
+            "terminate_client_session requires `confirm: true` to terminate a session."
+        )
+    session_id = call.data.get("session_id")
+    if isinstance(session_id, bool) or not isinstance(session_id, int) or session_id <= 0:
+        raise ServiceValidationError("session_id must be a positive integer.")
+    try:
+        await _resolve_session_coordinator(hass, call).async_terminate_client_session(session_id)
+    except ValueError as exc:
+        raise ServiceValidationError(str(exc)) from exc
+
+
+async def _async_handle_terminate_other_client_sessions(
+    hass: HomeAssistant, call: ServiceCall
+) -> dict[str, int]:
+    """Terminate all sessions except the current Aegis account session."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    if not call.data.get("confirm"):
+        raise ServiceValidationError(
+            "terminate_other_client_sessions requires `confirm: true` to terminate all "
+            "other sessions."
+        )
+    try:
+        terminated = await _resolve_session_coordinator(
+            hass, call
+        ).async_terminate_other_client_sessions()
+    except ValueError as exc:
+        raise ServiceValidationError(str(exc)) from exc
+    return {"terminated_sessions": terminated}
 
 
 async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -516,18 +586,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
         await _async_handle_set_photo_on_demand_mode(hass, call)
 
-    if not hass.services.has_service(DOMAIN, "force_arm"):
-        service_handlers = {
-            "force_arm": _force_arm_handler,
-            "force_arm_night": _force_arm_night_handler,
-            "disarm_night_mode": _disarm_night_mode_handler,
-            "press_panic_button": _press_panic_button_handler,
-            "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
-        }
-        # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
-        # handler — fail loudly at setup rather than silently skipping it.
-        for name in _CUSTOM_SERVICE_NAMES:
-            hass.services.async_register(DOMAIN, name, service_handlers[name])
+    async def _list_client_sessions_handler(call: ServiceCall) -> dict[str, object]:
+        return await _async_handle_list_client_sessions(hass, call)
+
+    async def _terminate_client_session_handler(call: ServiceCall) -> None:
+        await _async_handle_terminate_client_session(hass, call)
+
+    async def _terminate_other_client_sessions_handler(call: ServiceCall) -> dict[str, int]:
+        return await _async_handle_terminate_other_client_sessions(hass, call)
+
+    service_handlers = {
+        "force_arm": _force_arm_handler,
+        "force_arm_night": _force_arm_night_handler,
+        "disarm_night_mode": _disarm_night_mode_handler,
+        "press_panic_button": _press_panic_button_handler,
+        "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
+        "list_client_sessions": _list_client_sessions_handler,
+        "terminate_client_session": _terminate_client_session_handler,
+        "terminate_other_client_sessions": _terminate_other_client_sessions_handler,
+    }
+    # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
+    # handler — fail loudly at setup rather than silently skipping it.
+    for name in _CUSTOM_SERVICE_NAMES:
+        if hass.services.has_service(DOMAIN, name):
+            continue
+        kwargs = (
+            {"supports_response": SupportsResponse.ONLY}
+            if name in {"list_client_sessions", "terminate_other_client_sessions"}
+            else {}
+        )
+        hass.services.async_register(DOMAIN, name, service_handlers[name], **kwargs)
 
     # Reload integration when options change (e.g. FCM credentials)
     entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))
