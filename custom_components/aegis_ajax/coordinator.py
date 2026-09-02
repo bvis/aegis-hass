@@ -75,7 +75,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.core import HomeAssistant
-    from homeassistant.util.json import JsonObjectType
+    from homeassistant.util.json import JsonArrayType
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
     from custom_components.aegis_ajax.api.hts.hub_state import (
@@ -659,12 +659,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """True if HTS has an active connection feeding hub-network sensors."""
         return self._hts_client is not None and self._hts_task is not None
 
-    async def async_list_client_sessions(self) -> list[JsonObjectType]:
+    async def async_list_client_sessions(self) -> JsonArrayType:
         """Return account sessions in a service-safe representation."""
         hts_client = self._require_hts_client()
         ajax_sessions = await hts_client.get_client_sessions()
         current_device_id = self._client.session.device_id
-        sessions: list[JsonObjectType] = []
+        sessions: JsonArrayType = []
         for session in ajax_sessions:
             sessions.append(
                 {
