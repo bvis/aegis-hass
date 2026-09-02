@@ -658,7 +658,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """True if HTS has an active connection feeding hub-network sensors."""
         return self._hts_client is not None and self._hts_task is not None
 
-    async def async_list_client_sessions(self) -> list[dict[str, object]]:
+    async def async_list_client_sessions(self) -> list[dict[str, str | int | bool]]:
         """Return account sessions in a service-safe representation."""
         hts_client = self._require_hts_client()
         sessions = await hts_client.get_client_sessions()

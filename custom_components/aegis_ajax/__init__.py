@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import SupportsResponse, callback
+from homeassistant.core import ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
@@ -176,26 +176,24 @@ def _resolve_session_coordinator(
     if entry_id is not None:
         for entry in entries:
             if entry.entry_id == entry_id:
-                return entry.runtime_data
+                return cast("AjaxCobrandedCoordinator", entry.runtime_data)
         raise ServiceValidationError("No Aegis account was found for the supplied entry_id.")
     if len(entries) != 1:
         raise ServiceValidationError(
             "entry_id is required when more than one Aegis account is configured."
         )
-    return entries[0].runtime_data
+    return cast("AjaxCobrandedCoordinator", entries[0].runtime_data)
 
 
 async def _async_handle_list_client_sessions(
     hass: HomeAssistant, call: ServiceCall
-) -> dict[str, object]:
+) -> ServiceResponse:
     """Return sessions for one configured Ajax account."""
     coordinator = _resolve_session_coordinator(hass, call)
     return {"sessions": await coordinator.async_list_client_sessions()}
 
 
-async def _async_handle_terminate_client_session(
-    hass: HomeAssistant, call: ServiceCall
-) -> None:
+async def _async_handle_terminate_client_session(hass: HomeAssistant, call: ServiceCall) -> None:
     """Terminate one selected non-current Ajax account session."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
@@ -214,7 +212,7 @@ async def _async_handle_terminate_client_session(
 
 async def _async_handle_terminate_other_client_sessions(
     hass: HomeAssistant, call: ServiceCall
-) -> dict[str, int]:
+) -> ServiceResponse:
     """Terminate all sessions except the current Aegis account session."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
@@ -586,13 +584,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
         await _async_handle_set_photo_on_demand_mode(hass, call)
 
-    async def _list_client_sessions_handler(call: ServiceCall) -> dict[str, object]:
+    async def _list_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
         return await _async_handle_list_client_sessions(hass, call)
 
     async def _terminate_client_session_handler(call: ServiceCall) -> None:
         await _async_handle_terminate_client_session(hass, call)
 
-    async def _terminate_other_client_sessions_handler(call: ServiceCall) -> dict[str, int]:
+    async def _terminate_other_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
         return await _async_handle_terminate_other_client_sessions(hass, call)
 
     service_handlers = {
@@ -601,21 +599,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         "disarm_night_mode": _disarm_night_mode_handler,
         "press_panic_button": _press_panic_button_handler,
         "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
-        "list_client_sessions": _list_client_sessions_handler,
-        "terminate_client_session": _terminate_client_session_handler,
-        "terminate_other_client_sessions": _terminate_other_client_sessions_handler,
     }
     # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
     # handler — fail loudly at setup rather than silently skipping it.
     for name in _CUSTOM_SERVICE_NAMES:
+        if name not in service_handlers:
+            continue
         if hass.services.has_service(DOMAIN, name):
             continue
-        kwargs = (
-            {"supports_response": SupportsResponse.ONLY}
-            if name in {"list_client_sessions", "terminate_other_client_sessions"}
-            else {}
+        hass.services.async_register(DOMAIN, name, service_handlers[name])
+    if not hass.services.has_service(DOMAIN, "list_client_sessions"):
+        hass.services.async_register(
+            DOMAIN,
+            "list_client_sessions",
+            _list_client_sessions_handler,
+            supports_response=SupportsResponse.ONLY,
         )
-        hass.services.async_register(DOMAIN, name, service_handlers[name], **kwargs)
+    if not hass.services.has_service(DOMAIN, "terminate_client_session"):
+        hass.services.async_register(
+            DOMAIN,
+            "terminate_client_session",
+            _terminate_client_session_handler,
+        )
+    if not hass.services.has_service(DOMAIN, "terminate_other_client_sessions"):
+        hass.services.async_register(
+            DOMAIN,
+            "terminate_other_client_sessions",
+            _terminate_other_client_sessions_handler,
+            supports_response=SupportsResponse.ONLY,
+        )
 
     # Reload integration when options change (e.g. FCM credentials)
     entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))

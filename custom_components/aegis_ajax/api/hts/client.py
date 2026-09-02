@@ -274,9 +274,9 @@ class HtsClient:
         # `listen()` exclusively owns the TCP reader, so account-management
         # requests hand their matching response back through this future.
         self._user_registration_request_lock = asyncio.Lock()
-        self._pending_user_registration_response: tuple[
-            int, asyncio.Future[list[bytes]]
-        ] | None = None
+        self._pending_user_registration_response: tuple[int, asyncio.Future[list[bytes]]] | None = (
+            None
+        )
 
     # ------------------------------------------------------------------
     # Properties
@@ -660,10 +660,7 @@ class HtsClient:
         """Terminate the supplied Ajax account sessions."""
         if not session_ids:
             return
-        params = [
-            session_id.to_bytes(8, "big", signed=True)
-            for session_id in session_ids
-        ]
+        params = [session_id.to_bytes(8, "big", signed=True) for session_id in session_ids]
         response_params = await self._request_user_registration(
             request_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
             response_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
