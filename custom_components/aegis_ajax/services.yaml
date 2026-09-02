@@ -159,8 +159,7 @@ list_client_sessions:
     Return the active Ajax account sessions, including a session_id for use
     with terminate_client_session. The current Aegis session is marked
     is_current and cannot be terminated by this integration.
-  response:
-    optional: false
+  target: {}
   fields:
     entry_id:
       name: Config entry ID
@@ -204,8 +203,7 @@ terminate_other_client_sessions:
   description: >-
     Immediately terminate every active Ajax account session except the
     current Aegis session. This may sign out the Ajax mobile and desktop apps.
-  response:
-    optional: false
+  target: {}
   fields:
     confirm:
       name: Confirm termination
