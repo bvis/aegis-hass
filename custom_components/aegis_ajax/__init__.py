@@ -63,6 +63,7 @@ try:
 except TypeError as exc:
     _log_proto_descriptor_collision(exc)
     raise
+from custom_components.aegis_ajax.api.hts.client import HtsConnectionError  # noqa: E402
 from custom_components.aegis_ajax.api.session import log_fingerprint  # noqa: E402
 from custom_components.aegis_ajax.const import (  # noqa: E402
     APPLICATION_LABEL,
@@ -189,8 +190,13 @@ async def _async_handle_list_client_sessions(
     hass: HomeAssistant, call: ServiceCall
 ) -> ServiceResponse:
     """Return sessions for one configured Ajax account."""
-    coordinator = _resolve_session_coordinator(hass, call)
-    return {"sessions": await coordinator.async_list_client_sessions()}
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    try:
+        sessions = await _resolve_session_coordinator(hass, call).async_list_client_sessions()
+    except (RuntimeError, HtsConnectionError) as exc:
+        raise ServiceValidationError(f"Could not list Ajax account sessions: {exc}") from exc
+    return {"sessions": sessions}
 
 
 async def _async_handle_terminate_client_session(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -206,7 +212,7 @@ async def _async_handle_terminate_client_session(hass: HomeAssistant, call: Serv
         raise ServiceValidationError("session_id must be a positive integer.")
     try:
         await _resolve_session_coordinator(hass, call).async_terminate_client_session(session_id)
-    except ValueError as exc:
+    except (RuntimeError, ValueError, HtsConnectionError) as exc:
         raise ServiceValidationError(str(exc)) from exc
 
 
@@ -225,7 +231,7 @@ async def _async_handle_terminate_other_client_sessions(
         terminated = await _resolve_session_coordinator(
             hass, call
         ).async_terminate_other_client_sessions()
-    except ValueError as exc:
+    except (RuntimeError, ValueError, HtsConnectionError) as exc:
         raise ServiceValidationError(str(exc)) from exc
     return {"terminated_sessions": terminated}
 

@@ -143,6 +143,27 @@ class TestClientSessionServices:
         assert await coordinator.async_terminate_other_client_sessions() == 2
         coordinator._hts_client.kill_client_sessions.assert_awaited_once_with([2, 3])
 
+    @pytest.mark.asyncio
+    async def test_list_sessions_surfaces_hts_errors_as_service_validation_errors(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_list_client_sessions
+        from custom_components.aegis_ajax.api.hts.client import HtsConnectionError
+
+        coordinator = MagicMock()
+        coordinator.async_list_client_sessions = AsyncMock(
+            side_effect=HtsConnectionError("connection closed")
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        hass = MagicMock()
+        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        call = MagicMock()
+        call.data = {}
+
+        with pytest.raises(ServiceValidationError, match="Could not list Ajax account sessions"):
+            await _async_handle_list_client_sessions(hass, call)
+
 
 class TestServiceRegistration:
     @pytest.mark.asyncio

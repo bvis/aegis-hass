@@ -75,6 +75,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.core import HomeAssistant
+    from homeassistant.util.json import JsonObjectType
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
     from custom_components.aegis_ajax.api.hts.hub_state import (
@@ -658,24 +659,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """True if HTS has an active connection feeding hub-network sensors."""
         return self._hts_client is not None and self._hts_task is not None
 
-    async def async_list_client_sessions(self) -> list[dict[str, str | int | bool]]:
+    async def async_list_client_sessions(self) -> list[JsonObjectType]:
         """Return account sessions in a service-safe representation."""
         hts_client = self._require_hts_client()
-        sessions = await hts_client.get_client_sessions()
+        ajax_sessions = await hts_client.get_client_sessions()
         current_device_id = self._client.session.device_id
-        return [
-            {
-                "session_id": session.session_id,
-                "device_model": session.client_device_model,
-                "operating_system": session.client_os,
-                "application": session.application_label,
-                "version": session.client_version_major,
-                "created_at": session.session_creation_timestamp,
-                "last_refreshed_at": session.session_refresh_timestamp,
-                "is_current": session.client_device_id == current_device_id,
-            }
-            for session in sessions
-        ]
+        sessions: list[JsonObjectType] = []
+        for session in ajax_sessions:
+            sessions.append(
+                {
+                    "session_id": session.session_id,
+                    "device_model": session.client_device_model,
+                    "operating_system": session.client_os,
+                    "application": session.application_label,
+                    "version": session.client_version_major,
+                    "created_at": session.session_creation_timestamp,
+                    "last_refreshed_at": session.session_refresh_timestamp,
+                    "is_current": session.client_device_id == current_device_id,
+                }
+            )
+        return sessions
 
     async def async_terminate_client_session(self, session_id: int) -> None:
         """Terminate one non-current Ajax account session."""
