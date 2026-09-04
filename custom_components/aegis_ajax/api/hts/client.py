@@ -6,9 +6,8 @@ import asyncio
 import contextlib
 import logging
 import ssl
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
-
-from systems.ajax.protobuf.v2.gw.session import session_pb2
 
 from custom_components.aegis_ajax.api.hts.auth import (
     ConnectedResponse,
@@ -70,6 +69,20 @@ class DeviceKvCallback(Protocol):
     ) -> None: ...
 
 
+@dataclass(frozen=True)
+class ClientSession:
+    """One session record returned by USER_REGISTRATION key 0x41."""
+
+    device_model: str
+    operating_system: str
+    application: str
+    version: str
+    created_at: int | None
+    expires_at: int | None
+    last_active_at: int | None
+    is_current: bool
+
+
 _LOGGER = logging.getLogger(__name__)
 
 HTS_HOST = "hts.prod.ajax.systems"
@@ -108,7 +121,7 @@ MAX_FRAME_BUFFER_BYTES = 256 * 1024
 _MSG_TYPE_EVENT = 0x08
 _USER_REGISTRATION_KEY_GET_CLIENT_SESSIONS = 0x40
 _USER_REGISTRATION_KEY_CLIENT_SESSIONS = 0x41
-_USER_REGISTRATION_KEY_KILL_SESSIONS = 0x42
+_CLIENT_SESSION_RECORD_SEPARATOR = b"\xfe\xfe"
 # A `type=0x08` space event (chime toggle #239, arm/disarm #258/#284) starts
 # with params[0]=0x02, params[1]=<event family>, then params[2]=the 4-byte
 # SOURCE id that triggered it (the keypad/keyfob/app device — VARIES per hub
@@ -637,46 +650,70 @@ class HtsClient:
         """
         await self._send_request_full_status(hub_id)
 
-    async def get_client_sessions(self) -> list[session_pb2.Session]:
+    async def get_client_sessions(self) -> list[ClientSession]:
         """Return active Ajax account sessions from the connected HTS channel."""
         params = await self._request_user_registration(
             request_key=_USER_REGISTRATION_KEY_GET_CLIENT_SESSIONS,
             response_key=_USER_REGISTRATION_KEY_CLIENT_SESSIONS,
         )
-        if len(params) != 2:
-            raise HtsConnectionError(
-                f"Unexpected CLIENT_SESSIONS response shape: {len(params)} parameters"
-            )
-        response = session_pb2.GetActiveSessionsResponse()
-        try:
-            response.ParseFromString(params[1])
-        except Exception as exc:
-            raise HtsConnectionError("Could not decode CLIENT_SESSIONS response") from exc
-        if response.WhichOneof("test_oneof") != "sessions":
-            raise HtsConnectionError("Ajax rejected GET_CLIENT_SESSIONS")
-        return list(response.sessions.sessions)
+        return self._parse_client_sessions(params)
 
-    async def kill_client_sessions(self, session_ids: list[int]) -> None:
-        """Terminate the supplied Ajax account sessions."""
-        if not session_ids:
-            return
-        params = [session_id.to_bytes(8, "big", signed=True) for session_id in session_ids]
-        response_params = await self._request_user_registration(
-            request_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
-            response_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
-            params=params,
-        )
-        if len(response_params) != 2:
-            raise HtsConnectionError(
-                f"Unexpected KILL_SESSIONS response shape: {len(response_params)} parameters"
+    @staticmethod
+    def _parse_client_sessions(params: list[bytes]) -> list[ClientSession]:
+        """Decode the flat, separator-delimited CLIENT_SESSIONS payload.
+
+        Ajax returns alternating one-byte sub-keys and values after the 0x41
+        response key. Records are separated by a ``fe fe`` parameter. A real
+        capture can end with an incomplete record, which is deliberately
+        ignored instead of making this read-only service fail.
+        """
+        records: list[dict[int, bytes]] = []
+        record: dict[int, bytes] = {}
+        index = 1
+        while index < len(params):
+            param = params[index]
+            if param == _CLIENT_SESSION_RECORD_SEPARATOR:
+                if record:
+                    records.append(record)
+                    record = {}
+                index += 1
+                continue
+            if (
+                len(param) == 1
+                and index + 1 < len(params)
+                and params[index + 1] != _CLIENT_SESSION_RECORD_SEPARATOR
+            ):
+                record[param[0]] = params[index + 1]
+                index += 2
+                continue
+            index += 1
+        if record:
+            records.append(record)
+
+        def text(value: bytes | None) -> str:
+            return value.decode("utf-8", errors="replace") if value is not None else ""
+
+        def timestamp(value: bytes | None) -> int | None:
+            return int.from_bytes(value, "big", signed=True) if value and len(value) == 8 else None
+
+        sessions: list[ClientSession] = []
+        for values in records:
+            last_active = timestamp(values.get(0x06))
+            sessions.append(
+                ClientSession(
+                    device_model=text(values.get(0x03)),
+                    operating_system=text(values.get(0x04)),
+                    application=text(values.get(0x0A)),
+                    version=text(values.get(0x09)),
+                    created_at=timestamp(values.get(0x01)),
+                    expires_at=timestamp(values.get(0x05)),
+                    last_active_at=last_active,
+                    # 0x07 identifies this client identity. Multiple stale
+                    # sessions can carry it; only the active one is current.
+                    is_current=values.get(0x07) == b"\x01" and last_active not in (None, 0),
+                )
             )
-        response = session_pb2.DropUserSessionResponse()
-        try:
-            response.ParseFromString(response_params[1])
-        except Exception as exc:
-            raise HtsConnectionError("Could not decode KILL_SESSIONS response") from exc
-        if response.WhichOneof("test_oneof") != "response":
-            raise HtsConnectionError("Ajax rejected KILL_SESSIONS")
+        return sessions
 
     async def _request_user_registration(
         self,

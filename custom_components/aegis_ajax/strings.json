@@ -173,6 +173,16 @@
                     "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
                 }
             }
+        },
+        "list_client_sessions": {
+            "name": "List account sessions",
+            "description": "Return the active Ajax account sessions. The currently active Aegis session is marked when it can be identified from the response.",
+            "fields": {
+                "entry_id": {
+                    "name": "Config entry ID",
+                    "description": "Required when more than one Aegis account is configured. Use the integration's config entry ID to select the account."
+                }
+            }
         }
     },
     "issues": {

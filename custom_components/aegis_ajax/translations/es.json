@@ -184,6 +184,11 @@
                     "description": "Entidad del panel de alarma del espacio cuyo modo de hub actualizar. Si se omite, se aplica a todos los espacios configurados."
                 }
             }
+        },
+        "list_client_sessions": {
+            "name": "List account sessions",
+            "description": "Return the active Ajax account sessions. The currently active Aegis session is marked when it can be identified from the response.",
+            "fields": {"entry_id": {"name": "Config entry ID", "description": "Required when more than one Aegis account is configured."}}
         }
     },
     "issues": {
