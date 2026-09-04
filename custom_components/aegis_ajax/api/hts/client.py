@@ -73,6 +73,7 @@ class DeviceKvCallback(Protocol):
 class ClientSession:
     """One session record returned by USER_REGISTRATION key 0x41."""
 
+    session_id: int | None
     device_model: str
     operating_system: str
     application: str
@@ -121,6 +122,7 @@ MAX_FRAME_BUFFER_BYTES = 256 * 1024
 _MSG_TYPE_EVENT = 0x08
 _USER_REGISTRATION_KEY_GET_CLIENT_SESSIONS = 0x40
 _USER_REGISTRATION_KEY_CLIENT_SESSIONS = 0x41
+_USER_REGISTRATION_KEY_KILL_SESSIONS = 0x42
 _CLIENT_SESSION_RECORD_SEPARATOR = b"\xfe\xfe"
 # A `type=0x08` space event (chime toggle #239, arm/disarm #258/#284) starts
 # with params[0]=0x02, params[1]=<event family>, then params[2]=the 4-byte
@@ -658,6 +660,21 @@ class HtsClient:
         )
         return self._parse_client_sessions(params)
 
+    async def kill_client_sessions(self, session_ids: list[int]) -> None:
+        """Terminate account sessions identified by their 0x01 creation timestamp.
+
+        The official Ajax Android app sends each selected record's 0x01 value
+        as a signed eight-byte target under USER_REGISTRATION key 0x42. Ajax
+        answers by returning the refreshed CLIENT_SESSIONS (0x41) list.
+        """
+        if not session_ids:
+            return
+        await self._request_user_registration(
+            request_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
+            response_key=_USER_REGISTRATION_KEY_CLIENT_SESSIONS,
+            params=[session_id.to_bytes(8, "big", signed=True) for session_id in session_ids],
+        )
+
     @staticmethod
     def _parse_client_sessions(params: list[bytes]) -> list[ClientSession]:
         """Decode the flat, separator-delimited CLIENT_SESSIONS payload.
@@ -701,6 +718,7 @@ class HtsClient:
             last_active = timestamp(values.get(0x06))
             sessions.append(
                 ClientSession(
+                    session_id=timestamp(values.get(0x01)),
                     device_model=text(values.get(0x03)),
                     operating_system=text(values.get(0x04)),
                     application=text(values.get(0x0A)),

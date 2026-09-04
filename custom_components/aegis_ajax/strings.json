@@ -183,6 +183,23 @@
                     "description": "Required when more than one Aegis account is configured. Use the integration's config entry ID to select the account."
                 }
             }
+        },
+        "terminate_client_session": {
+            "name": "Terminate account session",
+            "description": "Immediately terminate one other Ajax account session. Obtain its session ID through list_client_sessions. The current Aegis session is protected.",
+            "fields": {
+                "session_id": {"name": "Session ID", "description": "Session ID returned by list_client_sessions."},
+                "confirm": {"name": "Confirm termination", "description": "Must be true to immediately terminate the selected session."},
+                "entry_id": {"name": "Config entry ID", "description": "Required when more than one Aegis account is configured."}
+            }
+        },
+        "terminate_other_client_sessions": {
+            "name": "Terminate all other account sessions",
+            "description": "Immediately terminate every active Ajax account session except the current Aegis session. This may sign out Ajax mobile and desktop apps.",
+            "fields": {
+                "confirm": {"name": "Confirm termination", "description": "Must be true to immediately terminate all other sessions."},
+                "entry_id": {"name": "Config entry ID", "description": "Required when more than one Aegis account is configured."}
+            }
         }
     },
     "issues": {

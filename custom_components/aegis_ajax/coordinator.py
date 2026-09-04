@@ -667,6 +667,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for session in ajax_sessions:
             sessions.append(
                 {
+                    "session_id": session.session_id,
                     "device_model": session.device_model,
                     "operating_system": session.operating_system,
                     "application": session.application,
@@ -678,6 +679,38 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 }
             )
         return sessions
+
+    async def async_terminate_client_session(self, session_id: int) -> None:
+        """Terminate one selected non-current Ajax account session."""
+        hts_client = self._require_hts_client()
+        sessions = await hts_client.get_client_sessions()
+        target = next((session for session in sessions if session.session_id == session_id), None)
+        if target is None:
+            raise ValueError("The selected Ajax session is no longer active.")
+        if target.is_current:
+            raise ValueError("Refusing to terminate the current Aegis session.")
+        await hts_client.kill_client_sessions([session_id])
+        _LOGGER.info("Terminated one other Ajax account session")
+
+    async def async_terminate_other_client_sessions(self) -> int:
+        """Terminate every session except the identified current Aegis session."""
+        hts_client = self._require_hts_client()
+        sessions = await hts_client.get_client_sessions()
+        current_sessions = [session for session in sessions if session.is_current]
+        if len(current_sessions) != 1:
+            raise ValueError(
+                "Could not uniquely identify the current Aegis session; "
+                "refusing to terminate other sessions."
+            )
+        session_ids = [
+            session.session_id
+            for session in sessions
+            if not session.is_current and session.session_id is not None
+        ]
+        if session_ids:
+            await hts_client.kill_client_sessions(session_ids)
+            _LOGGER.info("Terminated %d other Ajax account session(s)", len(session_ids))
+        return len(session_ids)
 
     def _require_hts_client(self) -> HtsClient:
         """Return the active HTS client or explain why session management cannot run."""
