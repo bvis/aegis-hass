@@ -614,12 +614,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     for name in _CUSTOM_SERVICE_NAMES:
         if hass.services.has_service(DOMAIN, name):
             continue
-        kwargs = (
-            {"supports_response": SupportsResponse.ONLY}
-            if name in {"list_client_sessions", "terminate_other_client_sessions"}
-            else {}
-        )
-        hass.services.async_register(DOMAIN, name, service_handlers[name], **kwargs)
+        if name in {"list_client_sessions", "terminate_other_client_sessions"}:
+            hass.services.async_register(
+                DOMAIN,
+                name,
+                service_handlers[name],
+                supports_response=SupportsResponse.ONLY,
+            )
+        else:
+            hass.services.async_register(DOMAIN, name, service_handlers[name])
     # Reload integration when options change (e.g. FCM credentials)
     entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))
 

@@ -201,8 +201,7 @@ terminate_other_client_sessions:
   description: >-
     Immediately terminate every active Ajax account session except the current
     Aegis session. This may sign out Ajax mobile and desktop apps.
-  response:
-    optional: false
+  target: {}
   fields:
     confirm:
       name: Confirm termination

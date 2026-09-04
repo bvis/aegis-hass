@@ -761,6 +761,8 @@ class HtsClient:
             finally:
                 if self._pending_user_registration_response == (response_key, future):
                     self._pending_user_registration_response = None
+                if not future.done():
+                    future.cancel()
 
     async def _send_request_payload(self, hub_id: str, *, sub_key: int, label: str) -> None:
         """Generic 3-param REQUEST sender shared by SETTINGS and STATUS variants."""
