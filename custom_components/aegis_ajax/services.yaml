@@ -152,3 +152,19 @@ set_photo_on_demand_mode:
         entity:
           domain: alarm_control_panel
           integration: aegis_ajax
+
+list_client_sessions:
+  name: List account sessions
+  description: >-
+    Return the active Ajax account sessions. The currently active Aegis
+    session is marked is_current when it can be identified from the response.
+  target: {}
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: >-
+        Required when more than one Aegis account is configured. Use the
+        integration's config entry ID to select the account.
+      required: false
+      selector:
+        text:

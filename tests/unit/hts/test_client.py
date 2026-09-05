@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,6 +23,7 @@ from custom_components.aegis_ajax.api.hts.messages import (
     AUTH_KEY_AUTHENTICATION_REQUEST,
     HtsMessage,
     MsgType,
+    tlv_decode,
     tlv_encode,
 )
 from custom_components.aegis_ajax.api.hts.protocol import ETX, STX
@@ -40,6 +42,59 @@ def _make_client(**kwargs: object) -> HtsClient:
     }
     defaults.update(kwargs)
     return HtsClient(**defaults)
+
+
+class TestClientSessions:
+    _CLIENT_SESSIONS_WIRE_FIXTURE = bytes.fromhex(
+        "05410501050000019d06351020000502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d06351040000506360500000000000000000508050000019d0635999999050905332e3436050a0550726f746567696d5f616c61726d61050b0500050c050205fefe0501050000019d06351020010502056e2f61050305534d2d4135333642050405416e64726f6964203134050635050000019d06351040010506360500000000000000000508050000019d0635999999050905332e3330050a0550726f746567696d5f616c61726d61050b0501050c05020507050105fefe0501050000019d06351020020502056e2f61050305534d2d4135333642050405416e64726f6964203134050635050000019d06351040020506360500000000000000000508050000019d0635999999050905332e3330050a0550726f746567696d5f616c61726d61050b0501050c05020507050105fefe0501050000019d06351020030502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d06351040030506360500000000000000000508050000019d0635999999050905332e3436050a05536f6d654f746865724c6162656c050b0500050c050205fefe0501050000019d06351020040502053230332e302e3131332e313731050305534d2d4135333642050405416e64726f6964203134050635050000019d0635104004050636050000019d06357777770508050000019d0635999999050905332e3330050a0550726f746567696d5f616c61726d61050b0501050c05020507050105fefe0501050000019d0635102006350502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d0635104006350506360500000000000000000508050000019d0635999999050905332e3436050a0550726f746567696d5f616c61726d61050b0500050c050205fefe0501050000019d0635102006360502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d0635104006360506360500000000000000000508050000019d0635999999050905332e3436050a05536f6d654f746865724c6162656c050b0500050c050205fefe0501050000019d06351020070502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d06351040070506360500000000000000000508050000019d0635999999050905332e3436050a05536f6d654f746865724c6162656c050b0500050c050205fefe0501050000019d06351020080502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d06351040080506360500000000000000000508050000019d0635999999050905332e3436050a05416a6178050b0500050c050205fefe0501050000019d06351020090502056e2f61050305534d2d5830303058050405416e64726f6964050635050000019d06351040090506360500000000000000000508050000019d0635999999050905332e3436050a0550726f746567696d5f616c61726d61050b0500050c050205fefe05"
+    )
+    _CLIENT_SESSIONS_TRAILING_FRAGMENT = bytes.fromhex("0a0a5012620a0a110a350a")
+
+    @pytest.mark.asyncio
+    async def test_get_client_sessions_sends_expected_request_and_parses_response(self) -> None:
+        client = _make_client()
+        client._connected = True
+        client._send_message = AsyncMock()  # type: ignore[method-assign]
+
+        task = asyncio.create_task(client.get_client_sessions())
+        await asyncio.sleep(0)
+        msg_type, payload = client._send_message.await_args.args
+        assert msg_type == MsgType.USER_REGISTRATION
+        assert tlv_decode(payload) == [b"\x40"]
+
+        assert len(self._CLIENT_SESSIONS_WIRE_FIXTURE) == 1145
+        assert (
+            hashlib.sha256(self._CLIENT_SESSIONS_WIRE_FIXTURE).hexdigest()
+            == "3b9484203e3293c8a2bc9c81381bcd17b06a6bc9afbe5831b1dae6a84f1d430a"
+        )
+        assert len(tlv_decode(self._CLIENT_SESSIONS_WIRE_FIXTURE)) == 237
+
+        client._handle_user_registration_response(
+            _msg(MsgType.USER_REGISTRATION, self._CLIENT_SESSIONS_WIRE_FIXTURE)
+        )
+
+        sessions = await task
+        assert len(sessions) == 10
+        assert sum(session.is_current for session in sessions) == 1
+        assert sessions[0].device_model == "SM-X000X"
+        assert sessions[0].application == "Protegim_alarma"
+        assert sessions[4].device_model == "SM-A536B"
+        assert sessions[4].operating_system == "Android 14"
+        assert sessions[4].version == "3.30"
+        assert sessions[4].last_active_at is not None
+        assert sessions[4].is_current is True
+
+    def test_parse_client_sessions_ignores_trailing_fragment(self) -> None:
+        """Trailing bytes after the final separator are not a session record."""
+        client = _make_client()
+        payload = self._CLIENT_SESSIONS_WIRE_FIXTURE + tlv_encode(
+            [self._CLIENT_SESSIONS_TRAILING_FRAGMENT]
+        )
+
+        sessions = client._parse_client_sessions(tlv_decode(payload))
+
+        assert len(sessions) == 10
+        assert sum(session.is_current for session in sessions) == 1
 
 
 # ---------------------------------------------------------------------------

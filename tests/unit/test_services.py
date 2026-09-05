@@ -98,6 +98,29 @@ class TestDisarmNightModeService:
         mock_coordinator.async_request_refresh.assert_called_once()
 
 
+class TestClientSessionServices:
+    @pytest.mark.asyncio
+    async def test_list_sessions_surfaces_hts_errors_as_service_validation_errors(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_list_client_sessions
+        from custom_components.aegis_ajax.api.hts.client import HtsConnectionError
+
+        coordinator = MagicMock()
+        coordinator.async_list_client_sessions = AsyncMock(
+            side_effect=HtsConnectionError("connection closed")
+        )
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        hass = MagicMock()
+        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        call = MagicMock()
+        call.data = {}
+
+        with pytest.raises(ServiceValidationError, match="Could not list Ajax account sessions"):
+            await _async_handle_list_client_sessions(hass, call)
+
+
 class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_services_registered_on_setup(self) -> None:
@@ -150,6 +173,7 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in register_calls
         assert "press_panic_button" in register_calls
         assert "set_photo_on_demand_mode" in register_calls
+        assert "list_client_sessions" in register_calls
 
     @pytest.mark.asyncio
     async def test_services_removed_on_unload(self) -> None:
@@ -177,3 +201,4 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in remove_calls
         assert "press_panic_button" in remove_calls
         assert "set_photo_on_demand_mode" in remove_calls
+        assert "list_client_sessions" in remove_calls

@@ -186,6 +186,11 @@
                     "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
                 }
             }
+        },
+        "list_client_sessions": {
+            "name": "Accountsessies weergeven",
+            "description": "Geeft de actieve Ajax-accountsessies terug. De momenteel actieve Aegis-sessie wordt gemarkeerd wanneer deze in het antwoord kan worden geïdentificeerd.",
+            "fields": {"entry_id": {"name": "Configuratie-entry-ID", "description": "Vereist wanneer meer dan één Aegis-account is geconfigureerd."}}
         }
     },
     "issues": {
