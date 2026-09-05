@@ -186,7 +186,14 @@
                     "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
                 }
             }
-        }
+        },
+        "list_client_sessions": {
+            "name": "List account sessions",
+            "description": "Return the active Ajax account sessions. The currently active Aegis session is marked when it can be identified from the response.",
+            "fields": {"entry_id": {"name": "Config entry ID", "description": "Required when more than one Aegis account is configured."}}
+        },
+        "terminate_client_session": {"name": "Terminate account session", "description": "Immediately terminate one other Ajax account session.", "fields": {"session_id": {"name": "Session ID"}, "confirm": {"name": "Confirm termination"}, "entry_id": {"name": "Config entry ID"}}},
+        "terminate_other_client_sessions": {"name": "Terminate all other account sessions", "description": "Immediately terminate every active Ajax account session except the current Aegis session.", "fields": {"confirm": {"name": "Confirm termination"}, "entry_id": {"name": "Config entry ID"}}}
     },
     "issues": {
         "hub_offline_24h": {

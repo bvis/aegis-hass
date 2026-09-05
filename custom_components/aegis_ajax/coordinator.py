@@ -87,6 +87,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.core import HomeAssistant
+    from homeassistant.util.json import JsonArrayType
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
     from custom_components.aegis_ajax.api.hts.hub_state import (
@@ -685,6 +686,67 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def is_hts_connected(self) -> bool:
         """True if HTS has an active connection feeding hub-network sensors."""
         return self._hts_client is not None and self._hts_task is not None
+
+    async def async_list_client_sessions(self) -> JsonArrayType:
+        """Return account sessions in a service-safe representation."""
+        hts_client = self._require_hts_client()
+        ajax_sessions = await hts_client.get_client_sessions()
+        sessions: JsonArrayType = []
+        for session in ajax_sessions:
+            sessions.append(
+                {
+                    "session_id": session.session_id,
+                    "device_model": session.device_model,
+                    "operating_system": session.operating_system,
+                    "application": session.application,
+                    "version": session.version,
+                    "created_at": session.created_at,
+                    "expires_at": session.expires_at,
+                    "last_active_at": session.last_active_at,
+                    "is_current": session.is_current,
+                }
+            )
+        return sessions
+
+    async def async_terminate_client_session(self, session_id: int) -> None:
+        """Terminate one selected non-current Ajax account session."""
+        hts_client = self._require_hts_client()
+        sessions = await hts_client.get_client_sessions()
+        target = next((session for session in sessions if session.session_id == session_id), None)
+        if target is None:
+            raise ValueError("The selected Ajax session is no longer active.")
+        if target.is_current:
+            raise ValueError("Refusing to terminate the current Aegis session.")
+        await hts_client.kill_client_sessions([session_id])
+        _LOGGER.info("Terminated one other Ajax account session")
+
+    async def async_terminate_other_client_sessions(self) -> int:
+        """Terminate every session except the identified current Aegis session."""
+        hts_client = self._require_hts_client()
+        sessions = await hts_client.get_client_sessions()
+        current_sessions = [session for session in sessions if session.is_current]
+        if len(current_sessions) != 1:
+            raise ValueError(
+                "Could not uniquely identify the current Aegis session; "
+                "refusing to terminate other sessions."
+            )
+        session_ids = [
+            session.session_id
+            for session in sessions
+            if not session.is_current and session.session_id is not None
+        ]
+        if session_ids:
+            await hts_client.kill_client_sessions(session_ids)
+            _LOGGER.info("Terminated %d other Ajax account session(s)", len(session_ids))
+        return len(session_ids)
+
+    def _require_hts_client(self) -> HtsClient:
+        """Return the active HTS client or explain why session management cannot run."""
+        if self._hts_client is None or not self._hts_client.is_connected:
+            raise RuntimeError(
+                "Ajax session management is unavailable because the HTS connection is not ready."
+            )
+        return self._hts_client
 
     @property
     def last_update_success_time(self) -> datetime | None:

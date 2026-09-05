@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 import ssl
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from custom_components.aegis_ajax.api.hts.auth import (
@@ -73,6 +74,21 @@ class DeviceKvCallback(Protocol):
     ) -> None: ...
 
 
+@dataclass(frozen=True)
+class ClientSession:
+    """One session record returned by USER_REGISTRATION key 0x41."""
+
+    session_id: int | None
+    device_model: str
+    operating_system: str
+    application: str
+    version: str
+    created_at: int | None
+    expires_at: int | None
+    last_active_at: int | None
+    is_current: bool
+
+
 _LOGGER = logging.getLogger(__name__)
 
 HTS_HOST = "hts.prod.ajax.systems"
@@ -87,6 +103,7 @@ PING_INTERVAL = 30
 # periodic re-sync as well. Cost per cycle: ~2.7 KB per hub.
 STATUS_REFRESH_INTERVAL = 60
 READ_TIMEOUT = 40
+SESSION_REQUEST_TIMEOUT = 15
 # Bound the full 4-step auth handshake. Without this, a server that keeps the
 # TCP connection alive but feeds bytes slowly can keep `_receive_message()`'s
 # per-chunk reads under READ_TIMEOUT forever, so the coroutine never resolves.
@@ -108,6 +125,10 @@ MAX_FRAME_BUFFER_BYTES = 256 * 1024
 # Chime frame by signature and use it only as a trigger to re-read the
 # authoritative gRPC chime_status.
 _MSG_TYPE_EVENT = 0x08
+_USER_REGISTRATION_KEY_GET_CLIENT_SESSIONS = 0x40
+_USER_REGISTRATION_KEY_CLIENT_SESSIONS = 0x41
+_USER_REGISTRATION_KEY_KILL_SESSIONS = 0x42
+_CLIENT_SESSION_RECORD_SEPARATOR = b"\xfe\xfe"
 # A `type=0x08` space event (chime toggle #239, arm/disarm #258/#284) starts
 # with params[0]=0x02, params[1]=<event family>, then params[2]=the 4-byte
 # SOURCE id that triggered it (the keypad/keyfob/app device — VARIES per hub
@@ -276,6 +297,12 @@ class HtsClient:
         self._on_chime_event: Callable[[str, str, int | None], None] | None = None
         self._on_hub_event: Callable[[HubEvent], None] | None = None
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
+        # `listen()` exclusively owns the TCP reader, so account-management
+        # requests hand their matching response back through this future.
+        self._user_registration_request_lock = asyncio.Lock()
+        self._pending_user_registration_response: tuple[int, asyncio.Future[list[bytes]]] | None = (
+            None
+        )
 
     # ------------------------------------------------------------------
     # Properties
@@ -636,6 +663,118 @@ class HtsClient:
         """
         await self._send_request_full_status(hub_id)
 
+    async def get_client_sessions(self) -> list[ClientSession]:
+        """Return active Ajax account sessions from the connected HTS channel."""
+        params = await self._request_user_registration(
+            request_key=_USER_REGISTRATION_KEY_GET_CLIENT_SESSIONS,
+            response_key=_USER_REGISTRATION_KEY_CLIENT_SESSIONS,
+        )
+        return self._parse_client_sessions(params)
+
+    async def kill_client_sessions(self, session_ids: list[int]) -> None:
+        """Terminate account sessions identified by their 0x01 creation timestamp.
+
+        The official Ajax Android app sends each selected record's 0x01 value
+        as a signed eight-byte target under USER_REGISTRATION key 0x42. Ajax
+        answers by returning the refreshed CLIENT_SESSIONS (0x41) list.
+        """
+        if not session_ids:
+            return
+        await self._request_user_registration(
+            request_key=_USER_REGISTRATION_KEY_KILL_SESSIONS,
+            response_key=_USER_REGISTRATION_KEY_CLIENT_SESSIONS,
+            params=[session_id.to_bytes(8, "big", signed=True) for session_id in session_ids],
+        )
+
+    @staticmethod
+    def _parse_client_sessions(params: list[bytes]) -> list[ClientSession]:
+        """Decode the flat, separator-delimited CLIENT_SESSIONS payload.
+
+        Ajax returns alternating one-byte sub-keys and values after the 0x41
+        response key. Records are separated by a ``fe fe`` parameter. A real
+        capture can end with an incomplete record, which is deliberately
+        ignored instead of making this read-only service fail.
+        """
+        records: list[dict[int, bytes]] = []
+        record: dict[int, bytes] = {}
+        index = 1
+        while index < len(params):
+            param = params[index]
+            if param == _CLIENT_SESSION_RECORD_SEPARATOR:
+                if record:
+                    records.append(record)
+                    record = {}
+                index += 1
+                continue
+            if (
+                len(param) == 1
+                and index + 1 < len(params)
+                and params[index + 1] != _CLIENT_SESSION_RECORD_SEPARATOR
+            ):
+                record[param[0]] = params[index + 1]
+                index += 2
+                continue
+            index += 1
+        if record:
+            records.append(record)
+
+        def text(value: bytes | None) -> str:
+            return value.decode("utf-8", errors="replace") if value is not None else ""
+
+        def timestamp(value: bytes | None) -> int | None:
+            return int.from_bytes(value, "big", signed=True) if value and len(value) == 8 else None
+
+        sessions: list[ClientSession] = []
+        for values in records:
+            last_active = timestamp(values.get(0x06))
+            sessions.append(
+                ClientSession(
+                    session_id=timestamp(values.get(0x01)),
+                    device_model=text(values.get(0x03)),
+                    operating_system=text(values.get(0x04)),
+                    application=text(values.get(0x0A)),
+                    version=text(values.get(0x09)),
+                    created_at=timestamp(values.get(0x01)),
+                    expires_at=timestamp(values.get(0x05)),
+                    last_active_at=last_active,
+                    # 0x07 identifies this client identity. Multiple stale
+                    # sessions can carry it; only the active one is current.
+                    is_current=values.get(0x07) == b"\x01" and last_active not in (None, 0),
+                )
+            )
+        return sessions
+
+    async def _request_user_registration(
+        self,
+        *,
+        request_key: int,
+        response_key: int,
+        params: list[bytes] | None = None,
+    ) -> list[bytes]:
+        """Send a USER_REGISTRATION request and await its listener-delivered reply."""
+        if not self._connected:
+            raise HtsConnectionError("HTS is not connected")
+        async with self._user_registration_request_lock:
+            future: asyncio.Future[list[bytes]] = asyncio.get_running_loop().create_future()
+            self._pending_user_registration_response = (response_key, future)
+            try:
+                await self._send_message(
+                    MsgType.USER_REGISTRATION,
+                    tlv_encode([bytes([request_key]), *(params or [])]),
+                )
+                return await asyncio.wait_for(
+                    asyncio.shield(future), timeout=SESSION_REQUEST_TIMEOUT
+                )
+            except TimeoutError as exc:
+                raise HtsConnectionError(
+                    f"Timed out waiting for USER_REGISTRATION key 0x{response_key:02X}"
+                ) from exc
+            finally:
+                if self._pending_user_registration_response == (response_key, future):
+                    self._pending_user_registration_response = None
+                if not future.done():
+                    future.cancel()
+
     async def _send_request_payload(self, hub_id: str, *, sub_key: int, label: str) -> None:
         """Generic 3-param REQUEST sender shared by SETTINGS and STATUS variants."""
         if self._writer is None:
@@ -756,6 +895,8 @@ class HtsClient:
                 )
                 if msg.msg_type == MsgType.UPDATES:
                     await self._handle_update(msg)
+                elif msg.msg_type == MsgType.USER_REGISTRATION:
+                    self._handle_user_registration_response(msg)
                 elif msg.msg_type == MsgType.ACK:
                     pass  # expected
                 elif int(msg.msg_type) == _MSG_TYPE_EVENT:
@@ -768,6 +909,21 @@ class HtsClient:
     # ------------------------------------------------------------------
     # Update handler
     # ------------------------------------------------------------------
+
+    def _handle_user_registration_response(self, msg: HtsMessage) -> None:
+        """Deliver an account-management response to its waiting request."""
+        pending = self._pending_user_registration_response
+        if pending is None:
+            return
+        try:
+            params = tlv_decode(msg.payload)
+        except ValueError:
+            _LOGGER.warning("Could not decode USER_REGISTRATION response")
+            return
+        if not params or len(params[0]) != 1 or params[0][0] != pending[0]:
+            return
+        if not pending[1].done():
+            pending[1].set_result(params)
 
     async def _handle_update(self, msg: HtsMessage) -> None:
         """Parse an UPDATES message and update hub state."""
@@ -1327,6 +1483,10 @@ class HtsClient:
     async def close(self) -> None:
         """Disconnect cleanly."""
         self._connected = False
+        pending = self._pending_user_registration_response
+        self._pending_user_registration_response = None
+        if pending is not None and not pending[1].done():
+            pending[1].set_exception(HtsConnectionError("HTS connection closed"))
         if self._data_request_task is not None:
             self._data_request_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):

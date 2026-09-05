@@ -152,3 +152,66 @@ set_photo_on_demand_mode:
         entity:
           domain: alarm_control_panel
           integration: aegis_ajax
+
+list_client_sessions:
+  name: List account sessions
+  description: >-
+    Return the active Ajax account sessions, including a session ID for use
+    with terminate_client_session. The current Aegis session is protected. Use
+    this on demand, not as a polling endpoint in an automation.
+  target: {}
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: >-
+        Required when more than one Aegis account is configured. Use the
+        integration's config entry ID to select the account.
+      required: false
+      selector:
+        text:
+
+terminate_client_session:
+  name: Terminate account session
+  description: >-
+    Immediately terminate one other Ajax account session. Obtain its session
+    ID through list_client_sessions. The current Aegis session is protected.
+  fields:
+    session_id:
+      name: Session ID
+      description: Session ID returned by list_client_sessions.
+      required: true
+      selector:
+        number:
+          mode: box
+    confirm:
+      name: Confirm termination
+      description: Must be true to immediately terminate the selected session.
+      required: true
+      selector:
+        boolean:
+    entry_id:
+      name: Config entry ID
+      description: Required when more than one Aegis account is configured.
+      required: false
+      selector:
+        text:
+
+terminate_other_client_sessions:
+  name: Terminate all other account sessions
+  description: >-
+    Immediately terminate every active Ajax account session except the current
+    Aegis session. This may sign out Ajax mobile and desktop apps.
+  target: {}
+  fields:
+    confirm:
+      name: Confirm termination
+      description: Must be true to immediately terminate all other sessions.
+      required: true
+      selector:
+        boolean:
+    entry_id:
+      name: Config entry ID
+      description: Required when more than one Aegis account is configured.
+      required: false
+      selector:
+        text:
