@@ -170,62 +170,62 @@
             }
         },
         "set_photo_on_demand_mode": {
-            "name": "Set Photo on Demand mode",
-            "description": "Enable or disable Photo on Demand mode on a hub. Two independent channels can be toggled separately — user requests (whether hub users can request photos from the Ajax app) and scenarios (whether scenarios / automations can trigger captures). Leave a field unset to keep its current value. At least one is required.",
+            "name": "Imposta la modalità Foto su richiesta",
+            "description": "Attiva o disattiva la modalità Foto su richiesta su un hub. Si possono commutare separatamente due canali indipendenti: le richieste degli utenti (se gli utenti dell'hub possono richiedere foto dall'app Ajax) e gli scenari (se scenari e automazioni possono avviare gli scatti). Lascia un campo non impostato per mantenerne il valore attuale. Almeno uno è obbligatorio.",
             "fields": {
                 "user": {
-                    "name": "User requests",
-                    "description": "When set, enables or disables on-demand photo requests initiated by hub users. Leave unset to keep the current value."
+                    "name": "Richieste degli utenti",
+                    "description": "Se impostato, attiva o disattiva le richieste di foto avviate dagli utenti dell'hub. Lascia non impostato per mantenere il valore attuale."
                 },
                 "scenario": {
-                    "name": "Scenarios",
-                    "description": "When set, enables or disables Photo on Demand captures triggered by Ajax scenarios / automations. Leave unset to keep the current value."
+                    "name": "Scenari",
+                    "description": "Se impostato, attiva o disattiva gli scatti Foto su richiesta avviati da scenari o automazioni Ajax. Lascia non impostato per mantenere il valore attuale."
                 },
                 "entity_id": {
-                    "name": "Entity",
-                    "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
+                    "name": "Entità",
+                    "description": "Pannello allarme dello spazio di cui aggiornare la modalità dell'hub. Se omesso, si applica a tutti gli spazi configurati."
                 }
             }
         },
         "list_client_sessions": {
-            "name": "List account sessions",
-            "description": "Return active Ajax account sessions for manual inspection on demand. This service calls an internal Ajax endpoint that may rate limit frequent requests; do not poll it in automations. The currently active Aegis session is marked is_current when it can be identified.",
+            "name": "Elenca le sessioni dell'account",
+            "description": "Restituisce su richiesta le sessioni attive dell'account Ajax, per un'ispezione manuale. Questo servizio chiama un endpoint interno di Ajax che può limitare la frequenza delle richieste: non interrogarlo ciclicamente nelle automazioni. La sessione Aegis attualmente attiva è contrassegnata con is_current quando è identificabile.",
             "fields": {
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID voce di configurazione",
+                    "description": "Necessario quando è configurato più di un account Aegis."
                 }
             }
         },
         "terminate_client_session": {
-            "name": "Terminate account session",
-            "description": "Immediately log the selected other device out of the Ajax account. Obtain its session ID through list_client_sessions. The integration never terminates its own session.",
+            "name": "Disconnetti una sessione dell'account",
+            "description": "Disconnette immediatamente dall'account Ajax il dispositivo selezionato. Ottieni il suo ID sessione con list_client_sessions. L'integrazione non disconnette mai la propria sessione.",
             "fields": {
                 "session_id": {
-                    "name": "Session ID",
-                    "description": "Session ID returned by list_client_sessions."
+                    "name": "ID sessione",
+                    "description": "ID sessione restituito da list_client_sessions."
                 },
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate the selected session."
+                    "name": "Conferma disconnessione",
+                    "description": "Deve essere true per disconnettere immediatamente la sessione selezionata."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID voce di configurazione",
+                    "description": "Necessario quando è configurato più di un account Aegis."
                 }
             }
         },
         "terminate_other_client_sessions": {
-            "name": "Terminate all other account sessions",
-            "description": "Immediately log all other devices out of the Ajax account. This signs out other active Ajax mobile and desktop apps. The integration never terminates its own session.",
+            "name": "Disconnetti tutte le altre sessioni dell'account",
+            "description": "Disconnette immediatamente dall'account Ajax tutti gli altri dispositivi. Fa uscire le altre app Ajax mobili e desktop attive. L'integrazione non disconnette mai la propria sessione.",
             "fields": {
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate all other sessions."
+                    "name": "Conferma disconnessione",
+                    "description": "Deve essere true per disconnettere immediatamente tutte le altre sessioni."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID voce di configurazione",
+                    "description": "Necessario quando è configurato più di un account Aegis."
                 }
             }
         }
