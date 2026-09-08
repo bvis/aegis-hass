@@ -717,10 +717,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ValueError("The selected Ajax session is no longer active.")
         if target.is_current or target.is_self_identity:
             raise ValueError("Refusing to terminate Aegis integration sessions.")
+        witnesses = frozenset(
+            session.session_id
+            for session in sessions
+            if session.session_id is not None and session.session_id != session_id
+        )
         try:
             await hts_client.kill_client_sessions([session_id])
         except HtsTerminationOutcomeUnknownError:
-            if not await self._async_verify_termination_after_uncertain_outcome(session_id):
+            if not await self._async_verify_termination_after_uncertain_outcome(
+                session_id, witnesses
+            ):
                 raise HtsConnectionError(
                     "Ajax confirmed the session remains active after the termination request."
                 ) from None
@@ -747,7 +754,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 terminated = await hts_client.kill_client_sessions(session_ids)
             except HtsTerminationOutcomeUnknownError as exc:
-                if not await self._async_verify_termination_after_uncertain_outcome(exc.session_id):
+                witnesses = frozenset(
+                    session.session_id for session in sessions if session.session_id is not None
+                ) - frozenset(session_ids)
+                if not await self._async_verify_termination_after_uncertain_outcome(
+                    exc.session_id, witnesses
+                ):
                     raise HtsConnectionError(
                         f"Terminated {len(exc.succeeded_session_ids)} of "
                         f"{len(session_ids)} session(s); the uncertain session remains active."
@@ -757,8 +769,21 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return len(terminated)
         return 0
 
-    async def _async_verify_termination_after_uncertain_outcome(self, session_id: int) -> bool:
-        """Confirm a sent termination after HTS recovers; never resend it."""
+    async def _async_verify_termination_after_uncertain_outcome(
+        self, session_id: int, witness_session_ids: frozenset[int] = frozenset()
+    ) -> bool:
+        """Confirm a sent termination after HTS recovers; never resend it.
+
+        `witness_session_ids` are the sessions Ajax listed immediately before
+        the request that this call is not verifying — for a single termination
+        every other session, for a bulk call the ones it did not target. At
+        least one of them must come back, because absence is only evidence when
+        the read that reports it can be trusted: `_parse_client_sessions`
+        deliberately drops a trailing incomplete record rather than failing the
+        read-only service, so a truncated answer arrives non-empty and short,
+        and the one moment that is likely is right after the connection drop
+        that made the outcome uncertain in the first place.
+        """
         await self._maybe_restart_hts()
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -776,7 +801,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "Termination outcome is unknown because its read-only verification "
                         "returned no sessions; do not retry automatically."
                     )
-                return all(session.session_id != session_id for session in sessions)
+                listed = {session.session_id for session in sessions}
+                if witness_session_ids and witness_session_ids.isdisjoint(listed):
+                    raise HtsConnectionError(
+                        "Termination outcome is unknown because its read-only verification "
+                        "returned none of the sessions that were live before the request; "
+                        "do not retry automatically."
+                    )
+                return session_id not in listed
             await asyncio.sleep(0.1)
         raise HtsConnectionError(
             "Termination outcome is unknown because HTS did not reconnect for verification; "

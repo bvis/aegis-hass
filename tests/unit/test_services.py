@@ -193,7 +193,9 @@ class TestClientSessionServices:
         await coordinator.async_terminate_client_session(2)
 
         coordinator._hts_client.kill_client_sessions.assert_awaited_once_with([2])
-        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(2)
+        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(
+            2, frozenset()
+        )
 
     @pytest.mark.asyncio
     async def test_uncertain_bulk_termination_counts_verified_final_session(self) -> None:
@@ -212,7 +214,9 @@ class TestClientSessionServices:
 
         assert await coordinator.async_terminate_other_client_sessions() == 2
         coordinator._hts_client.kill_client_sessions.assert_awaited_once_with([2, 3])
-        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(3)
+        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(
+            3, frozenset({1})
+        )
 
     @pytest.mark.asyncio
     async def test_uncertain_termination_remaining_session_reports_confirmed_failure(self) -> None:
@@ -303,6 +307,125 @@ class TestClientSessionServices:
         with pytest.raises(HtsConnectionError, match="outcome is unknown"):
             await coordinator._async_verify_termination_after_uncertain_outcome(2)
         coordinator._hts_client.get_client_sessions.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_uncertain_outcome_truncated_verification_is_unknown(self) -> None:
+        """A list carrying no session that was live before the request cannot verify.
+
+        `_parse_client_sessions` drops a trailing incomplete record, so a
+        truncated answer arrives non-empty and short. Absence of the target in
+        such a list is not evidence the target is gone.
+        """
+        from custom_components.aegis_ajax.api.hts.client import HtsConnectionError
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(return_value=[self._session(99)])
+        coordinator._maybe_restart_hts = AsyncMock()
+
+        with pytest.raises(HtsConnectionError, match="outcome is unknown"):
+            await coordinator._async_verify_termination_after_uncertain_outcome(
+                2, frozenset({1, 3})
+            )
+        coordinator._hts_client.get_client_sessions.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_uncertain_outcome_corroborated_absence_verifies(self) -> None:
+        """One surviving pre-request session is enough to trust the read."""
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[self._session(1, is_current=True)]
+        )
+        coordinator._maybe_restart_hts = AsyncMock()
+
+        assert (
+            await coordinator._async_verify_termination_after_uncertain_outcome(
+                2, frozenset({1, 3})
+            )
+            is True
+        )
+
+    @pytest.mark.asyncio
+    async def test_uncertain_outcome_corroborated_presence_is_a_failure(self) -> None:
+        """A corroborated list that still holds the target is a real failure."""
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[self._session(1, is_current=True), self._session(2)]
+        )
+        coordinator._maybe_restart_hts = AsyncMock()
+
+        assert (
+            await coordinator._async_verify_termination_after_uncertain_outcome(2, frozenset({1}))
+            is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_uncertain_outcome_without_witnesses_still_verifies(self) -> None:
+        """With nothing to corroborate against, the check is not made stricter."""
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(return_value=[self._session(99)])
+        coordinator._maybe_restart_hts = AsyncMock()
+
+        assert await coordinator._async_verify_termination_after_uncertain_outcome(2) is True
+
+    @pytest.mark.asyncio
+    async def test_uncertain_single_termination_corroborates_with_live_sessions(self) -> None:
+        """The sessions listed before the request become the verification's witnesses."""
+        from custom_components.aegis_ajax.api.hts.client import HtsTerminationOutcomeUnknownError
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[self._session(1, is_current=True), self._session(2), self._session(3)]
+        )
+        coordinator._hts_client.kill_client_sessions = AsyncMock(
+            side_effect=HtsTerminationOutcomeUnknownError(2)
+        )
+        coordinator._async_verify_termination_after_uncertain_outcome = AsyncMock(return_value=True)
+
+        await coordinator.async_terminate_client_session(2)
+
+        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(
+            2, frozenset({1, 3})
+        )
+
+    @pytest.mark.asyncio
+    async def test_uncertain_bulk_termination_corroborates_with_untargeted_sessions(self) -> None:
+        """A bulk call can only corroborate with the sessions it did not target."""
+        from custom_components.aegis_ajax.api.hts.client import HtsTerminationOutcomeUnknownError
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = object.__new__(AjaxCobrandedCoordinator)
+        coordinator._hts_client = MagicMock(is_connected=True)
+        coordinator._hts_client.get_client_sessions = AsyncMock(
+            return_value=[
+                self._session(1, is_current=True),
+                self._session(4, is_self_identity=True),
+                self._session(2),
+                self._session(3),
+            ]
+        )
+        coordinator._hts_client.kill_client_sessions = AsyncMock(
+            side_effect=HtsTerminationOutcomeUnknownError(3, [2])
+        )
+        coordinator._async_verify_termination_after_uncertain_outcome = AsyncMock(return_value=True)
+
+        assert await coordinator.async_terminate_other_client_sessions() == 2
+
+        coordinator._async_verify_termination_after_uncertain_outcome.assert_awaited_once_with(
+            3, frozenset({1, 4})
+        )
 
     @pytest.mark.asyncio
     async def test_termination_requires_confirmation(self) -> None:
