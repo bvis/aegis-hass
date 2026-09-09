@@ -378,6 +378,26 @@ class AjaxNotificationListener:
             self._credentials.get("creds_hash") if isinstance(self._credentials, dict) else None
         )
 
+        # A cache written before 1.19.0 carries no fingerprint. It is ADOPTED,
+        # not discarded (#487): stamp the current fingerprint on it and keep the
+        # token. Discarding it forced every upgrading install through a fresh
+        # registration, and registration is the fragile step — a transient GCM
+        # failure there (the very failure #464 documents as common and
+        # retryable) takes push down on an install where it had been working
+        # for months. Adopting is exactly what 1.18.0 did with the same cache,
+        # so it cannot be worse, and from here on the fingerprint is present,
+        # which is what makes a real credential change detectable at all.
+        legacy_cache = bool(stored_token) and stored_creds_hash is None
+        if legacy_cache and isinstance(self._credentials, dict):
+            self._credentials["creds_hash"] = creds_hash
+            await self._store.async_save(self._credentials)
+            _LOGGER.info(
+                "cached push registration carries no credential fingerprint "
+                "(made before 1.19.0); adopting it for the configured credentials "
+                "instead of registering again"
+            )
+            stored_creds_hash = creds_hash
+
         valid_cache = (
             bool(stored_token)
             and isinstance(stored_creds_hash, str)
@@ -388,14 +408,6 @@ class AjaxNotificationListener:
             if self._credentials:
                 if not stored_token:
                     _LOGGER.info("Stored FCM registration has no token; registering again")
-                elif stored_creds_hash is None:
-                    # Pre-1.19.0 cache: made before registrations carried a
-                    # fingerprint. Every upgrading install sees this once; it
-                    # says nothing about whether the values changed (#464).
-                    _LOGGER.info(
-                        "cached push registration carries no credential fingerprint "
-                        "(made before 1.19.0); registering again once"
-                    )
                 else:
                     _LOGGER.info(
                         "cached push registration belongs to a different credential set; "

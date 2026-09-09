@@ -1180,7 +1180,17 @@ class TestFcmCacheFingerprinting:
         assert listener.cache_creds_fingerprint == expected_hash[:16]
 
     @pytest.mark.asyncio
-    async def test_reregisters_when_stored_creds_hash_is_missing(self) -> None:
+    async def test_adopts_a_pre_1_19_cache_instead_of_reregistering(self) -> None:
+        """#487 — the working registration of an upgrading install is KEPT.
+
+        This asserts the opposite of what it used to: 1.19.0 discarded a cache
+        with no fingerprint and registered again, which put every upgrading
+        install through the one step that can fail. Two reporters lost push on
+        upgrade and got it back by reverting, because the old cache file was
+        still on disk for 1.18.0 to reuse. The fingerprint exists to detect a
+        *changed* credential set; absent, the 1.18.0 assumption — this token
+        belongs to the configured values — is the safe one.
+        """
         hass = MagicMock()
         hass.async_add_executor_job = AsyncMock(
             return_value={"fcm": {"registration": {"token": "new-token"}}}
@@ -1190,6 +1200,40 @@ class TestFcmCacheFingerprinting:
         listener._store.async_load = AsyncMock(
             return_value={"fcm": {"registration": {"token": "old-token"}}}
         )
+        listener._store.async_save = AsyncMock()
+        listener._register_push_token = AsyncMock()
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+            patch("firebase_messaging.FcmPushClient", MagicMock()),
+        ):
+            await listener.async_start()
+
+        register_cls.assert_not_called()
+        listener._register_push_token.assert_awaited_once_with("old-token")
+        # The fingerprint is stamped and persisted, so the next start is an
+        # ordinary cache hit and a real credential change stays detectable.
+        listener._store.async_save.assert_awaited_once_with(
+            {"fcm": {"registration": {"token": "old-token"}}, "creds_hash": expected_hash}
+        )
+        assert listener.cache_creds_fingerprint == expected_hash[:16]
+
+    @pytest.mark.asyncio
+    async def test_adoption_does_not_touch_a_cache_without_a_token(self) -> None:
+        """A cache with no token has nothing to adopt — it must still register."""
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            return_value={"fcm": {"registration": {"token": "new-token"}}}
+        )
+        listener = self._listener(hass)
+        expected_hash = self._expected_hash()
+        listener._store.async_load = AsyncMock(return_value={"fcm": {"registration": {}}})
         listener._store.async_save = AsyncMock()
         listener._register_push_token = AsyncMock()
         register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
