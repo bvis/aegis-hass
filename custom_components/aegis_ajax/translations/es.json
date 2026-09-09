@@ -188,44 +188,44 @@
             }
         },
         "list_client_sessions": {
-            "name": "List account sessions",
-            "description": "Return active Ajax account sessions for manual inspection on demand. This service calls an internal Ajax endpoint that may rate limit frequent requests; do not poll it in automations. The currently active Aegis session is marked is_current when it can be identified.",
+            "name": "Listar sesiones de la cuenta",
+            "description": "Devuelve bajo demanda las sesiones activas de la cuenta Ajax, para inspeccionarlas manualmente. Este servicio llama a un endpoint interno de Ajax que puede limitar la frecuencia de las peticiones: no lo consultes de forma periódica en automatizaciones. La sesión de Aegis actualmente activa se marca con is_current cuando se puede identificar.",
             "fields": {
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de entrada de configuración",
+                    "description": "Obligatorio cuando hay más de una cuenta de Aegis configurada."
                 }
             }
         },
         "terminate_client_session": {
-            "name": "Terminate account session",
-            "description": "Immediately log the selected other device out of the Ajax account. Obtain its session ID through list_client_sessions. The integration never terminates its own session.",
+            "name": "Cerrar una sesión de la cuenta",
+            "description": "Cierra inmediatamente la sesión del dispositivo seleccionado en la cuenta Ajax. Obtén su ID de sesión con list_client_sessions. La integración nunca cierra su propia sesión.",
             "fields": {
                 "session_id": {
-                    "name": "Session ID",
-                    "description": "Session ID returned by list_client_sessions."
+                    "name": "ID de sesión",
+                    "description": "ID de sesión devuelto por list_client_sessions."
                 },
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate the selected session."
+                    "name": "Confirmar cierre",
+                    "description": "Debe ser true para cerrar inmediatamente la sesión seleccionada."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de entrada de configuración",
+                    "description": "Obligatorio cuando hay más de una cuenta de Aegis configurada."
                 }
             }
         },
         "terminate_other_client_sessions": {
-            "name": "Terminate all other account sessions",
-            "description": "Immediately log all other devices out of the Ajax account. This signs out other active Ajax mobile and desktop apps. The integration never terminates its own session.",
+            "name": "Cerrar todas las demás sesiones de la cuenta",
+            "description": "Cierra inmediatamente la sesión de todos los demás dispositivos en la cuenta Ajax. Esto expulsa a las demás apps de Ajax móviles y de escritorio que estén activas. La integración nunca cierra su propia sesión.",
             "fields": {
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate all other sessions."
+                    "name": "Confirmar cierre",
+                    "description": "Debe ser true para cerrar inmediatamente todas las demás sesiones."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de entrada de configuración",
+                    "description": "Obligatorio cuando hay más de una cuenta de Aegis configurada."
                 }
             }
         }
