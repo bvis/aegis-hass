@@ -26,6 +26,20 @@ if TYPE_CHECKING:
 # 2027.8 removes both (#444). Older cores reject the new key with a TypeError
 # deep inside `async_get_or_create`, so the key the running core understands is
 # detected once here and every via link goes through `via_device_fields`.
+#
+# ⚠️ THE `via_device_id` BRANCH CANNOT BE RUN AGAINST A CORE THAT HAS IT.
+# The newest `homeassistant` on PyPI is 2026.2.x, so CI — and any local dev
+# image — resolves a core where `via_device_id` is absent from `DeviceInfo` and
+# this flag is always False. The branch that every user on 2026.8+ actually
+# takes is only ever exercised with the flag patched, against our idea of the
+# API rather than the API. That is not a hypothetical: #489 shipped in 1.18.0
+# and 1.19.0 with NVR-bridged Video Edge cameras silently orphaned, through
+# fully green CI, because a device whose `hub_id` is its own id was handed
+# itself as its parent and only a real 2026.8 core rejects that.
+# So changes here are reasoned about, not merely tested. What guards them is an
+# invariant rather than a version: `TestNoDeviceIsEverItsOwnParent` asserts,
+# for every device family and both branches, that no via link ever points at
+# the device's own identity — and it fails if the #489 fix below is removed.
 _VIA_DEVICE_ID_SUPPORTED = "via_device_id" in (
     DeviceInfo.__required_keys__ | DeviceInfo.__optional_keys__
 )
