@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
+
+from custom_components.aegis_ajax.api.hts.hub_state import (
+    DIRECT_POWER_DEVICE_TYPES,
+    ELECTRICAL_DEVICE_TYPES,
+    HTS_TEMPERATURE_DEVICE_TYPES,
+)
 
 if TYPE_CHECKING:
     from custom_components.aegis_ajax.api.models import Device
@@ -22,6 +29,9 @@ class DeviceCapabilities:
     is_doorbell: bool = False
     is_button_press: bool = False
     has_siren_settings: bool = False
+    has_electrical_readings: bool = False
+    has_direct_power: bool = False
+    has_hts_temperature: bool = False
 
 
 class DeviceHandler(Protocol):
@@ -406,6 +416,32 @@ def get_device_handler(device_type: str) -> DeviceHandler:
     return _DEVICE_HANDLERS.get(device_type, _DEFAULT_HANDLER)
 
 
+# These three capabilities are deliberately NOT declared in `_HANDLERS`: the
+# fact each one encodes already lives in the HTS layer, and retyping the family
+# list here is exactly the drift this registry exists to remove.
+#
+# Which families report electrical readings is decided by the per-family sub-key
+# map in `api/hts/hub_state.py` — a family with no key map has nothing to read,
+# and a family added to the key map already carries everything its sensors need.
+# `DIRECT_POWER_DEVICE_TYPES` is the subset whose firmware reports instantaneous
+# power instead of leaving it to be derived, and `HTS_TEMPERATURE_DEVICE_TYPES`
+# is the set whose internal temperature has no gRPC source at all (see #229,
+# #269, #312). So the flags are derived from those tables: add a family there
+# and its sensor entities follow, with nothing to keep in step by hand.
+
+
 def capabilities_for(device: Device) -> DeviceCapabilities:
     """Return device capabilities for the given device."""
-    return get_device_handler(device.device_type).capabilities(device)
+    capabilities = get_device_handler(device.device_type).capabilities(device)
+    device_type = device.device_type
+    if device_type in ELECTRICAL_DEVICE_TYPES:
+        capabilities = dataclasses.replace(
+            capabilities,
+            has_electrical_readings=True,
+            # A subset of the electrical families: the rest leave `power_w`
+            # empty and get the derived-from-current sensor instead.
+            has_direct_power=device_type in DIRECT_POWER_DEVICE_TYPES,
+        )
+    if device_type in HTS_TEMPERATURE_DEVICE_TYPES:
+        capabilities = dataclasses.replace(capabilities, has_hts_temperature=True)
+    return capabilities

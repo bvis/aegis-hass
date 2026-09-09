@@ -188,3 +188,97 @@ class TestCapabilityParityWithConstSets:
         from custom_components.aegis_ajax.const import BUTTON_PRESS_DEVICE_TYPES
 
         assert self._types_with("is_button_press") == set(BUTTON_PRESS_DEVICE_TYPES)
+
+
+class TestHtsDerivedCapabilities:
+    """#332 PR-5: the sensor platform's three gates, derived from the HTS tables.
+
+    They are not declared in `_HANDLERS` on purpose — `api/hts/hub_state.py`
+    already decides which families have electrical readings and which have no
+    gRPC temperature — so what these tests pin is that the derivation happens
+    and that it adds nothing else.
+    """
+
+    @pytest.mark.parametrize(
+        "device_type",
+        ["wall_switch", "relay", "socket", "socket_outlet_type_e", "socket_outlet_type_f"],
+    )
+    def test_electrical_family_has_electrical_readings(self, device_type: str) -> None:
+        assert device_handlers.capabilities_for(_device(device_type)).has_electrical_readings
+
+    @pytest.mark.parametrize("device_type", ["socket_outlet_type_e", "socket_outlet_type_f"])
+    def test_outlet_reports_power_directly(self, device_type: str) -> None:
+        assert device_handlers.capabilities_for(_device(device_type)).has_direct_power
+
+    @pytest.mark.parametrize("device_type", ["wall_switch", "relay", "socket"])
+    def test_wallswitch_family_power_is_derived_not_direct(self, device_type: str) -> None:
+        capabilities = device_handlers.capabilities_for(_device(device_type))
+        assert capabilities.has_electrical_readings
+        assert not capabilities.has_direct_power
+
+    def test_direct_power_is_a_subset_of_electrical(self) -> None:
+        """`capabilities_for` only reaches `has_direct_power` inside the electrical branch."""
+        from custom_components.aegis_ajax.api.hts.hub_state import (
+            DIRECT_POWER_DEVICE_TYPES,
+            ELECTRICAL_DEVICE_TYPES,
+        )
+
+        assert DIRECT_POWER_DEVICE_TYPES <= ELECTRICAL_DEVICE_TYPES
+
+    @pytest.mark.parametrize(
+        "device_type",
+        ["street_siren", "motion_protect_outdoor", "motion_protect_curtain_outdoor_plus"],
+    )
+    def test_hts_temperature_family_is_flagged(self, device_type: str) -> None:
+        assert device_handlers.capabilities_for(_device(device_type)).has_hts_temperature
+
+    @pytest.mark.parametrize("device_type", ["door_protect", "keypad_combi", "motion_protect"])
+    def test_grpc_temperature_family_is_not_flagged(self, device_type: str) -> None:
+        """Families that already get temperature over gRPC must not gain the HTS gate."""
+        assert not device_handlers.capabilities_for(_device(device_type)).has_hts_temperature
+
+    def test_derivation_matches_the_hts_tables_exactly(self) -> None:
+        from custom_components.aegis_ajax.api.hts.hub_state import (
+            DIRECT_POWER_DEVICE_TYPES,
+            ELECTRICAL_DEVICE_TYPES,
+            HTS_TEMPERATURE_DEVICE_TYPES,
+        )
+
+        candidates = (
+            set(device_handlers._DEVICE_HANDLERS)
+            | set(ELECTRICAL_DEVICE_TYPES)
+            | set(HTS_TEMPERATURE_DEVICE_TYPES)
+        )
+        electrical = set()
+        direct = set()
+        hts_temperature = set()
+        for device_type in candidates:
+            capabilities = device_handlers.capabilities_for(_device(device_type))
+            if capabilities.has_electrical_readings:
+                electrical.add(device_type)
+            if capabilities.has_direct_power:
+                direct.add(device_type)
+            if capabilities.has_hts_temperature:
+                hts_temperature.add(device_type)
+        assert electrical == set(ELECTRICAL_DEVICE_TYPES)
+        assert direct == set(DIRECT_POWER_DEVICE_TYPES)
+        assert hts_temperature == set(HTS_TEMPERATURE_DEVICE_TYPES)
+
+    @pytest.mark.parametrize(
+        "device_type", ["wall_switch", "socket_outlet_type_e", "street_siren", "door_protect"]
+    )
+    def test_derivation_does_not_disturb_the_declared_capabilities(self, device_type: str) -> None:
+        """The derived flags are added on top; nothing declared may change."""
+        declared = device_handlers.get_device_handler(device_type).capabilities(
+            _device(device_type)
+        )
+        derived = device_handlers.capabilities_for(_device(device_type))
+        assert derived.binary_sensor_keys == declared.binary_sensor_keys
+        assert derived.is_lock == declared.is_lock
+        assert derived.is_camera == declared.is_camera
+        assert derived.is_phod == declared.is_phod
+        assert derived.is_light == declared.is_light
+        assert derived.is_valve == declared.is_valve
+        assert derived.is_doorbell == declared.is_doorbell
+        assert derived.is_button_press == declared.is_button_press
+        assert derived.has_siren_settings == declared.has_siren_settings

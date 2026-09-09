@@ -23,13 +23,9 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.aegis_ajax.api.hts.hub_state import (
-    DIRECT_POWER_DEVICE_TYPES,
-    ELECTRICAL_DEVICE_TYPES,
-    HTS_TEMPERATURE_DEVICE_TYPES,
-)
 from custom_components.aegis_ajax.api.models import MonitoringCompanyStatus
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import build_device_info
 
 # Fallback voltage used to derive instantaneous power when the device
@@ -146,7 +142,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
 
     def _should_create_status_sensor(device: Device, key: str) -> bool:
-        if key == "temperature" and device.device_type in HTS_TEMPERATURE_DEVICE_TYPES:
+        if key == "temperature" and capabilities_for(device).has_hts_temperature:
             return True
         return key in device.statuses
 
@@ -201,11 +197,12 @@ async def async_setup_entry(
     # and Outlet Type E / F (#179, calibrated in 1.5.3-beta.11).
     _remove_orphan_outlet_power_derived(hass, coordinator)
     for device_id, device in coordinator.devices.items():
-        if device.device_type in ELECTRICAL_DEVICE_TYPES:
+        capabilities = capabilities_for(device)
+        if capabilities.has_electrical_readings:
             entities.append(AjaxDeviceCurrentSensor(coordinator, device_id))
             entities.append(AjaxDeviceVoltageSensor(coordinator, device_id))
             entities.append(AjaxDeviceEnergyConsumedSensor(coordinator, device_id))
-            if device.device_type in DIRECT_POWER_DEVICE_TYPES:
+            if capabilities.has_direct_power:
                 entities.append(AjaxDevicePowerSensor(coordinator, device_id))
             else:
                 entities.append(AjaxDeviceDerivedPowerSensor(coordinator, device_id))
@@ -220,14 +217,14 @@ def _remove_orphan_outlet_power_derived(
 
     Between `1.4.0` (when the WallSwitch family's derived-power entity
     first shipped) and `1.5.3-beta.1` (when the Outlet was excluded
-    from `ELECTRICAL_DEVICE_TYPES` while we figured out its sub-key
+    from the electrical-readings key map while we figured out its sub-key
     map), users on Outlets got a `_power_derived` entity registered
     with WallSwitch-shaped (and incorrect) parsing behind it. From
     `1.5.3-beta.11` the Outlet emits a real `_power` sensor instead;
     the legacy `_power_derived` lingers in the entity registry as
     `unavailable` until the user deletes it by hand. This helper
     sweeps the registry once per setup and removes it cleanly.
-    Touches only devices currently in `DIRECT_POWER_DEVICE_TYPES`;
+    Touches only devices whose `has_direct_power` capability is set;
     WallSwitch family's own `_power_derived` is untouched.
     """
     from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
@@ -235,7 +232,7 @@ def _remove_orphan_outlet_power_derived(
     registry = er.async_get(hass)
     removed = 0
     for device_id, device in coordinator.devices.items():
-        if device.device_type not in DIRECT_POWER_DEVICE_TYPES:
+        if not capabilities_for(device).has_direct_power:
             continue
         unique_id = f"aegis_ajax_{device_id}_power_derived"
         entity_id = registry.async_get_entity_id("sensor", "aegis_ajax", unique_id)

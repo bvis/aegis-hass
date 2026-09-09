@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from custom_components.aegis_ajax.api.hts.hub_state import (
+    DIRECT_POWER_DEVICE_TYPES,
+    ELECTRICAL_DEVICE_TYPES,
     HTS_TEMPERATURE_DEVICE_TYPES,
     HubNetworkState,
 )
@@ -1232,3 +1234,89 @@ class TestTemperatureSensorCreationGate:
         assert "aegis_ajax_s1_humidity" not in unique_ids
         assert "aegis_ajax_s1_co2" not in unique_ids
         assert "aegis_ajax_s1_signal_strength" not in unique_ids
+
+
+class TestElectricalSensorCreationGate:
+    """Which families grow the electrical sensors, and which power entity they get.
+
+    This gate had no test at all before #332 PR-5: deleting the condition
+    outright left the whole suite green, so a refactor could have dropped every
+    WallSwitch / Socket / Outlet electrical entity on a live install without CI
+    noticing. The families come from the HTS sub-key map, so sweeping the set
+    keeps a family added there covered without anyone extending a list here.
+    """
+
+    @staticmethod
+    def _make_device(device_id: str, device_type: str) -> Device:
+        return Device(
+            id=device_id,
+            hub_id="hub-1",
+            name=f"Device {device_id}",
+            device_type=device_type,
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+
+    @staticmethod
+    async def _setup(devices: dict[str, Device]) -> list:
+        from custom_components.aegis_ajax.sensor import async_setup_entry
+
+        coordinator = MagicMock()
+        coordinator.devices = devices
+        coordinator.rooms = {}
+        coordinator.spaces = {}
+        coordinator.sim_info = {}
+
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+
+        with patch("custom_components.aegis_ajax.sensor._remove_orphan_outlet_power_derived"):
+            await async_setup_entry(MagicMock(), entry, added.extend)
+        return added
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("device_type", sorted(ELECTRICAL_DEVICE_TYPES))
+    async def test_every_electrical_family_gets_the_three_readings(self, device_type: str) -> None:
+        added = await self._setup({"e1": self._make_device("e1", device_type)})
+
+        unique_ids = {e.unique_id for e in added}
+        assert "aegis_ajax_e1_current" in unique_ids
+        assert "aegis_ajax_e1_voltage" in unique_ids
+        assert "aegis_ajax_e1_energy_consumed" in unique_ids
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("device_type", sorted(DIRECT_POWER_DEVICE_TYPES))
+    async def test_direct_power_family_gets_a_real_power_sensor(self, device_type: str) -> None:
+        """The Outlet reports `power_w`, so it must not get the derived placeholder."""
+        added = await self._setup({"e1": self._make_device("e1", device_type)})
+
+        unique_ids = {e.unique_id for e in added}
+        assert "aegis_ajax_e1_power" in unique_ids
+        assert "aegis_ajax_e1_power_derived" not in unique_ids
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "device_type", sorted(ELECTRICAL_DEVICE_TYPES - DIRECT_POWER_DEVICE_TYPES)
+    )
+    async def test_wallswitch_family_gets_the_derived_power_sensor(self, device_type: str) -> None:
+        """No `power_w` in the firmware's readings, so power is current × voltage."""
+        added = await self._setup({"e1": self._make_device("e1", device_type)})
+
+        unique_ids = {e.unique_id for e in added}
+        assert "aegis_ajax_e1_power_derived" in unique_ids
+        assert "aegis_ajax_e1_power" not in unique_ids
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("device_type", ["door_protect", "home_siren", "light_switch_dimmer"])
+    async def test_non_electrical_family_gets_no_electrical_sensors(self, device_type: str) -> None:
+        added = await self._setup({"d1": self._make_device("d1", device_type)})
+
+        unique_ids = {e.unique_id for e in added}
+        for suffix in ("current", "voltage", "energy_consumed", "power", "power_derived"):
+            assert f"aegis_ajax_d1_{suffix}" not in unique_ids
