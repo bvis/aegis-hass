@@ -584,7 +584,9 @@ If you cannot obtain a coherent set, leaving FCM unconfigured is a fully support
 
 ## Translations
 
-The integration is available in 14 languages: English, Spanish, Catalan, German, French, Italian, Dutch, Polish, Portuguese, Brazilian Portuguese, Romanian, Turkish, Ukrainian, and Czech.
+The integration is available in 15 languages: English, Spanish, Catalan, German, French, Italian, Dutch, Polish, Portuguese, Brazilian Portuguese, Romanian, Turkish, Ukrainian, Czech, and Danish.
+
+Not all of them were written by native speakers. Some locales, or parts of them, were produced with non-human translation systems and then checked against the vocabulary already in the file, not against a native ear. Contributors have since reviewed or rewritten several languages (Italian, Dutch, Ukrainian, Danish and Spanish among them), but the rest may still read stiffly or use a term the Ajax app itself renders differently. If something in your language is wrong, awkward, or not what the Ajax app says, please tell us: open an issue quoting the string and the wording you would expect, or send a pull request that touches only `custom_components/aegis_ajax/translations/<lang>.json`. Values only, keys unchanged; a test pins key parity with `strings.json`, so a stray key edit fails CI rather than breaking the UI. Corrections to a single string are as welcome as a full review.
 
 ## Support
 
