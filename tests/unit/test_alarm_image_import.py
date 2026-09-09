@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 
@@ -60,6 +61,9 @@ class TestAlarmImageImport:
             )
         )
         coordinator._imported_alarm_notification_ids = set()
+        coordinator._alarm_import_lock = asyncio.Lock()
+        coordinator.photo_revisions = {}
+        coordinator.last_photo_urls = {}
         coordinator.devices = {"camera": _camera()}
         coordinator._async_download_and_save_alarm_image = AsyncMock(
             side_effect=[Path("older-a.jpg"), Path("older-b.jpg"), Path("newer.jpg")]
@@ -69,7 +73,7 @@ class TestAlarmImageImport:
 
         with patch(
             "custom_components.aegis_ajax.coordinator.save_alarm_contact_sheet",
-            new=AsyncMock(),
+            new=AsyncMock(return_value=Path("last.jpg")),
         ) as contact_sheet:
             result = await coordinator.async_import_alarm_images("space")
 
@@ -102,13 +106,20 @@ class TestAlarmImageImport:
                 coordinator.hass,
                 "Hall camera",
                 [Path("older-a.jpg"), Path("older-b.jpg")],
+                captured_at=dt_util.utc_from_timestamp(10),
             ),
-            call(coordinator.hass, "Hall camera", [Path("newer.jpg")]),
+            call(
+                coordinator.hass,
+                "Hall camera",
+                [Path("newer.jpg")],
+                captured_at=dt_util.utc_from_timestamp(20),
+            ),
         ]
+        assert coordinator.photo_revisions == {"camera": 2}
         coordinator.async_update_listeners.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_download_saves_trusted_image_and_updates_camera_revision(self) -> None:
+    async def test_download_saves_trusted_image_without_publishing_revision(self) -> None:
         coordinator = object.__new__(AjaxCobrandedCoordinator)
         coordinator.hass = MagicMock()
         coordinator.photo_revisions = {}
@@ -146,4 +157,4 @@ class TestAlarmImageImport:
             filename=None,
             update_last=True,
         )
-        assert coordinator.photo_revisions == {"camera": 1}
+        assert coordinator.photo_revisions == {}

@@ -504,6 +504,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # An alarm push can arrive before Ajax has uploaded every frame. Keep
         # one short-lived retry task per notification rather than polling media.
         self._alarm_import_tasks: dict[str, asyncio.Task[None]] = {}
+        self._alarm_import_lock = asyncio.Lock()
         # space_id -> (expiry_time, security_state)
         self._optimistic_space_states: dict[str, tuple[float, Any]] = {}
         # Spaces with an intrusion alarm push not yet acknowledged by an
@@ -703,6 +704,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         This runs from the manual service and, for a single notification, from
         a delayed FCM alarm callback. It never runs in the periodic poll.
         """
+        # Manual backfill and FCM callbacks may overlap. Serialize publication
+        # and deduplication so they cannot write the same album concurrently.
+        async with self._alarm_import_lock:
+            return await self._async_import_alarm_images(
+                space_id, notification_ids=notification_ids
+            )
+
+    async def _async_import_alarm_images(
+        self,
+        space_id: str,
+        *,
+        notification_ids: Collection[str] | None = None,
+    ) -> dict[str, int]:
+        """Import albums while holding the alarm import lock."""
         camera_device_ids = {
             device_id
             for device_id, device in self.devices.items()
@@ -716,9 +731,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         imported_notifications = 0
         imported_images = 0
 
-        # The server normally returns newest first. Sorting by server time
-        # makes `last.jpg` deterministic even if that order changes: the most
-        # recent alarm for a camera becomes the image its Camera entity shows.
+        # Process oldest first; storage also compares capture times with the
+        # persisted preview to protect newer alarms and PhOD across imports.
         for alarm in sorted(alarm_media, key=lambda item: item.timestamp):
             if alarm.notification_id in self._imported_alarm_notification_ids:
                 continue
@@ -729,8 +743,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             saved_images = 0
             saved_photo_paths: list[Path] = []
             captured_at = dt_util.utc_from_timestamp(alarm.timestamp) if alarm.timestamp else None
-            album_name = (
-                (captured_at or dt_util.now()).astimezone().strftime("%Y-%m-%d_%H-%M-%S-%f")
+            album_name = dt_util.as_local(captured_at or dt_util.now()).strftime(
+                "%Y-%m-%d_%H-%M-%S-%f"
             )
             for image_index, image_url in enumerate(alarm.image_urls, start=1):
                 saved_path = await self._async_download_and_save_alarm_image(
@@ -744,8 +758,18 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     saved_images += 1
                     saved_photo_paths.append(saved_path)
 
-            if saved_images:
-                await save_alarm_contact_sheet(self.hass, device.name, saved_photo_paths)
+            if saved_images and saved_images == len(alarm.image_urls):
+                preview = await save_alarm_contact_sheet(
+                    self.hass, device.name, saved_photo_paths, captured_at=captured_at
+                )
+                if preview is None:
+                    continue
+                # Publish the revision only after the complete preview exists.
+                # Otherwise a camera request can cache the old file under the
+                # new revision while composition is still in the executor.
+                self.photo_revisions[device.id] = self.photo_revisions.get(device.id, 0) + 1
+                if preview.name == "last.jpg":
+                    self.last_photo_urls.pop(device.id, None)
                 self._imported_alarm_notification_ids.add(alarm.notification_id)
                 imported_notifications += 1
                 imported_images += saved_images
@@ -800,7 +824,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if saved_path is None:
             return None
 
-        self.photo_revisions[device.id] = self.photo_revisions.get(device.id, 0) + 1
         return saved_path
 
     def schedule_alarm_image_import(self, space_id: str, notification_id: str) -> None:

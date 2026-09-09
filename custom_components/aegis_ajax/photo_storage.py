@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import os
 import shutil
 import time
 from math import ceil, sqrt
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING
 
 from homeassistant.util import dt as dt_util
@@ -24,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 PHOTOS_BASE_DIR = "ajax_photos"
 _CONTACT_SHEET_GAP = 4
 _CONTACT_SHEET_MAX_CELL_SIZE = (640, 480)
+_LATEST_PHOTO_LOCK = Lock()
 
 
 def _sanitize_name(name: str) -> str:
@@ -39,7 +42,7 @@ def _overlay_timestamp(image_bytes: bytes, captured_at: datetime | None = None) 
         img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
-        timestamp = (captured_at or dt_util.now()).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = dt_util.as_local(captured_at or dt_util.now()).strftime("%Y-%m-%d %H:%M:%S")
         font = ImageFont.load_default(size=11)
 
         text_bbox = draw.textbbox((0, 0), timestamp, font=font)
@@ -63,6 +66,28 @@ def _overlay_timestamp(image_bytes: bytes, captured_at: datetime | None = None) 
         return image_bytes
 
 
+def _publish_latest_photo(device_dir: Path, image: bytes, captured_at: datetime) -> bool:
+    """Atomically publish a preview only if it is not older than the current one.
+
+    Persist capture time in last.jpg's mtime, including for PhOD. Comparison
+    survives restart and is serialized across executor threads. Legacy files
+    without a capture mtime conservatively retain their original write time.
+    """
+    timestamp = captured_at.timestamp()
+    last_path = device_dir / "last.jpg"
+    with _LATEST_PHOTO_LOCK:
+        if last_path.exists() and last_path.stat().st_mtime > timestamp:
+            return False
+        pending = device_dir / ".last.jpg.tmp"
+        try:
+            pending.write_bytes(image)
+            os.utime(pending, (timestamp, timestamp))
+            pending.replace(last_path)
+        finally:
+            pending.unlink(missing_ok=True)
+    return True
+
+
 async def save_photo(
     hass: HomeAssistant,
     image_bytes: bytes,
@@ -75,6 +100,7 @@ async def save_photo(
     update_last: bool = True,
 ) -> Path | None:
     """Save a photo with its capture time overlay to the media directory."""
+    photo_time = captured_at or dt_util.now()
 
     def _do_save() -> Path | None:
         try:
@@ -94,8 +120,7 @@ async def save_photo(
             # On-demand images remain the Camera's latest single image. Alarm
             # imports set the preview only after all sequence frames are saved.
             if update_last:
-                last_path = device_dir / "last.jpg"
-                last_path.write_bytes(stamped)
+                _publish_latest_photo(device_dir, stamped, photo_time)
 
             return filepath
         except Exception:
@@ -109,6 +134,8 @@ async def save_alarm_contact_sheet(
     hass: HomeAssistant,
     device_name: str,
     photo_paths: Sequence[Path],
+    *,
+    captured_at: datetime | None = None,
 ) -> Path | None:
     """Compose one alarm's frames into the Camera entity's `last.jpg`.
 
@@ -116,6 +143,7 @@ async def save_alarm_contact_sheet(
     can only return one image, so the contact sheet exposes the full sequence
     in a native HA camera card.
     """
+    photo_time = captured_at or dt_util.now()
 
     def _do_save() -> Path | None:
         try:
@@ -130,6 +158,7 @@ async def save_alarm_contact_sheet(
                         frames.append(frame)
                 except Exception:
                     _LOGGER.debug("Could not include alarm frame in contact sheet", exc_info=True)
+                    return None
 
             if not frames:
                 return None
@@ -143,8 +172,10 @@ async def save_alarm_contact_sheet(
             # camera image instead of being needlessly recompressed.
             if len(frames) == 1:
                 shutil.copyfile(photo_paths[0], album_preview)
-                shutil.copyfile(photo_paths[0], last_path)
-                return last_path
+                published = _publish_latest_photo(
+                    device_dir, album_preview.read_bytes(), photo_time
+                )
+                return last_path if published else album_preview
 
             columns = ceil(sqrt(len(frames)))
             rows = ceil(len(frames) / columns)
@@ -163,9 +194,9 @@ async def save_alarm_contact_sheet(
                 contact_sheet.paste(frame, (x, y))
 
             contact_sheet.save(album_preview, format="JPEG", quality=90)
-            contact_sheet.save(last_path, format="JPEG", quality=90)
+            published = _publish_latest_photo(device_dir, album_preview.read_bytes(), photo_time)
             _LOGGER.debug("Saved %d-frame alarm contact sheet: %s", len(frames), last_path)
-            return last_path
+            return last_path if published else album_preview
         except Exception:
             _LOGGER.debug("Could not save alarm contact sheet", exc_info=True)
             return None

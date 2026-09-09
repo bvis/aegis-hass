@@ -14,6 +14,9 @@ from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notifica
     folder_pb2,
     origin_id_pb2,
 )
+from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification.hub.media import (  # noqa: E501
+    image_status_pb2,
+)
 from systems.ajax.api.mobile.v2.notificationlog import (
     find_notifications_pb2,
     notification_log_endpoints_pb2_grpc,
@@ -51,10 +54,16 @@ class _MediaAsset(Protocol):
     url: str
 
 
+class _HubImage(_MediaAsset, Protocol):
+    """Hub photos carry a per-frame upload status."""
+
+    status: int
+
+
 class _HubNotificationMedia(Protocol):
     """Relevant subset of the generated HubNotificationMedia protobuf."""
 
-    images: Sequence[_MediaAsset]
+    images: Sequence[_HubImage]
 
 
 class _VideoFramesMedia(Protocol):
@@ -69,7 +78,7 @@ class _NotificationMedia(Protocol):
     hub_notification_media: _HubNotificationMedia
     video_frames_media: _VideoFramesMedia
 
-    def WhichOneof(self, oneof_group: str) -> str | None: ...  # noqa: N802
+    def WhichOneof(self, _oneof_group: str, /) -> str | None: ...  # noqa: N802
 
 
 class _StreamNotificationMediaSuccess(Protocol):
@@ -83,7 +92,7 @@ class _StreamNotificationMediaResponse(Protocol):
 
     success: _StreamNotificationMediaSuccess
 
-    def WhichOneof(self, oneof_group: str) -> str | None: ...  # noqa: N802
+    def WhichOneof(self, _oneof_group: str, /) -> str | None: ...  # noqa: N802
 
 
 class _NotificationMediaStream(Protocol):
@@ -116,10 +125,24 @@ def is_valid_photo_url(url: str) -> bool:
 
 
 def _photo_urls_from_media(media: _NotificationMedia) -> tuple[str, ...]:
-    """Extract ready image/frame URLs from a notification-media payload."""
+    """Extract a complete sequence, waiting for every pending hub frame.
+
+    Failed frames are terminal and cannot be downloaded. An empty result for
+    an unfinished sequence keeps the stream/retry active instead of silently
+    treating the first ready frame as the whole alarm.
+    """
     content = media.WhichOneof("content")
     if content == "hub_notification_media":
-        return tuple(image.url for image in media.hub_notification_media.images if image.url)
+        images = media.hub_notification_media.images
+        if any(
+            image.status != image_status_pb2.IMAGE_STATUS_FAILED
+            and (image.status != image_status_pb2.IMAGE_STATUS_READY or not image.url)
+            for image in images
+        ):
+            return ()
+        return tuple(
+            image.url for image in images if image.status == image_status_pb2.IMAGE_STATUS_READY
+        )
     if content == "video_frames_media":
         return tuple(frame.url for frame in media.video_frames_media.frames if frame.url)
     return ()
@@ -173,8 +196,8 @@ class MediaApi:
     ) -> tuple[AlarmMedia, ...]:
         """Return recent alarm images for one space.
 
-        Notification history is a server-side log, separate from FCM.  It is
-        It is queried by the explicit user service or for one notification
+        Notification history is a server-side log, separate from FCM. It is
+        queried by the explicit user service or for one notification
         selected by an FCM alarm push; it is never part of the periodic update
         loop.
         """
@@ -277,11 +300,10 @@ class MediaApi:
             async for response in stream:
                 if response.WhichOneof("response") != "success":
                     return ()
-                return tuple(
-                    url
-                    for url in _photo_urls_from_media(response.success.media)
-                    if is_valid_photo_url(url)
-                )
+                urls = _photo_urls_from_media(response.success.media)
+                if urls:
+                    # Never turn a rejected frame into a successful partial album.
+                    return urls if all(is_valid_photo_url(url) for url in urls) else ()
         except Exception:
             # `not_found` and expired assets are normal for old notifications;
             # do not make one unavailable item abort the import.

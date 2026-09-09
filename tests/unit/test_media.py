@@ -84,6 +84,8 @@ class TestNotificationMedia:
         media = media_pb2.NotificationMedia()
         media.hub_notification_media.images.add().url = "https://example.ajax.systems/one.jpg"
         media.hub_notification_media.images.add().url = "https://example.ajax.systems/two.jpg"
+        for image in media.hub_notification_media.images:
+            image.status = 2
 
         assert _photo_urls_from_media(media) == (
             "https://example.ajax.systems/one.jpg",
@@ -118,6 +120,7 @@ class TestAlarmHistory:
         response.success.media.hub_notification_media.images.add().url = (
             "https://hubs-uploaded-resources.s3.amazonaws.com/image.jpg"
         )
+        response.success.media.hub_notification_media.images[0].status = 2
         return response
 
     @pytest.mark.asyncio

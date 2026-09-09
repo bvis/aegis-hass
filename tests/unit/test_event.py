@@ -358,7 +358,7 @@ class TestNotificationEventParsing:
         encoded = base64.b64encode(b"\x0a\x02\x08\x01").decode()
         listener._on_notification({"ENCODED_DATA": encoded}, "pid-1")
 
-        listener._parse_and_fire_event.assert_called_once_with(encoded)
+        listener._parse_and_fire_event.assert_called_once_with(encoded, notification_id=None)
 
     def test_extract_event_raw_returns_none(self) -> None:
         from custom_components.aegis_ajax.notification import AjaxNotificationListener
