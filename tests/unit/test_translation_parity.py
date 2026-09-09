@@ -34,7 +34,10 @@ def _load(path: Path) -> set[str]:
 
 
 def test_the_expected_locales_are_present() -> None:
-    assert len(LOCALES) == 14, LOCALES
+    # 14 + Danish (#488). The count is asserted rather than derived so that a
+    # locale file vanishing from the directory fails loudly instead of the
+    # parametrised tests below quietly having one fewer case to run.
+    assert len(LOCALES) == 15, LOCALES
 
 
 @pytest.mark.parametrize("locale", LOCALES)
