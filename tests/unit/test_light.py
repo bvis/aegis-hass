@@ -6,12 +6,43 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.aegis_ajax.light import LIGHT_DEVICE_TYPES, AjaxLight
+from custom_components.aegis_ajax.api.models import Device
+from custom_components.aegis_ajax.const import DeviceState
+from custom_components.aegis_ajax.light import AjaxLight, async_setup_entry
 
 
-class TestLightDeviceTypes:
-    def test_dimmer_is_light(self) -> None:
-        assert "light_switch_dimmer" in LIGHT_DEVICE_TYPES
+def _device(device_id: str, device_type: str) -> Device:
+    return Device(
+        id=device_id,
+        hub_id="h1",
+        name="Device",
+        device_type=device_type,
+        room_id=None,
+        group_id=None,
+        state=DeviceState.ONLINE,
+        malfunctions=0,
+        bypassed=False,
+        statuses={},
+        battery=None,
+    )
+
+
+class TestLightSetup:
+    @pytest.mark.asyncio
+    async def test_setup_adds_only_the_light_capability(self) -> None:
+        coordinator = MagicMock()
+        coordinator.devices = {
+            "dimmer": _device("dimmer", "light_switch_dimmer"),
+            "not-a-light": _device("not-a-light", "door_protect"),
+        }
+        coordinator.rooms = {}
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+
+        await async_setup_entry(MagicMock(), entry, lambda new: added.extend(new))
+
+        assert [entity._device_id for entity in added] == ["dimmer"]
 
 
 class TestAjaxLight:

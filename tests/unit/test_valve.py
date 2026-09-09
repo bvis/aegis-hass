@@ -13,7 +13,7 @@ from custom_components.aegis_ajax.const import (
     DeviceState,
     SecurityState,
 )
-from custom_components.aegis_ajax.valve import VALVE_DEVICE_TYPES, AjaxValve
+from custom_components.aegis_ajax.valve import AjaxValve, async_setup_entry
 
 
 def _make_device(device_type: str = "water_stop", **status_overrides: Any) -> Device:  # noqa: ANN401
@@ -53,14 +53,29 @@ def _make_coordinator(device: Device) -> MagicMock:
     return coordinator
 
 
-class TestValveDeviceTypes:
-    def test_water_stop_in_valve_types(self) -> None:
-        assert "water_stop" in VALVE_DEVICE_TYPES
+class TestValveSetup:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("device_type", ["water_stop", "water_stop_base"])
+    async def test_setup_adds_a_valve_for_both_water_stop_buckets(self, device_type: str) -> None:
+        device = _make_device(device_type=device_type)
+        entry = MagicMock()
+        entry.runtime_data = _make_coordinator(device)
+        added: list = []
 
-    def test_water_stop_base_in_valve_types(self) -> None:
-        # `water_stop_base` is the Fibra (wired) sibling — same channel
-        # status shape, same parser path, must surface a valve entity too.
-        assert "water_stop_base" in VALVE_DEVICE_TYPES
+        await async_setup_entry(MagicMock(), entry, lambda new: added.extend(new))
+
+        assert [entity._device_id for entity in added] == [device.id]
+
+    @pytest.mark.asyncio
+    async def test_setup_skips_a_family_without_the_valve_capability(self) -> None:
+        device = _make_device(device_type="life_quality")
+        entry = MagicMock()
+        entry.runtime_data = _make_coordinator(device)
+        added: list = []
+
+        await async_setup_entry(MagicMock(), entry, lambda new: added.extend(new))
+
+        assert added == []
 
 
 class TestAjaxValveState:

@@ -17,6 +17,11 @@ class DeviceCapabilities:
     is_lock: bool = False
     is_camera: bool = False
     is_phod: bool = False
+    is_light: bool = False
+    is_valve: bool = False
+    is_doorbell: bool = False
+    is_button_press: bool = False
+    has_siren_settings: bool = False
 
 
 class DeviceHandler(Protocol):
@@ -40,6 +45,11 @@ class StaticDeviceHandler:
         is_lock: bool = False,
         is_camera: bool = False,
         is_phod: bool = False,
+        is_light: bool = False,
+        is_valve: bool = False,
+        is_doorbell: bool = False,
+        is_button_press: bool = False,
+        has_siren_settings: bool = False,
     ) -> None:
         self.device_types = frozenset(device_types)
         self._capabilities = DeviceCapabilities(
@@ -47,6 +57,11 @@ class StaticDeviceHandler:
             is_lock=is_lock,
             is_camera=is_camera,
             is_phod=is_phod,
+            is_light=is_light,
+            is_valve=is_valve,
+            is_doorbell=is_doorbell,
+            is_button_press=is_button_press,
+            has_siren_settings=has_siren_settings,
         )
 
     def capabilities(self, device: Device) -> DeviceCapabilities:
@@ -142,22 +157,34 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "motion_cam_s_phod_am",
             "motion_cam_superior_phod",
             "motion_cam_video_base",
-            "motion_cam_video_doorbell",
             "motion_cam_video_indoor",
         ),
         ("motion_detected", "tamper", "delay_when_leaving"),
+    ),
+    # Split out of the group above only to carry `is_doorbell`; the binary
+    # sensors are identical.
+    StaticDeviceHandler(
+        ("motion_cam_video_doorbell",),
+        ("motion_detected", "tamper", "delay_when_leaving"),
+        is_doorbell=True,
     ),
     # VideoEdge
     StaticDeviceHandler(
         (
             "video_edge_bullet",
-            "video_edge_doorbell",
             "video_edge_indoor",
             "video_edge_minidome",
             "video_edge_turret",
             "video_edge_unknown",
         ),
         ("motion_detected", "tamper"),
+    ),
+    # Split out of the group above only to carry `is_doorbell`; the binary
+    # sensors are identical.
+    StaticDeviceHandler(
+        ("video_edge_doorbell",),
+        ("motion_detected", "tamper"),
+        is_doorbell=True,
     ),
     # CombiProtect
     StaticDeviceHandler(
@@ -240,7 +267,6 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "home_siren_fibra",
             "home_siren_g3",
             "street_siren",
-            "street_siren_plus",
             "street_siren_fibra",
             "street_siren_plus_fibra",
             "street_siren_plus_g3",
@@ -249,6 +275,15 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "street_siren_s_double_deck",
             "street_siren_double_deck_fibra",
         ),
+        ("tamper",),
+        has_siren_settings=True,
+    ),
+    # `street_siren_plus` is a siren, but its oneof case is missing from the
+    # HubDevice proto, so its settings are unreadable and `number` / `select`
+    # would sit permanently empty. Same binary sensors, no settings entities —
+    # see SIREN_DEVICE_TYPES in const.py.
+    StaticDeviceHandler(
+        ("street_siren_plus",),
         ("tamper",),
     ),
     # ReX / ReX 2 / LifeQuality / WaterStop — explicit no-capability handlers (#332)
@@ -260,10 +295,16 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "range_extender_2",
             "life_quality",
             "life_quality_plus",
-            "water_stop",
-            "water_stop_base",
         ),
         (),
+    ),
+    # WaterStop — no binary sensors, one valve entity. Ajax ships two buckets,
+    # `water_stop` (Jeweller, wireless) and `water_stop_base` (Fibra, wired):
+    # same `WaterStopChannel` payload, same parser path, same entity surface.
+    StaticDeviceHandler(
+        ("water_stop", "water_stop_base"),
+        (),
+        is_valve=True,
     ),
     StaticDeviceHandler(
         ("range_extender_2_fire",),
@@ -287,6 +328,21 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
     StaticDeviceHandler(
         ("wire_input_mt",),
         ("tamper", "wire_input_alert", "external_contact_open"),
+    ),
+    # LightSwitch dimmer — previously unmapped, so it fell through to the
+    # tamper-only default. Registered with that same tamper-only set so the
+    # binary sensors do not move; the registration exists to carry `is_light`.
+    StaticDeviceHandler(
+        ("light_switch_dimmer",),
+        ("tamper",),
+        is_light=True,
+    ),
+    # Button — previously unmapped, same tamper-only default preserved; the
+    # registration exists to carry `is_button_press`.
+    StaticDeviceHandler(
+        ("button",),
+        ("tamper",),
+        is_button_press=True,
     ),
     # Keypads
     StaticDeviceHandler(

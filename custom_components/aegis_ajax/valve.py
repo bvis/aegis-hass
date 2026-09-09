@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
 if TYPE_CHECKING:
@@ -35,11 +36,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Ajax catalog ships two WaterStop buckets — `water_stop` (Jeweller, the
-# default wireless variant) and `water_stop_base` (Fibra, wired). Same
-# `WaterStopChannel` payload, same parser path, same entity surface.
-VALVE_DEVICE_TYPES: frozenset[str] = frozenset({"water_stop", "water_stop_base"})
-
 # The WaterStop exposes a single valve channel; on/off commands target it.
 _VALVE_CHANNEL = 1
 
@@ -50,7 +46,7 @@ async def async_setup_entry(
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
     entities: list[AjaxValve] = []
     for device_id, device in coordinator.devices.items():
-        if device.device_type in VALVE_DEVICE_TYPES:
+        if capabilities_for(device).is_valve:
             entities.append(AjaxValve(coordinator=coordinator, device_id=device_id))
     async_add_entities(entities)
 

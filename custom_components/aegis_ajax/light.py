@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
 if TYPE_CHECKING:
@@ -25,8 +26,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-LIGHT_DEVICE_TYPES = {"light_switch_dimmer"}
-
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -34,7 +33,7 @@ async def async_setup_entry(
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
     entities: list[AjaxLight] = []
     for device_id, device in coordinator.devices.items():
-        if device.device_type in LIGHT_DEVICE_TYPES:
+        if capabilities_for(device).is_light:
             entities.append(
                 AjaxLight(
                     coordinator=coordinator,

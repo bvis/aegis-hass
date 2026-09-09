@@ -11,15 +11,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.const import (
     ALL_EVENT_TYPES,
-    BUTTON_PRESS_DEVICE_TYPES,
     BUTTON_PRESS_EVENT_TYPE,
     DOMAIN,
-    DOORBELL_DEVICE_TYPES,
     DOORBELL_EVENT_TYPE,
     DOORBELL_RING_EVENT_TYPE,
     MANUFACTURER,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
@@ -41,12 +40,12 @@ async def async_setup_entry(
     doorbell_entities = [
         AjaxDoorbellEvent(coordinator=coordinator, device_id=device_id)
         for device_id, device in coordinator.devices.items()
-        if device.device_type in DOORBELL_DEVICE_TYPES
+        if capabilities_for(device).is_doorbell
     ]
     button_entities = [
         AjaxButtonPressEvent(coordinator=coordinator, device_id=device_id)
         for device_id, device in coordinator.devices.items()
-        if device.device_type in BUTTON_PRESS_DEVICE_TYPES
+        if capabilities_for(device).is_button_press
     ]
     async_add_entities([*entities, *doorbell_entities, *button_entities])
     for entity in entities:
