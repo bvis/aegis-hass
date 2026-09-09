@@ -956,7 +956,7 @@ class AjaxNotificationListener:
 
         # Parse event from ENCODED_DATA using compiled protos
         if encoded_data:
-            self._parse_and_fire_event(encoded_data)
+            self._parse_and_fire_event(encoded_data, notification_id=notif_id)
 
         # Always trigger refresh
         if self._hass.loop and self._hass.loop.is_running():
@@ -1121,7 +1121,9 @@ class AjaxNotificationListener:
     def extract_notification_id(encoded_data: str) -> str | None:
         return notification_event_parser.extract_notification_id(encoded_data)
 
-    def _parse_and_fire_event(self, encoded_data: str) -> None:
+    def _parse_and_fire_event(
+        self, encoded_data: str, *, notification_id: str | None = None
+    ) -> None:
         """Parse event from base64-encoded push notification data."""
         try:
             raw = base64.b64decode(encoded_data)
@@ -1178,6 +1180,12 @@ class AjaxNotificationListener:
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, target_space, event_type, event_data
                     )
+                    if event_type == "alarm" and notification_id:
+                        self._dispatch_to_loop(
+                            self._coordinator.schedule_alarm_image_import,
+                            target_space,
+                            notification_id,
+                        )
                     self._apply_security_state_from_event(target_space, event_data)
                 elif len(self._coordinator._space_ids) == 1:
                     # One space: the destination is unambiguous even when the
@@ -1186,6 +1194,12 @@ class AjaxNotificationListener:
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, only_space, event_type, event_data
                     )
+                    if event_type == "alarm" and notification_id:
+                        self._dispatch_to_loop(
+                            self._coordinator.schedule_alarm_image_import,
+                            only_space,
+                            notification_id,
+                        )
                     self._apply_security_state_from_event(only_space, event_data)
                 elif named_space := notification_event_parser.extract_space_id(raw):
                     # The push names a space this entry doesn't manage. The FCM

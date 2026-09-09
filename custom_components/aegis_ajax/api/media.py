@@ -5,10 +5,24 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
 from urllib.parse import urlparse
 
+from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.notification import (
+    filter_pb2,
+    folder_pb2,
+    origin_id_pb2,
+)
+from systems.ajax.api.mobile.v2.notificationlog import (
+    find_notifications_pb2,
+    notification_log_endpoints_pb2_grpc,
+    stream_media_pb2,
+)
+
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Collection, Sequence
+
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,6 +30,107 @@ _LOGGER = logging.getLogger(__name__)
 _STREAM_NOTIFICATION_MEDIA = (
     "/systems.ajax.api.mobile.v2.notification.NotificationLogService/streamNotificationMedia"
 )
+
+_ALARM_HISTORY_LIMIT = 50
+_ALARM_MEDIA_LIMIT = 10
+
+
+@dataclass(frozen=True)
+class AlarmMedia:
+    """Media attached to one historical hub alarm notification."""
+
+    device_id: str
+    notification_id: str
+    image_urls: tuple[str, ...]
+    timestamp: float = 0
+
+
+class _MediaAsset(Protocol):
+    """The URL fields shared by alarm images and video frames."""
+
+    url: str
+
+
+class _HubNotificationMedia(Protocol):
+    """Relevant subset of the generated HubNotificationMedia protobuf."""
+
+    images: Sequence[_MediaAsset]
+
+
+class _VideoFramesMedia(Protocol):
+    """Relevant subset of the generated VideoFramesMedia protobuf."""
+
+    frames: Sequence[_MediaAsset]
+
+
+class _NotificationMedia(Protocol):
+    """Relevant subset of the generated NotificationMedia protobuf."""
+
+    hub_notification_media: _HubNotificationMedia
+    video_frames_media: _VideoFramesMedia
+
+    def WhichOneof(self, oneof_group: str) -> str | None: ...  # noqa: N802
+
+
+class _StreamNotificationMediaSuccess(Protocol):
+    """Relevant subset of a successful notification-media response."""
+
+    media: _NotificationMedia
+
+
+class _StreamNotificationMediaResponse(Protocol):
+    """Relevant subset of the generated stream response protobuf."""
+
+    success: _StreamNotificationMediaSuccess
+
+    def WhichOneof(self, oneof_group: str) -> str | None: ...  # noqa: N802
+
+
+class _NotificationMediaStream(Protocol):
+    """The cancellable async stream returned by grpc.aio."""
+
+    def __aiter__(self) -> AsyncIterator[_StreamNotificationMediaResponse]: ...
+
+    def cancel(self) -> bool: ...
+
+
+class _NotificationLogServiceStub(Protocol):
+    """Typed subset of the generated notification-log client stub."""
+
+    def streamNotificationMedia(  # noqa: N802
+        self,
+        request: stream_media_pb2.StreamNotificationMediaRequest,
+        *,
+        metadata: list[tuple[str, str]],
+        timeout: float,
+    ) -> _NotificationMediaStream: ...
+
+
+def is_valid_photo_url(url: str) -> bool:
+    """Return whether a signed Ajax photo URL points at a known host."""
+    hostname = urlparse(url).hostname or ""
+    # Anchor the S3 branch to the real bucket host so a substring match can't
+    # accept e.g. `hubs-uploaded-resources.attacker.com` (SSRF).
+    is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(".amazonaws.com")
+    return hostname.endswith(".ajax.systems") or is_s3
+
+
+def _photo_urls_from_media(media: _NotificationMedia) -> tuple[str, ...]:
+    """Extract ready image/frame URLs from a notification-media payload."""
+    content = media.WhichOneof("content")
+    if content == "hub_notification_media":
+        return tuple(image.url for image in media.hub_notification_media.images if image.url)
+    if content == "video_frames_media":
+        return tuple(frame.url for frame in media.video_frames_media.frames if frame.url)
+    return ()
+
+
+def _notification_timestamp(notification: object) -> float:
+    """Return a notification's server timestamp for deterministic ordering."""
+    timestamp = getattr(notification, "server_timestamp", None)
+    if timestamp is None:
+        return 0
+    return float(timestamp.seconds) + float(timestamp.nanos) / 1_000_000_000
 
 
 def _encode_string_field(field_number: int, value: str) -> bytes:
@@ -48,6 +163,132 @@ class MediaApi:
 
     def __init__(self, client: AjaxGrpcClient) -> None:
         self._client = client
+
+    async def get_recent_alarm_media(
+        self,
+        space_id: str,
+        *,
+        device_ids: Collection[str] | None = None,
+        notification_ids: Collection[str] | None = None,
+    ) -> tuple[AlarmMedia, ...]:
+        """Return recent alarm images for one space.
+
+        Notification history is a server-side log, separate from FCM.  It is
+        It is queried by the explicit user service or for one notification
+        selected by an FCM alarm push; it is never part of the periodic update
+        loop.
+        """
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = notification_log_endpoints_pb2_grpc.NotificationLogServiceStub(channel)
+        request = find_notifications_pb2.FindNotificationsRequest(
+            filter=filter_pb2.NotificationsFilter(
+                origin=origin_id_pb2.NotificationOriginId(space_id=space_id),
+                folder=folder_pb2.FOLDER_ALARM,
+            ),
+            limit=_ALARM_HISTORY_LIMIT,
+        )
+
+        try:
+            response = await stub.findNotifications(request, metadata=metadata, timeout=15)
+        except Exception:
+            _LOGGER.debug("Could not retrieve Ajax alarm notification history", exc_info=True)
+            return ()
+
+        if response.WhichOneof("response") != "success":
+            _LOGGER.debug("Ajax alarm notification history was not available")
+            return ()
+
+        # The API's response ordering is not contractual. Prefer the newest
+        # history entries before applying the media request budget, otherwise a
+        # busy installation can spend all ten requests on old alarms.
+        notifications = sorted(
+            response.success.notifications,
+            key=_notification_timestamp,
+            reverse=True,
+        )
+        target_device_ids = set(device_ids) if device_ids is not None else None
+        target_notification_ids = set(notification_ids) if notification_ids is not None else None
+        alarms: list[AlarmMedia] = []
+        media_attempts = 0
+        for notification in notifications:
+            if (
+                target_notification_ids is not None
+                and notification.id not in target_notification_ids
+            ):
+                continue
+            content = notification.content.WhichOneof("content")
+            if content == "hub_notification_content":
+                hub_content = notification.content.hub_notification_content
+                device_id = hub_content.source.id
+                origin = origin_id_pb2.NotificationOriginId(hub_hex_id=hub_content.origin.hex_id)
+            elif content == "video_notification_content":
+                # Video/NVR events are scoped to the space rather than an Ajax
+                # hub. This has not appeared on the development account yet,
+                # but the notification protocol explicitly supports it.
+                device_id = notification.content.video_notification_content.source.id
+                origin = origin_id_pb2.NotificationOriginId(space_id=space_id)
+            else:
+                continue
+
+            if not notification.id or not device_id or origin.WhichOneof("origin") is None:
+                continue
+            # Skip non-camera alarm sources before using the bounded media
+            # budget. A Hub can generate many other alarm history entries.
+            if target_device_ids is not None and device_id not in target_device_ids:
+                continue
+            if media_attempts >= _ALARM_MEDIA_LIMIT:
+                break
+            media_attempts += 1
+
+            image_urls = await self._get_notification_media_urls(
+                stub,
+                notification_id=notification.id,
+                origin=origin,
+                metadata=metadata,
+            )
+            if image_urls:
+                alarms.append(
+                    AlarmMedia(
+                        device_id=device_id,
+                        notification_id=notification.id,
+                        image_urls=image_urls,
+                        timestamp=_notification_timestamp(notification),
+                    )
+                )
+
+        return tuple(alarms)
+
+    async def _get_notification_media_urls(
+        self,
+        stub: _NotificationLogServiceStub,
+        *,
+        notification_id: str,
+        origin: origin_id_pb2.NotificationOriginId,
+        metadata: list[tuple[str, str]],
+    ) -> tuple[str, ...]:
+        """Read the ready media payload for one historical notification."""
+        request = stream_media_pb2.StreamNotificationMediaRequest(
+            notification_id=notification_id,
+            origin=origin,
+        )
+        stream = stub.streamNotificationMedia(request, metadata=metadata, timeout=10)
+        try:
+            async for response in stream:
+                if response.WhichOneof("response") != "success":
+                    return ()
+                return tuple(
+                    url
+                    for url in _photo_urls_from_media(response.success.media)
+                    if is_valid_photo_url(url)
+                )
+        except Exception:
+            # `not_found` and expired assets are normal for old notifications;
+            # do not make one unavailable item abort the import.
+            _LOGGER.debug("Could not retrieve Ajax alarm notification media", exc_info=True)
+        finally:
+            stream.cancel()
+        return ()
 
     async def get_photo_url(
         self, notification_id: str, hub_hex_id: str, timeout: float = 15.0

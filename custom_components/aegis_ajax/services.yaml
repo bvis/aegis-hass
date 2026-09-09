@@ -153,6 +153,30 @@ set_photo_on_demand_mode:
           domain: alarm_control_panel
           integration: aegis_ajax
 
+refresh_alarm_images:
+  name: Refresh alarm camera images
+  description: >-
+    Read recent notifications from the Ajax Alarm folder and save attached
+    camera images locally. The saved newest image is exposed by compatible
+    MotionCam camera entities, including models without Photo on Demand. This
+    service does not capture a new photo. New alarm pushes import their own
+    images automatically; use this service to backfill recent history.
+  target:
+    entity:
+      domain: alarm_control_panel
+      integration: aegis_ajax
+  fields:
+    entity_id:
+      name: Entity
+      description: >-
+        Alarm panel entity for the space to import. If omitted, imports from
+        every configured space.
+      required: false
+      selector:
+        entity:
+          domain: alarm_control_panel
+          integration: aegis_ajax
+
 list_client_sessions:
   name: List account sessions
   description: >-

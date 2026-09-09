@@ -149,6 +149,24 @@ class TestAjaxPhotoMediaSource:
         assert result.children[0].title == "2026-04-14 00:23:18"
 
     @pytest.mark.asyncio
+    async def test_browse_alarm_album_with_preview_and_frames(self, tmp_path: Path) -> None:
+        media_dir = tmp_path / "media"
+        album = media_dir / "ajax_photos" / "SALON" / "2026-09-09_21-30-12-000000"
+        album.mkdir(parents=True)
+        for name in ("01.jpg", "02.jpg", "preview.jpg"):
+            (album / name).write_bytes(b"\xff\xd8")
+
+        source = AjaxPhotoMediaSource(_make_hass(str(media_dir)))
+        item = MagicMock(identifier="SALON")
+        camera = await source.async_browse_media(item)
+        assert camera.children[0].title == "Alarm 2026-09-09 21:30:12"
+        assert camera.children[0].thumbnail.endswith("preview.jpg")
+
+        item.identifier = "SALON/2026-09-09_21-30-12-000000"
+        album_view = await source.async_browse_media(item)
+        assert [child.title for child in album_view.children] == ["01", "02"]
+
+    @pytest.mark.asyncio
     async def test_browse_folder_traversal_returns_root(self, tmp_path: Path) -> None:
         media_dir = tmp_path / "media"
         (media_dir / "ajax_photos").mkdir(parents=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -96,6 +96,33 @@ class TestDisarmNightModeService:
         mock_security_api.disarm_from_night_mode.assert_any_call("space1")
         mock_security_api.disarm_from_night_mode.assert_any_call("space2")
         mock_coordinator.async_request_refresh.assert_called_once()
+
+
+class TestRefreshAlarmImagesService:
+    @pytest.mark.asyncio
+    async def test_returns_import_summary_for_every_space(self) -> None:
+        from custom_components.aegis_ajax import _async_handle_refresh_alarm_images
+
+        coordinator = MagicMock()
+        coordinator._space_ids = ["space1", "space2"]
+        coordinator.async_import_alarm_images = AsyncMock(
+            side_effect=[
+                {"notifications": 1, "images": 3},
+                {"notifications": 2, "images": 4},
+            ]
+        )
+        entry = MagicMock(runtime_data=coordinator)
+        hass = MagicMock()
+        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        service_call = MagicMock(data={})
+
+        result = await _async_handle_refresh_alarm_images(hass, service_call)
+
+        assert result == {"spaces": 2, "notifications": 3, "images": 7}
+        assert coordinator.async_import_alarm_images.await_args_list == [
+            call("space1"),
+            call("space2"),
+        ]
 
 
 class TestClientSessionServices:
@@ -416,6 +443,8 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in register_calls
         assert "press_panic_button" in register_calls
         assert "set_photo_on_demand_mode" in register_calls
+        assert "refresh_alarm_images" in register_calls
+        assert register_calls["refresh_alarm_images"] == SupportsResponse.OPTIONAL
         assert "list_client_sessions" in register_calls
         assert register_calls["list_client_sessions"] == SupportsResponse.ONLY
         assert "terminate_client_session" in register_calls
@@ -448,6 +477,7 @@ class TestServiceRegistration:
         assert "disarm_night_mode" in remove_calls
         assert "press_panic_button" in remove_calls
         assert "set_photo_on_demand_mode" in remove_calls
+        assert "refresh_alarm_images" in remove_calls
         assert "list_client_sessions" in remove_calls
         assert "terminate_client_session" in remove_calls
         assert "terminate_other_client_sessions" in remove_calls

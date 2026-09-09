@@ -2814,6 +2814,24 @@ class TestSecurityEventSnapshotNudge:
         self._fire(listener, "doorbell_pressed", "doorbell_press")
         listener._coordinator.request_security_snapshot_refresh.assert_not_called()
 
+    def test_alarm_push_schedules_its_image_import(self) -> None:
+        listener = self._make_listener()
+        encoded = base64.b64encode(b"any-payload").decode()
+        with (
+            patch.object(
+                listener,
+                "_extract_event_from_proto",
+                return_value=("alarm", {"raw_tag": "intrusion_alarm"}),
+            ),
+            patch.object(listener, "_extract_source_info", return_value={}),
+            patch.object(listener, "_find_space_for_event", return_value="space-1"),
+        ):
+            listener._parse_and_fire_event(encoded, notification_id="alarm-notification-id")
+
+        listener._coordinator.schedule_alarm_image_import.assert_called_once_with(
+            "space-1", "alarm-notification-id"
+        )
+
     def test_group_event_without_group_id_logs_warning_with_hex(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

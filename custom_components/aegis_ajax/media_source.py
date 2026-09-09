@@ -78,8 +78,8 @@ class AjaxPhotoMediaSource(MediaSource):
                     if folder.is_dir():
                         photo_count = sum(
                             1
-                            for f in folder.iterdir()
-                            if f.is_file() and f.suffix == ".jpg" and f.name != "last.jpg"
+                            for f in folder.rglob("*.jpg")
+                            if f.name not in {"last.jpg", "preview.jpg"}
                         )
                         items.append(
                             BrowseMediaSource(
@@ -107,45 +107,73 @@ class AjaxPhotoMediaSource(MediaSource):
             children=children,
         )
 
-    async def _browse_folder(self, folder_name: str) -> BrowseMediaSource:
-        """List photos in a device folder."""
-        folder_path = self._base_path / folder_name
+    async def _browse_folder(self, identifier: str) -> BrowseMediaSource:
+        """List albums and individual photos below a device folder."""
+        folder_path = self._base_path / identifier
         try:
             folder_path.resolve().relative_to(self._base_path.resolve())
         except ValueError:
             return await self._browse_root()
 
+        def _title_for_name(name: str, *, is_album: bool = False) -> str:
+            # Alarm albums use `YYYY-MM-DD_HH-MM-SS-microseconds`; older
+            # individual captures retain their legacy timestamp filename.
+            if len(name) >= 19 and name[4:5] == "-" and name[10:11] == "_":
+                timestamp = name[:10] + " " + name[11:19].replace("-", ":")
+                return f"Alarm {timestamp}" if is_album else timestamp
+            return name
+
         def _scan_folder() -> list[BrowseMediaSource]:
             items: list[BrowseMediaSource] = []
             if folder_path.is_dir():
+                for album in sorted(
+                    (entry for entry in folder_path.iterdir() if entry.is_dir()),
+                    key=lambda entry: entry.name,
+                    reverse=True,
+                ):
+                    relative = album.relative_to(self._base_path).as_posix()
+                    preview = album / "preview.jpg"
+                    items.append(
+                        BrowseMediaSource(
+                            domain=DOMAIN,
+                            identifier=relative,
+                            media_class=MediaClass.DIRECTORY,
+                            media_content_type="",
+                            title=_title_for_name(album.name, is_album=True),
+                            can_play=False,
+                            can_expand=True,
+                            thumbnail=(
+                                f"/media/local/{PHOTOS_BASE_DIR}/{relative}/preview.jpg"
+                                if preview.is_file()
+                                else None
+                            ),
+                        )
+                    )
                 photos = sorted(
                     [
                         f
                         for f in folder_path.iterdir()
-                        if f.is_file() and f.suffix == ".jpg" and f.name != "last.jpg"
+                        if f.is_file()
+                        and f.suffix == ".jpg"
+                        and f.name not in {"last.jpg", "preview.jpg"}
                     ],
                     key=lambda f: f.name,
-                    reverse=True,
+                    # Device-level captures are newest first; frame numbers in
+                    # an alarm album must retain their chronological sequence.
+                    reverse=folder_path.parent == self._base_path,
                 )
                 for photo in photos:
-                    # Format "2026-04-14_00-23-18.jpg" -> "2026-04-14 00:23:18"
-                    parts = photo.stem.split("_", 1)
-                    if len(parts) == 2:
-                        title = parts[0] + " " + parts[1].replace("-", ":")
-                    else:
-                        title = photo.stem
-
-                    identifier = f"{folder_name}/{photo.name}"
+                    relative = photo.relative_to(self._base_path).as_posix()
                     items.append(
                         BrowseMediaSource(
                             domain=DOMAIN,
-                            identifier=identifier,
+                            identifier=relative,
                             media_class=MediaClass.IMAGE,
                             media_content_type="image/jpeg",
-                            title=title,
+                            title=_title_for_name(photo.stem),
                             can_play=True,
                             can_expand=False,
-                            thumbnail=f"/media/local/{PHOTOS_BASE_DIR}/{identifier}",
+                            thumbnail=f"/media/local/{PHOTOS_BASE_DIR}/{relative}",
                         )
                     )
             return items
@@ -154,10 +182,10 @@ class AjaxPhotoMediaSource(MediaSource):
 
         return BrowseMediaSource(
             domain=DOMAIN,
-            identifier=folder_name,
+            identifier=identifier,
             media_class=MediaClass.DIRECTORY,
             media_content_type="",
-            title=folder_name,
+            title=_title_for_name(folder_path.name, is_album=folder_path.parent != self._base_path),
             can_play=False,
             can_expand=True,
             children=children,

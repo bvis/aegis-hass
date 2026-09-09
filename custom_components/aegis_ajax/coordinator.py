@@ -9,9 +9,11 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+import aiohttp
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
@@ -36,7 +38,7 @@ from custom_components.aegis_ajax.api.hub_object import (
     HubObjectApi,
     SimCardInfo,
 )
-from custom_components.aegis_ajax.api.media import MediaApi
+from custom_components.aegis_ajax.api.media import MediaApi, is_valid_photo_url
 from custom_components.aegis_ajax.api.models import Device as DeviceModel
 from custom_components.aegis_ajax.api.models import (
     device_deactivation_kinds,
@@ -81,6 +83,7 @@ from custom_components.aegis_ajax.delay_states import (
 from custom_components.aegis_ajax.device_cache import DevicesCache
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_get_registered_device
+from custom_components.aegis_ajax.photo_storage import save_alarm_contact_sheet, save_photo
 from custom_components.aegis_ajax.repairs import (
     async_clear_hts_chronic_failure,
     async_clear_hub_offline,
@@ -89,7 +92,8 @@ from custom_components.aegis_ajax.repairs import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Collection
+    from pathlib import Path
 
     from homeassistant.core import HomeAssistant
     from homeassistant.util.json import JsonArrayType
@@ -490,6 +494,16 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # device_id -> cancel handle for a pending motion auto-off timer (#173)
         self._motion_off_cancels: dict[str, Any] = {}
         self.last_photo_urls: dict[str, str] = {}
+        # Incremented after saving a historical alarm image. Camera entities
+        # compare it before serving a cached `last.jpg`, so a dashboard shows
+        # the import immediately without re-downloading the signed URL.
+        self.photo_revisions: dict[str, int] = {}
+        # History is intentionally an on-demand import. Avoid importing the
+        # same event twice in one HA process if the service is called again.
+        self._imported_alarm_notification_ids: set[str] = set()
+        # An alarm push can arrive before Ajax has uploaded every frame. Keep
+        # one short-lived retry task per notification rather than polling media.
+        self._alarm_import_tasks: dict[str, asyncio.Task[None]] = {}
         # space_id -> (expiry_time, security_state)
         self._optimistic_space_states: dict[str, tuple[float, Any]] = {}
         # Spaces with an intrusion alarm push not yet acknowledged by an
@@ -677,6 +691,142 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def media_api(self) -> MediaApi:
         return self._media_api
+
+    async def async_import_alarm_images(
+        self,
+        space_id: str,
+        *,
+        notification_ids: Collection[str] | None = None,
+    ) -> dict[str, int]:
+        """Save recent alarm images for camera devices in one space.
+
+        This runs from the manual service and, for a single notification, from
+        a delayed FCM alarm callback. It never runs in the periodic poll.
+        """
+        camera_device_ids = {
+            device_id
+            for device_id, device in self.devices.items()
+            if capabilities_for(device).is_camera
+        }
+        alarm_media = await self._media_api.get_recent_alarm_media(
+            space_id,
+            device_ids=camera_device_ids,
+            notification_ids=notification_ids,
+        )
+        imported_notifications = 0
+        imported_images = 0
+
+        # The server normally returns newest first. Sorting by server time
+        # makes `last.jpg` deterministic even if that order changes: the most
+        # recent alarm for a camera becomes the image its Camera entity shows.
+        for alarm in sorted(alarm_media, key=lambda item: item.timestamp):
+            if alarm.notification_id in self._imported_alarm_notification_ids:
+                continue
+            device = self.devices.get(alarm.device_id)
+            if device is None or not capabilities_for(device).is_camera:
+                continue
+
+            saved_images = 0
+            saved_photo_paths: list[Path] = []
+            captured_at = dt_util.utc_from_timestamp(alarm.timestamp) if alarm.timestamp else None
+            album_name = (
+                (captured_at or dt_util.now()).astimezone().strftime("%Y-%m-%d_%H-%M-%S-%f")
+            )
+            for image_index, image_url in enumerate(alarm.image_urls, start=1):
+                saved_path = await self._async_download_and_save_alarm_image(
+                    device,
+                    image_url,
+                    captured_at=captured_at,
+                    album_name=album_name,
+                    filename=f"{image_index:02d}.jpg",
+                )
+                if saved_path is not None:
+                    saved_images += 1
+                    saved_photo_paths.append(saved_path)
+
+            if saved_images:
+                await save_alarm_contact_sheet(self.hass, device.name, saved_photo_paths)
+                self._imported_alarm_notification_ids.add(alarm.notification_id)
+                imported_notifications += 1
+                imported_images += saved_images
+
+        if imported_images:
+            # Notify Camera entities so HA invalidates the proxy response and
+            # the dashboard requests the newly written `last.jpg` immediately.
+            self.async_update_listeners()
+
+        return {
+            "notifications": imported_notifications,
+            "images": imported_images,
+        }
+
+    async def _async_download_and_save_alarm_image(
+        self,
+        device: Device,
+        url: str,
+        *,
+        captured_at: datetime | None = None,
+        album_name: str | None = None,
+        filename: str | None = None,
+    ) -> Path | None:
+        """Download one trusted historical image and save it for its camera."""
+        if not is_valid_photo_url(url):
+            _LOGGER.warning("Rejected alarm image URL with unexpected domain")
+            return None
+
+        try:
+            session = async_get_clientsession(self.hass)
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as response:
+                if response.status != 200:
+                    _LOGGER.debug("Ajax alarm image download returned HTTP %s", response.status)
+                    return None
+                image = await response.read()
+        except Exception:
+            _LOGGER.debug("Could not download Ajax alarm image", exc_info=True)
+            return None
+
+        if not image:
+            return None
+        saved_path = await save_photo(
+            self.hass,
+            image,
+            device.id,
+            device.name,
+            captured_at=captured_at,
+            album_name=album_name,
+            filename=filename,
+            update_last=album_name is None,
+        )
+        if saved_path is None:
+            return None
+
+        self.photo_revisions[device.id] = self.photo_revisions.get(device.id, 0) + 1
+        return saved_path
+
+    def schedule_alarm_image_import(self, space_id: str, notification_id: str) -> None:
+        """Import one alarm's image sequence after Ajax media becomes ready."""
+        if not notification_id or notification_id in self._alarm_import_tasks:
+            return
+
+        task = self.hass.async_create_task(
+            self._async_import_pushed_alarm_images(space_id, notification_id),
+            name=f"aegis_ajax_alarm_images_{notification_id[:12]}",
+        )
+        self._alarm_import_tasks[notification_id] = task
+        task.add_done_callback(lambda _: self._alarm_import_tasks.pop(notification_id, None))
+
+    async def _async_import_pushed_alarm_images(self, space_id: str, notification_id: str) -> None:
+        """Retry a newly pushed alarm while Ajax finishes publishing media."""
+        for delay in (8, 12, 20):
+            await asyncio.sleep(delay)
+            result = await self.async_import_alarm_images(
+                space_id,
+                notification_ids={notification_id},
+            )
+            if result["notifications"]:
+                _LOGGER.debug("Imported images for pushed Ajax alarm %s", notification_id[:12])
+                return
+        _LOGGER.debug("Ajax alarm %s had no ready camera media after retries", notification_id[:12])
 
     @property
     def notification_listener(self) -> AjaxNotificationListener | None:
@@ -3385,6 +3535,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Cancel any pending security-event re-read (#270)
         self._security_refresh_debouncer.async_shutdown()
+
+        # Do not leave delayed alarm-media retries alive after an integration
+        # reload. Their client/session belongs to this coordinator instance.
+        for task in getattr(self, "_alarm_import_tasks", {}).values():
+            if not task.done():
+                task.cancel()
+        if hasattr(self, "_alarm_import_tasks"):
+            self._alarm_import_tasks.clear()
 
         # Cancel all stream tasks
         for task in self._stream_tasks:

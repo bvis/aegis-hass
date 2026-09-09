@@ -195,6 +195,23 @@ class TestAjaxCamera:
         assert "d1" not in coordinator.last_photo_urls
 
     @pytest.mark.asyncio
+    async def test_async_camera_image_reloads_after_alarm_image_import(self) -> None:
+        coordinator = MagicMock()
+        coordinator.last_photo_urls = {}
+        coordinator.photo_revisions = {"d1": 1}
+        coordinator.devices = {"d1": _device("d1", "motion_cam")}
+        cam = AjaxCamera(
+            coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam"
+        )
+        cam._last_image = b"old"
+
+        with patch(
+            "custom_components.aegis_ajax.photo_storage.load_last_photo",
+            new=AsyncMock(return_value=b"alarm-image"),
+        ):
+            assert await cam.async_camera_image() == b"alarm-image"
+
+    @pytest.mark.asyncio
     async def test_async_camera_image_returns_none_when_capture_fails(self) -> None:
         """When capture_photo returns None, no URL wait happens and cached image returned."""
         coordinator = MagicMock()

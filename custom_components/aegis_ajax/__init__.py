@@ -119,6 +119,7 @@ _CUSTOM_SERVICE_NAMES = (
     "disarm_night_mode",
     "press_panic_button",
     "set_photo_on_demand_mode",
+    "refresh_alarm_images",
     "list_client_sessions",
     "terminate_client_session",
     "terminate_other_client_sessions",
@@ -351,6 +352,29 @@ async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: Serv
             user_enabled=user_enabled,
             scenario_enabled=scenario_enabled,
         )
+
+
+async def _async_handle_refresh_alarm_images(
+    hass: HomeAssistant, call: ServiceCall
+) -> ServiceResponse:
+    """Import recent camera images attached to historical Ajax alarms.
+
+    This service has no device-control side effect. It reads the server's
+    Alarm folder and stores the trusted images locally for Camera entities.
+    It is intentionally manual: do not use it in a frequent automation.
+    """
+    imported_notifications = 0
+    imported_images = 0
+    targets = _resolve_target_space_ids(hass, call)
+    for coordinator, space_id in targets:
+        result = await coordinator.async_import_alarm_images(space_id)
+        imported_notifications += result["notifications"]
+        imported_images += result["images"]
+    return {
+        "spaces": len(targets),
+        "notifications": imported_notifications,
+        "images": imported_images,
+    }
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -595,6 +619,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
         await _async_handle_set_photo_on_demand_mode(hass, call)
 
+    async def _refresh_alarm_images_handler(call: ServiceCall) -> ServiceResponse:
+        return await _async_handle_refresh_alarm_images(hass, call)
+
     async def _list_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
         return await _async_handle_list_client_sessions(hass, call)
 
@@ -610,6 +637,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         "disarm_night_mode": _disarm_night_mode_handler,
         "press_panic_button": _press_panic_button_handler,
         "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
+        "refresh_alarm_images": _refresh_alarm_images_handler,
         "list_client_sessions": _list_client_sessions_handler,
         "terminate_client_session": _terminate_client_session_handler,
         "terminate_other_client_sessions": _terminate_other_client_sessions_handler,
@@ -626,7 +654,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
                 service_handlers[name],
                 supports_response=SupportsResponse.ONLY,
             )
-        elif name == "terminate_other_client_sessions":
+        elif name in {"terminate_other_client_sessions", "refresh_alarm_images"}:
             hass.services.async_register(
                 DOMAIN,
                 name,

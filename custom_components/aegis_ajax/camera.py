@@ -59,6 +59,7 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         self._attr_unique_id = f"aegis_ajax_{device_id}_camera"
         self._last_image_url: str | None = None
         self._last_image: bytes | None = None
+        self._photo_revision = 0
         device = coordinator.devices.get(device_id)
         if device:
             self._attr_device_info = build_device_info(
@@ -80,6 +81,16 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         height: int | None = None,  # noqa: ARG002
     ) -> bytes | None:
         """Return the last captured photo. Use the button entity to capture new photos."""
+        # A manual historical-alarm import writes a fresh `last.jpg`. Discard
+        # our in-memory copy so normal MotionCam hardware immediately exposes
+        # it, without attempting an unsupported Photo on Demand capture.
+        photo_revisions = getattr(self.coordinator, "photo_revisions", None)
+        if isinstance(photo_revisions, dict):
+            current_revision = photo_revisions.get(self._device_id, 0)
+            if current_revision != self._photo_revision:
+                self._last_image = None
+                self._last_image_url = None
+                self._photo_revision = current_revision
         # Check if button.py just retrieved a new URL
         url = self.coordinator.last_photo_urls.pop(self._device_id, None)
         if url:

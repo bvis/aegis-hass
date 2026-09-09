@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,14 +18,19 @@ from custom_components.aegis_ajax.photo_storage import (
     _sanitize_name,
     cleanup_old_photos,
     load_last_photo,
+    save_alarm_contact_sheet,
     save_photo,
 )
 
 
-def _make_jpeg(width: int = 32, height: int = 32) -> bytes:
+def _make_jpeg(
+    width: int = 32,
+    height: int = 32,
+    color: tuple[int, int, int] = (64, 64, 64),
+) -> bytes:
     """Build a small valid JPEG as a fixture for filesystem tests."""
     buf = io.BytesIO()
-    Image.new("RGB", (width, height), color=(64, 64, 64)).save(buf, format="JPEG")
+    Image.new("RGB", (width, height), color=color).save(buf, format="JPEG")
     return buf.getvalue()
 
 
@@ -80,6 +86,78 @@ class TestSavePhoto:
             assert p.stat().st_size > 0
 
     @pytest.mark.asyncio
+    async def test_uses_historical_capture_time_for_overlay(self, tmp_path: Path) -> None:
+        hass = _hass_with_media(tmp_path)
+        captured_at = datetime(2026, 9, 9, 18, 0, 0)
+        with patch(
+            "custom_components.aegis_ajax.photo_storage._overlay_timestamp",
+            return_value=b"stamped",
+        ) as overlay:
+            await save_photo(
+                hass,
+                _make_jpeg(),
+                "dev-1",
+                "Front Door",
+                captured_at=captured_at,
+            )
+
+        overlay.assert_called_once()
+        assert overlay.call_args.args[1] == captured_at
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("colors", "expected_size"),
+        [
+            ([(220, 20, 20), (20, 220, 20)], (204, 75)),
+            ([(220, 20, 20), (20, 220, 20), (20, 20, 220)], (204, 154)),
+        ],
+    )
+    async def test_contact_sheet_shows_each_alarm_frame(
+        self,
+        tmp_path: Path,
+        colors: list[tuple[int, int, int]],
+        expected_size: tuple[int, int],
+    ) -> None:
+        hass = _hass_with_media(tmp_path)
+        paths = []
+        for color in colors:
+            path = await save_photo(
+                hass,
+                _make_jpeg(100, 75, color),
+                "dev-1",
+                "Front Door",
+            )
+            assert path is not None
+            paths.append(path)
+
+        result = await save_alarm_contact_sheet(hass, "Front Door", paths)
+
+        assert result == tmp_path / PHOTOS_BASE_DIR / "Front Door" / "last.jpg"
+        with Image.open(result) as contact_sheet:
+            assert contact_sheet.size == expected_size
+            assert contact_sheet.getpixel((10, 10))[0] > 150
+            assert contact_sheet.getpixel((114, 10))[1] > 150
+            if len(colors) == 3:
+                assert contact_sheet.getpixel((10, 89))[2] > 150
+
+    @pytest.mark.asyncio
+    async def test_one_frame_alarm_keeps_the_single_camera_image(self, tmp_path: Path) -> None:
+        hass = _hass_with_media(tmp_path)
+        path = await save_photo(
+            hass,
+            _make_jpeg(100, 75, (220, 20, 20)),
+            "dev-1",
+            "Front Door",
+        )
+        assert path is not None
+
+        result = await save_alarm_contact_sheet(hass, "Front Door", [path])
+
+        assert result == tmp_path / PHOTOS_BASE_DIR / "Front Door" / "last.jpg"
+        with Image.open(tmp_path / PHOTOS_BASE_DIR / "Front Door" / "last.jpg") as last_photo:
+            assert last_photo.size == (100, 75)
+
+    @pytest.mark.asyncio
     async def test_sanitizes_device_name_into_directory(self, tmp_path: Path) -> None:
         hass = _hass_with_media(tmp_path)
         # "/" and "<" are not allowed in a path component → replaced with "_"
@@ -110,6 +188,37 @@ class TestSavePhoto:
         with patch.object(Path, "mkdir", side_effect=OSError("read-only")):
             result = await save_photo(hass, _make_jpeg(), "dev-1", "Front Door")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_alarm_frames_are_saved_in_a_dated_album(self, tmp_path: Path) -> None:
+        hass = _hass_with_media(tmp_path)
+        first = await save_photo(
+            hass,
+            _make_jpeg(),
+            "dev-1",
+            "Front Door",
+            album_name="2026-09-09_21-30-12-000000",
+            filename="01.jpg",
+            update_last=False,
+        )
+        second = await save_photo(
+            hass,
+            _make_jpeg(),
+            "dev-1",
+            "Front Door",
+            album_name="2026-09-09_21-30-12-000000",
+            filename="02.jpg",
+            update_last=False,
+        )
+        assert first is not None and second is not None
+
+        preview = await save_alarm_contact_sheet(hass, "Front Door", [first, second])
+
+        album = tmp_path / PHOTOS_BASE_DIR / "Front Door" / "2026-09-09_21-30-12-000000"
+        assert preview == tmp_path / PHOTOS_BASE_DIR / "Front Door" / "last.jpg"
+        assert (album / "01.jpg").is_file()
+        assert (album / "02.jpg").is_file()
+        assert (album / "preview.jpg").is_file()
 
 
 class TestLoadLastPhoto:
