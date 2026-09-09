@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from custom_components.aegis_ajax.const import ALL_EVENT_TYPES, HUB_EVENT_TAG_MAP
+from custom_components.aegis_ajax.api.models import Device
+from custom_components.aegis_ajax.const import ALL_EVENT_TYPES, HUB_EVENT_TAG_MAP, DeviceState
 from custom_components.aegis_ajax.event import (
     AjaxButtonPressEvent,
     AjaxDoorbellEvent,
     AjaxSecurityEvent,
+    async_setup_entry,
 )
 
 
@@ -424,3 +426,41 @@ class TestAjaxButtonPressEvent:
         entity = self._make_button_entity()
         assert entity._attr_device_info is not None
         assert ("aegis_ajax", "313E5F32") in entity._attr_device_info["identifiers"]
+
+
+class TestEventSetup:
+    async def test_creates_device_events_for_registered_capabilities(self) -> None:
+        def device(device_id: str, device_type: str) -> Device:
+            return Device(
+                id=device_id,
+                hub_id="hub-1",
+                name=device_id,
+                device_type=device_type,
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={},
+                battery=None,
+            )
+
+        coordinator = MagicMock()
+        coordinator.spaces = {}
+        coordinator.rooms = {}
+        coordinator.devices = {
+            "video-doorbell": device("video-doorbell", "video_edge_doorbell"),
+            "motion-doorbell": device("motion-doorbell", "motion_cam_video_doorbell"),
+            "button": device("button", "button"),
+            "other": device("other", "door_protect"),
+        }
+        entry = MagicMock(runtime_data=coordinator)
+        added: list = []
+
+        await async_setup_entry(MagicMock(), entry, added.extend)
+
+        assert {entity.unique_id for entity in added} == {
+            "aegis_ajax_video-doorbell_doorbell_event",
+            "aegis_ajax_motion-doorbell_doorbell_event",
+            "aegis_ajax_button_button_press_event",
+        }

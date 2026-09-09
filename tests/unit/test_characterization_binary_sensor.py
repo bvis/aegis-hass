@@ -88,3 +88,53 @@ class TestBinarySensorCharacterization:
         ]
 
         assert actual_entities == expected_entities
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("device_type", ["button", "light_switch_dimmer"])
+    async def test_new_platform_registration_preserves_unmapped_binary_sensor_shape(
+        self, monkeypatch: pytest.MonkeyPatch, device_type: str
+    ) -> None:
+        """New registrations retain the former tamper and standard-diagnostics fallback."""
+        fixture_data = _load_fixture()
+        monkeypatch.delitem(_DEVICE_HANDLERS, device_type)
+
+        device_id = "test_device"
+        mock_coordinator = MagicMock()
+        mock_coordinator.devices = {
+            device_id: Device(
+                id=device_id,
+                hub_id="hub_1",
+                name="Test Device",
+                device_type=device_type,
+                room_id="room_1",
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={},
+                battery=None,
+            )
+        }
+        mock_coordinator.spaces = {}
+        mock_coordinator.rooms = {}
+        mock_coordinator.hub_registry_id.return_value = "hub_reg_1"
+        entry = MagicMock(entry_id="entry_1", runtime_data=mock_coordinator)
+        added_entities: list = []
+
+        await async_setup_entry(MagicMock(), entry, added_entities.extend)
+
+        actual_entities = [
+            {
+                "unique_id": entity.unique_id,
+                "device_class": entity.device_class.value
+                if hasattr(entity.device_class, "value")
+                else entity.device_class,
+                "entity_category": entity.entity_category.value
+                if hasattr(entity.entity_category, "value")
+                else entity.entity_category,
+                "enabled_by_default": entity.entity_registry_enabled_default,
+            }
+            for entity in added_entities
+        ]
+
+        assert actual_entities == fixture_data[device_type]
