@@ -156,15 +156,15 @@
                     "description": "Moet op true staan. Werkt als veiligheidsslot zodat automatiseringen deze service niet per ongeluk activeren."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entiteit",
                     "description": "Alarmpaneelentiteit van de ruimte waarvan de paniekknop wordt ingedrukt. Bij weglaten wordt de paniek naar alle geconfigureerde ruimtes gestuurd."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Breedtegraad",
                     "description": "Optionele breedtegraad van de melder, doorgegeven aan Ajax. Gebruik samen met lengtegraad."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Lengtegraad",
                     "description": "Optionele lengtegraad van de melder, doorgegeven aan Ajax. Gebruik samen met breedtegraad."
                 }
             }

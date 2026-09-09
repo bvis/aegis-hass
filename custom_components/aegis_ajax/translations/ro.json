@@ -156,15 +156,15 @@
                     "description": "Trebuie să fie true. Acționează ca un blocaj de siguranță pentru a împiedica automatizările să declanșeze accidental acest serviciu."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entitate",
                     "description": "Entitatea panoului de alarmă a spațiului pentru care se apasă butonul de panică. Dacă este omisă, panica este trimisă către toate spațiile configurate."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Latitudine",
                     "description": "Latitudine opțională a apelantului transmisă către Ajax. Folosiți împreună cu longitudinea."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Longitudine",
                     "description": "Longitudine opțională a apelantului transmisă către Ajax. Folosiți împreună cu latitudinea."
                 }
             }

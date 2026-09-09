@@ -156,15 +156,15 @@
                     "description": "Deve essere true. Funge da blocco di sicurezza per evitare che le automazioni attivino il servizio per errore."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entità",
                     "description": "Entità del pannello di allarme dello spazio di cui premere il pulsante antipanico. Se omessa, l'antipanico viene inviato a tutti gli spazi configurati."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Latitudine",
                     "description": "Latitudine opzionale del chiamante inoltrata ad Ajax. Da usare con la longitudine."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Longitudine",
                     "description": "Longitudine opzionale del chiamante inoltrata ad Ajax. Da usare con la latitudine."
                 }
             }
