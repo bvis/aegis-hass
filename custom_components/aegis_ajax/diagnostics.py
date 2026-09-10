@@ -91,6 +91,10 @@ async def async_get_config_entry_diagnostics(
     # already follows below.
     return {
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
+        # The #419 deactivation carry, which self-corrects within one status
+        # refresh and therefore used to leave no trace a user could send after
+        # the fact. See `deactivation_carry_state`.
+        "deactivation_carry": coordinator.deactivation_carry_state(),
         "spaces": {
             sid: {
                 "name_length": len(s.name or ""),

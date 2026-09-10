@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from dataclasses import replace
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -5500,3 +5501,94 @@ class TestSimInfoFailureIsDiagnosable:
         await coordinator._async_update_data()
 
         assert "hub-1" in coordinator._sim_info_failed
+
+
+class TestDeactivationCarryIsVisibleInDiagnostics:
+    """The #419 carry must leave a record that outlives a log buffer.
+
+    The carry self-corrects within one status refresh, so its only trace was a
+    DEBUG line. The reporter watching for it lost the decisive instant to log
+    rotation twice, which is what kept the fix unconfirmed rather than any
+    doubt about the code. A counter and the corroborator's freshness survive in
+    the diagnostics dump, so a natural occurrence can be reported afterwards
+    instead of having to be caught live.
+    """
+
+    def _coordinator(self) -> AjaxCobrandedCoordinator:  # noqa: F821
+        return TestStreamHandlers()._make_coordinator_with_stream()
+
+    def _deactivated(self, device_id: str = "d1") -> Device:
+        return _make_device(
+            device_id,
+            statuses={"temporary_deactivation_whole": True, "deactivated": True},
+        )
+
+    def test_a_carry_is_counted_and_dated(self) -> None:
+        coordinator = self._coordinator()
+        coordinator.devices["d1"] = self._deactivated()
+        coordinator._hts_bypass_state["d1"] = (True, time.monotonic())
+
+        before = coordinator.deactivation_carry_state()
+        assert before["device_carries"] == 0
+        assert before["last_carry_at"] is None
+
+        coordinator._handle_devices_snapshot([_make_device("d1")])
+
+        after = coordinator.deactivation_carry_state()
+        assert after["snapshots_with_a_carry"] == 1
+        assert after["device_carries"] == 1
+        assert after["last_carry_at"] is not None
+        assert after["currently_carried_device_ids"] == ["d1"]
+
+    def test_two_devices_carried_in_one_snapshot_count_as_one_snapshot(self) -> None:
+        coordinator = self._coordinator()
+        for device_id in ("d1", "d2"):
+            coordinator.devices[device_id] = self._deactivated(device_id)
+            coordinator._hts_bypass_state[device_id] = (True, time.monotonic())
+
+        coordinator._handle_devices_snapshot([_make_device("d1"), _make_device("d2")])
+
+        state = coordinator.deactivation_carry_state()
+        assert state["snapshots_with_a_carry"] == 1
+        assert state["device_carries"] == 2
+        assert state["currently_carried_device_ids"] == ["d1", "d2"]
+
+    def test_a_healthy_snapshot_counts_nothing(self) -> None:
+        coordinator = self._coordinator()
+        coordinator.devices["d1"] = self._deactivated()
+        coordinator._hts_bypass_state["d1"] = (True, time.monotonic())
+
+        coordinator._handle_devices_snapshot([self._deactivated("d1")])
+
+        state = coordinator.deactivation_carry_state()
+        assert state["snapshots_with_a_carry"] == 0
+        assert state["device_carries"] == 0
+        assert state["currently_carried_device_ids"] == []
+
+    def test_the_corroborator_reports_its_own_age(self) -> None:
+        """A stale report is why a carry did *not* happen, so the age is the
+        first thing to look at when the counter stays at zero."""
+        coordinator = self._coordinator()
+        coordinator._hts_bypass_state["d1"] = (True, time.monotonic() - 120)
+        coordinator._hts_bypass_state["d2"] = (False, time.monotonic())
+
+        reports = coordinator.deactivation_carry_state()["hub_bypass_reports"]
+
+        assert reports["d1"]["deactivated"] is True
+        assert 119 <= reports["d1"]["age_seconds"] <= 125
+        assert reports["d2"]["deactivated"] is False
+        assert reports["d2"]["age_seconds"] < 5
+
+    def test_a_withdrawn_carry_leaves_the_count_but_clears_the_membership(self) -> None:
+        """The count records that it happened; membership records that it still
+        applies. Conflating them would erase the evidence on self-correction."""
+        coordinator = self._coordinator()
+        coordinator.devices["d1"] = self._deactivated()
+        coordinator._hts_bypass_state["d1"] = (True, time.monotonic())
+        coordinator._handle_devices_snapshot([_make_device("d1")])
+
+        coordinator._maybe_track_hts_bypass_state("d1", coordinator.devices["d1"], {0xB7: b"\x00"})
+
+        state = coordinator.deactivation_carry_state()
+        assert state["device_carries"] == 1
+        assert state["currently_carried_device_ids"] == []

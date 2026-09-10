@@ -842,3 +842,31 @@ class TestUserChosenNamesAreNotInTheDump:
 
         assert "dev-1" in result["devices"]
         assert result["devices"]["dev-1"]["group_id"] == "g1"
+
+
+class TestDeactivationCarryBlock:
+    """The #419 carry record has to reach the dump, not just the debug log."""
+
+    @pytest.mark.asyncio
+    async def test_the_dump_carries_the_coordinator_s_carry_state(self) -> None:
+        coordinator = MagicMock()
+        coordinator.deactivation_carry_state = MagicMock(
+            return_value={
+                "snapshots_with_a_carry": 2,
+                "device_carries": 5,
+                "last_carry_at": "2026-09-10T12:00:00+00:00",
+                "currently_carried_device_ids": ["dev-1"],
+                "hub_bypass_reports": {"dev-1": {"deactivated": True, "age_seconds": 12.0}},
+            }
+        )
+        coordinator.spaces = {}
+        coordinator.devices = {}
+        coordinator.keyfobs = {}
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        entry.data = {}
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["deactivation_carry"]["device_carries"] == 5
+        assert result["deactivation_carry"]["currently_carried_device_ids"] == ["dev-1"]
