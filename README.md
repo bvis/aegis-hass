@@ -52,7 +52,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Push notifications**: FCM integration for immediate event delivery
 - **2FA support** (TOTP)
 - **Reauth flow**: when the Ajax session is rejected (password rotated, 2FA newly enabled, server-side logout), HA shows the orange "Reconfigure" banner with a guided password prompt — entity ids, areas, automations and history survive untouched
-- **HA Repairs**: diagnosable conditions surface as cards under **Settings → Repairs** instead of being buried in `home-assistant.log` — hub offline > 24h, sustained HTS reconnect failure, FCM credentials rejected (with one-click fix flow), a push connection repeatedly killed by an unreadable message (the integration renews its own push registration to recover), or grpcio version below the floor on Home Assistant OS
+- **HA Repairs**: diagnosable conditions surface as cards under **Settings → Repairs** instead of being buried in `home-assistant.log` — hub offline > 24h, sustained HTS reconnect failure, FCM credentials rejected (with one-click fix flow), a push connection repeatedly killed by an unreadable message (the integration renews its own push registration to recover), a push registration that Ajax accepted and that has never delivered anything, or grpcio version below the floor on Home Assistant OS
 - **System Health card**: one-line snapshot under **Settings → System → Repairs → System Information** with gRPC reachability, HTS / FCM connection ratios, last push / last poll ages — replaces log archaeology as the first triage step
 - **DHCP discovery**: Ajax hubs on the same LAN appear as a "Discovered" card in **Settings → Devices & Services**, no need to search by name
 - **MDI icons** for all entity types
@@ -588,6 +588,14 @@ Two quick consistency checks that catch the most common "credentials rejected" r
 ### If submission still fails
 
 Since `1.6.0` the integration also runs the same shape checks above as a **pre-flight** before contacting Google. When something is structurally off (e.g. `fcm_sender_id` doesn't match the digit chunk in `fcm_app_id`), a **Push notifications disabled — FCM credentials malformed** Repair card appears with the specific problem named, and the values aren't sent to Firebase at all. That's faster and clearer than Google's opaque 403.
+
+### When everything is accepted and push still never arrives
+
+FCM credentials can pass every checkpoint — the offline shape checks, Firebase minting a token, Ajax's own `UpsertPushToken`, and an MCS session that connects and heartbeats indefinitely — and still never carry a single message. Nothing looks broken, because the alarm panel never depends on push; the only symptom is that real-time events (doorbell rings, intrusion alarms) silently never happen, which is hard to notice without a baseline.
+
+Since `1.20.0` the integration detects this. The hub's own status stream carries the same space events push does, about a second apart on a healthy install, so Aegis counts arm/disarm-class events seen while the push client was up. Once **20** of those have gone by with no push ever delivered for the credentials in force, a **Push notifications are not arriving** Repair card appears under **Settings → Repairs**. The count is persisted against a fingerprint of the four values, so it survives restarts and resets by construction when you re-enter them; the card clears itself the moment one push arrives. A quiet installation never trips it, since a house that generates no events generates no evidence either.
+
+The card names the three causes and deliberately does not pick one, because they are indistinguishable from inside Home Assistant: values belonging to a Firebase project your co-branded app's push provider does not route through, another registration holding your Ajax account's push destination, or a push connection that never actually completed. The diagnostics dump carries the same numbers under `push` if you would rather read them directly, including the event count that makes a zero delivery count meaningful.
 
 If the shape checks pass and Google still rejects, the WARNING line under **Settings → System → Logs** names the specific cause (project consistency, app-id format, or network reach to Google's FCM hosts). Re-enter the four values together via the Repair card under **Settings → Repairs** once you have a coherent set.
 

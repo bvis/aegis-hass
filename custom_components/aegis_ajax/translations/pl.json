@@ -316,6 +316,10 @@
                     "entry_missing": "Konto Aegis, dla ktorego utworzono ten Repair, nie jest juz skonfigurowane. Nie ma czego naprawiac."
                 }
             }
+        },
+        "fcm_never_delivered": {
+            "title": "Push notifications are not arriving",
+            "description": "Aegis has seen {events} events from your hub while the push connection was up, and not one of them arrived over push. Your alarm state is not affected — it comes from the hub connection and from polling, never from push — but real-time events such as doorbell rings and intrusion alarms reach Home Assistant only over push, so those are being lost.\n\nThree things produce this and they look identical from here: the four FCM values may belong to a Firebase project your co-branded app's push provider does not send through, another registration may be holding your Ajax account's push destination, or the push connection may never have completed.\n\nWhat helps: re-enter the four values for your co-branded app, under Settings > Repairs or in the integration options. If the same Ajax account is used by another Home Assistant instance, try a separate account for this integration. This notice clears by itself as soon as one push arrives."
         }
     },
     "entity": {
