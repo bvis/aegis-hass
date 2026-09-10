@@ -56,6 +56,7 @@ def test_non_lock_does_not_have_lock_capability() -> None:
         "motion_cam_phod",
         "motion_cam_outdoor_phod",
         "motion_cam_fibra_base",
+        "motion_cam_outdoor_two_four_phod",
     ],
 )
 def test_camera_capability_is_registered(device_type: str) -> None:
@@ -64,7 +65,12 @@ def test_camera_capability_is_registered(device_type: str) -> None:
 
 @pytest.mark.parametrize(
     "device_type",
-    ["motion_cam_phod", "motion_cam_outdoor_phod", "motion_cam_fibra_base"],
+    [
+        "motion_cam_phod",
+        "motion_cam_outdoor_phod",
+        "motion_cam_fibra_base",
+        "motion_cam_outdoor_two_four_phod",
+    ],
 )
 def test_phod_capability_is_registered(device_type: str) -> None:
     capabilities = device_handlers.capabilities_for(_device(device_type))
