@@ -38,7 +38,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Hub firmware update** (read-only): each hub exposes an `update.<hub>_firmware` entity that reports the firmware version the hub is **actually running** as its installed version — also shown under **Firmware** on the hub's device page — and whether Ajax has queued an update against it, with download progress when the cloud is pushing bytes. No install button is exposed on purpose — firmware updates remain Ajax-scheduled and the entity is informational. Hubs whose firmware doesn't report the running version behave as before (queued-update info only).
 - **Per-device firmware update** (read-only): each non-hub device gets an `update.<device>_firmware` counterpart sourced from the same read-only snapshot, surfacing the queued target version, download progress and a security-critical flag. **Disabled by default** (a typical install has 10-30 devices) — enable the ones you want to watch
 - **Persistent notifications** (optional): an option that surfaces selected security events as Home Assistant persistent notifications that stay visible until dismissed, as a built-in alternative to wiring your own `persistent_notification.create` automation. The event set is configurable and defaults to real incidents (alarm, panic, tamper, fire, CO, flood, glass break). Off by default; requires FCM push
-- **Cameras**: MotionCam Photo on Demand — capture photos and view them in HA (PhOD models only)
+- **Cameras**: MotionCam alarm-photo sequences in HA, plus on-demand captures on PhOD models
 - **Photo Storage**: Captured photos saved to `/media/ajax_photos/` with timestamp overlay, configurable retention
 - **Media Browser**: Browse captured photos per device via HA Media Browser
 - **Event Platform**: Security events from FCM push notifications (alarm, arm/disarm, tamper, panic, fire, flood, motion, and more)
@@ -107,7 +107,7 @@ Click the button above, or manually:
 > in practice the account needs admin / full access (see the FCM troubleshooting
 > note below). You can also revoke its
 > **photo / video** access if you don't use
-> Photo on Demand, so Home Assistant never has access to camera images. This keeps
+> Photo on Demand or alarm photos, so Home Assistant never has access to camera images. This keeps
 > your main credentials out of HA and limits what a compromised HA host could reach
 > in your Ajax installation.
 >
@@ -228,6 +228,16 @@ MotionCam **PhOD** (Photo on Demand) models support capturing photos remotely:
 
 Photos are automatically cleaned up based on your retention settings (configurable in integration options).
 
+### Alarm photos in Media Source
+
+MotionCam models, including PhOD, can display photos attached to real alarms. This does not trigger a new capture: regular MotionCam models still have no on-demand capture button. The camera entity shows the latest alarm's contact sheet (one, two or three frames, depending on the camera configuration); a newer PhOD capture can also update that entity. Historical imports never replace a newer preview.
+
+Open **Media Browser → Aegis Security Photos → device → alarm album** to browse each sequence. Albums are saved under `/media/ajax_photos/{device_name}/YYYY-MM-DD_HH-MM-SS-ffffff/`, using the alarm's timestamp in Home Assistant's timezone, with numbered frames (`01.jpg`, `02.jpg`, `03.jpg`) and `preview.jpg`. The device's `last.jpg` is the latest preview. PhOD captures remain separate files named `YYYY-MM-DD_HH-MM-SS-ffffff.jpg`; microseconds avoid same-second collisions. Retention removes whole expired albums as well as old captures.
+
+New camera-alarm pushes add **one Ajax gRPC `streamNotificationMedia` call** using the notification and hub IDs from the push. That same stream waits for pending frames to finish; it never queries history or reopens the stream. Completed local albums are skipped, including after restart. Existing PhOD capture behavior is unchanged.
+
+For missed events, call `aegis_ajax.refresh_alarm_images` manually. Per space, each invocation adds **one `findNotifications` query** against the Alarm folder (up to 50 events) and **at most 10 media streams**, skipping completed local albums before opening a stream. A five-minute per-space cooldown rejects repeated calls before any network request. Both paths also download available frames using their signed image URLs. There is no periodic history polling; unavailable or incomplete sequences can be recovered with a later manual backfill.
+
 ## Video cameras (ONVIF / RTSP)
 
 Ajax video hardware (the **NVR** and the IP cameras / doorbell channels bridged through it) exposes a **local** ONVIF/RTSP service. This integration does **not** stream or proxy that video itself — instead it reads the connection details so you can point **Home Assistant's built-in [ONVIF integration](https://www.home-assistant.io/integrations/onvif/)** at each camera and get a real `camera` entity with live view.
@@ -258,6 +268,7 @@ That's it — from there the camera behaves like any other ONVIF camera in Home 
 | `aegis_ajax.force_arm_night` | Arm night mode ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
 | `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Supports entity target; if omitted, applies to all panels. |
 | `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
+| `aegis_ajax.refresh_alarm_images` | Import recent alarm-photo albums without triggering a capture. Target an alarm panel with `entity_id`, or omit it for all spaces. One history query + at most 10 media streams per space, once per five minutes; completed albums are skipped. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
 
 Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.

@@ -85,6 +85,33 @@ _MAX_WALK_CANDIDATES = 1024
 _MIN_QUALIFIER_LEN = 4
 
 
+def extract_alarm_photo_context(raw: bytes, notification_id: str) -> tuple[str, str, float] | None:
+    """Recover the camera, hub and event time from the push without an API lookup."""
+    try:
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.service.push_notification_dispatch import (  # noqa: PLC0415, E501
+            event_pb2,
+        )
+
+        dispatch = event_pb2.PushNotificationDispatchEvent()
+        dispatch.ParseFromString(raw)
+        if dispatch.WhichOneof("push") != "notification":
+            return None
+        notification = dispatch.notification
+        if notification.id != notification_id:
+            return None
+        if notification.content.WhichOneof("content") != "hub_notification_content":
+            return None
+        content = notification.content.hub_notification_content
+        ts = notification.server_timestamp
+        timestamp = ts.seconds + ts.nanos / 1_000_000_000
+        if not content.source.id or not content.origin.hex_id or timestamp <= 0:
+            return None
+        return content.source.id, content.origin.hex_id, timestamp
+    except Exception:
+        _LOGGER.debug("Alarm push lacks usable photo context; manual backfill is available")
+        return None
+
+
 def extract_notification_id(encoded_data: str) -> str | None:
     """Extract notification_id from base64-encoded push notification data."""
     try:

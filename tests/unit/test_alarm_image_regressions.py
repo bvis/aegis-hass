@@ -36,6 +36,8 @@ def _coordinator(tmp_path: Path) -> AjaxCobrandedCoordinator:
     coordinator.hub_registry_id = MagicMock(return_value=None)
     coordinator._media_api = MagicMock()
     coordinator._alarm_import_lock = asyncio.Lock()
+    coordinator._last_alarm_backfill = {}
+    coordinator._seen_alarm_push_ids = set()
     coordinator._imported_alarm_notification_ids = set()
     coordinator.photo_revisions = {}
     coordinator.last_photo_urls = {}
@@ -108,10 +110,13 @@ async def test_partial_download_remains_retryable(tmp_path: Path) -> None:
     coordinator._async_download_and_save_alarm_image = AsyncMock(
         side_effect=[Path("one"), None, None, Path("one"), Path("two"), Path("three")]
     )
-    with patch(
-        "custom_components.aegis_ajax.coordinator.save_alarm_contact_sheet",
-        new=AsyncMock(return_value=Path("last.jpg")),
-    ) as compose:
+    with (
+        patch("custom_components.aegis_ajax.coordinator.time.monotonic", side_effect=[1000, 1300]),
+        patch(
+            "custom_components.aegis_ajax.coordinator.save_alarm_contact_sheet",
+            new=AsyncMock(return_value=Path("last.jpg")),
+        ) as compose,
+    ):
         first = await coordinator.async_import_alarm_images("space")
         assert first["notifications"] == 0
         assert "alarm" not in coordinator._imported_alarm_notification_ids
@@ -262,21 +267,31 @@ async def test_overlapping_imports_publish_an_alarm_once(tmp_path: Path) -> None
     coordinator._media_api.get_recent_alarm_media = AsyncMock(
         return_value=(AlarmMedia("camera", "alarm", ("one",), 100),)
     )
+    coordinator._media_api.get_alarm_media = AsyncMock(
+        return_value=AlarmMedia("camera", "alarm", ("one",), 100)
+    )
+    original_sleep = asyncio.sleep
+
+    async def skip_delay(_seconds: float) -> None:
+        await original_sleep(0)
 
     async def download(*_args: object, **_kwargs: object) -> Path:
         await asyncio.sleep(0)
         return Path("one")
 
     coordinator._async_download_and_save_alarm_image = AsyncMock(side_effect=download)
-    with patch(
-        "custom_components.aegis_ajax.coordinator.save_alarm_contact_sheet",
-        new=AsyncMock(return_value=Path("last.jpg")),
+    with (
+        patch("custom_components.aegis_ajax.coordinator.asyncio.sleep", side_effect=skip_delay),
+        patch(
+            "custom_components.aegis_ajax.coordinator.save_alarm_contact_sheet",
+            new=AsyncMock(return_value=Path("last.jpg")),
+        ),
     ):
         results = await asyncio.gather(
             coordinator.async_import_alarm_images("space"),
-            coordinator.async_import_alarm_images("space", notification_ids={"alarm"}),
+            coordinator._async_import_pushed_alarm_images("alarm", "camera", "hub", 100),
         )
-    assert sum(result["notifications"] for result in results) == 1
+    assert results[0]["notifications"] == 1
     assert coordinator._async_download_and_save_alarm_image.await_count == 1
 
 
@@ -297,9 +312,8 @@ async def test_backfill_after_fcm_keeps_latest_and_archives_older(tmp_path: Path
     coordinator = _coordinator(tmp_path)
     newer = AlarmMedia("camera", "newer", ("newer",), 200)
     older = AlarmMedia("camera", "older", ("older",), 100)
-    coordinator._media_api.get_recent_alarm_media = AsyncMock(
-        side_effect=[(newer,), (newer, older)]
-    )
+    coordinator._media_api.get_recent_alarm_media = AsyncMock(return_value=(newer, older))
+    coordinator._media_api.get_alarm_media = AsyncMock(return_value=newer)
 
     async def download(device: object, url: str, **kwargs: object) -> Path | None:
         return await save_photo(
@@ -312,7 +326,8 @@ async def test_backfill_after_fcm_keeps_latest_and_archives_older(tmp_path: Path
         )
 
     coordinator._async_download_and_save_alarm_image = AsyncMock(side_effect=download)
-    await coordinator.async_import_alarm_images("space", notification_ids={"newer"})
+    with patch("custom_components.aegis_ajax.coordinator.asyncio.sleep", new=AsyncMock()):
+        await coordinator._async_import_pushed_alarm_images("newer", "camera", "hub", 200)
     expected = await load_last_photo(coordinator.hass, "Hall camera")
     result = await coordinator.async_import_alarm_images("space")
     assert result == {"notifications": 1, "images": 1}

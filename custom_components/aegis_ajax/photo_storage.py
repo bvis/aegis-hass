@@ -34,6 +34,29 @@ def _sanitize_name(name: str) -> str:
     return "".join(c if c.isalnum() or c in " -_" else "_" for c in name).strip()
 
 
+def alarm_album_name(timestamp: float) -> str:
+    """Use the same event-time directory for push and historical imports."""
+    captured_at = dt_util.utc_from_timestamp(timestamp) if timestamp else dt_util.now()
+    return dt_util.as_local(captured_at).strftime("%Y-%m-%d_%H-%M-%S-%f")
+
+
+async def alarm_album_exists(hass: HomeAssistant, device_name: str, timestamp: float) -> bool:
+    """Skip network retrieval only for completed albums, not partial downloads."""
+    if not timestamp:
+        return False
+
+    def _exists() -> bool:
+        media_dir = Path(hass.config.media_dirs.get("local", "/media"))
+        album = (
+            media_dir / PHOTOS_BASE_DIR / _sanitize_name(device_name) / alarm_album_name(timestamp)
+        )
+        return (album / "preview.jpg").is_file() and any(
+            photo.name != "preview.jpg" for photo in album.glob("*.jpg")
+        )
+
+    return await asyncio.to_thread(_exists)
+
+
 def _overlay_timestamp(image_bytes: bytes, captured_at: datetime | None = None) -> bytes:
     """Add the image capture time, or now when it is unknown, as an overlay."""
     try:

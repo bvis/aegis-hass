@@ -1188,15 +1188,21 @@ class AjaxNotificationListener:
                 # every event took the fallback below and was delivered to every
                 # space. Don't reintroduce a byte scan here.
                 target_space = self._find_space_for_event(raw)
+                photo_context = (
+                    notification_event_parser.extract_alarm_photo_context(raw, notification_id)
+                    if event_type == "alarm" and notification_id
+                    else None
+                )
                 if target_space:
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, target_space, event_type, event_data
                     )
-                    if event_type == "alarm" and notification_id:
+                    if photo_context is not None:
                         self._dispatch_to_loop(
                             self._coordinator.schedule_alarm_image_import,
                             target_space,
                             notification_id,
+                            *photo_context,
                         )
                     self._apply_security_state_from_event(target_space, event_data)
                 elif len(self._coordinator._space_ids) == 1:
@@ -1206,11 +1212,12 @@ class AjaxNotificationListener:
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, only_space, event_type, event_data
                     )
-                    if event_type == "alarm" and notification_id:
+                    if photo_context is not None:
                         self._dispatch_to_loop(
                             self._coordinator.schedule_alarm_image_import,
                             only_space,
                             notification_id,
+                            *photo_context,
                         )
                     self._apply_security_state_from_event(only_space, event_data)
                 elif named_space := notification_event_parser.extract_space_id(raw):

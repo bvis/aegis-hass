@@ -161,6 +161,8 @@ refresh_alarm_images:
     MotionCam camera entities, including models without Photo on Demand. This
     service does not capture a new photo. New alarm pushes import their own
     images automatically; use this service to backfill recent history.
+    Limited to once per five minutes per space: one history query and at most
+    ten media streams. Completed local albums are skipped, including after restart.
   target:
     entity:
       domain: alarm_control_panel

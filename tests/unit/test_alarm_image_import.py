@@ -33,22 +33,29 @@ def _camera(device_id: str = "camera") -> Device:
 
 class TestAlarmImageImport:
     @pytest.mark.asyncio
-    async def test_pushed_alarm_retries_until_media_is_ready(self) -> None:
+    async def test_pushed_alarm_uses_direct_media_stream(self) -> None:
         coordinator = object.__new__(AjaxCobrandedCoordinator)
-        coordinator.async_import_alarm_images = AsyncMock(
-            side_effect=[{"notifications": 0, "images": 0}, {"notifications": 1, "images": 3}]
+        coordinator._alarm_import_lock = asyncio.Lock()
+        coordinator._async_alarm_is_stored = AsyncMock(return_value=False)
+        alarm = AlarmMedia("camera", "notification", ("one", "two", "three"), 123)
+        coordinator._media_api = MagicMock()
+        coordinator._media_api.get_alarm_media = AsyncMock(return_value=alarm)
+        coordinator._async_save_alarm_media = AsyncMock(
+            return_value={"notifications": 1, "images": 3}
         )
 
         with patch(
             "custom_components.aegis_ajax.coordinator.asyncio.sleep", new=AsyncMock()
         ) as sleep:
-            await coordinator._async_import_pushed_alarm_images("space", "notification")
+            await coordinator._async_import_pushed_alarm_images(
+                "notification", "camera", "hub", 123
+            )
 
-        assert sleep.await_args_list == [call(8), call(12)]
-        assert coordinator.async_import_alarm_images.await_args_list == [
-            call("space", notification_ids={"notification"}),
-            call("space", notification_ids={"notification"}),
-        ]
+        sleep.assert_awaited_once_with(8)
+        coordinator._media_api.get_alarm_media.assert_awaited_once_with(
+            "notification", "hub", "camera", 123
+        )
+        coordinator._async_save_alarm_media.assert_awaited_once_with((alarm,))
 
     @pytest.mark.asyncio
     async def test_import_orders_photos_so_last_image_is_the_newest(self) -> None:
@@ -62,6 +69,7 @@ class TestAlarmImageImport:
         )
         coordinator._imported_alarm_notification_ids = set()
         coordinator._alarm_import_lock = asyncio.Lock()
+        coordinator._last_alarm_backfill = {}
         coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices = {"camera": _camera()}

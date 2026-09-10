@@ -9,6 +9,7 @@ from homeassistant.components.camera import Camera
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.aegis_ajax.api.media import is_valid_photo_url
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import build_device_info
@@ -84,13 +85,11 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         # A manual historical-alarm import writes a fresh `last.jpg`. Discard
         # our in-memory copy so normal MotionCam hardware immediately exposes
         # it, without attempting an unsupported Photo on Demand capture.
-        photo_revisions = getattr(self.coordinator, "photo_revisions", None)
-        if isinstance(photo_revisions, dict):
-            current_revision = photo_revisions.get(self._device_id, 0)
-            if current_revision != self._photo_revision:
-                self._last_image = None
-                self._last_image_url = None
-                self._photo_revision = current_revision
+        current_revision = self.coordinator.photo_revisions.get(self._device_id, 0)
+        if current_revision != self._photo_revision:
+            self._last_image = None
+            self._last_image_url = None
+            self._photo_revision = current_revision
         # Check if button.py just retrieved a new URL
         url = self.coordinator.last_photo_urls.pop(self._device_id, None)
         if url:
@@ -109,22 +108,11 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
             self._last_image = await load_last_photo(self.hass, device_name)
         return self._last_image
 
-    @staticmethod
-    def _is_valid_photo_url(url: str) -> bool:
-        """Validate that the URL belongs to a known Ajax domain."""
-        from urllib.parse import urlparse  # noqa: PLC0415
-
-        hostname = urlparse(url).hostname or ""
-        # S3 branch anchored to the real bucket host so a substring match can't
-        # accept `hubs-uploaded-resources.attacker.com` (SSRF).
-        is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(".amazonaws.com")
-        return hostname.endswith(".ajax.systems") or is_s3
-
     async def _download_image(self, url: str) -> bytes | None:
         """Download image from URL and cache it."""
         import aiohttp  # noqa: PLC0415
 
-        if not self._is_valid_photo_url(url):
+        if not is_valid_photo_url(url):
             # Log host only — never the query string (carries the S3 signature).
             from urllib.parse import urlparse  # noqa: PLC0415
 

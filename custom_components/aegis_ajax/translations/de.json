@@ -187,6 +187,16 @@
                 }
             }
         },
+        "refresh_alarm_images": {
+            "name": "Refresh alarm camera images",
+            "description": "Import recent alarm photos into local albums without taking a new photo. New alarm pushes import automatically. Manual backfill is limited to once per five minutes per space, with one history query and at most ten media streams; completed local albums are skipped.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                }
+            }
+        },
         "list_client_sessions": {
             "name": "Kontositzungen auflisten",
             "description": "Gibt die aktiven Sitzungen des Ajax-Kontos zur manuellen Prüfung auf Abruf zurück. Dieser Dienst ruft einen internen Ajax-Endpunkt auf, der häufige Anfragen begrenzen kann; nicht in Automatisierungen regelmäßig abfragen. Die aktuell aktive Aegis-Sitzung wird als is_current markiert, wenn sie erkannt werden kann.",
@@ -552,6 +562,9 @@
     "exceptions": {
         "manual_refresh_hts_unavailable": {
             "message": "Die Hub-Netzwerkverbindung (HTS) ist derzeit nicht aktiv; die manuelle Aktualisierung kann nicht ausgeführt werden."
+        },
+        "alarm_backfill_rate_limited": {
+            "message": "Alarm photos were recently refreshed for this space; wait {seconds} more seconds and try again."
         },
         "manual_refresh_rate_limited": {
             "message": "Eine Hub-Aktualisierung wurde gerade angefordert; warte noch {seconds} Sekunden und versuche es erneut."

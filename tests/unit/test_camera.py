@@ -53,6 +53,7 @@ class TestCameraSetup:
         from custom_components.aegis_ajax.camera import async_setup_entry
 
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.devices = {
             "camera": _device("camera", "motion_cam"),
             "not-camera": _device("not-camera", "motion_cam_g3"),
@@ -70,6 +71,7 @@ class TestCameraSetup:
 class TestAjaxCamera:
     def test_unique_id(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         cam = AjaxCamera(
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam_phod"
         )
@@ -77,6 +79,7 @@ class TestAjaxCamera:
 
     def test_has_camera_image_method(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         cam = AjaxCamera(
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam_phod"
         )
@@ -85,6 +88,7 @@ class TestAjaxCamera:
     def test_name_is_none(self) -> None:
         """Camera is the primary entity and adopts device name."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         mock_device = MagicMock()
         mock_device.name = "Front Camera"
         coordinator.devices = {"d1": mock_device}
@@ -95,6 +99,7 @@ class TestAjaxCamera:
 
     def test_device_info_with_device(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         mock_device = MagicMock()
         mock_device.id = "d1"
         mock_device.name = "Front Camera"
@@ -109,6 +114,7 @@ class TestAjaxCamera:
 
     def test_device_info_without_device(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.devices = {}
         cam = AjaxCamera(
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam"
@@ -117,6 +123,7 @@ class TestAjaxCamera:
 
     def test_available_when_device_online(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         mock_device = MagicMock()
         mock_device.is_online = True
         coordinator.devices = {"d1": mock_device}
@@ -127,6 +134,7 @@ class TestAjaxCamera:
 
     def test_unavailable_when_device_missing(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.devices = {}
         cam = AjaxCamera(
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam"
@@ -137,6 +145,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_downloads_from_cached_url(self) -> None:
         """When button stored a URL, camera downloads and returns the image."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {
             "d1": "https://hubs-uploaded-resources.s3.amazonaws.com/photo.jpg"
         }
@@ -167,6 +176,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_uses_cached_url_from_button(self) -> None:
         """When button already retrieved a URL, camera uses it directly."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {
             "d1": "https://hubs-uploaded-resources.s3.amazonaws.com/photo.jpg"
         }
@@ -197,6 +207,7 @@ class TestAjaxCamera:
     @pytest.mark.asyncio
     async def test_async_camera_image_reloads_after_alarm_image_import(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.photo_revisions = {"d1": 1}
         coordinator.devices = {"d1": _device("d1", "motion_cam")}
@@ -215,6 +226,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_returns_none_when_capture_fails(self) -> None:
         """When capture_photo returns None, no URL wait happens and cached image returned."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value=None)
         mock_listener = MagicMock()
@@ -234,6 +246,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_returns_cached_when_no_url(self) -> None:
         """When both notification_id and push URL fail, cached image is returned."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value="d1")
         mock_listener = MagicMock()
@@ -253,6 +266,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_media_stream_no_url(self) -> None:
         """When notification_id arrives but media stream returns no URL."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value="d1")
         mock_listener = MagicMock()
@@ -271,6 +285,7 @@ class TestAjaxCamera:
     @pytest.mark.asyncio
     async def test_async_camera_image_handles_http_error(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value="d1")
         mock_listener = MagicMock()
@@ -306,6 +321,7 @@ class TestAjaxCamera:
     @pytest.mark.asyncio
     async def test_async_camera_image_handles_download_exception(self) -> None:
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value="d1")
         mock_listener = MagicMock()
@@ -336,6 +352,7 @@ class TestAjaxCamera:
     async def test_async_camera_image_no_notification_listener(self) -> None:
         """When notification_listener is None, capture returns but no URL wait."""
         coordinator = MagicMock()
+        coordinator.photo_revisions = {}
         coordinator.last_photo_urls = {}
         coordinator.devices_api.capture_photo = AsyncMock(return_value="d1")
         coordinator.notification_listener = None

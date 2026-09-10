@@ -24,7 +24,7 @@ from systems.ajax.api.mobile.v2.notificationlog import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Collection, Sequence
+    from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequence
 
     from custom_components.aegis_ajax.api.client import AjaxGrpcClient
 
@@ -128,7 +128,7 @@ def _photo_urls_from_media(media: _NotificationMedia) -> tuple[str, ...]:
     """Extract a complete sequence, waiting for every pending hub frame.
 
     Failed frames are terminal and cannot be downloaded. An empty result for
-    an unfinished sequence keeps the stream/retry active instead of silently
+    an unfinished sequence keeps the stream active instead of silently
     treating the first ready frame as the whole alarm.
     """
     content = media.WhichOneof("content")
@@ -192,14 +192,13 @@ class MediaApi:
         space_id: str,
         *,
         device_ids: Collection[str] | None = None,
-        notification_ids: Collection[str] | None = None,
+        is_stored: Callable[[str, str, float], Awaitable[bool]] | None = None,
     ) -> tuple[AlarmMedia, ...]:
         """Return recent alarm images for one space.
 
         Notification history is a server-side log, separate from FCM. It is
-        queried by the explicit user service or for one notification
-        selected by an FCM alarm push; it is never part of the periodic update
-        loop.
+        queried only by the explicit backfill service, never by FCM or polling.
+        Completed local albums are skipped before spending the media budget.
         """
         channel = self._client._get_channel()
         metadata = self._client._session.get_call_metadata()
@@ -231,15 +230,9 @@ class MediaApi:
             reverse=True,
         )
         target_device_ids = set(device_ids) if device_ids is not None else None
-        target_notification_ids = set(notification_ids) if notification_ids is not None else None
         alarms: list[AlarmMedia] = []
         media_attempts = 0
         for notification in notifications:
-            if (
-                target_notification_ids is not None
-                and notification.id not in target_notification_ids
-            ):
-                continue
             content = notification.content.WhichOneof("content")
             if content == "hub_notification_content":
                 hub_content = notification.content.hub_notification_content
@@ -259,6 +252,10 @@ class MediaApi:
             # Skip non-camera alarm sources before using the bounded media
             # budget. A Hub can generate many other alarm history entries.
             if target_device_ids is not None and device_id not in target_device_ids:
+                continue
+            if is_stored is not None and await is_stored(
+                device_id, notification.id, _notification_timestamp(notification)
+            ):
                 continue
             if media_attempts >= _ALARM_MEDIA_LIMIT:
                 break
@@ -282,6 +279,22 @@ class MediaApi:
 
         return tuple(alarms)
 
+    async def get_alarm_media(
+        self, notification_id: str, hub_id: str, device_id: str, timestamp: float
+    ) -> AlarmMedia | None:
+        """Open exactly one media stream for a pushed alarm; never query history."""
+        stub = notification_log_endpoints_pb2_grpc.NotificationLogServiceStub(
+            self._client._get_channel()
+        )
+        urls = await self._get_notification_media_urls(
+            stub,
+            notification_id=notification_id,
+            origin=origin_id_pb2.NotificationOriginId(hub_hex_id=hub_id),
+            metadata=self._client._session.get_call_metadata(),
+            timeout=60,
+        )
+        return AlarmMedia(device_id, notification_id, urls, timestamp) if urls else None
+
     async def _get_notification_media_urls(
         self,
         stub: _NotificationLogServiceStub,
@@ -289,13 +302,14 @@ class MediaApi:
         notification_id: str,
         origin: origin_id_pb2.NotificationOriginId,
         metadata: list[tuple[str, str]],
+        timeout: float = 10,
     ) -> tuple[str, ...]:
         """Read the ready media payload for one historical notification."""
         request = stream_media_pb2.StreamNotificationMediaRequest(
             notification_id=notification_id,
             origin=origin,
         )
-        stream = stub.streamNotificationMedia(request, metadata=metadata, timeout=10)
+        stream = stub.streamNotificationMedia(request, metadata=metadata, timeout=timeout)
         try:
             async for response in stream:
                 if response.WhichOneof("response") != "success":

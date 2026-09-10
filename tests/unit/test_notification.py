@@ -2858,22 +2858,28 @@ class TestSecurityEventSnapshotNudge:
         self._fire(listener, "doorbell_pressed", "doorbell_press")
         listener._coordinator.request_security_snapshot_refresh.assert_not_called()
 
-    def test_alarm_push_schedules_its_image_import(self) -> None:
+    @pytest.mark.parametrize("tag", ["intrusion_alarm", "intrusion_alarm_confirmed"])
+    def test_alarm_push_schedules_its_image_import(self, tag: str) -> None:
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.service.push_notification_dispatch import (  # noqa: E501
+            event_pb2,
+        )
+
         listener = self._make_listener()
-        encoded = base64.b64encode(b"any-payload").decode()
-        with (
-            patch.object(
-                listener,
-                "_extract_event_from_proto",
-                return_value=("alarm", {"raw_tag": "intrusion_alarm"}),
-            ),
-            patch.object(listener, "_extract_source_info", return_value={}),
-            patch.object(listener, "_find_space_for_event", return_value="space-1"),
-        ):
+        dispatch = event_pb2.PushNotificationDispatchEvent()
+        notification = dispatch.notification
+        notification.id = "alarm-notification-id"
+        notification.server_timestamp.seconds = 123
+        content = notification.content.hub_notification_content
+        content.source.id = "camera"
+        content.origin.hex_id = "hub"
+        getattr(content.qualifier.tag, tag).SetInParent()
+        content.qualifier.transition.triggered.SetInParent()
+        encoded = base64.b64encode(dispatch.SerializeToString()).decode()
+        with patch.object(listener, "_find_space_for_event", return_value="space-1"):
             listener._parse_and_fire_event(encoded, notification_id="alarm-notification-id")
 
         listener._coordinator.schedule_alarm_image_import.assert_called_once_with(
-            "space-1", "alarm-notification-id"
+            "space-1", "alarm-notification-id", "camera", "hub", 123
         )
 
     def test_group_event_without_group_id_logs_warning_with_hex(
