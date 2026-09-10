@@ -151,8 +151,19 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
         ("motion_detected", "tamper", "delay_when_leaving"),
         is_camera=True,
     ),
+    # `motion_cam_outdoor_two_four_phod` joined this group on field evidence
+    # rather than on its name: #499 reported an install whose Ajax app offers
+    # Photo on Demand for it, and the same diagnostics dump carries a working
+    # `motion_cam_phod` on the same hub — same account, same permissions, one
+    # family getting the entities and the other not. The remaining unmapped
+    # MotionCam families in the group below still await that confirmation (#472).
     StaticDeviceHandler(
-        ("motion_cam_phod", "motion_cam_outdoor_phod", "motion_cam_fibra_base"),
+        (
+            "motion_cam_phod",
+            "motion_cam_outdoor_phod",
+            "motion_cam_fibra_base",
+            "motion_cam_outdoor_two_four_phod",
+        ),
         ("motion_detected", "tamper", "delay_when_leaving"),
         is_camera=True,
         is_phod=True,
@@ -162,7 +173,6 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "motion_cam_g3",
             "motion_cam_hd",
             "motion_cam_phod_fibra",
-            "motion_cam_outdoor_two_four_phod",
             "motion_cam_s_phod",
             "motion_cam_s_phod_am",
             "motion_cam_superior_phod",
