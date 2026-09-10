@@ -3861,6 +3861,70 @@ class TestCapturePhotoV2:
         assert idx != -1
         assert request[idx + 1] == 2  # device type 2 for outdoor
 
+    @pytest.mark.asyncio
+    async def test_capture_photo_outdoor_two_four_phod_sends_outdoor_type(self) -> None:
+        """The Outdoor 2/4 PhOD must be announced as outdoor, not indoor (#499).
+
+        It used to fall through the map to MOTION_CAM, so the hub was told an
+        outdoor detector was an indoor one and rejected the capture.
+        """
+        api = self._make_api()
+
+        captured_request: list[bytes] = []
+
+        async def _capture(request_bytes: bytes, **kwargs: object) -> bytes:
+            captured_request.append(request_bytes)
+            return b"\x0a\x00"
+
+        mock_channel = api._client._get_channel.return_value
+        mock_channel.unary_unary.return_value = _capture
+
+        await api.capture_photo("hub-1", "dev-1", "motion_cam_outdoor_two_four_phod")
+
+        request = captured_request[0]
+        idx = request.find(b"\x18")
+        assert idx != -1
+        assert request[idx + 1] == 2, "Outdoor 2/4 PhOD must send MOTION_CAM_OUTDOOR"
+
+    def test_every_phod_family_has_an_explicit_v2_device_type(self) -> None:
+        """No family carrying `is_phod` may rely on the fallback (#499).
+
+        The capture button is created from the handler registry's `is_phod`
+        flag, but the wire request needs a v2 DeviceType from a separate table.
+        Widening the registry without widening the table is what shipped a
+        button that always failed, so the two are pinned together here.
+        """
+        from custom_components.aegis_ajax import device_handlers
+        from custom_components.aegis_ajax.api.devices import PHOD_V2_DEVICE_TYPES
+        from custom_components.aegis_ajax.api.models import Device
+        from custom_components.aegis_ajax.const import DeviceState
+
+        def _device(device_type: str) -> Device:
+            return Device(
+                id="device-1",
+                hub_id="hub-1",
+                name="Test device",
+                device_type=device_type,
+                room_id=None,
+                group_id=None,
+                state=DeviceState.ONLINE,
+                malfunctions=0,
+                bypassed=False,
+                statuses={},
+                battery=None,
+            )
+
+        phod_families = {
+            device_type
+            for device_type in device_handlers._DEVICE_HANDLERS
+            if device_handlers.capabilities_for(_device(device_type)).is_phod
+        }
+        assert phod_families, "no PhOD families found - the registry lookup broke"
+        unmapped = phod_families - set(PHOD_V2_DEVICE_TYPES)
+        assert not unmapped, (
+            f"families expose a capture button but have no v2 DeviceType: {sorted(unmapped)}"
+        )
+
 
 class TestSetPhotoOnDemandMode:
     """Tests for DevicesApi.set_photo_on_demand_mode (DeviceCommandPhotoOnDemandModeService)."""
