@@ -156,76 +156,76 @@
                     "description": "Ha d'estar a true. Actua com a bloqueig de seguretat per evitar que les automatitzacions activin aquest servei per error."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entitat",
                     "description": "Entitat del panell d'alarma de l'espai del qual es prem el botó de pànic. Si s'omet, el pànic s'envia a tots els espais configurats."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Latitud",
                     "description": "Latitud opcional de qui truca, reenviada a Ajax. Usa-la amb longitud."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Longitud",
                     "description": "Longitud opcional de qui truca, reenviada a Ajax. Usa-la amb latitud."
                 }
             }
         },
         "set_photo_on_demand_mode": {
-            "name": "Set Photo on Demand mode",
-            "description": "Enable or disable Photo on Demand mode on a hub. Two independent channels can be toggled separately — user requests (whether hub users can request photos from the Ajax app) and scenarios (whether scenarios / automations can trigger captures). Leave a field unset to keep its current value. At least one is required.",
+            "name": "Configurar el mode Foto sota demanda",
+            "description": "Activa o desactiva el mode Foto sota demanda en un hub. Dos canals independents que es poden alternar per separat: peticions d'usuari (si els usuaris del hub poden demanar fotos des de l'app Ajax) i escenaris (si els escenaris / automatitzacions poden disparar captures). Deixa un camp sense valor per mantenir-ne l'estat actual. Almenys un dels dos és obligatori.",
             "fields": {
                 "user": {
-                    "name": "User requests",
-                    "description": "When set, enables or disables on-demand photo requests initiated by hub users. Leave unset to keep the current value."
+                    "name": "Peticions d'usuari",
+                    "description": "Si està marcat, activa o desactiva les peticions de foto sota demanda iniciades pels usuaris del hub. Deixa-ho sense valor per mantenir l'estat actual."
                 },
                 "scenario": {
-                    "name": "Scenarios",
-                    "description": "When set, enables or disables Photo on Demand captures triggered by Ajax scenarios / automations. Leave unset to keep the current value."
+                    "name": "Escenaris",
+                    "description": "Si està marcat, activa o desactiva les captures de Foto sota demanda disparades per escenaris / automatitzacions d'Ajax. Deixa-ho sense valor per mantenir l'estat actual."
                 },
                 "entity_id": {
-                    "name": "Entity",
-                    "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
+                    "name": "Entitat",
+                    "description": "Entitat del panell d'alarma de l'espai el mode de hub del qual s'ha d'actualitzar. Si s'omet, s'aplica a tots els espais configurats."
                 }
             }
         },
         "list_client_sessions": {
-            "name": "List account sessions",
-            "description": "Return active Ajax account sessions for manual inspection on demand. This service calls an internal Ajax endpoint that may rate limit frequent requests; do not poll it in automations. The currently active Aegis session is marked is_current when it can be identified.",
+            "name": "Llistar les sessions del compte",
+            "description": "Retorna a demanda les sessions actives del compte Ajax, per inspeccionar-les manualment. Aquest servei crida un endpoint intern d'Ajax que pot limitar la freqüència de les peticions: no el consultis periòdicament en automatitzacions. La sessió d'Aegis actualment activa es marca amb is_current quan es pot identificar.",
             "fields": {
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de l'entrada de configuració",
+                    "description": "Obligatori quan hi ha més d'un compte d'Aegis configurat."
                 }
             }
         },
         "terminate_client_session": {
-            "name": "Terminate account session",
-            "description": "Immediately log the selected other device out of the Ajax account. Obtain its session ID through list_client_sessions. The integration never terminates its own session.",
+            "name": "Tancar una sessió del compte",
+            "description": "Tanca immediatament la sessió del dispositiu seleccionat al compte Ajax. Obtén el seu ID de sessió amb list_client_sessions. La integració no tanca mai la seva pròpia sessió.",
             "fields": {
                 "session_id": {
-                    "name": "Session ID",
-                    "description": "Session ID returned by list_client_sessions."
+                    "name": "ID de sessió",
+                    "description": "ID de sessió retornat per list_client_sessions."
                 },
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate the selected session."
+                    "name": "Confirmar el tancament",
+                    "description": "Ha de ser true per tancar immediatament la sessió seleccionada."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de l'entrada de configuració",
+                    "description": "Obligatori quan hi ha més d'un compte d'Aegis configurat."
                 }
             }
         },
         "terminate_other_client_sessions": {
-            "name": "Terminate all other account sessions",
-            "description": "Immediately log all other devices out of the Ajax account. This signs out other active Ajax mobile and desktop apps. The integration never terminates its own session.",
+            "name": "Tancar totes les altres sessions del compte",
+            "description": "Tanca immediatament la sessió de tots els altres dispositius al compte Ajax. Això expulsa les altres apps d'Ajax mòbils i d'escriptori que estiguin actives. La integració no tanca mai la seva pròpia sessió.",
             "fields": {
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate all other sessions."
+                    "name": "Confirmar el tancament",
+                    "description": "Ha de ser true per tancar immediatament totes les altres sessions."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID de l'entrada de configuració",
+                    "description": "Obligatori quan hi ha més d'un compte d'Aegis configurat."
                 }
             }
         }

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from custom_components.aegis_ajax.api.models import Device, Room
 from custom_components.aegis_ajax.const import DOMAIN, DeviceState
 from custom_components.aegis_ajax.entity import (
@@ -64,6 +66,22 @@ class TestBuildDeviceInfo:
         assert "via_device_id" not in info
         assert "via_device" not in info
 
+    def test_video_edge_channel_has_no_self_via_link_on_new_ha(self) -> None:
+        # Video Edge channels have no hub-side parent; their parser uses the
+        # channel id as hub_id. Passing its own registered id as via_device_id
+        # makes HA reject the child device as its own parent (#489).
+        with patch("custom_components.aegis_ajax.entity._VIA_DEVICE_ID_SUPPORTED", True):
+            info = build_device_info(
+                _make_device(
+                    device_type="video_edge_turret",
+                    device_id="camera-1",
+                    hub_id="camera-1",
+                ),
+                via_device_id="reg-camera-1",
+            )
+        assert "via_device_id" not in info
+        assert "via_device" not in info
+
     def test_non_hub_device_keeps_identifier_link_on_old_ha(self) -> None:
         # Before 2026.8 `DeviceInfo` has no `via_device_id` key and passing one
         # is a TypeError inside HA, so the identifier tuple stays in use there.
@@ -73,6 +91,19 @@ class TestBuildDeviceInfo:
             )
         assert info["via_device"] == (DOMAIN, "HUB7")
         assert "via_device_id" not in info
+
+    def test_video_edge_channel_has_no_self_via_link_on_old_ha(self) -> None:
+        with patch("custom_components.aegis_ajax.entity._VIA_DEVICE_ID_SUPPORTED", False):
+            info = build_device_info(
+                _make_device(
+                    device_type="video_edge_turret",
+                    device_id="camera-1",
+                    hub_id="camera-1",
+                ),
+                via_device_id="reg-camera-1",
+            )
+        assert "via_device_id" not in info
+        assert "via_device" not in info
 
     def test_hub_device_has_no_via_link(self) -> None:
         for supported in (True, False):
@@ -227,3 +258,107 @@ class TestAsyncGetRegisteredDevice:
 
         assert found == "entry"
         registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "HUB7")})
+
+
+class TestNoDeviceIsEverItsOwnParent:
+    """#489, generalised: the self-parent bug, caught for every family.
+
+    The Video Edge regression was not really about Video Edge. It was about a
+    device whose `hub_id` equals its own id — which the parser does deliberately
+    whenever Ajax gives a device no hub parent — being handed its own registry
+    entry as `via_device_id`. Home Assistant refuses a device that is its own
+    parent and stops the platform providing its entities, which is how two
+    releases shipped with the NVR-bridged cameras silently orphaned.
+
+    A test naming `video_edge_turret` would not have caught it in advance. This
+    one asserts the property instead, over every device family the registry
+    knows plus an unmapped one, on both device-registry APIs.
+
+    ⚠️ Neither branch can be run against a Home Assistant that actually has the
+    2026.8 API: the newest `homeassistant` on PyPI is 2026.2.x, so CI resolves a
+    core where `via_device_id` does not exist in `DeviceInfo` and
+    `_VIA_DEVICE_ID_SUPPORTED` is always False. Patching the flag is therefore
+    the only way to exercise the branch every modern user actually runs, which
+    is exactly why the invariant has to be asserted rather than assumed.
+    """
+
+    @staticmethod
+    def _families() -> list[str]:
+        from custom_components.aegis_ajax.device_handlers import _DEVICE_HANDLERS
+
+        return [*sorted(_DEVICE_HANDLERS), "unmapped_unknown_device"]
+
+    @pytest.mark.parametrize("via_device_id_supported", [True, False])
+    def test_a_parentless_device_gets_no_via_link_at_all(
+        self, *, via_device_id_supported: bool
+    ) -> None:
+        for device_type in self._families():
+            device = _make_device(device_type=device_type, device_id="SELF1", hub_id="SELF1")
+            with patch(
+                "custom_components.aegis_ajax.entity._VIA_DEVICE_ID_SUPPORTED",
+                via_device_id_supported,
+            ):
+                info = build_device_info(device, via_device_id="reg-SELF1")
+            assert "via_device_id" not in info, device_type
+            assert "via_device" not in info, device_type
+
+    @pytest.mark.parametrize("via_device_id_supported", [True, False])
+    def test_a_device_with_a_real_hub_keeps_its_link(
+        self, *, via_device_id_supported: bool
+    ) -> None:
+        """The guard must not cost the ordinary case its parent."""
+        device = _make_device(device_type="door_protect", device_id="DEV1", hub_id="HUB1")
+        with patch(
+            "custom_components.aegis_ajax.entity._VIA_DEVICE_ID_SUPPORTED",
+            via_device_id_supported,
+        ):
+            info = build_device_info(device, via_device_id="reg-HUB1")
+        if via_device_id_supported:
+            assert info["via_device_id"] == "reg-HUB1"
+        else:
+            assert info["via_device"] == (DOMAIN, "HUB1")
+
+    def test_a_via_link_never_points_at_the_devices_own_identity(self) -> None:
+        """The invariant stated directly, whichever key carries the link."""
+        for device_type in self._families():
+            for hub_id, registry_id in (("SELF1", "reg-SELF1"), ("HUB1", "reg-HUB1")):
+                device = _make_device(device_type=device_type, device_id="SELF1", hub_id=hub_id)
+                for supported in (True, False):
+                    with patch(
+                        "custom_components.aegis_ajax.entity._VIA_DEVICE_ID_SUPPORTED", supported
+                    ):
+                        info = build_device_info(device, via_device_id=registry_id)
+                    assert info.get("via_device") != (DOMAIN, device.id), (device_type, supported)
+                    assert info.get("via_device_id") != "reg-SELF1" or hub_id != "SELF1", (
+                        device_type,
+                        supported,
+                    )
+
+
+class TestFeatureDetectionMatchesTheInstalledCore:
+    """`_VIA_DEVICE_ID_SUPPORTED` is a claim about the running Home Assistant.
+
+    If the detection ever stops matching reality — HA renames the key, or the
+    `TypedDict` stops exposing `__optional_keys__` — every via link silently
+    takes the wrong branch, and on a modern core that means `via_device` tuples
+    HA has removed. Asserting it against the installed core is cheap and it is
+    the one part of #444 that CI *can* verify at whatever version it resolves.
+    """
+
+    def test_detection_agrees_with_device_info(self) -> None:
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        from custom_components.aegis_ajax import entity
+
+        actual = "via_device_id" in (DeviceInfo.__required_keys__ | DeviceInfo.__optional_keys__)
+        assert entity._VIA_DEVICE_ID_SUPPORTED is actual
+
+    def test_the_old_key_still_exists_while_we_fall_back_to_it(self) -> None:
+        """The fallback branch is only safe while HA still accepts `via_device`."""
+        from homeassistant.helpers.device_registry import DeviceInfo
+
+        from custom_components.aegis_ajax import entity
+
+        if entity._VIA_DEVICE_ID_SUPPORTED:
+            return
+        assert "via_device" in (DeviceInfo.__required_keys__ | DeviceInfo.__optional_keys__)

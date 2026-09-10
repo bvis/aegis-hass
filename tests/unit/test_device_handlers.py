@@ -139,8 +139,8 @@ def test_street_siren_plus_has_no_siren_settings() -> None:
     """It is a siren, but its oneof case is missing from the HubDevice proto.
 
     Its settings are unreadable, so `number` / `select` would sit permanently
-    empty — which is why it is excluded from `SIREN_DEVICE_TYPES` and must stay
-    excluded here. Its binary sensors are unaffected.
+    empty — which is why it has no siren-settings capability. Its binary
+    sensors are unaffected.
     """
     capabilities = device_handlers.capabilities_for(_device("street_siren_plus"))
     assert not capabilities.has_siren_settings
@@ -156,38 +156,6 @@ def test_newly_registered_family_keeps_the_unmapped_binary_sensors(device_type: 
     default = device_handlers.DefaultDeviceHandler().capabilities(_device(device_type))
     registered = device_handlers.capabilities_for(_device(device_type))
     assert registered.binary_sensor_keys == default.binary_sensor_keys == ("tamper",)
-
-
-class TestCapabilityParityWithConstSets:
-    """`coordinator` and `notification` still gate on the `const.py` sets.
-
-    Until those move too, the registry and the sets are two sources of truth
-    for the same families, so pin them against each other: adding a family to
-    one and not the other is the drift this catches.
-    """
-
-    @staticmethod
-    def _types_with(capability: str) -> set[str]:
-        return {
-            device_type
-            for device_type, handler in device_handlers._DEVICE_HANDLERS.items()
-            if getattr(handler.capabilities(_device(device_type)), capability)
-        }
-
-    def test_siren_settings_matches_siren_device_types(self) -> None:
-        from custom_components.aegis_ajax.const import SIREN_DEVICE_TYPES
-
-        assert self._types_with("has_siren_settings") == set(SIREN_DEVICE_TYPES)
-
-    def test_doorbell_matches_doorbell_device_types(self) -> None:
-        from custom_components.aegis_ajax.const import DOORBELL_DEVICE_TYPES
-
-        assert self._types_with("is_doorbell") == set(DOORBELL_DEVICE_TYPES)
-
-    def test_button_press_matches_button_press_device_types(self) -> None:
-        from custom_components.aegis_ajax.const import BUTTON_PRESS_DEVICE_TYPES
-
-        assert self._types_with("is_button_press") == set(BUTTON_PRESS_DEVICE_TYPES)
 
 
 class TestHtsDerivedCapabilities:

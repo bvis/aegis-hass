@@ -156,15 +156,15 @@
                     "description": "Musi być ustawione na true. Działa jako blokada bezpieczeństwa, aby automatyzacje nie wywołały tej usługi przypadkowo."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Jednostka",
                     "description": "Encja panelu alarmowego przestrzeni, w której ma zostać naciśnięty przycisk paniki. Jeśli zostanie pominięta, alarm zostanie wysłany do wszystkich skonfigurowanych przestrzeni."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Szerokość geograficzna",
                     "description": "Opcjonalna szerokość geograficzna osoby dzwoniącej przekazywana do Ajax. Używaj razem z długością."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Długość geograficzna",
                     "description": "Opcjonalna długość geograficzna osoby dzwoniącej przekazywana do Ajax. Używaj razem z szerokością."
                 }
             }

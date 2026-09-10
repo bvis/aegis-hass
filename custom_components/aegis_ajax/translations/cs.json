@@ -156,15 +156,15 @@
                     "description": "Musí být nastaveno na true. Funguje jako bezpečnostní zámek bránící náhodnému spuštění automatizací."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entita",
                     "description": "Entita alarmového panelu prostoru, jehož panikové tlačítko se má stisknout. Pokud je vynecháno, panika se odešle do všech nakonfigurovaných prostorů."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Zeměpisná šířka",
                     "description": "Volitelná zeměpisná šířka volajícího předávaná Ajaxu. Použijte společně s délkou."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Zeměpisná délka",
                     "description": "Volitelná zeměpisná délka volajícího předávaná Ajaxu. Použijte společně se šířkou."
                 }
             }

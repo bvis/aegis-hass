@@ -270,6 +270,21 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
         ("leak_detected", "tamper"),
     ),
     # Sirens
+    # These are the siren families whose `HubDevice` proto oneof includes a
+    # writable `common_siren_part.siren_settings`. A SKU missing from that
+    # oneof decodes as unknown, leaving its settings unreadable and its
+    # `number` / `select` entities permanently empty. Keep this registration
+    # aligned with the proto oneof.
+    #
+    # The DoubleDeck, Fibra, and S variants include only
+    # `common_siren_part`, not temperature, tamper, or battery parts, so their
+    # internal temperature comes from HTS 0x02 instead of this snapshot.
+    #
+    # Writing is independent of this capability: `UpdateHubDevice` addresses
+    # the device by `ObjectType`, so a SKU absent from the oneof remains
+    # writable but unreadable. `home_siren_plus` is intentionally absent:
+    # although its proto oneof exists, `ObjectType` has no corresponding
+    # value, so `parse_device` cannot produce that device type.
     StaticDeviceHandler(
         (
             "home_siren",
@@ -290,8 +305,7 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
     ),
     # `street_siren_plus` is a siren, but its oneof case is missing from the
     # HubDevice proto, so its settings are unreadable and `number` / `select`
-    # would sit permanently empty. Same binary sensors, no settings entities —
-    # see SIREN_DEVICE_TYPES in const.py.
+    # would sit permanently empty. Same binary sensors, no settings entities.
     StaticDeviceHandler(
         ("street_siren_plus",),
         ("tamper",),

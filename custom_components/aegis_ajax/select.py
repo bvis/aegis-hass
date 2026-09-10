@@ -2,14 +2,13 @@
 
 Currently exposes the siren **volume level**. An entity is created for every
 siren device type the rich `StreamHubDevice` proto models a `common_siren_part`
-for (`has_siren_settings` in the device-handler registry, pinned against
-`SIREN_DEVICE_TYPES`) — created at setup regardless of whether its current
-value has been fetched yet, so it appears on first boot without waiting for the
-background settings refresh (it reads no selected option until the first
-snapshot merges the value). Writes go through the shared `UpdateHubDevice`
-command path (`DeviceCommand.set_siren_settings`); a hub rejection (e.g. the
-account lacks device-edit permission) is surfaced as a translated
-`HomeAssistantError`.
+for (`has_siren_settings` in the device-handler registry, the single source of
+truth) — created at setup regardless of whether its current value has been
+fetched yet, so it appears on first boot without waiting for the background
+settings refresh (it reads no selected option until the first snapshot merges
+the value). Writes go through the shared `UpdateHubDevice` command path
+(`DeviceCommand.set_siren_settings`); a hub rejection (e.g. the account lacks
+device-edit permission) is surfaced as a translated `HomeAssistantError`.
 """
 
 from __future__ import annotations

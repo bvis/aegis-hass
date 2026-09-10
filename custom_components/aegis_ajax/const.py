@@ -288,46 +288,6 @@ DEFAULT_BYPASS_SWITCHES = BYPASS_SWITCHES_AUTO
 BYPASS_REQUIRED_PERMISSION = "DEVICE_EDIT"
 
 # --- Siren settings entities (#310, #354) -------------------------------
-# Siren device families whose rich `StreamHubDevice` snapshot embeds a
-# writable `common_siren_part.siren_settings`. This is exactly the set of siren
-# `device` oneof cases our generated `HubDevice` proto models (verified: each
-# embeds `common_siren_part`) — a SKU missing from that oneof decodes as an
-# unknown case, so no settings can be read for it and creating its entities
-# would leave them permanently empty. Keep this set and the proto oneof in
-# step: extend one only alongside the other.
-#
-# The DoubleDeck / Fibra / S variants were added in #354. They carry *only*
-# `common_siren_part` on this API — no temperature, tamper or battery part —
-# which is why their internal temperature still comes from HTS 0x02 (see
-# HTS_TEMPERATURE_DEVICE_TYPES) rather than from this snapshot.
-#
-# Note the write path does not depend on any of this: `UpdateHubDevice`
-# addresses the device by `ObjectType`, so a SKU absent from the oneof was
-# always writable — it was only unreadable.
-#
-# `home_siren_plus` is intentionally absent: the proto now models that oneof
-# case, but `ObjectType` has no `home_siren_plus`, so `parse_device` can never
-# produce that device_type and listing it here would be dead weight. Add it if
-# and when the ObjectType appears.
-#
-# The settings refresh only streams the snapshot for these types, and the
-# `number`/`select` platforms create their entities for exactly these types.
-SIREN_DEVICE_TYPES = frozenset(
-    {
-        "street_siren",
-        "street_siren_plus_g3",
-        "street_siren_s",
-        "street_siren_fibra",
-        "street_siren_plus_fibra",
-        "street_siren_double_deck",
-        "street_siren_s_double_deck",
-        "street_siren_double_deck_fibra",
-        "home_siren",
-        "home_siren_g3",
-        "home_siren_s",
-        "home_siren_fibra",
-    }
-)
 # Status keys under which the writable siren settings are surfaced by the
 # device parser. `number`/`select` create their entities from the presence of
 # these keys, so every siren SKU that embeds a `common_siren_part` is covered
@@ -749,16 +709,6 @@ DEFAULT_PERSISTENT_NOTIFICATION_EVENTS: list[str] = [
 # startup) use it; kept generic so future runtime discovery can reuse it.
 SIGNAL_NEW_DEVICE = f"{DOMAIN}_new_device"
 
-# Device types that get their own per-device doorbell `event` entity on their
-# device card (#173). The ring event is also fired on the hub-level event
-# entity for backwards compatibility; this surfaces it where users look first.
-DOORBELL_DEVICE_TYPES: frozenset[str] = frozenset(
-    {
-        "video_edge_doorbell",
-        "motion_cam_video_doorbell",
-    }
-)
-
 # Internal routing key for doorbell pushes (used by the parser, the coordinator
 # dispatch, and the hub-level security event entity). Not the type the
 # doorbell-device-class entity emits — see DOORBELL_RING_EVENT_TYPE.
@@ -790,14 +740,13 @@ MOTION_EVENT_TYPE = "motion"
 # not push control-mode presses at all, confirmed on an install with push
 # configured, so no richer source exists to tell them apart.
 #
-# Only the single Button is included. The DoubleButton is panic-only and its
-# reporter confirmed pressing it emits nothing at all. Keyfobs
-# (`space_control`) do not carry this key: a press there produced no 0x39
-# whatsoever on a 13-device install, so this must stay gated by device type —
+# Only the single Button exposes the button-press capability. The DoubleButton
+# is panic-only and its reporter confirmed pressing it emits nothing at all.
+# Keyfobs (`space_control`) do not carry this key: a press there produced no
+# 0x39 whatsoever on a 13-device install, so this remains capability-gated —
 # the same sub-key means unrelated things on other families (on a DoorProtect
 # Plus it is a roller-shutter-online flag).
 BUTTON_PRESS_EVENT_TYPE = "pressed"
-BUTTON_PRESS_DEVICE_TYPES = frozenset({"button"})
 
 # Maps a DeviceCommand failure-oneof case (what the hub returned) to a
 # translated `exceptions.*` message key. Unmapped reasons fall back to

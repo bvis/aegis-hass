@@ -156,15 +156,15 @@
                     "description": "Debe estar en true. Actúa como bloqueo de seguridad para evitar que automatizaciones lo disparen por error."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entidad",
                     "description": "Entidad del panel de alarma del espacio cuyo botón de pánico se va a pulsar. Si se omite, el pánico se envía a todos los espacios configurados."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Latitud",
                     "description": "Latitud opcional de quien llama, reenviada a Ajax. Úsala junto con longitud."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Longitud",
                     "description": "Longitud opcional de quien llama, reenviada a Ajax. Úsala junto con latitud."
                 }
             }

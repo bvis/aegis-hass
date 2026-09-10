@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1] - 2026-09-09
+
+Two regression fixes, both of them for bugs that only exist on a real installation and that the
+test suite could not have caught in the shape it had.
+
+**Push notifications stopped working after upgrading to `1.19.0`** (#487, #491). `1.19.0` began
+stamping a fingerprint on the stored FCM registration so that a changed credential set could be
+detected. A registration saved by `1.18.0` or earlier carries no fingerprint, and the new check
+read that as an invalid cache: it discarded a working registration and registered again — putting
+every upgrading install through the one step in the flow that can fail for reasons unrelated to
+the user's credentials, which is the failure #464 exists to document as transient. Two reporters
+lost push and got it back by reverting to `1.18.0`, because the old registration was still on
+disk for `1.18.0` to reuse. A missing fingerprint is now adopted instead of discarded: the token
+is kept, the fingerprint is stamped on it, and upgrading does not re-register at all. That is
+exactly what `1.18.0` did with the same file, so it cannot be worse than the version people were
+reverting to, while a real credential change stays detectable from here on.
+
+The `1.19.0` notes said this migration had run on three installs. It had — and it succeeded on
+all three, because re-registration usually works. Success on three installs said nothing about
+the fourth, since the step it forced fails probabilistically. That is the lesson, not the fix.
+
+**Video Edge cameras bridged through an NVR lost their entities on `1.18.0`** (#489, #487, #490,
+by @aavdberg). Ajax provides no hub parent for a Video Edge channel, so the parser deliberately
+uses the channel's own id as its `hub_id`. The device-registry migration in #444 then resolved
+that id to the channel's own registry entry and passed it as the parent, and Home Assistant
+refuses a device that is its own parent — so the platform stopped providing the Motion and Case
+tampering entities and Home Assistant marked them "no longer provided". Channels now stay root
+devices. Unique IDs are unchanged, so the orphaned entities are re-adopted rather than duplicated.
+
+Neither fix could be confirmed on a live install here: the FCM one needs a pre-`1.19.0`
+registration on disk, which this maintainer's install no longer has after upgrading, and the
+registry one needs a Video Edge behind an NVR, which nobody here owns. Both ship on the mechanism
+plus unit tests that fail when the fix is reverted, and both issues stay open until a reporter
+confirms. The `1.18.0`-era regression also only reproduces on Home Assistant 2026.8 or newer,
+which the CI matrix does not reach.
+
+Also in this release: Danish, a fifteenth language, contributed in full by @webliodk (#488), plus
+Italian, Dutch and Spanish translations of the four action blocks that were still English (#475,
+#477, #483, #484, #485), and the completion of the device-handler refactor (#332) — the `light`,
+`valve`, `number`, `select`, `event` and `sensor` platforms now read their device families from
+the handler registry (#479, #481, #482).
+
+No change in this release adds a request to Ajax. The push fix removes one: an upgrading install
+no longer performs a registration it does not need.
+
+### Fixed
+
+- Push notifications no longer break on upgrade from a pre-`1.19.0` release: a cached FCM
+  registration without a credential fingerprint is adopted instead of discarded and re-registered
+  (#487).
+- Video Edge channels bridged through an NVR keep their Motion and Case tampering entities: they
+  are no longer given themselves as their device-registry parent (#489, #487).
+
+### Added
+
+- Danish translation (`da`), the fifteenth language (#488).
+- Italian, Dutch and Spanish translations of the account-session and Photo-on-Demand action
+  blocks (#475).
+
+### Changed
+
+- The `light`, `valve`, `number`, `select`, `event` and `sensor` platforms, and the coordinator's
+  siren-settings, button-press and temperature routing, now take their device families from the
+  device-handler registry instead of per-platform tables (#332). No user-visible change: verified
+  by an entity-registry census on a live install, byte-identical before and after.
+- The characterization suite now pins the neutrality of a newly registered device family
+  permanently, and the electrical sensors' creation gate has test coverage for the first time
+  (#482).
+
 ## [1.19.0] - 2026-09-08
 
 Consolidates the `1.19.0-beta.1` → `beta.7` series, same bits as `beta.7`. The release is

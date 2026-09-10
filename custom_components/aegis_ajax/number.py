@@ -3,13 +3,13 @@
 Currently exposes the siren **alarm duration** (seconds). An entity is created
 for every siren device type the rich `StreamHubDevice` proto models a
 `common_siren_part` for (`has_siren_settings` in the device-handler registry,
-pinned against `SIREN_DEVICE_TYPES`) — the entity is created at setup
-regardless of whether its current value has been fetched yet, so it appears on
-first boot without waiting for the background settings refresh (it reads
-`unknown` until the first snapshot merges the value). Writes go through the
-shared `UpdateHubDevice` command path (`DeviceCommand.set_siren_settings`),
-which the account can only perform with device-edit permission — a hub
-rejection is surfaced as a translated `HomeAssistantError`.
+the single source of truth) — the entity is created at setup regardless of
+whether its current value has been fetched yet, so it appears on first boot
+without waiting for the background settings refresh (it reads `unknown` until
+the first snapshot merges the value). Writes go through the shared
+`UpdateHubDevice` command path (`DeviceCommand.set_siren_settings`), which the
+account can only perform with device-edit permission — a hub rejection is
+surfaced as a translated `HomeAssistantError`.
 """
 
 from __future__ import annotations

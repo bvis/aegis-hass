@@ -156,7 +156,7 @@
                     "description": "Tem de estar a true. Funciona como bloqueio de segurança para impedir que automatizações acionem o serviço por engano."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Entidade",
                     "description": "Entidade do painel de alarme do espaço cujo botão de pânico vai ser premido. Se for omitida, o pânico é enviado a todos os espaços configurados."
                 },
                 "latitude": {
@@ -170,62 +170,62 @@
             }
         },
         "set_photo_on_demand_mode": {
-            "name": "Set Photo on Demand mode",
-            "description": "Enable or disable Photo on Demand mode on a hub. Two independent channels can be toggled separately — user requests (whether hub users can request photos from the Ajax app) and scenarios (whether scenarios / automations can trigger captures). Leave a field unset to keep its current value. At least one is required.",
+            "name": "Definir o modo Foto a pedido",
+            "description": "Ativa ou desativa o modo Foto a pedido num hub. Dois canais independentes podem ser alternados em separado: pedidos de utilizadores (se os utilizadores do hub podem pedir fotos a partir da app Ajax) e cenários (se os cenários / automatizações podem acionar capturas). Deixe um campo por preencher para manter o valor atual. É obrigatório pelo menos um dos dois.",
             "fields": {
                 "user": {
-                    "name": "User requests",
-                    "description": "When set, enables or disables on-demand photo requests initiated by hub users. Leave unset to keep the current value."
+                    "name": "Pedidos de utilizadores",
+                    "description": "Quando definido, ativa ou desativa os pedidos de foto a pedido iniciados pelos utilizadores do hub. Deixe por preencher para manter o valor atual."
                 },
                 "scenario": {
-                    "name": "Scenarios",
-                    "description": "When set, enables or disables Photo on Demand captures triggered by Ajax scenarios / automations. Leave unset to keep the current value."
+                    "name": "Cenários",
+                    "description": "Quando definido, ativa ou desativa as capturas de Foto a pedido acionadas por cenários / automatizações da Ajax. Deixe por preencher para manter o valor atual."
                 },
                 "entity_id": {
-                    "name": "Entity",
-                    "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
+                    "name": "Entidade",
+                    "description": "Painel de alarme do espaço cujo modo do hub deve ser atualizado. Se omitido, aplica-se a todos os espaços configurados."
                 }
             }
         },
         "list_client_sessions": {
-            "name": "List account sessions",
-            "description": "Return active Ajax account sessions for manual inspection on demand. This service calls an internal Ajax endpoint that may rate limit frequent requests; do not poll it in automations. The currently active Aegis session is marked is_current when it can be identified.",
+            "name": "Listar sessões da conta",
+            "description": "Devolve a pedido as sessões ativas da conta Ajax, para inspeção manual. Este serviço chama um endpoint interno da Ajax que pode limitar pedidos frequentes; não o consulte periodicamente em automatizações. A sessão do Aegis atualmente ativa é marcada como is_current quando puder ser identificada.",
             "fields": {
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID da entrada de configuração",
+                    "description": "Obrigatório quando está configurada mais de uma conta Aegis."
                 }
             }
         },
         "terminate_client_session": {
-            "name": "Terminate account session",
-            "description": "Immediately log the selected other device out of the Ajax account. Obtain its session ID through list_client_sessions. The integration never terminates its own session.",
+            "name": "Terminar uma sessão da conta",
+            "description": "Termina imediatamente a sessão do outro dispositivo selecionado na conta Ajax. Obtenha o respetivo ID de sessão através de list_client_sessions. A integração nunca termina a sua própria sessão.",
             "fields": {
                 "session_id": {
-                    "name": "Session ID",
-                    "description": "Session ID returned by list_client_sessions."
+                    "name": "ID de sessão",
+                    "description": "ID de sessão devolvido por list_client_sessions."
                 },
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate the selected session."
+                    "name": "Confirmar o término",
+                    "description": "Deve ser true para terminar imediatamente a sessão selecionada."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID da entrada de configuração",
+                    "description": "Obrigatório quando está configurada mais de uma conta Aegis."
                 }
             }
         },
         "terminate_other_client_sessions": {
-            "name": "Terminate all other account sessions",
-            "description": "Immediately log all other devices out of the Ajax account. This signs out other active Ajax mobile and desktop apps. The integration never terminates its own session.",
+            "name": "Terminar todas as outras sessões da conta",
+            "description": "Termina imediatamente a sessão de todos os outros dispositivos na conta Ajax. Isto termina a sessão das outras aplicações Ajax móveis e de computador ativas. A integração nunca termina a sua própria sessão.",
             "fields": {
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate all other sessions."
+                    "name": "Confirmar o término",
+                    "description": "Deve ser true para terminar imediatamente todas as outras sessões."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID da entrada de configuração",
+                    "description": "Obrigatório quando está configurada mais de uma conta Aegis."
                 }
             }
         }

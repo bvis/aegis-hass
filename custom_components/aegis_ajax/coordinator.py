@@ -52,7 +52,6 @@ from custom_components.aegis_ajax.api.session import (
 )
 from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import (
-    BUTTON_PRESS_DEVICE_TYPES,
     BUTTON_PRESS_EVENT_TYPE,
     BYPASS_CONFIRM_DELAY,
     DEACTIVATED_KEY,
@@ -67,7 +66,6 @@ from custom_components.aegis_ajax.const import (
     SECURITY_EVENT_REFRESH_COOLDOWN,
     SIGNAL_NEW_DEVICE,
     SIREN_ALARM_DURATION_KEY,
-    SIREN_DEVICE_TYPES,
     SIREN_SETTINGS_CONFIRM_DELAY,
     SIREN_VOLUME_LEVEL_KEY,
     ChimeStatus,
@@ -1411,18 +1409,16 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
-        from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
-            HTS_TEMPERATURE_DEVICE_TYPES,
-        )
-
         changed = False
         for device_id, device in list(self.devices.items()):
+            # The const describes a gRPC temperature field; the capability
+            # describes a distinct, authoritative HTS temperature source.
             # Families sourced from HTS 0x02 (sirens #312, Curtain Plus/Base
             # #229) are authoritative there — don't fetch their gRPC board
             # temperature, which is wrong (runs hotter) and a wasted RPC.
             if (
                 device.device_type not in HUB_DEVICE_TEMPERATURE_DEVICE_TYPES
-                or device.device_type in HTS_TEMPERATURE_DEVICE_TYPES
+                or capabilities_for(device).has_hts_temperature
             ):
                 continue
             try:
@@ -1463,7 +1459,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         changed = False
         for device_id, device in list(self.devices.items()):
-            if device.device_type not in SIREN_DEVICE_TYPES:
+            if not capabilities_for(device).has_siren_settings:
                 continue
             changed = await self._async_fetch_and_merge_siren_settings(device_id) or changed
         if changed:
@@ -2214,9 +2210,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         """Fire the Button's press event when its activity epoch moves (#348).
 
-        Gated on device type: the same sub-key carries unrelated data on other
-        families, so a global read would fire phantom presses off a door
-        sensor's roller-shutter flag. See `BUTTON_PRESS_DEVICE_TYPES`.
+        Gated on the button-press capability: the same sub-key carries
+        unrelated data on other families, so a global read would fire phantom
+        presses off a door sensor's roller-shutter flag.
 
         Three guards, all of them there to avoid inventing a press:
 
@@ -2239,7 +2235,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Runs on the event loop (HTS listen task), so touching entity state here
         needs no thread marshalling.
         """
-        if device.device_type not in BUTTON_PRESS_DEVICE_TYPES:
+        if not capabilities_for(device).is_button_press:
             return
         raw = kv.get(_HTS_BUTTON_PRESS_KEY)
         if raw is None or len(raw) != 4:
@@ -2438,20 +2434,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         merge in `_async_refresh_hub_device_temperatures`; the carry-forward in
         the device-snapshot path keeps it across gRPC refreshes.
 
-        Safe and live: only applies to families in `HTS_TEMPERATURE_DEVICE_TYPES`
-        (0x02 is authoritative for them) and refreshes on change so the reading
-        tracks the device rather than freezing at the first value (#312). An
-        unchanged 0x02 (re-reported on every STATUS_BODY probe) is a no-op.
-        Returns True when a value was applied. Runs on the loop (HTS listen task).
+        Safe and live: only applies to families with the HTS-temperature
+        capability (0x02 is authoritative for them) and refreshes on change so
+        the reading tracks the device rather than freezing at the first value
+        (#312). An unchanged 0x02 (re-reported on every STATUS_BODY probe) is
+        a no-op. Returns True when a value was applied. Runs on the loop (HTS
+        listen task).
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
         from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
-            HTS_TEMPERATURE_DEVICE_TYPES,
             parse_device_temperature_c,
         )
 
-        if device.device_type not in HTS_TEMPERATURE_DEVICE_TYPES:
+        if not capabilities_for(device).has_hts_temperature:
             return False
         temperature = parse_device_temperature_c(device.device_type, kv)
         if temperature is None:
@@ -3116,7 +3112,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # not this stream — carry the merged values forward so a fresh light
             # snapshot doesn't wipe them (and the number/select entities) until
             # the next timer fire.
-            if existing is not None and device.device_type in SIREN_DEVICE_TYPES:
+            if existing is not None and capabilities_for(device).has_siren_settings:
                 carried = {
                     key: existing.statuses[key]
                     for key in (SIREN_ALARM_DURATION_KEY, SIREN_VOLUME_LEVEL_KEY)

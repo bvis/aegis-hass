@@ -1,0 +1,641 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Aegis for Ajax — Log ind",
+                "description": "Indtast dine Ajax-kontooplysninger.",
+                "data": {
+                    "email": "E-mail",
+                    "password": "Adgangskode",
+                    "app_label": "App-navn (co-branded appnavn)"
+                }
+            },
+            "2fa": {
+                "title": "To-faktor-godkendelse",
+                "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
+                "data": {
+                    "totp_code": "TOTP-kode"
+                }
+            },
+            "select_spaces": {
+                "title": "Vælg spaces",
+                "description": "Vælg hvilke spaces (hubs), der skal tilføjes.",
+                "data": {
+                    "spaces": "Spaces"
+                }
+            },
+            "reconfigure": {
+                "title": "Genkonfigurer Aegis for Ajax",
+                "description": "Opdater dine kontooplysninger.",
+                "data": {
+                    "email": "E-mail",
+                    "password": "Adgangskode",
+                    "app_label": "App-navn (co-branded appnavn)"
+                }
+            },
+            "reconfigure_2fa": {
+                "title": "To-faktor-godkendelse",
+                "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
+                "data": {
+                    "totp_code": "TOTP-kode"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Genautentificer Aegis for Ajax",
+                "description": "Din Ajax-session for {email} er ikke længere gyldig. Indtast den aktuelle kontoadgangskode for at genoprette adgangen.",
+                "data": {
+                    "password": "Adgangskode"
+                }
+            },
+            "reauth_2fa": {
+                "title": "To-faktor-godkendelse",
+                "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
+                "data": {
+                    "totp_code": "TOTP-kode"
+                }
+            }
+        },
+        "error": {
+            "invalid_auth": "Forkert e-mail eller adgangskode.",
+            "invalid_totp": "Forkert TOTP-kode. Prøv igen.",
+            "cannot_connect": "Kan ikke oprette forbindelse til Ajax-serverne.",
+            "unknown": "Der opstod en uventet fejl."
+        },
+        "abort": {
+            "already_configured": "Denne konto er allerede konfigureret.",
+            "already_in_progress": "Konfiguration er allerede i gang. Fuldfør eller annuller det eksisterende forløb.",
+            "account_locked": "Kontoen er låst. Prøv igen senere.",
+            "reauth_successful": "Genautentificering gennemført.",
+            "reconfigure_successful": "Loginoplysningerne er opdateret."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Aegis for Ajax — Indstillinger",
+                "data": {
+                    "poll_interval": "Fallback-pollinginterval (sekunder, 60-300)",
+                    "force_arm": "Tving aktivering (ignorer åbne sensorer og fejl)",
+                    "expose_arm_home": "Vis knappen \"Aktiver hjemme\"",
+                    "delay_panel_states": "Vis ud-/indgangsforsinkelser som panelstatusser",
+                    "use_pin_code": "Kræv PIN-kode ved aktivering/deaktivering",
+                    "pin_code": "PIN-kode",
+                    "fcm_project_id": "FCM-projekt-ID (til pushnotifikationer)",
+                    "fcm_app_id": "FCM-app-ID",
+                    "fcm_api_key": "FCM-API-nøgle",
+                    "fcm_sender_id": "FCM-afsender-ID",
+                    "clear_fcm_credentials": "Slet FCM-loginoplysninger (rydder alle fire felter)",
+                    "disable_push_warning": "Jeg bruger ikke pushnotifikationer",
+                    "photo_retention_days": "Fotoopbevaring (dage)",
+                    "photo_max_per_device": "Maks. antal fotos pr. enhed (0 = ubegrænset)",
+                    "auto_create_labels": "Opret og tildel automatisk Aegis-labels til enheder",
+                    "bypass_switches": "Opret bypass-kontakter til enheder",
+                    "persistent_notifications": "Vis sikkerhedshændelser som vedvarende notifikationer",
+                    "persistent_notification_events": "Hændelser der opretter en vedvarende notifikation"
+                },
+                "data_description": {
+                    "bypass_switches": "Bypass-kontakter gør det muligt at deaktivere en enhed, før systemet aktiveres. \"Auto\" opretter dem kun, hvis din Ajax-konto har tilladelse til at deaktivere enheder.",
+                    "expose_arm_home": "Tilføjer en \"Aktiver hjemme\"-mulighed til alarmpanelet. Den spejler natfunktionen og er primært nødvendig til Amazon Alexa eller Nabu Casa Cloud. Slå den fra for at skjule den ekstra knap, hvis du ikke bruger disse.",
+                    "delay_panel_states": "Når denne er slået til, viser alarmpanelet \"aktiverer\", mens hub'en kører en detektors \"Forsinkelse ved udgang\", og \"afventer\", mens en \"Forsinkelse ved indgang\" kører — begge dele styres af hub'ens egne signaler, ikke af en timer fra vores side. Detektorer uden forsinkelse (Instant Alarm) er allerede aktive under \"aktiverer\". Automatiseringer, der venter på \"armed_away\", udløses, når udgangsforsinkelsen er afsluttet. Hub'ens rå status ligger fortsat i attributten \"hub_state\".",
+                    "disable_push_warning": "Slå denne til, hvis du bevidst kører uden push. Den skjuler den gentagne \"FCM ikke konfigureret\"-påmindelse og reparationskortet. Hændelser i realtid (dørklokke, aktiver/deaktiver, alarm) når stadig ikke Home Assistant, før du konfigurerer FCM.",
+                    "persistent_notifications": "Når denne er slået til, vises de valgte hændelser som vedvarende notifikationer i Home Assistant, der forbliver synlige, indtil de afvises, eller Home Assistant genstartes. Disse hændelser leveres via push (FCM), så push skal være konfigureret, for at de kan modtages.",
+                    "persistent_notification_events": "Hvilke hændelser der udløser en vedvarende notifikation. Som standard reelle hændelser (alarm, panik, sabotage, brand, CO, oversvømmelse, glasbrud). Tilføj aktiver/deaktiver, bevægelse eller dørklokke, hvis du også ønsker disse."
+                }
+            }
+        }
+    },
+    "system_health": {
+        "info": {
+            "can_reach_server": "Forbindelse til Ajax-skyen (gRPC-host)",
+            "configured_accounts": "Konfigurerede konti",
+            "spaces": "Spaces (hubs)",
+            "hts_connected": "Tilsluttede HTS-streams",
+            "fcm_connected": "Tilsluttede FCM-pushklienter",
+            "pushes_received": "Modtagne pushbeskeder",
+            "last_push": "Sidste modtagne push",
+            "last_poll": "Sidste vellykkede polling"
+        }
+    },
+    "services": {
+        "force_arm": {
+            "name": "Tving aktivering",
+            "description": "Aktiver systemet og ignorer åbne sensorer og aktive alarmer.",
+            "fields": {
+                "entity_id": {
+                    "name": "Enhed",
+                    "description": "Alarmpanel-enhed der skal tvangsaktiveres. Hvis udeladt, aktiveres alle paneler."
+                }
+            }
+        },
+        "force_arm_night": {
+            "name": "Tving aktivering af natfunktion",
+            "description": "Aktiver natfunktion og ignorer åbne sensorer og aktive alarmer.",
+            "fields": {
+                "entity_id": {
+                    "name": "Enhed",
+                    "description": "Alarmpanel-enhed der skal tvangsaktiveres i natfunktion. Hvis udeladt, aktiveres alle paneler."
+                }
+            }
+        },
+        "disarm_night_mode": {
+            "name": "Deaktiver natfunktion",
+            "description": "Afslut natfunktion, mens uafhængigt aktiverede (fraværs-) grupper forbliver aktiveret. I modsætning til en fuld deaktivering nedjusterer denne handling kun natfunktionsgrupperne — Ajax' indbyggede \"deaktiver natfunktion\"-handling.",
+            "fields": {
+                "entity_id": {
+                    "name": "Enhed",
+                    "description": "Alarmpanel-enhed for det space, der skal deaktiveres fra natfunktion. Hvis udeladt, gælder det alle paneler."
+                }
+            }
+        },
+        "press_panic_button": {
+            "name": "Tryk på panikknap (SOS)",
+            "description": "Udløs Ajax' SOS-/panikknap på et space. Kalder det samme endpoint som den røde SOS-knap i den officielle mobilapp og videresender en panikalarm til vagtcentralen (CRA), hvilket på de fleste kontrakter udløser øjeblikkelig politiudrykning og springer verifikationsvinduer over. Må kun bruges i reelle nødsituationer. Feltet confirm skal være sat til true, ellers afvises kaldet.",
+            "fields": {
+                "confirm": {
+                    "name": "Bekræft panik",
+                    "description": "Skal være sat til true. Fungerer som en sikkerhedslås, der forhindrer automatiseringer i utilsigtet at udløse denne service."
+                },
+                "entity_id": {
+                    "name": "Enhed",
+                    "description": "Alarmpanel-enhed for det space, hvis panikknap der skal trykkes. Hvis udeladt, sendes panikken til alle konfigurerede spaces."
+                },
+                "latitude": {
+                    "name": "Breddegrad",
+                    "description": "Valgfri breddegrad for den opkaldende, som videresendes til Ajax. Bruges sammen med longitude."
+                },
+                "longitude": {
+                    "name": "Længdegrad",
+                    "description": "Valgfri længdegrad for den opkaldende, som videresendes til Ajax. Bruges sammen med latitude."
+                }
+            }
+        },
+        "set_photo_on_demand_mode": {
+            "name": "Indstil Foto på anmodning-tilstand",
+            "description": "Aktiver eller deaktiver Foto på anmodning på en hub. To uafhængige kanaler kan slås til/fra separat — brugeranmodninger (om hub-brugere kan anmode om fotos fra Ajax-appen) og scenarier (om scenarier/automatiseringer kan udløse optagelser). Lad et felt stå tomt for at bevare den aktuelle værdi. Mindst ét felt er påkrævet.",
+            "fields": {
+                "user": {
+                    "name": "Brugeranmodninger",
+                    "description": "Når denne er sat, aktiveres eller deaktiveres fotoanmodninger på forlangende, som iværksættes af hub-brugere. Lad feltet stå tomt for at bevare den aktuelle værdi."
+                },
+                "scenario": {
+                    "name": "Scenarier",
+                    "description": "Når denne er sat, aktiveres eller deaktiveres foto på anmodning-optagelser, som udløses af Ajax-scenarier/automatiseringer. Lad feltet stå tomt for at bevare den aktuelle værdi."
+                },
+                "entity_id": {
+                    "name": "Enhed",
+                    "description": "Alarmpanel-enhed for det space, hvis hub-tilstand der skal opdateres. Hvis udeladt, gælder det alle konfigurerede spaces."
+                }
+            }
+        },
+        "list_client_sessions": {
+            "name": "Vis kontosessioner",
+            "description": "Returnerer aktive Ajax-kontosessioner til manuel inspektion på anmodning. Denne service kalder et internt Ajax-endpoint, der kan rate-begrænse hyppige forespørgsler; brug den ikke til polling i automatiseringer. Den aktuelt aktive Aegis-session markeres som is_current, når den kan identificeres.",
+            "fields": {
+                "entry_id": {
+                    "name": "Konfigurationspost-ID",
+                    "description": "Påkrævet når mere end én Aegis-konto er konfigureret."
+                }
+            }
+        },
+        "terminate_client_session": {
+            "name": "Afslut kontosession",
+            "description": "Log øjeblikkeligt den valgte enhed ud af Ajax-kontoen. Session-ID'et fås via list_client_sessions. Integrationen afslutter aldrig sin egen session.",
+            "fields": {
+                "session_id": {
+                    "name": "Session-ID",
+                    "description": "Session-ID returneret af list_client_sessions."
+                },
+                "confirm": {
+                    "name": "Bekræft afslutning",
+                    "description": "Skal være true for øjeblikkeligt at afslutte den valgte session."
+                },
+                "entry_id": {
+                    "name": "Konfigurationspost-ID",
+                    "description": "Påkrævet når mere end én Aegis-konto er konfigureret."
+                }
+            }
+        },
+        "terminate_other_client_sessions": {
+            "name": "Afslut alle andre kontosessioner",
+            "description": "Log øjeblikkeligt alle andre enheder ud af Ajax-kontoen. Dette logger andre aktive Ajax mobil- og desktopapps ud. Integrationen afslutter aldrig sin egen session.",
+            "fields": {
+                "confirm": {
+                    "name": "Bekræft afslutning",
+                    "description": "Skal være true for øjeblikkeligt at afslutte alle andre sessioner."
+                },
+                "entry_id": {
+                    "name": "Konfigurationspost-ID",
+                    "description": "Påkrævet når mere end én Aegis-konto er konfigureret."
+                }
+            }
+        }
+    },
+    "issues": {
+        "hub_offline_24h": {
+            "title": "Hub {hub_name} har været offline i over {hours_offline} timer",
+            "description": "Aegis har modtaget forbindelsesstatussen OFFLINE for hub {hub_name} i {hours_offline} timer i træk. Enhederne er forældede, indtil hub'en genopretter forbindelsen. Almindelige årsager: hub'en er koblet fra strøm, netværksnedbrud, eller hub'ens udgående forbindelse til Ajax-skyen er blokeret af en firewall. Reparationen fjernes automatisk, så snart Aegis ser hub'en online igen."
+        },
+        "hts_chronic_failure": {
+            "title": "Hub-netværkssensorer er forringede",
+            "description": "HTS-forbindelsen (som fodrer sensorerne for Ethernet/Wi-Fi/GSM/lysnetstrøm) for space {space_id} har ikke kunnet holde forbindelsen oppe i {minutes_failing} minutter. Hub-netværkssensorerne vil være utilgængelige, indtil forbindelsen genoprettes. Skyldes oftest en firewall, der blokerer udgående trafik til Ajax' HTS-endpoints, eller vedvarende netværksustabilitet mellem Home Assistant og Ajax-skyen. Reparationen fjernes automatisk, når HTS genopretter forbindelsen."
+        },
+        "fcm_credentials_invalid": {
+            "title": "Pushnotifikationer deaktiveret — FCM-loginoplysninger afvist",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Ret Aegis' FCM-loginoplysninger",
+                        "description": "Registrering hos Firebase Cloud Messaging mislykkedes for denne konto. De konfigurerede værdier for FCM-projekt-ID/app-ID/API-nøgle/afsender-ID er højst sandsynligt forkerte for din co-brandede Ajax-app, eller API-nøglen er blevet tilbagekaldt. Indtast de fire værdier nedenfor igen, hvorefter integrationen genindlæses — virker de nye loginoplysninger, fjernes reparationen automatisk; hvis ikke, vises formularen igen. Se afsnittet \"How to obtain FCM credentials\" i README-filen.",
+                        "data": {
+                            "fcm_project_id": "FCM-projekt-ID",
+                            "fcm_app_id": "FCM-app-ID",
+                            "fcm_api_key": "FCM-API-nøgle",
+                            "fcm_sender_id": "FCM-afsender-ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Den Aegis-konto, som denne reparation blev oprettet for, er ikke længere konfigureret. Der er intet at rette."
+                }
+            }
+        },
+        "fcm_credentials_malformed": {
+            "title": "Pushnotifikationer deaktiveret — FCM-loginoplysninger er ugyldige ({problem})",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Ret Aegis' FCM-loginoplysninger",
+                        "description": "Aegis fandt et strukturelt problem med de konfigurerede FCM-loginoplysninger, inden Google blev kontaktet: {problem}. De fire værdier skal komme fra det samme Firebase-projekt — udtræk dem igen fra din co-brandede Ajax-app i henhold til afsnittet \"Where the values live\" i README-filen, og indtast derefter alle fire igen nedenfor. Integrationen genindlæses, formatkontrollen køres igen, og reparationen fjernes, når værdierne er indbyrdes konsistente.",
+                        "data": {
+                            "fcm_project_id": "FCM-projekt-ID",
+                            "fcm_app_id": "FCM-app-ID",
+                            "fcm_api_key": "FCM-API-nøgle",
+                            "fcm_sender_id": "FCM-afsender-ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Den Aegis-konto, som denne reparation blev oprettet for, er ikke længere konfigureret. Der er intet at rette."
+                }
+            }
+        },
+        "fcm_not_configured": {
+            "title": "Pushnotifikationer ikke konfigureret — hændelser i realtid deaktiveret",
+            "fix_flow": {
+                "step": {
+                    "init": {
+                        "title": "Konfigurer Aegis' FCM-loginoplysninger",
+                        "description": "FCM-loginoplysninger er aldrig blevet angivet for denne konto, så hændelser i realtid fra Ajax (dørklokke, push ved aktiver/deaktiver, alarm) kan ikke nå Home Assistant — integrationen falder i stedet tilbage til polling hvert 5. minut. Indtast de fire FCM-værdier for din co-brandede Ajax-app nedenfor, hvorefter integrationen genindlæses. Se afsnittet \"How to obtain FCM credentials\" i README-filen for, hvordan du udtrækker dem fra din Ajax-app.",
+                        "data": {
+                            "fcm_project_id": "FCM-projekt-ID",
+                            "fcm_app_id": "FCM-app-ID",
+                            "fcm_api_key": "FCM-API-nøgle",
+                            "fcm_sender_id": "FCM-afsender-ID"
+                        }
+                    }
+                },
+                "abort": {
+                    "entry_missing": "Den Aegis-konto, som denne reparation blev oprettet for, er ikke længere konfigureret. Der er intet at rette."
+                }
+            }
+        },
+        "fcm_push_stuck": {
+            "title": "Pushnotifikationer afbrudt — den samme besked bliver ved med at afslutte forbindelsen",
+            "description": "Pushforbindelsen er blevet afsluttet {terminations} gange i træk under håndtering af den samme besked. Da beskeden aldrig bliver kvitteret, bliver den ved med at blive leveret igen af Ajax' pushudbyder, og hver ny forbindelse afsluttes på samme måde, så dette forsvinder ikke af sig selv. Din alarmstatus påvirkes ikke — den kommer fra polling og fra hub-forbindelsen, aldrig fra push — men hændelser i realtid såsom dørklokkeringninger går tabt, så længe dette står på. Aegis har udskiftet sin push-registrering for at bryde løkken, og push bør genoptages inden for et minut. Denne meddelelse fjernes automatisk, når forbindelsen har været oppe et stykke tid. Hvis det bliver ved med at komme igen, så indrapporter det venligst på GitHub (issue #373)."
+        },
+        "grpcio_version_mismatch": {
+            "title": "Aegis kræver grpcio {required} eller nyere (fandt {current})",
+            "description": "Aegis er afhængig af `grpcio` til gRPC-kanalen, der kommunikerer med Ajax-skyen, og din Home Assistant-installation medbringer `grpcio` {current}. Login kan mislykkes med kryptiske HTTP/2-fejl under {required}. På Home Assistant Core eller Container fastlåser integrationens manifest versionen ved installation, men på Home Assistant OS medbringer runtime'en en systemdækkende grpcio, som dette manifest ikke kan påvirke — du skal typisk opgradere Home Assistant OS til en build, der indeholder en nyere grpcio. Reparationen fjernes automatisk ved næste genindlæsning, når versionen overstiger {required}."
+        }
+    },
+    "entity": {
+        "button": {
+            "capture_photo": {
+                "name": "Tag foto"
+            },
+            "refresh_hub": {
+                "name": "Opdater hub"
+            }
+        },
+        "event": {
+            "security_event": {
+                "name": "Sikkerhedshændelse",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "alarm": "Alarm",
+                            "arm": "Aktiveret",
+                            "arm_night": "Aktiveret nat",
+                            "battery_low": "Lavt batteriniveau",
+                            "co_alarm": "CO-alarm",
+                            "connection_lost": "Forbindelse mistet",
+                            "disarm": "Deaktiveret",
+                            "disarm_night": "Deaktiveret nat",
+                            "door_open": "Dør åbnet",
+                            "doorbell_pressed": "Dørklokke trykket",
+                            "fire": "Brand",
+                            "flood": "Oversvømmelse",
+                            "glass_break": "Glasbrud",
+                            "malfunction": "Fejl",
+                            "motion": "Bevægelse",
+                            "panic": "Panik",
+                            "tamper": "Sabotage"
+                        }
+                    }
+                }
+            },
+            "doorbell": {
+                "name": "Dørklokke",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "ring": "Dørklokke trykket"
+                        }
+                    }
+                }
+            },
+            "button_press": {
+                "name": "Knap",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "pressed": "Trykket"
+                        }
+                    }
+                }
+            }
+        },
+        "binary_sensor": {
+            "monitoring": {
+                "name": "CRA-forbindelse"
+            },
+            "gsm": {
+                "name": "Mobilforbindelse"
+            },
+            "lid": {
+                "name": "Låg åbnet"
+            },
+            "ext_contact": {
+                "name": "Ekstern kontakt brudt"
+            },
+            "ext_alert": {
+                "name": "Ekstern kontaktalarm"
+            },
+            "drilling": {
+                "name": "Boring i kabinet"
+            },
+            "anti_mask": {
+                "name": "Anti-maskering"
+            },
+            "malfunction": {
+                "name": "Fejl"
+            },
+            "interference": {
+                "name": "Interferens"
+            },
+            "relay_stuck": {
+                "name": "Relæ fastklemt"
+            },
+            "always_active": {
+                "name": "Altid aktiv"
+            },
+            "glass_break": {
+                "name": "Glasbrud"
+            },
+            "vibration": {
+                "name": "Vibration"
+            },
+            "tilt": {
+                "name": "Vip"
+            },
+            "steam": {
+                "name": "Damp"
+            },
+            "wire_input_alert": {
+                "name": "Ledningsindgangsalarm"
+            },
+            "tamper": {
+                "name": "Sabotage af kabinet"
+            },
+            "connectivity": {
+                "name": "Forbindelse"
+            },
+            "problem": {
+                "name": "Enhedsproblem"
+            },
+            "ethernet": {
+                "name": "Ethernet"
+            },
+            "wifi": {
+                "name": "Wi-Fi"
+            },
+            "mains_power": {
+                "name": "Lysnetstrøm"
+            },
+            "external_contact_open": {
+                "name": "Kontakt"
+            },
+            "delay_when_leaving": {
+                "name": "Forsinkelse ved udgang"
+            },
+            "siren_on_panic_button": {
+                "name": "Sirene ved panikknap"
+            },
+            "siren_on_any_tamper": {
+                "name": "Sirene ved sabotage"
+            }
+        },
+        "sensor": {
+            "monitoring_company": {
+                "name": "Vagtcentral"
+            },
+            "signal_strength": {
+                "name": "Signalstyrke"
+            },
+            "mobile_network_type": {
+                "name": "Mobilnetværkstype"
+            },
+            "wifi_signal_level": {
+                "name": "Wi-Fi-signalniveau"
+            },
+            "sim_status": {
+                "name": "SIM-status"
+            },
+            "sim_imei": {
+                "name": "IMEI"
+            },
+            "connection_type": {
+                "name": "Forbindelsestype"
+            },
+            "wifi_ssid": {
+                "name": "Wi-Fi SSID"
+            },
+            "wifi_ip": {
+                "name": "Wi-Fi IP-adresse"
+            },
+            "ethernet_ip": {
+                "name": "Ethernet IP-adresse"
+            },
+            "ethernet_gateway": {
+                "name": "Ethernet-gateway"
+            },
+            "ethernet_dns": {
+                "name": "Ethernet DNS"
+            },
+            "cellular_signal": {
+                "name": "Mobilsignal"
+            },
+            "cellular_network": {
+                "name": "Mobilnetværk"
+            },
+            "current": {
+                "name": "Strømstyrke"
+            },
+            "voltage": {
+                "name": "Spænding"
+            },
+            "energy_consumed": {
+                "name": "Forbrugt elenergi"
+            },
+            "power_derived": {
+                "name": "Effekt"
+            },
+            "power": {
+                "name": "Effekt"
+            },
+            "channels_online": {
+                "name": "Kanaler online"
+            },
+            "channels_total": {
+                "name": "Kanaler i alt"
+            }
+        },
+        "switch": {
+            "channel_1": {
+                "name": "Kanal 1"
+            },
+            "channel_2": {
+                "name": "Kanal 2"
+            },
+            "bypass": {
+                "name": "Bypass"
+            },
+            "chime": {
+                "name": "Ringetone"
+            }
+        },
+        "number": {
+            "siren_alarm_duration": {
+                "name": "Alarmvarighed"
+            }
+        },
+        "select": {
+            "siren_volume_level": {
+                "name": "Sirenelydstyrke",
+                "state": {
+                    "very_loud": "Meget høj",
+                    "loud": "Høj",
+                    "quiet": "Lav",
+                    "disabled": "Deaktiveret"
+                }
+            }
+        },
+        "update": {
+            "hub_firmware": {
+                "name": "Firmware"
+            },
+            "device_firmware": {
+                "name": "Firmware"
+            }
+        }
+    },
+    "exceptions": {
+        "manual_refresh_hts_unavailable": {
+            "message": "Hub-netværksforbindelsen (HTS) er ikke aktiv lige nu; den manuelle opdatering kan ikke udføres."
+        },
+        "manual_refresh_rate_limited": {
+            "message": "Hub-opdatering blev netop anmodet om; vent {seconds} sekunder mere, og prøv igen."
+        },
+        "photo_capture_failed": {
+            "message": "Fotooptagelsen blev ikke gennemført. Hub'en har muligvis afvist anmodningen eller ikke returneret et billede; se logfilerne for detaljer."
+        },
+        "photo_no_push": {
+            "message": "Foto på anmodning kræver FCM-pushnotifikationer, som ikke er konfigureret for denne integration."
+        },
+        "photo_capture_timeout": {
+            "message": "Timeout ved venten på, at kameraet leverer det optagede foto. Prøv igen, og kontroller at kameraet er online."
+        },
+        "command_permission_denied": {
+            "message": "Din Ajax-konto har ikke tilladelse til at udføre denne handling."
+        },
+        "command_hub_offline": {
+            "message": "Hub'en er offline, så kommandoen kunne ikke sendes."
+        },
+        "command_hub_wrong_state": {
+            "message": "Hub'en er i øjeblikket ikke i en tilstand, der tillader denne handling."
+        },
+        "command_alarm_reset_needed": {
+            "message": "En aktiv alarm skal nulstilles, før denne handling kan udføres."
+        },
+        "command_not_performed": {
+            "message": "Hub'en udførte ikke kommandoen."
+        },
+        "command_unknown": {
+            "message": "Hub'en genkendte ikke kommandoen."
+        },
+        "command_failed": {
+            "message": "Kommandoen kunne ikke gennemføres. Hub'en returnerede: {reason}."
+        }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "alarm": "Alarm",
+            "arm": "Aktiveret",
+            "arm_night": "Aktiveret nat",
+            "battery_low": "Lavt batteriniveau",
+            "co_alarm": "CO-alarm",
+            "connection_lost": "Forbindelse mistet",
+            "disarm": "Deaktiveret",
+            "disarm_night": "Deaktiveret nat",
+            "door_open": "Dør åbnet",
+            "doorbell_pressed": "Dørklokke trykket",
+            "fire": "Brand",
+            "flood": "Oversvømmelse",
+            "glass_break": "Glasbrud",
+            "malfunction": "Fejl",
+            "motion": "Bevægelse",
+            "panic": "Panik",
+            "tamper": "Sabotage"
+        }
+    },
+    "selector": {
+        "bypass_switches": {
+            "options": {
+                "auto": "Auto (kun hvis din konto kan deaktivere enheder)",
+                "always": "Altid",
+                "never": "Aldrig"
+            }
+        },
+        "persistent_notification_events": {
+            "options": {
+                "alarm": "Alarm",
+                "arm": "Aktiveret",
+                "arm_night": "Natfunktion aktiveret",
+                "battery_low": "Lavt batteriniveau",
+                "co_alarm": "CO-alarm",
+                "connection_lost": "Forbindelse mistet",
+                "disarm": "Deaktiveret",
+                "disarm_night": "Natfunktion deaktiveret",
+                "door_open": "Dør åbnet",
+                "doorbell_pressed": "Dørklokke trykket",
+                "fire": "Brand",
+                "flood": "Oversvømmelse",
+                "glass_break": "Glasbrud",
+                "malfunction": "Fejl",
+                "motion": "Bevægelse",
+                "panic": "Panik",
+                "tamper": "Sabotage"
+            }
+        }
+    }
+}

@@ -14,16 +14,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Wire up the proto search path before any `systems.*` import.
+from custom_components.aegis_ajax import device_handlers
 from custom_components.aegis_ajax.api import _proto_path as _proto_path  # noqa: F401
 from custom_components.aegis_ajax.api.devices import DeviceCommandError, DevicesApi
 from custom_components.aegis_ajax.api.devices_parser import parse_hub_device_siren_settings
 from custom_components.aegis_ajax.api.models import Device, DeviceCommand
 from custom_components.aegis_ajax.const import (
     SIREN_ALARM_DURATION_KEY,
-    SIREN_DEVICE_TYPES,
     SIREN_VOLUME_LEVEL_KEY,
     DeviceState,
 )
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.number import (
     AjaxSirenAlarmDurationNumber,
 )
@@ -86,12 +87,21 @@ def _make_device(
     )
 
 
+_SIREN_SETTINGS_DEVICE_TYPES = tuple(
+    sorted(
+        device_type
+        for device_type in device_handlers._DEVICE_HANDLERS
+        if capabilities_for(_make_device({}, device_type=device_type)).has_siren_settings
+    )
+)
+
+
 class TestSirenSkuCoverage:
     """#354: the SKUs whose oneof case the HubDevice proto used to be missing.
 
     A SKU absent from the `device` oneof decodes as an unknown case, so its
     settings were unreadable and its entities would have sat permanently empty
-    — which is why they were excluded from `SIREN_DEVICE_TYPES`.
+    — which is why they have no siren-settings capability.
     """
 
     NEW_SKUS = (
@@ -133,11 +143,11 @@ class TestSirenSkuCoverage:
         }
 
     @pytest.mark.parametrize("device_type", NEW_SKUS)
-    def test_device_type_is_in_siren_device_types(self, device_type: str) -> None:
+    def test_device_type_has_siren_settings_capability(self, device_type: str) -> None:
         """The proto oneof and the entity gate have to move together."""
-        assert device_type in SIREN_DEVICE_TYPES
+        assert capabilities_for(_make_device({}, device_type=device_type)).has_siren_settings
 
-    @pytest.mark.parametrize("device_type", sorted(SIREN_DEVICE_TYPES))
+    @pytest.mark.parametrize("device_type", _SIREN_SETTINGS_DEVICE_TYPES)
     def test_every_gated_type_is_a_real_object_type(self, device_type: str) -> None:
         """A device_type that `ObjectType` doesn't know can never be produced.
 
@@ -150,7 +160,7 @@ class TestSirenSkuCoverage:
 
         assert hasattr(object_type_pb2.ObjectType(), device_type)
 
-    @pytest.mark.parametrize("device_type", sorted(SIREN_DEVICE_TYPES))
+    @pytest.mark.parametrize("device_type", _SIREN_SETTINGS_DEVICE_TYPES)
     def test_every_gated_type_can_be_decoded(self, device_type: str) -> None:
         """Guard against the inverse drift: gated here but missing from the oneof."""
         from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import hub_device_pb2

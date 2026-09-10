@@ -156,15 +156,15 @@
                     "description": "true olarak ayarlanmalıdır. Otomasyonların bu hizmeti yanlışlıkla tetiklemesini önleyen güvenlik kilidi olarak çalışır."
                 },
                 "entity_id": {
-                    "name": "Entity",
+                    "name": "Varlık",
                     "description": "Panik butonu basılacak alanın alarm paneli varlığı. Atlanırsa panik tüm yapılandırılmış alanlara gönderilir."
                 },
                 "latitude": {
-                    "name": "Latitude",
+                    "name": "Enlem",
                     "description": "Çağrı yapanın isteğe bağlı enlemi Ajax'a iletilir. Boylamla birlikte kullanın."
                 },
                 "longitude": {
-                    "name": "Longitude",
+                    "name": "Boylam",
                     "description": "Çağrı yapanın isteğe bağlı boylamı Ajax'a iletilir. Enlemle birlikte kullanın."
                 }
             }
