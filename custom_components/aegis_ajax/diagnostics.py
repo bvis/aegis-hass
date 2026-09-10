@@ -308,6 +308,9 @@ def _push_diagnostics(listener: Any) -> dict[str, Any]:  # noqa: ANN401
     return {
         "configured": True,
         "connected": listener.is_fcm_connected,
+        # The denominator for `ever_delivered` (#437): zero deliveries says
+        # nothing until you know how many space events push could have carried.
+        "hub_events_while_connected": listener.hub_events_while_connected,
         "client_connected_for_seconds": (
             round(now - started_at) if started_at is not None else None
         ),

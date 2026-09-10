@@ -33,10 +33,12 @@ from custom_components.aegis_ajax.notification_fcm_guard import (
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
     async_clear_fcm_credentials_malformed,
+    async_clear_fcm_never_delivered,
     async_clear_fcm_not_configured,
     async_clear_fcm_push_stuck,
     async_register_fcm_credentials_invalid,
     async_register_fcm_credentials_malformed,
+    async_register_fcm_never_delivered,
     async_register_fcm_not_configured,
     async_register_fcm_push_stuck,
 )
@@ -98,6 +100,16 @@ STALE_PUSH_THRESHOLD_SECONDS = 120.0
 # consecutive supervised deaths happen with the same last-received
 # persistent_id, raise a Repair naming the recovery.
 FCM_STUCK_TERMINATION_THRESHOLD = 3
+
+# Hub-side space events observed with the push client up, and zero pushes ever
+# delivered for these credentials, before the Repair is raised (#437). The
+# hub's status stream and push carry the same space event about a second apart
+# on a healthy install, so each of these is one demonstrated opportunity that
+# push did not take. Set well past the point of doubt on purpose: the failure
+# it reports is invisible and slow, while a false positive tells a correctly
+# configured user their system is broken. Twenty arm/disarm-class events is
+# days of ordinary use, and by then zero deliveries is not a quiet house.
+FCM_NEVER_DELIVERED_EVENT_THRESHOLD = 20
 
 # A run of this many consecutive printable-ASCII bytes in a redacted hex dump
 # is treated as text (likely a device name / label) and masked. Shorter runs
@@ -221,6 +233,10 @@ class AjaxNotificationListener:
         self._ever_delivered: bool = False
         self._first_delivery_at: str | None = None
         self._delivery_record_unsaved: bool = False
+        # Hub-side space events seen with the push client up while this
+        # credential set has never delivered (#437). The denominator: zero
+        # deliveries means nothing without knowing how many chances there were.
+        self._hub_events_while_connected: int = 0
 
     @property
     def pushes_received(self) -> int:
@@ -250,6 +266,11 @@ class AjaxNotificationListener:
             if isinstance(creds_hash, str):
                 return creds_hash[:16]
         return None
+
+    @property
+    def hub_events_while_connected(self) -> int:
+        """Demonstrated push opportunities this credential set has not taken."""
+        return self._hub_events_while_connected
 
     @property
     def ever_delivered(self) -> bool:
@@ -781,6 +802,8 @@ class AjaxNotificationListener:
         # the liveness branches below, all of which can return early.
         if self._delivery_record_unsaved:
             await self._async_persist_delivery_record()
+        # Same reason it sits here: every branch below can return early (#437).
+        await self._async_review_push_delivery()
         client = self._push_client
         if client is not None:
             tasks = getattr(client, "tasks", None) or []
@@ -995,8 +1018,16 @@ class AjaxNotificationListener:
             return
         if not stored or stored.get("hash") != self._creds_fingerprint:
             return
-        self._ever_delivered = True
+        # `first_delivery_at` is the delivery flag. Records written by the
+        # version that introduced this store carry no explicit one, and a
+        # record now also exists BEFORE any delivery, to hold the event
+        # counter — so inferring "delivered" from the record merely existing
+        # would be wrong in one direction and inferring "not delivered" from a
+        # missing flag would be wrong in the other, resetting the evidence on
+        # every install that already has one. Adopt the shipped shape.
         self._first_delivery_at = stored.get("first_delivery_at")
+        self._ever_delivered = self._first_delivery_at is not None
+        self._hub_events_while_connected = int(stored.get("hub_events_while_connected") or 0)
 
     def _note_push_delivered(self) -> None:
         """Mark that this credential set has now delivered at least one push.
@@ -1022,15 +1053,67 @@ class AjaxNotificationListener:
         self._first_delivery_at = dt_util.utcnow().isoformat()
         self._delivery_record_unsaved = True
 
+    def note_hub_space_event(self) -> None:
+        """Count a space event the hub reported while push was up (#437).
+
+        Called from the coordinator's HTS space-event path, which runs on the
+        event loop. Attributes only, and nothing scheduled — the same contract
+        as `_note_push_delivered`, for the same reason: the tests around that
+        path assert exactly what each event schedules, and the supervisor tick
+        already flushes this record within a minute.
+
+        Stops counting once a push has arrived. The question is answered at
+        that point, and the record's remaining job is only to stay answered.
+        """
+        if self._ever_delivered or not self.is_fcm_connected:
+            return
+        self._hub_events_while_connected += 1
+        self._delivery_record_unsaved = True
+
+    async def _async_review_push_delivery(self) -> None:
+        """Raise or clear the never-delivered Repair (#437).
+
+        Runs on the supervisor tick rather than at the counting site so the
+        Repair is created on the event loop from one predictable place, and so
+        a burst of space events cannot produce a burst of issue writes.
+        """
+        if not self._entry_id:
+            # Every other repair in this class guards the same way: without an
+            # entry id the issue id would not identify anything.
+            return
+        if self._ever_delivered:
+            async_clear_fcm_never_delivered(self._hass, entry_id=self._entry_id)
+            return
+        if self._hub_events_while_connected < FCM_NEVER_DELIVERED_EVENT_THRESHOLD:
+            return
+        _LOGGER.warning(
+            "Push notifications appear not to be delivering: %d hub space event(s) "
+            "have been seen with the push client connected and this credential set "
+            "has never delivered a push. Alarm state is unaffected; real-time "
+            "events are not arriving. See the Repair under Settings > Repairs.",
+            self._hub_events_while_connected,
+        )
+        async_register_fcm_never_delivered(
+            self._hass,
+            entry_id=self._entry_id,
+            events=self._hub_events_while_connected,
+        )
+
     async def _async_persist_delivery_record(self) -> None:
-        """Write the delivery record. Only ever called on a first delivery,
-        so this touches `.storage` once per credential set rather than once
-        per push."""
+        """Write the delivery record.
+
+        Called from the supervisor tick when something changed: the first
+        delivery, or the event counter moving. Writes are bounded by that tick
+        rather than by push volume, and the counter stops moving the moment a
+        push is delivered, so a healthy install writes this once per credential
+        set and then never again.
+        """
         try:
             await self._delivery_store.async_save(
                 {
                     "hash": self._creds_fingerprint,
                     "first_delivery_at": self._first_delivery_at,
+                    "hub_events_while_connected": self._hub_events_while_connected,
                 }
             )
         except Exception:

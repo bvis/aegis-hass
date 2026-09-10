@@ -316,6 +316,10 @@
                     "entry_missing": "A conta Aegis para a qual este Repair foi gerado ja nao esta configurada. Nada a reparar."
                 }
             }
+        },
+        "fcm_never_delivered": {
+            "title": "As notificações push não estão a chegar",
+            "description": "O Aegis viu {events} eventos do seu hub enquanto a ligação push estava ativa, e nenhum deles chegou por push. O estado do alarme não é afetado: vem da ligação ao hub e da consulta periódica, nunca do push. Mas os eventos em tempo real, como um toque de campainha ou um alarme de intrusão, chegam ao Home Assistant apenas por push, pelo que estão a ser perdidos.\n\nTrês causas produzem isto e daqui são indistinguíveis: os quatro valores FCM podem pertencer a um projeto Firebase pelo qual o fornecedor de push da sua aplicação não envia, outro registo pode estar a ocupar o destino de push da sua conta Ajax, ou a ligação push pode nunca se ter concluído.\n\nO que ajuda: volte a introduzir os quatro valores da sua aplicação, em Definições > Reparações ou nas opções da integração. Se a mesma conta Ajax for usada por outra instância do Home Assistant, experimente uma conta separada para esta integração. Este aviso desaparece sozinho assim que chegar um push."
         }
     },
     "entity": {

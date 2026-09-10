@@ -43,6 +43,7 @@ ISSUE_FCM_CREDENTIALS_INVALID = "fcm_credentials_invalid"
 ISSUE_FCM_CREDENTIALS_MALFORMED = "fcm_credentials_malformed"
 ISSUE_FCM_NOT_CONFIGURED = "fcm_not_configured"
 ISSUE_FCM_PUSH_STUCK = "fcm_push_stuck"
+ISSUE_FCM_NEVER_DELIVERED = "fcm_never_delivered"
 ISSUE_GRPCIO_VERSION_MISMATCH = "grpcio_version_mismatch"
 
 # Floor below which the integration's gRPC calls have historically failed
@@ -221,6 +222,44 @@ def async_register_fcm_push_stuck(
 
 def async_clear_fcm_push_stuck(hass: HomeAssistant, *, entry_id: str) -> None:
     ir.async_delete_issue(hass, DOMAIN, _issue_id(ISSUE_FCM_PUSH_STUCK, entry_id))
+
+
+def async_register_fcm_never_delivered(
+    hass: HomeAssistant,
+    *,
+    entry_id: str,
+    events: int,
+) -> None:
+    """Credentials accepted at every checkpoint, and not one push delivered (#437).
+
+    The gap this closes: the four values can pass the offline shape check, mint
+    a token, be accepted by Ajax's `UpsertPushToken`, connect and heartbeat
+    indefinitely, and never carry a single message. Nothing else notices,
+    because the alarm panel never depends on push — so the only symptom is the
+    absence of real-time events, which a user has no baseline for.
+
+    Not fixable in place. The wording deliberately names the candidate causes
+    without claiming to tell them apart, because we cannot: a coherent set of
+    values belonging to a Firebase project the account's push provider does not
+    route through, another registration holding the account's push destination,
+    and a connection that never actually completed all look identical from
+    here. Suggesting one fix confidently would be worse than describing three
+    honestly.
+    """
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _issue_id(ISSUE_FCM_NEVER_DELIVERED, entry_id),
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=ISSUE_FCM_NEVER_DELIVERED,
+        translation_placeholders={"events": str(events)},
+        learn_more_url=f"{DOCS_BASE_URL}push-notifications-fcm",
+    )
+
+
+def async_clear_fcm_never_delivered(hass: HomeAssistant, *, entry_id: str) -> None:
+    ir.async_delete_issue(hass, DOMAIN, _issue_id(ISSUE_FCM_NEVER_DELIVERED, entry_id))
 
 
 def _parse_version(value: str) -> tuple[int, ...]:

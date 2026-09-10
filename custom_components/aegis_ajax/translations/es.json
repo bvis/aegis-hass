@@ -316,6 +316,10 @@
         "grpcio_version_mismatch": {
             "title": "Aegis necesita grpcio {required} o superior (encontrado {current})",
             "description": "Aegis depende de `grpcio` para el canal gRPC que habla con la nube de Ajax, y tu instalacion de Home Assistant trae `grpcio` {current}. Por debajo de {required} el login puede fallar con errores HTTP/2 poco descriptivos. En Home Assistant Core o Container el manifest de la integracion fija la version al instalar, pero en Home Assistant OS el runtime trae un grpcio del sistema que este manifest no puede tocar — normalmente toca actualizar Home Assistant OS a una build que incluya un grpcio mas reciente. La incidencia se cierra automaticamente en la siguiente recarga cuando la version cruce {required}."
+        },
+        "fcm_never_delivered": {
+            "title": "Las notificaciones push no llegan",
+            "description": "Aegis ha visto {events} eventos de tu hub mientras la conexión push estaba activa, y ninguno de ellos ha llegado por push. El estado de la alarma no está afectado: viene de la conexión con el hub y del sondeo, nunca del push. Pero los eventos en tiempo real, como el timbre o una alarma de intrusión, solo llegan a Home Assistant por push, así que se están perdiendo.\n\nHay tres causas que producen esto y desde aquí son indistinguibles: los cuatro valores FCM pueden pertenecer a un proyecto de Firebase por el que el proveedor de push de tu app no envía, otro registro puede estar ocupando el destino de push de tu cuenta Ajax, o la conexión de push puede no haberse completado nunca.\n\nQué ayuda: vuelve a introducir los cuatro valores de tu app, en Ajustes > Reparaciones o en las opciones de la integración. Si la misma cuenta de Ajax la usa otra instancia de Home Assistant, prueba con una cuenta separada para esta integración. Este aviso desaparece por sí solo en cuanto llegue un push."
         }
     },
     "entity": {

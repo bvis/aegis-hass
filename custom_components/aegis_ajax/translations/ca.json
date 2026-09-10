@@ -316,6 +316,10 @@
                     "entry_missing": "El compte d'Aegis per al qual s'ha generat aquest Repair ja no esta configurat. No hi ha res a reparar."
                 }
             }
+        },
+        "fcm_never_delivered": {
+            "title": "Les notificacions push no arriben",
+            "description": "Aegis ha vist {events} esdeveniments del teu hub mentre la connexió push estava activa, i cap d'ells no ha arribat per push. L'estat de l'alarma no està afectat: ve de la connexió amb el hub i del sondeig, mai del push. Però els esdeveniments en temps real, com el timbre o una alarma d'intrusió, només arriben a Home Assistant per push, així que s'estan perdent.\n\nHi ha tres causes que ho produeixen i des d'aquí són indistingibles: els quatre valors FCM poden pertànyer a un projecte de Firebase pel qual el proveïdor de push de la teva app no envia, un altre registre pot estar ocupant la destinació de push del teu compte d'Ajax, o la connexió de push pot no haver-se completat mai.\n\nQuè ajuda: torna a introduir els quatre valors de la teva app, a Configuració > Reparacions o a les opcions de la integració. Si el mateix compte d'Ajax l'utilitza una altra instància de Home Assistant, prova un compte separat per a aquesta integració. Aquest avís desapareix tot sol tan bon punt arribi un push."
         }
     },
     "entity": {

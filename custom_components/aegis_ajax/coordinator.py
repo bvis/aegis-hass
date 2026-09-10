@@ -2687,6 +2687,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 payload_hex,
             )
             self.request_security_snapshot_refresh()
+            # One demonstrated opportunity for push: the same event reaches a
+            # healthy install over both channels about a second apart, so this
+            # is the denominator the never-delivered detector needs (#437).
+            # Only the non-chime branch counts — these are the arm/disarm-class
+            # events measured to arrive on both, and under-counting is the safe
+            # direction for something that can raise a Repair.
+            if self._notification_listener is not None:
+                self._notification_listener.note_hub_space_event()
             return
 
         _LOGGER.debug(
