@@ -46,6 +46,25 @@ _SMART_LOCK_TYPE_ASSA_ABLOY_NA = 2
 # left ghost "Unnamed" devices behind after a panel-side delete (#422).
 _UPDATE_TYPE_REMOVE = 3
 
+# `CapturePhotoOnDemandRequest.DeviceType`, which only distinguishes indoor /
+# outdoor / Fibra base:
+#   NO_DEVICE_TYPE_INFO = 0, MOTION_CAM = 1,
+#   MOTION_CAM_OUTDOOR = 2, MOTION_CAM_FIBRA_BASE = 3
+# A family missing from this map used to fall back to MOTION_CAM silently, which
+# told the hub an outdoor detector was an indoor one and got the capture
+# rejected with no useful message (#499). Every family carrying `is_phod` must
+# appear here; `tests/unit/test_devices.py` pins that, so widening the handler
+# registry cannot outrun this map again.
+PHOD_V2_DEVICE_TYPES: dict[str, int] = {
+    "motion_cam": 1,
+    "motion_cam_phod": 1,
+    "motion_cam_outdoor": 2,
+    "motion_cam_outdoor_phod": 2,
+    "motion_cam_outdoor_two_four_phod": 2,
+    "motion_cam_fibra": 3,
+    "motion_cam_fibra_base": 3,
+}
+
 
 class _DevicesSnapshotHandler(Protocol):
     """Receiver for parsed device snapshots off the stream.
@@ -1290,16 +1309,15 @@ class DevicesApi:
         Returns device_id as a signal that capture was triggered successfully,
         or None on failure. The actual photo URL is delivered via FCM push.
         """
-        # Map device_type to v2 DeviceType enum
-        device_type_map = {
-            "motion_cam": 1,
-            "motion_cam_phod": 1,
-            "motion_cam_outdoor": 2,
-            "motion_cam_outdoor_phod": 2,
-            "motion_cam_fibra": 3,
-            "motion_cam_fibra_base": 3,
-        }
-        v2_device_type = device_type_map.get(device_type, 1)
+        v2_device_type = PHOD_V2_DEVICE_TYPES.get(device_type)
+        if v2_device_type is None:
+            _LOGGER.warning(
+                "No v2 PhotoOnDemand device type mapped for family %s (device %s); "
+                "sending MOTION_CAM, which the hub may reject",
+                device_type,
+                device_id,
+            )
+            v2_device_type = 1
 
         # Build raw protobuf request bytes
         # Field 1: hub_id (string), Field 2: device_id (string), Field 3: device_type (varint)
