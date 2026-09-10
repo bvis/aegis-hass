@@ -363,17 +363,36 @@ async def _async_handle_refresh_alarm_images(
     Alarm folder and stores the trusted images locally for Camera entities.
     It is intentionally manual: do not use it in a frequent automation.
     """
+    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+
     imported_notifications = 0
     imported_images = 0
+    skipped = 0
     targets = _resolve_target_space_ids(hass, call)
+    cooldown: HomeAssistantError | None = None
     for coordinator, space_id in targets:
-        result = await coordinator.async_import_alarm_images(space_id)
+        try:
+            result = await coordinator.async_import_alarm_images(space_id)
+        except HomeAssistantError as err:
+            # A space still inside its backfill cooldown must not discard what
+            # the other spaces returned, nor make the outcome depend on the
+            # order they were resolved in. Any other failure still propagates.
+            if getattr(err, "translation_key", None) != "alarm_backfill_rate_limited":
+                raise
+            cooldown = err
+            skipped += 1
+            continue
         imported_notifications += result["notifications"]
         imported_images += result["images"]
+    if cooldown is not None and skipped == len(targets):
+        # Nothing ran, so the cooldown is the whole answer and the caller should
+        # see it as an error rather than as an empty success.
+        raise cooldown
     return {
         "spaces": len(targets),
         "notifications": imported_notifications,
         "images": imported_images,
+        "skipped": skipped,
     }
 
 

@@ -67,7 +67,7 @@ class TestAlarmImageImport:
                 AlarmMedia("camera", "older", ("older-a.jpg", "older-b.jpg"), timestamp=10),
             )
         )
-        coordinator._imported_alarm_notification_ids = set()
+        coordinator._imported_alarm_notification_ids = {}
         coordinator._alarm_import_lock = asyncio.Lock()
         coordinator._last_alarm_backfill = {}
         coordinator.photo_revisions = {}
