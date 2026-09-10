@@ -129,6 +129,12 @@ _HTS_CHRONIC_FAILURE_SECONDS = 30 * 60
 MANUAL_REFRESH_INTERVAL = 60
 ALARM_BACKFILL_INTERVAL = 300
 
+# How many alarm ids the two in-process memories below keep. They are a fast
+# path in front of the on-disk album check, never the authority, so evicting an
+# id costs one directory stat and can never cost a request to Ajax. Bounded
+# because an unbounded set grows for the life of the Home Assistant process.
+_ALARM_ID_MEMORY = 512
+
 # Map proto status field name to internal key used by binary_sensor/sensor.
 # Module-level constant to avoid recreating on every status update.
 _STATUS_KEY_MAP: dict[str, str] = {
@@ -504,13 +510,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.photo_revisions: dict[str, int] = {}
         # History is intentionally an on-demand import. Avoid importing the
         # same event twice in one HA process if the service is called again.
-        self._imported_alarm_notification_ids: set[str] = set()
+        self._imported_alarm_notification_ids: dict[str, None] = {}
         # An alarm push can arrive before Ajax has uploaded every frame. Keep
         # one short-lived retry task per notification rather than polling media.
         self._alarm_import_tasks: dict[str, asyncio.Task[None]] = {}
         self._alarm_import_lock = asyncio.Lock()
         self._last_alarm_backfill: dict[str, float] = {}
-        self._seen_alarm_push_ids: set[str] = set()
+        self._seen_alarm_push_ids: dict[str, None] = {}
         # space_id -> (expiry_time, security_state)
         self._optimistic_space_states: dict[str, tuple[float, Any]] = {}
         # Spaces with an intrusion alarm push not yet acknowledged by an
@@ -737,6 +743,18 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         return await self._async_save_alarm_media(alarm_media)
 
+    @staticmethod
+    def _remember_alarm_id(store: dict[str, None], notification_id: str) -> None:
+        """Record an alarm id, forgetting the oldest once the cap is reached.
+
+        Re-recording an id moves it back to the newest end, so an alarm that
+        keeps being asked about is not the one evicted.
+        """
+        store.pop(notification_id, None)
+        store[notification_id] = None
+        while len(store) > _ALARM_ID_MEMORY:
+            del store[next(iter(store))]
+
     async def _async_alarm_is_stored(
         self, device_id: str, notification_id: str, timestamp: float
     ) -> bool:
@@ -788,7 +806,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.photo_revisions[device.id] = self.photo_revisions.get(device.id, 0) + 1
                 if preview.name == "last.jpg":
                     self.last_photo_urls.pop(device.id, None)
-                self._imported_alarm_notification_ids.add(alarm.notification_id)
+                self._remember_alarm_id(
+                    self._imported_alarm_notification_ids, alarm.notification_id
+                )
                 imported_notifications += 1
                 imported_images += saved_images
 
@@ -860,7 +880,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             or space.hub_id != hub_id
         ):
             return
-        self._seen_alarm_push_ids.add(notification_id)
+        self._remember_alarm_id(self._seen_alarm_push_ids, notification_id)
         task = self.hass.async_create_task(
             self._async_import_pushed_alarm_images(notification_id, device_id, hub_id, timestamp),
             name=f"aegis_ajax_alarm_images_{notification_id[:12]}",
@@ -871,15 +891,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_import_pushed_alarm_images(
         self, notification_id: str, device_id: str, hub_id: str, timestamp: float
     ) -> None:
-        """Wait for readiness on one stream; unavailable media can be backfilled later."""
+        """Wait for readiness on one stream; unavailable media can be backfilled later.
+
+        The stream is awaited *outside* the import lock. It can stay open for up
+        to a minute waiting for Ajax to finish publishing frames, and holding
+        the lock across it made a manual backfill called in that window wait on
+        it, which Home Assistant reports as a slow action. The lock still covers
+        the part that needs serialising — the dedupe check and the write — with
+        the stored check repeated under it, so an album written while this
+        stream was open is not written a second time.
+        """
         await asyncio.sleep(8)
-        async with self._alarm_import_lock:
-            if await self._async_alarm_is_stored(device_id, notification_id, timestamp):
-                return
-            alarm = await self._media_api.get_alarm_media(
-                notification_id, hub_id, device_id, timestamp
-            )
-            result = await self._async_save_alarm_media((alarm,)) if alarm is not None else None
+        if await self._async_alarm_is_stored(device_id, notification_id, timestamp):
+            return
+        alarm = await self._media_api.get_alarm_media(notification_id, hub_id, device_id, timestamp)
+        result = None
+        if alarm is not None:
+            async with self._alarm_import_lock:
+                if await self._async_alarm_is_stored(device_id, notification_id, timestamp):
+                    return
+                result = await self._async_save_alarm_media((alarm,))
         _LOGGER.debug(
             "Ajax pushed alarm %s: %s",
             notification_id[:12],

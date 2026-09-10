@@ -118,7 +118,9 @@ class TestRefreshAlarmImagesService:
 
         result = await _async_handle_refresh_alarm_images(hass, service_call)
 
-        assert result == {"spaces": 2, "notifications": 3, "images": 7}
+        # `skipped` counts spaces still inside their backfill cooldown, so a
+        # cooling space cannot hide what the others returned (#495 follow-up).
+        assert result == {"spaces": 2, "notifications": 3, "images": 7, "skipped": 0}
         assert coordinator.async_import_alarm_images.await_args_list == [
             call("space1"),
             call("space2"),

@@ -37,8 +37,8 @@ def _coordinator(tmp_path: Path) -> AjaxCobrandedCoordinator:
     coordinator._media_api = MagicMock()
     coordinator._alarm_import_lock = asyncio.Lock()
     coordinator._last_alarm_backfill = {}
-    coordinator._seen_alarm_push_ids = set()
-    coordinator._imported_alarm_notification_ids = set()
+    coordinator._seen_alarm_push_ids = {}
+    coordinator._imported_alarm_notification_ids = {}
     coordinator.photo_revisions = {}
     coordinator.last_photo_urls = {}
     coordinator.async_update_listeners = MagicMock()
