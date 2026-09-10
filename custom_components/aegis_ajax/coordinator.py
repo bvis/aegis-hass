@@ -599,6 +599,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # corroborated carry preserved them (#419). Membership licenses the
         # withdraw-on-0xB7=00 path; anything gRPC-fresh clears membership.
         self._hts_carried_deactivation_ids: set[str] = set()
+        # A durable record of the #419 carry, for diagnostics. The carry
+        # self-corrects within one status refresh, so its only trace was a
+        # DEBUG line and the decisive instant was twice lost to log rotation
+        # while the reporter was watching for it. Counters and a timestamp let
+        # a natural occurrence be reported after the fact.
+        self._deactivation_carry_snapshots = 0
+        self._deactivation_carry_devices = 0
+        self._last_deactivation_carry: datetime | None = None
         # Monotonic timestamp of the last user-triggered STATUS_BODY
         # refresh per hub. Read by `async_request_manual_refresh` to
         # rate-limit successive presses to `MANUAL_REFRESH_INTERVAL`.
@@ -2102,6 +2110,40 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
+    def deactivation_carry_state(self) -> dict[str, Any]:
+        """What the #419 carry has done, for the diagnostics dump.
+
+        `snapshots_with_a_carry` and `device_carries` only ever grow, so they
+        record that a carry happened even after the hub's next report withdrew
+        it; `currently_carried_device_ids` is the narrower question of whether
+        one still applies. Conflating the two would erase the evidence at the
+        moment the fix worked.
+
+        `hub_bypass_reports` is the corroborator's own freshness, which is the
+        first thing to look at when the counters stay at zero: a report older
+        than the trust window is why a carry did not happen. Device ids only —
+        never a device name, which ships as a length elsewhere in the dump.
+        """
+        now = time.monotonic()
+        return {
+            "snapshots_with_a_carry": self._deactivation_carry_snapshots,
+            "device_carries": self._deactivation_carry_devices,
+            "last_carry_at": (
+                self._last_deactivation_carry.isoformat()
+                if self._last_deactivation_carry is not None
+                else None
+            ),
+            "currently_carried_device_ids": sorted(self._hts_carried_deactivation_ids),
+            "trust_window_seconds": _HTS_BYPASS_STATE_TRUST_WINDOW,
+            "hub_bypass_reports": {
+                device_id: {
+                    "deactivated": deactivated,
+                    "age_seconds": round(now - seen_at, 1),
+                }
+                for device_id, (deactivated, seen_at) in self._hts_bypass_state.items()
+            },
+        }
+
     def _hts_confirms_deactivation(self, device_id: str) -> bool:
         """True when a fresh HTS `0xB7` report says the bypass is engaged (#419)."""
         entry = self._hts_bypass_state.get(device_id)
@@ -3308,6 +3350,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Separate line on purpose — the one above is grepped by field
         # instrumentation (#403) and its shape must stay stable.
         if carried_deactivation_count:
+            self._deactivation_carry_snapshots += 1
+            self._deactivation_carry_devices += carried_deactivation_count
+            self._last_deactivation_carry = dt_util.utcnow()
             _LOGGER.debug(
                 "Deactivation state carried across snapshot for %d device(s) "
                 "on the hub's own bypass report (#419)",
