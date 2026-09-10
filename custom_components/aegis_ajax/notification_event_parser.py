@@ -113,15 +113,38 @@ def extract_alarm_photo_context(raw: bytes, notification_id: str) -> tuple[str, 
 
 
 def extract_notification_id(encoded_data: str) -> str | None:
-    """Extract notification_id from base64-encoded push notification data."""
+    """Return `Notification.id` from a base64-encoded push payload, or None.
+
+    Read structurally, for the reason spelled out in `extract_space_id`: an id
+    is just text, and a substring search cannot tell one id from another that
+    happens to sit earlier in the payload. This function used to return the
+    first 64-character hex run it could find, which is the real id only while
+    the real id happens to be 64 hex characters and first. When it is not — a
+    video/NVR-sourced push is one shape where it is not — the scan returns some
+    other, often per-device constant, blob. That is worse than nothing here: the
+    value keys the 5 s duplicate window, so a constant makes two genuinely
+    different presses look like one delivery and silently drops the second
+    (#494).
+
+    The hex scan is kept as a fallback for payloads the structural read cannot
+    decode at all, which is what it was really covering.
+    """
     try:
         raw = base64.b64decode(encoded_data)
-        # PushNotificationDispatchEvent field 1 (Notification) is at tag 0x0a
-        # Inside Notification, field 1 (id) is also tag 0x0a
-        # We look for a 64-char hex string which is the notification ID format
+    except Exception:
+        _LOGGER.debug("Failed to extract notification_id from push")
+        return None
+
+    notification = _dispatch_notification(raw)
+    if notification is not None and notification.id:
+        structural: str = notification.id
+        return structural
+
+    try:
         matches = re.findall(rb"[0-9A-Fa-f]{64}", raw)
         if matches:
             result: str = matches[0].decode("ascii")
+            _LOGGER.debug("Push carried no readable Notification.id; using the hex scan instead")
             return result
     except Exception:
         _LOGGER.debug("Failed to extract notification_id from push")

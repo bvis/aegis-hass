@@ -1188,12 +1188,17 @@ class AjaxNotificationListener:
                 # every event took the fallback below and was delivered to every
                 # space. Don't reintroduce a byte scan here.
                 target_space = self._find_space_for_event(raw)
+                # The space this push was actually delivered to, or None when it
+                # could not be routed. Device attribution below is scoped to it
+                # so a ring can never surface on another space's doorbell (#494).
+                delivered_space: str | None = None
                 photo_context = (
                     notification_event_parser.extract_alarm_photo_context(raw, notification_id)
                     if event_type == "alarm" and notification_id
                     else None
                 )
                 if target_space:
+                    delivered_space = target_space
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, target_space, event_type, event_data
                     )
@@ -1209,6 +1214,7 @@ class AjaxNotificationListener:
                     # One space: the destination is unambiguous even when the
                     # payload didn't name it, so route there rather than drop.
                     only_space = self._coordinator._space_ids[0]
+                    delivered_space = only_space
                     self._dispatch_to_loop(
                         self._coordinator.fire_push_event, only_space, event_type, event_data
                     )
@@ -1258,22 +1264,56 @@ class AjaxNotificationListener:
                     self._dispatch_to_loop(self._coordinator.request_security_snapshot_refresh)
                 # Surface doorbell ring / motion on the source device's own
                 # card, in addition to the hub-level event entity (#173).
-                self._dispatch_event_to_device(event_type, event_data, raw)
+                self._dispatch_event_to_device(event_type, event_data, raw, delivered_space)
         except Exception:
             _LOGGER.debug("Failed to parse event from push notification", exc_info=True)
 
+    def _doorbell_fallback_candidates(
+        self, devices: dict[str, Any], space_id: str | None
+    ) -> list[str]:
+        """Doorbells eligible to receive a ring the push did not attribute (#494).
+
+        A doorbell belongs to the space whose hub it is paired to, so the
+        candidates are the doorbells sharing the delivered space's `hub_id`.
+        When the push could not be routed at all, guessing is only safe on an
+        account with a single space — there the account-wide set *is* that
+        space's set, which is what kept #173's single-doorbell case working.
+        """
+        doorbells = [dev_id for dev_id, dev in devices.items() if capabilities_for(dev).is_doorbell]
+        spaces = getattr(self._coordinator, "spaces", {}) or {}
+        if space_id and space_id in spaces:
+            hub_id = spaces[space_id].hub_id
+            return [dev_id for dev_id in doorbells if devices[dev_id].hub_id == hub_id]
+        if len(getattr(self._coordinator, "_space_ids", []) or []) > 1:
+            _LOGGER.debug(
+                "Unrouted doorbell push on a %d-space account: not guessing a device",
+                len(self._coordinator._space_ids),
+            )
+            return []
+        return doorbells
+
     def _dispatch_event_to_device(
-        self, event_type: str, event_data: dict[str, Any], raw: bytes
+        self,
+        event_type: str,
+        event_data: dict[str, Any],
+        raw: bytes,
+        space_id: str | None = None,
     ) -> None:
         """Mirror a doorbell ring / motion push onto the source device (#173).
 
         Resolves the source device from the `device_id` carried in the push
         (`_extract_source_info`). For doorbell rings, when no usable device id
-        is present we fall back to the sole doorbell device in the install —
-        the common single-doorbell case — so users still see the ring on the
-        doorbell card. Motion has no such fallback: the `motion` event_type is
-        shared with PIR detectors, so an unattributed motion push must not be
-        guessed onto an arbitrary device.
+        is present we fall back to the sole doorbell device of the space the push
+        was delivered to — the common single-doorbell case — so users still
+        see the ring on the doorbell card. Motion has no such fallback: the
+        `motion` event_type is shared with PIR detectors, so an unattributed
+        motion push must not be guessed onto an arbitrary device.
+
+        The fallback is scoped because it used to search every device on the
+        account (#494). A PRO account managing several client spaces with one
+        registered doorbell between them attributed every unrouted ring to that
+        doorbell, so a press at one client fired the ring on another client's
+        entity. Same shape as #358: invisible with a single space.
 
         The instrumentation log below is intentional: it records exactly what
         device attribution the parser resolved (or failed to), so if a user's
@@ -1298,9 +1338,7 @@ class AjaxNotificationListener:
                 resolved = alias
 
         if resolved is None and event_type == DOORBELL_EVENT_TYPE:
-            doorbells = [
-                dev_id for dev_id, dev in devices.items() if capabilities_for(dev).is_doorbell
-            ]
+            doorbells = self._doorbell_fallback_candidates(devices, space_id)
             if len(doorbells) == 1:
                 resolved = doorbells[0]
 
