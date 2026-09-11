@@ -4726,6 +4726,65 @@ class TestOnHtsDeviceKvKeyfob:
         coordinator.async_set_updated_data.assert_called_once()
         mock_send.assert_not_called()
 
+    def test_unrecognised_keyfob_shaped_row_warns_once_and_is_recorded(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A near-miss row is reported above DEBUG and lands in diagnostics (#504).
+
+        The shape match is what a hub firmware change breaks, and when it
+        broke, the entity vanished with the only trace a DEBUG line nobody
+        has enabled. One warning per shape, and the sub-key delta recorded so
+        a diagnostics dump answers it without a capture session.
+        """
+        coordinator = _make_coordinator()
+        row = _keyfob_kv(name=b"ALICE")
+        del row[0x16]
+        row[0x17] = b"\x00\x00"
+
+        with caplog.at_level(logging.WARNING, logger="custom_components.aegis_ajax.coordinator"):
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", dict(row))
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", dict(row))
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1, "the same shape must not warn on every SETTINGS_BODY"
+        assert "0x16" in warnings[0].getMessage()
+        assert "0x17" in warnings[0].getMessage()
+        # Sub-key names only: the row carries the keyfob's name as text.
+        assert "ALICE" not in warnings[0].getMessage()
+        assert coordinator.keyfobs == {}
+        assert coordinator.keyfob_unrecognised_rows == {
+            "2ACCB91C": {"missing": ["0x16"], "unexpected": ["0x17"]}
+        }
+
+    def test_recognised_keyfob_records_nothing(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+        with patch("custom_components.aegis_ajax.coordinator.async_dispatcher_send"):
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", _keyfob_kv())
+        assert coordinator.keyfobs != {}
+        assert coordinator.keyfob_unrecognised_rows == {}
+
+    def test_a_row_whose_shape_changes_again_is_reported_again(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Two different near-misses from the same device are two different
+        # facts; the de-duplication is per shape, not per device.
+        coordinator = _make_coordinator()
+        first = _keyfob_kv()
+        del first[0x16]
+        second = _keyfob_kv()
+        del second[0x13]
+
+        with caplog.at_level(logging.WARNING, logger="custom_components.aegis_ajax.coordinator"):
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", first)
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", second)
+
+        assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 2
+        assert coordinator.keyfob_unrecognised_rows["2ACCB91C"] == {
+            "missing": ["0x13"],
+            "unexpected": [],
+        }
+
     def test_non_keyfob_unknown_row_ignored(self) -> None:
         coordinator = _make_coordinator()
         coordinator.async_set_updated_data = MagicMock()

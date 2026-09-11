@@ -21,8 +21,8 @@ row, and the modeled path already surfaces the device properly. The
 coordinator's `_log_hts_space_control_settings` probe is where that class is
 observed.
 
-Empirically (live capture, 6 keyfobs) every keyfob row carries an identical
-15-sub-key set; only the name (`0x02`) and a per-device index (`0x0a`) differ:
+Empirically (live capture, 6 keyfobs) every keyfob row carries the same
+sub-key set; only the name (`0x02`) and a per-device index (`0x0a`) differ:
 
     0x02 = name (UTF-8)                 the keyfob's display name
     0x0a = per-device index/handle      sequential, distinct per keyfob
@@ -30,6 +30,12 @@ Empirically (live capture, 6 keyfobs) every keyfob row carries an identical
     0x07/0x08  = 00000000ffffffff       constant placeholders
     0x09/0x10/0x11/0x0f/0x13/0x14 = zeros
     0x16 = ffff
+    0x17 = 0000                         firmware 2.42.120 and later only
+
+`KEYFOB_SHAPE` is the set a row must CONTAIN, not equal (#504): `0x17` appeared
+with a hub firmware update and, while the match was an equality, it dropped
+every keyfob on that hub — six entities that had been reporting since June went
+`unavailable`, and the only trace was the DEBUG candidate line below.
 
 **The "active" flag is EXPERIMENTAL/unverified.** Every observed keyfob reads
 `0x0b == 0x01`; we have no `inactive` sample. Only a CRA admin can deactivate a
@@ -47,8 +53,9 @@ import dataclasses
 
 from custom_components.aegis_ajax.api.hts.hub_state import _bool_val, _int_be_val, _str_val
 
-# The exact sub-key set every captured keyfob row shares. No other device row,
-# user/member row, or section marker observed in SETTINGS_BODY collides with it.
+# The sub-keys every captured keyfob row carries. A row must CONTAIN all of
+# them (#504) — later firmwares add their own, e.g. `0x17`. No other device row,
+# user/member row, or section marker observed in SETTINGS_BODY carries them all.
 KEYFOB_SHAPE: frozenset[int] = frozenset(
     {0x02, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x16}
 )
@@ -97,13 +104,32 @@ def _flags_hex(kv: dict[int, bytes]) -> str:
 def parse_keyfob(device_id_hex: str, hub_id: str, kv: dict[int, bytes]) -> Keyfob | None:
     """Return a `Keyfob` iff *kv* is a keyfob row, else `None`.
 
-    Classification is install-independent and relies on the unique 15-sub-key
-    shape plus a printable name — no dependence on the device-id prefix (which
-    was coincidental). The caller (`coordinator._on_hts_device_kv`) only reaches
+    Classification is install-independent and relies on the known sub-key set
+    plus a printable name — no dependence on the device-id prefix (which was
+    coincidental). The caller (`coordinator._on_hts_device_kv`) only reaches
     this for rows absent from the gRPC device snapshot, so modeled devices and
     the hub are already excluded; this adds the user-row and marker guards.
+
+    **The match is a superset, not an equality (#504).** Every key in
+    `KEYFOB_SHAPE` must be present; keys beyond it are ignored. It was an
+    equality until a hub firmware update (`2.42.120`) added a sixteenth
+    sub-key, `0x17`, to the row — and every keyfob on that install stopped
+    being recognised at once, taking its entity with it. Requiring the known
+    keys keeps the discriminating power (no other observed row in a
+    SETTINGS_BODY carries all of them) while a field the vendor adds costs
+    nothing. Unknown keys are never read: each value below comes from a named
+    sub-key.
+
+    The rule is deliberately one-directional. A row that *drops* a known key is
+    still rejected, because that is a different shape and worth seeing rather
+    than absorbing — `looks_like_keyfob_candidate` catches it for the caller to
+    report (coordinator warns once per row and records it in diagnostics).
     """
-    if frozenset(kv) != KEYFOB_SHAPE:
+    if not frozenset(kv) >= KEYFOB_SHAPE:
+        return None
+    # A member row that happened to carry every keyfob key would otherwise pass
+    # now that extra keys are tolerated; the user markers still exclude it.
+    if frozenset(kv) >= _USER_ROW_MARKER_SUBKEYS:
         return None
     try:
         if int(device_id_hex, 16) < _MIN_DEVICE_ID:

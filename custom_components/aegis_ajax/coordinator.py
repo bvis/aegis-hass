@@ -315,6 +315,12 @@ _HTS_BUTTON_ACTIVITY_CANDIDATE_KEYS: tuple[int, ...] = (0x39, 0x40)
 # hub-wide and is not this device's activity.
 _HTS_BUTTON_PRESS_KEY = 0x39
 
+# How many distinct keyfob-shaped rows the coordinator will remember as
+# unrecognised (#504). A hub has a handful of keyfobs; the cap exists so a hub
+# that suddenly emits many near-miss rows cannot grow this without bound, since
+# it is held for the lifetime of the entry and dumped in diagnostics.
+_MAX_UNRECOGNISED_KEYFOB_ROWS = 16
+
 # SpaceControl settings keys on a *gRPC-modeled* keyfob's HTS row (#311) —
 # read-only probe, nothing is routed off them.
 #
@@ -624,6 +630,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # device + experimental "Active" sensor per entry, added at runtime via
         # the `SIGNAL_NEW_DEVICE` dispatcher as keyfobs are discovered.
         self.keyfobs: dict[str, Keyfob] = {}
+        # Rows that look like a keyfob but did not match the known shape (#504),
+        # keyed by device id: `{"missing": [...], "unexpected": [...]}` naming
+        # the sub-keys, never their values. A hub firmware that adds or drops a
+        # field stops every keyfob being recognised at once, and the entities
+        # already created go `unavailable` with no other trace — this is what
+        # makes that answerable from a diagnostics dump.
+        self.keyfob_unrecognised_rows: dict[str, dict[str, list[str]]] = {}
         # Last-seen arm flag (HTS sub-key 0x06) per hub-internal space-security
         # object (00000001/00000002…). A keypad full-arm of a group reaches us
         # only as a STATUS_UPDATE flip of this flag — no type=0x08 space event
@@ -2601,7 +2614,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         from custom_components.aegis_ajax.notification import _redact_printable  # noqa: PLC0415
 
-        if looks_like_keyfob_candidate(device_id_hex, kv):
+        is_candidate = looks_like_keyfob_candidate(device_id_hex, kv)
+        if is_candidate:
             _LOGGER.debug(
                 "Keyfob candidate %s on hub %s: %s",
                 device_id_hex,
@@ -2611,6 +2625,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         keyfob = parse_keyfob(device_id_hex, hub_id, kv)
         if keyfob is None:
+            if is_candidate:
+                self._record_unrecognised_keyfob_row(device_id_hex, hub_id, kv)
             return
         if self.keyfobs.get(device_id_hex) == keyfob:
             return
@@ -2619,6 +2635,51 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if is_new:
             async_dispatcher_send(self.hass, SIGNAL_NEW_DEVICE, device_id_hex)
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    def _record_unrecognised_keyfob_row(
+        self, device_id_hex: str, hub_id: str, kv: dict[int, bytes]
+    ) -> None:
+        """Report a keyfob-shaped row the parser refused, once per shape (#504).
+
+        The classifier requires a known sub-key set, so a hub firmware that
+        changes the row stops every keyfob being recognised — and because Home
+        Assistant never removes an entity a platform stops providing, the user
+        is left with sensors reading `unavailable` and no explanation. That is
+        what happened when firmware `2.42.120` added `0x17`: the only trace was
+        the DEBUG line above, which nobody runs with.
+
+        Sub-key names only, never values: this row carries the keyfob's name as
+        text and these logs get pasted into public issues.
+        """
+        from custom_components.aegis_ajax.api.hts.keyfobs import (  # noqa: PLC0415
+            KEYFOB_SHAPE,
+        )
+
+        keys = frozenset(kv)
+        record = {
+            "missing": sorted(f"0x{k:02x}" for k in KEYFOB_SHAPE - keys),
+            "unexpected": sorted(f"0x{k:02x}" for k in keys - KEYFOB_SHAPE),
+        }
+        if self.keyfob_unrecognised_rows.get(device_id_hex) == record:
+            # Same shape as last time: a SETTINGS_BODY arrives on every
+            # reconnect, and one warning per firmware is the useful amount.
+            return
+        if (
+            device_id_hex not in self.keyfob_unrecognised_rows
+            and len(self.keyfob_unrecognised_rows) >= _MAX_UNRECOGNISED_KEYFOB_ROWS
+        ):
+            return
+        self.keyfob_unrecognised_rows[device_id_hex] = record
+        _LOGGER.warning(
+            "Row %s on hub %s looks like a SpaceControl keyfob but does not match the "
+            "known shape, so no keyfob entity is provided for it: missing sub-keys %s, "
+            "unexpected %s. This usually means the hub firmware changed the row; a "
+            "diagnostics download carries the same detail for a bug report.",
+            device_id_hex,
+            hub_id,
+            ", ".join(record["missing"]) or "none",
+            ", ".join(record["unexpected"]) or "none",
+        )
 
     def request_security_snapshot_refresh(self) -> None:
         """Nudge the authoritative security re-read, group states included.
