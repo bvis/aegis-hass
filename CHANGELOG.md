@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.20.0] - unreleased
+## [1.20.0] - 2026-09-11
 
 A MotionCam that cannot take a photo on demand now has a camera entity worth looking at, the
 MotionCam Outdoor 2/4 PhOD gets the photo entities its own app already offers, and a doorbell
@@ -19,12 +19,22 @@ its only requests are the ones a button press or a real alarm already makes on t
 that were mapped before. The doorbell fix touches parsing and attribution only, so its delta is
 zero.
 
-The two larger changes are both unconfirmed in the field so far, and for opposite reasons:
-the alarm import needs a real camera alarm, which nobody can schedule, and the doorbell
-misattribution needs a PRO account managing several client spaces with a doorbell, which nobody
-here has. Both reporters own the hardware and offered to test, so both ship as a beta first. The
-Outdoor 2/4 PhOD entities are the exception: the reporter owns two of them and can confirm
-them on demand, since a capture is a button press rather than an event to wait for.
+Consolidates the `1.20.0-beta.1` to `1.20.0-beta.4` series. Three of the changes were confirmed
+on the reporters' own installations during that series: the doorbell fixes by @Sven2410 on the
+PRO account with three client spaces where the misattribution was found, and the Outdoor 2/4
+PhOD entities by @Cris59264 on both of his units, including the capture that `beta.3` got wrong
+and `beta.4` fixed.
+
+The alarm-image import ships without that confirmation, and deliberately. Its trigger is a real
+camera alarm, which nobody can schedule and which this maintainer's installation has no camera
+to produce; waiting for one would hold back four changes that are confirmed for an event with no
+date. What it ships on instead: tests that fail when each half of the mechanism is reverted,
+three pinned network budgets, and a path that is only reached by an alarm push carrying images,
+so an installation that never has a camera alarm runs byte-identical code to `1.19.1`. #495 stays
+open as the watch, and the debug lines from a first real alarm are still what closes it. The same
+applies to the undelivered-push detector on #437: twenty demonstrated opportunities have to
+accumulate before it says anything, which is weeks of ordinary use on a healthy install and
+cannot be forced.
 
 ### Added
 - **A MotionCam alarm's photo sequence is imported and kept (#495).** A plain MotionCam has no Photo on Demand, so its camera entity could never show anything, while the Ajax app shows the one, two or three photos the alarm produced immediately. Those photos are now retrieved when the alarm push arrives and stored as an album per alarm: the numbered frames plus a preview, browsable through Media Source, with the preview served by the camera entity — a contact sheet when the alarm carried more than one frame, since a camera entity can only return a single image. Manual Photo on Demand captures are untouched and stay individual files. Retention removes an album as a unit, so a sequence is never half-deleted, and a partly failed sequence is never published as if it were the whole alarm: the stream is read until every frame Ajax has not marked as failed is ready. A new `aegis_ajax.refresh_alarm_images` action backfills recent history for installs where push is not available, or for alarms whose media was not ready at the time; on an account with several spaces it reports how many were skipped for still being inside their cooldown rather than discarding what the others returned. Found, designed and built by @bogar. **Requests to Ajax:** one media stream per real camera alarm, opened with the identifier the push itself carries so no history search is needed, and readiness arriving on that same stream rather than through repeated attempts — which is what the Ajax app does when the notification is tapped. The backfill action adds one history query plus at most ten media reads per space, only when called, behind a five-minute per-space cooldown and skipping albums already complete on disk. Nothing periodic; the three network budgets are each pinned by a test that fails if they regress.
