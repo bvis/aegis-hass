@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - unreleased
+
+### Fixed
+- **Keyfob entities no longer disappear when the hub updates its firmware (#504).** SpaceControl keyfobs are not part of the device list Ajax serves over the normal API; they are recognised by matching the shape of a row in the hub's settings stream, and that match required the row to carry exactly the fields seen when it was written. A newer hub firmware adds one field to it, which stopped every keyfob on such a hub being recognised at once — and since Home Assistant never removes an entity a platform stops providing, the sensors created on an earlier firmware were left reading `unavailable` with nothing in the log to explain it. Found on a hub running `2.42.120` with six keyfobs whose entities had been reporting since June. The match now requires the fields it knows and ignores the ones it does not, so a hub on the older firmware behaves exactly as before and the restored entities keep their identifiers, and their history, rather than arriving as duplicates. A row that looks like a keyfob but is still not recognised is now reported once as a warning naming which fields differ, and recorded in the diagnostics dump: what it took to work this out was a debug capture from a live hub, and the next firmware that changes the row should be answerable from a diagnostics file instead. Sub-field names only, never their values — the row carries the keyfob's name as text. Whether the flag these entities expose really means "active" is still unconfirmed and stays on #311. **Requests to Ajax:** none added. This changes how a row already arriving on the hub's existing stream is read.
+
 ## [1.20.0] - 2026-09-11
 
 A MotionCam that cannot take a photo on demand now has a camera entity worth looking at, the

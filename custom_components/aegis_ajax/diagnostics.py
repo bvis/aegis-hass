@@ -187,6 +187,13 @@ async def async_get_config_entry_diagnostics(
             }
             for kid, k in coordinator.keyfobs.items()
         },
+        # Rows that looked like a SpaceControl keyfob but did not match the
+        # known shape (#504), naming the sub-key delta and never a value. A
+        # non-empty entry here is the answer to "why is my keyfob sensor
+        # unavailable": the hub changed the row, the classifier refused it,
+        # and Home Assistant kept the entity it already had. Empty on a
+        # healthy install and on one that never had a keyfob.
+        "keyfob_unrecognised_rows": coordinator.keyfob_unrecognised_rows,
         "video_edge_onvif_rtsp": video_edge_probe,
         # What decides whether a hub gets an IMEI sensor at all (#379). A
         # `null` here is the answer to "why is my IMEI sensor unavailable":

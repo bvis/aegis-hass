@@ -102,6 +102,59 @@ class TestParseKeyfob:
     def test_shape_matches_fixture(self) -> None:
         assert frozenset(_keyfob_row("ALICE", "02ef")) == KEYFOB_SHAPE
 
+    def test_firmware_2_42_120_row_with_extra_subkey(self) -> None:
+        """A hub firmware that ADDS a field must not drop the keyfob (#504).
+
+        Captured on hub firmware `2.42.120`: the row carries the same fifteen
+        sub-keys plus `0x17 = 0000`. An exact-set match rejected all six
+        keyfobs of that install at once, and the entities they had been
+        providing since June went `unavailable` with nothing above DEBUG to
+        say why.
+        """
+        row = dict(_KEYFOB_TEMPLATE)
+        row[0x17] = "0000"
+        kf = parse_keyfob("2A4B126E", HUB_ID, _kv(row | {0x02: _hx("T3"), 0x0A: "02f1"}))
+        assert kf is not None
+        assert kf == Keyfob(
+            id="2A4B126E",
+            hub_id=HUB_ID,
+            name="T3",
+            index=0x02F1,
+            active=True,
+            flags_hex="01:01:01:01",
+        )
+
+    def test_unknown_extra_subkeys_do_not_change_the_reading(self) -> None:
+        # Tolerating unknown fields must not let one of them be read by
+        # accident: the parsed values come from the known sub-keys only.
+        row = dict(_KEYFOB_TEMPLATE)
+        row[0x17] = "0000"
+        row[0x18] = "ff"
+        row[0x19] = _hx("NOT THE NAME")
+        kf = parse_keyfob("2ACCB91C", HUB_ID, _kv(row))
+        assert kf is not None
+        assert kf.name == "ALICE"
+        assert kf.active is True
+        assert kf.flags_hex == "01:01:01:01"
+
+    def test_row_missing_a_known_subkey_is_rejected(self) -> None:
+        # The widening is one-directional on purpose: every known sub-key is
+        # still required, so a row that merely resembles a keyfob is not
+        # absorbed. A firmware that REMOVES a field is a different change and
+        # must be seen (it surfaces through the rejected-candidate warning).
+        for missing in (0x07, 0x13, 0x16):
+            row = dict(_KEYFOB_TEMPLATE)
+            del row[missing]
+            assert parse_keyfob("2ACCB91C", HUB_ID, _kv(row)) is None, f"0x{missing:02x}"
+
+    def test_user_row_padded_to_the_keyfob_shape_is_still_rejected(self) -> None:
+        # The superset rule must not open the door to a member row that grows
+        # enough fields to cover the keyfob shape: the user markers still win.
+        row = dict(_KEYFOB_TEMPLATE)
+        row[0x01] = _hx("Home Assistant")
+        row[0x03] = _hx("+10000000000")
+        assert parse_keyfob("1B99007F", HUB_ID, _kv(row)) is None
+
     def test_deactivated_flag_value_flip(self) -> None:
         # Same keyset, 0x0b flipped to 00 → still a keyfob, but active=False.
         row = dict(_KEYFOB_TEMPLATE)
