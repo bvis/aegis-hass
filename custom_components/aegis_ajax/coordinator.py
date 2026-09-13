@@ -39,11 +39,12 @@ from custom_components.aegis_ajax.api.hub_object import (
     SimCardInfo,
 )
 from custom_components.aegis_ajax.api.media import AlarmMedia, MediaApi, is_valid_photo_url
-from custom_components.aegis_ajax.api.models import Device as DeviceModel
 from custom_components.aegis_ajax.api.models import (
+    BatteryInfo,
     device_deactivation_kinds,
     is_device_deactivated,
 )
+from custom_components.aegis_ajax.api.models import Device as DeviceModel
 from custom_components.aegis_ajax.api.security import SecurityApi
 from custom_components.aegis_ajax.api.session import (
     AuthenticationError,
@@ -3553,6 +3554,18 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:  # ADD (1) or UPDATE (2)
             new_statuses[key] = True
 
+        # #506: the battery delta carries a structured reading, so it updates
+        # `device.battery` rather than leaving a `statuses` flag behind. An
+        # unparsable payload keeps the last known reading: blanking it would
+        # take out the battery sensor and the panel's low-battery arm check on
+        # a firmware that reshapes the status.
+        battery = device.battery
+        if status_name == "battery":
+            raw = data.get("battery")
+            if isinstance(raw, dict) and "level" in raw:
+                battery = BatteryInfo(level=int(raw["level"]), is_low=bool(raw["is_low"]))
+            new_statuses.pop(key, None)
+
         # Case-tampering signals also drive the shared `tamper` key the
         # per-device tamper sensor binds to (#339). On REMOVE, only clear it
         # once no other tamper source remains active (lid could still be open
@@ -3591,7 +3604,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             malfunctions=device.malfunctions,
             bypassed=device.bypassed,
             statuses=new_statuses,
-            battery=device.battery,
+            battery=battery,
         )
         self.devices[device.id] = updated
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})

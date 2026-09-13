@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A battery reading no longer freezes at its last value while the device keeps reporting (#506).** Ajax sends a device's battery level over the same live stream that carries its temperature and signal strength, but that particular update was the one kind the integration did not know how to read: it recorded only that *something* about the battery had changed and kept the previous percentage. Nothing corrected it afterwards, because the periodic snapshot that would have brought a fresh reading is deliberately skipped whenever the live stream is healthy — so an install where everything looks fine is exactly the one where the number stops moving. Reported on a MotionProtect Plus showing 30% in Home Assistant while the Ajax app showed 20% and a battery alert, with temperature and signal updating normally throughout. The level and the low-battery state now follow the stream, which also restores the low-battery check the alarm panel runs before arming. A restart or reload was the only previous way out, and it is no longer needed. **Requests to Ajax:** none added — this reads a message already arriving on a stream the integration has always kept open. Note that the per-device **problem** sensor is a separate count the hub only publishes in the periodic snapshot; a malfunction that appears while the stream is up still does not reach it, and that half of the report stays open on #506.
+
 ## [1.20.1] - 2026-09-11
 
 ### Fixed

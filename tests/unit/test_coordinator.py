@@ -1436,6 +1436,45 @@ class TestStreamHandlers:
         assert coordinator.devices["d1"].statuses.get("door_opened") is True
         coordinator.async_set_updated_data.assert_called_once()
 
+    def test_handle_status_update_battery_replaces_the_structured_reading(self) -> None:
+        """#506: a battery delta must update `device.battery`, not just a flag.
+
+        The generic `else` branch wrote `statuses["battery"] = True` and
+        rebuilt the model with `battery=device.battery` — the old reading.
+        Nothing repairs it: `_maybe_fallback_device_snapshot` is a no-op while
+        a stream task is alive, so the stale level outlives every poll.
+        """
+        from custom_components.aegis_ajax.api.models import BatteryInfo
+
+        coordinator = self._make_coordinator_with_stream()
+        device = _make_device("d1")
+        coordinator.devices["d1"] = replace(device, battery=BatteryInfo(level=30, is_low=False))
+
+        coordinator._handle_status_update(
+            "d1", "battery", {"op": 2, "battery": {"level": 20, "is_low": True}}
+        )
+
+        updated = coordinator.devices["d1"]
+        assert updated.battery == BatteryInfo(level=20, is_low=True)
+        # The bogus presence flag must not be left behind: nothing reads it,
+        # and it is what made the stale record look like a fresh one.
+        assert "battery" not in updated.statuses
+
+    def test_handle_status_update_battery_without_payload_keeps_the_reading(self) -> None:
+        """A battery delta whose payload could not be parsed must leave the
+        last known reading alone. Wiping it to `None` would blank the sensor
+        and the panel's low-battery arm check on a firmware that reshapes the
+        status — the #504 lesson applied to a delta."""
+        from custom_components.aegis_ajax.api.models import BatteryInfo
+
+        coordinator = self._make_coordinator_with_stream()
+        known = BatteryInfo(level=30, is_low=False)
+        coordinator.devices["d1"] = replace(_make_device("d1"), battery=known)
+
+        coordinator._handle_status_update("d1", "battery", {"op": 2})
+
+        assert coordinator.devices["d1"].battery == known
+
     def test_handle_status_update_remove_deletes_status(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         device = Device(

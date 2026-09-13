@@ -264,6 +264,71 @@ class TestParseDevice:
         assert captured["status_name"] == "lock_control_status"
         assert captured["payload"]["value"] == "unlocked"
 
+    def test_handle_update_battery_forwards_level_and_alert_state(self) -> None:
+        """#506: a `battery` delta must carry the reading, not collapse to `True`.
+
+        Every other structured status has a parsing branch; battery had none,
+        so it fell through to the generic `else` in the coordinator
+        (`statuses["battery"] = True`) while the structured `device.battery`
+        was carried over untouched. With a healthy stream the device snapshot
+        is never re-fetched, so the stale level survived until a restart —
+        HA showed 30% while Ajax showed 20% + BATTERY_STATE_ALERT.
+        """
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        lds = light_device_status_pb2.LightDeviceStatus
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "3000AC9E"
+        update.status_update.status.CopyFrom(
+            lds(battery=lds.Battery(charge_level_percentage=20, battery_state=2))
+        )
+        update.status_update.update_type = 2  # UPDATE
+
+        captured: dict[str, Any] = {}
+
+        def _on_status(device_id: str, status_name: str, payload: dict[str, Any]) -> None:
+            captured.update(device_id=device_id, status_name=status_name, payload=payload)
+
+        api = DevicesApi(MagicMock())
+        api._handle_update(update, on_devices_snapshot=lambda _: None, on_status_update=_on_status)
+
+        assert captured["status_name"] == "battery"
+        assert captured["payload"]["battery"] == {"level": 20, "is_low": True}
+
+    def test_handle_update_battery_ok_state_is_not_low(self) -> None:
+        """`is_low` follows the same rule as the snapshot parser: states
+        0 (UNSPECIFIED) and 1 (OK) are not an alert. Pinned so the two
+        readers of the same wire value can never drift apart."""
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        lds = light_device_status_pb2.LightDeviceStatus
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "3000AC9E"
+        update.status_update.status.CopyFrom(
+            lds(battery=lds.Battery(charge_level_percentage=97, battery_state=1))
+        )
+        update.status_update.update_type = 2
+
+        captured: dict[str, Any] = {}
+
+        def _on_status(device_id: str, status_name: str, payload: dict[str, Any]) -> None:
+            captured.update(payload=payload)
+
+        api = DevicesApi(MagicMock())
+        api._handle_update(update, on_devices_snapshot=lambda _: None, on_status_update=_on_status)
+
+        assert captured["payload"]["battery"] == {"level": 97, "is_low": False}
+
     def test_handle_update_snapshot_remove_routes_to_on_device_removed(self) -> None:
         """A `snapshot_update` with `update_type=REMOVE` is a device deletion
         (#422), not a refresh. The residual record must NOT be merged back —

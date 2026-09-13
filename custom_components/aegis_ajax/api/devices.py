@@ -670,6 +670,19 @@ class DevicesApi:
                     payload["is_alert"] = bool(sub.is_alert)
                 if hasattr(sub, "type"):
                     payload["alarm_type"] = _ALARM_TYPE_NAMES.get(int(sub.type), "unspecified")
+            elif status_name == "battery":
+                # #506: without a branch here the delta fell through to the
+                # coordinator's generic `else`, which recorded a presence flag
+                # and rebuilt the device with the PREVIOUS reading. Nothing
+                # repaired it afterwards — the fallback device snapshot is
+                # skipped while a stream task is alive — so HA kept showing a
+                # level Ajax had already moved past. Same alert rule as the
+                # snapshot parser: 0 UNSPECIFIED / 1 OK are not an alert.
+                bat = status.battery
+                payload["battery"] = {
+                    "level": int(getattr(bat, "charge_level_percentage", 0)),
+                    "is_low": int(getattr(bat, "battery_state", 0)) not in (0, 1),
+                }
             elif status_name == "temperature":
                 payload["value"] = status.temperature.value
             elif status_name == "life_quality":
