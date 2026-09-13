@@ -79,7 +79,7 @@ from custom_components.aegis_ajax.delay_states import (
     DelayOverlay,
     parse_arm_delays,
 )
-from custom_components.aegis_ajax.device_cache import DevicesCache
+from custom_components.aegis_ajax.device_cache import BatteryDeltaShapes, DevicesCache
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_get_registered_device
 from custom_components.aegis_ajax.photo_storage import (
@@ -697,6 +697,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._devices_cache: DevicesCache | None = (
             DevicesCache(hass, entry_id) if entry_id else None
         )
+
+        # What the hub's battery deltas actually carry (#506). Disabled in the
+        # same no-entry_id mode as the cache above.
+        self._battery_shapes: BatteryDeltaShapes | None = (
+            BatteryDeltaShapes(hass, entry_id) if entry_id else None
+        )
+
+    @property
+    def battery_delta_shapes(self) -> dict[str, int]:
+        """What the battery deltas seen on this install carried (#506)."""
+        return {} if self._battery_shapes is None else self._battery_shapes.as_dict()
 
     @property
     def security_api(self) -> SecurityApi:
@@ -1750,6 +1761,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         values.
         """
         self._streams_started = True
+        if self._battery_shapes is not None:
+            await self._battery_shapes.async_load()
         cached_devices: dict[str, Device] | None = None
         if self._devices_cache is not None:
             try:
@@ -3562,6 +3575,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         battery = device.battery
         if status_name == "battery":
             raw = data.get("battery")
+            if self._battery_shapes is not None:
+                # Recorded before the guard below decides what is usable: the
+                # shape worth knowing about is the one that yields nothing.
+                self._battery_shapes.note(raw if isinstance(raw, dict) else {})
             if isinstance(raw, dict) and raw:
                 # A delta may restate only the alert. Merge onto the last known
                 # reading rather than rebuilding from defaults; with no previous

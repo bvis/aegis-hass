@@ -297,6 +297,13 @@ async def async_get_config_entry_diagnostics(
         # fingerprint identifies the credential set without carrying any of the
         # four values, all of which are in `TO_REDACT` above.
         "push": _push_diagnostics(coordinator.notification_listener),
+        # What the hub's battery deltas carried (#506). The reading is applied
+        # field by field because absent and zero are the same bytes for a
+        # proto3 scalar, so the shape that matters is `received` climbing while
+        # `with_level` stays at zero: deltas arriving that never restate the
+        # percentage, which leaves the level as stale as it was before the fix
+        # and is invisible anywhere else. Counts only — no device, no value.
+        "battery_delta_shapes": coordinator.battery_delta_shapes,
     }
 
 
