@@ -98,6 +98,7 @@ class TestAsyncGetConfigEntryDiagnostics:
         simply had no events.
         """
         listener = coordinator.notification_listener
+        listener.has_fcm_credentials = True
         listener.is_fcm_connected = True
         listener.pushes_received = 0
         listener.last_push_at = None
@@ -116,6 +117,35 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert push["last_push_seconds_ago"] is None
         assert push["creds_fingerprint"] == "abc123def456"
         assert push["cache_creds_fingerprint"] == "abc123def456"
+
+    @pytest.mark.asyncio
+    async def test_push_configured_reports_credentials_not_a_listener_object(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        """#507: `configured` must answer "are credentials set", nothing else.
+
+        It used to be a hardcoded `True` on the only branch where a listener
+        exists — so an install with no FCM credentials at all reported
+        `configured: true`, which reads as the exact opposite of the truth and
+        sent the first read of that dump the wrong way. Listener presence is
+        already reported separately as `notification_listener`.
+        """
+        listener = coordinator.notification_listener
+        listener.has_fcm_credentials = False
+        listener.is_fcm_connected = False
+        listener.pushes_received = 0
+        listener.last_push_at = None
+        listener.ever_delivered = False
+        listener.first_delivery_at = None
+        listener.creds_fingerprint = "be5be69f55e91af2"
+        listener.cache_creds_fingerprint = None
+        listener._fcm_client_started_at = None
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["push"]["configured"] is False
+        # The other half of the pair stays readable: the listener does exist.
+        assert result["notification_listener"] is True
 
     @pytest.mark.asyncio
     async def test_push_reports_not_configured_without_a_listener(

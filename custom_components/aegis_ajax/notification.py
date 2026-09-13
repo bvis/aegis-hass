@@ -283,6 +283,17 @@ class AjaxNotificationListener:
         return self._first_delivery_at
 
     @property
+    def has_fcm_credentials(self) -> bool:
+        """True if FCM credentials are configured for this entry (#507).
+
+        The distinction the diagnostics dump needs: a listener always exists
+        once the entry is set up, credentials or not. Without them `async_start`
+        raises `fcm_not_configured` and returns before a client is ever built,
+        so every other field in the push block reads as an inert zero.
+        """
+        return bool(self._fcm_api_key)
+
+    @property
     def is_fcm_connected(self) -> bool:
         """True if the FCM push client is alive."""
         return self._push_client is not None

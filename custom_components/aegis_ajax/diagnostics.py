@@ -313,7 +313,11 @@ def _push_diagnostics(listener: Any) -> dict[str, Any]:  # noqa: ANN401
     last_push_at = listener.last_push_at
     now = time.monotonic()
     return {
-        "configured": True,
+        # Credentials present — NOT "a listener object exists" (#507). It was
+        # the latter, which reported `true` on an install that had never been
+        # given credentials at all and pointed the first read of the dump the
+        # wrong way. Listener presence is reported as `notification_listener`.
+        "configured": bool(listener.has_fcm_credentials),
         "connected": listener.is_fcm_connected,
         # The denominator for `ever_delivered` (#437): zero deliveries says
         # nothing until you know how many space events push could have carried.
