@@ -678,11 +678,22 @@ class DevicesApi:
                 # skipped while a stream task is alive — so HA kept showing a
                 # level Ajax had already moved past. Same alert rule as the
                 # snapshot parser: 0 UNSPECIFIED / 1 OK are not an alert.
+                # ⚠️ Both fields are plain proto3 scalars, so "absent" and
+                # "zero" are the same bytes. Reading an empty or partial
+                # sub-message literally would publish 0% on a healthy device
+                # — a worse regression than the stale reading. Carry only what
+                # is demonstrably present and let the coordinator keep the
+                # rest: require known, ignore unknown (#504's lesson).
                 bat = status.battery
-                payload["battery"] = {
-                    "level": int(getattr(bat, "charge_level_percentage", 0)),
-                    "is_low": int(getattr(bat, "battery_state", 0)) not in (0, 1),
-                }
+                carried: dict[str, Any] = {}
+                level = int(getattr(bat, "charge_level_percentage", 0))
+                if level:
+                    carried["level"] = level
+                state = int(getattr(bat, "battery_state", 0))
+                if state:  # 0 = BATTERY_STATE_UNSPECIFIED, i.e. not carried
+                    carried["is_low"] = state != 1  # 1 = OK
+                if carried:
+                    payload["battery"] = carried
             elif status_name == "temperature":
                 payload["value"] = status.temperature.value
             elif status_name == "life_quality":
