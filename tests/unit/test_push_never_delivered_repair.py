@@ -253,6 +253,21 @@ class TestTheRepair:
         reg.assert_called_once()
 
 
+class TestCredentialsPresence:
+    """#507: the dump must be able to say "no credentials" out loud."""
+
+    def test_a_listener_with_an_api_key_has_credentials(self) -> None:
+        assert _make_listener().has_fcm_credentials is True
+
+    def test_a_listener_without_an_api_key_has_none(self) -> None:
+        hass = MagicMock()
+        hass.loop = None
+        kwargs = {**_FCM_KWARGS, "fcm_api_key": ""}
+        listener = AjaxNotificationListener(hass=hass, coordinator=MagicMock(), **kwargs)
+
+        assert listener.has_fcm_credentials is False
+
+
 class TestTheDenominatorIsInTheDump:
     @pytest.mark.asyncio
     async def test_the_push_block_reports_the_counted_events(self) -> None:
