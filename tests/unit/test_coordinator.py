@@ -952,25 +952,30 @@ class TestFallbackDeviceSnapshot:
         coordinator._devices_api.get_devices_snapshot.assert_not_awaited()
 
 
+def _coordinator_with_stream() -> AjaxCobrandedCoordinator:  # noqa: F821
+    """Module-level so sibling test modules can build the same coordinator."""
+    from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+    hass = MagicMock()
+    client = MagicMock()
+    with patch(
+        "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+        return_value=None,
+    ):
+        coordinator = AjaxCobrandedCoordinator(
+            hass=hass, client=client, space_ids=["s1"], poll_interval=300
+        )
+    coordinator.hass = hass
+    coordinator.entry_id = "entry-1"
+    coordinator.async_set_updated_data = MagicMock()
+    return coordinator
+
+
 class TestStreamHandlers:
     """Tests for coordinator stream callback handlers."""
 
     def _make_coordinator_with_stream(self) -> AjaxCobrandedCoordinator:  # noqa: F821
-        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
-
-        hass = MagicMock()
-        client = MagicMock()
-        with patch(
-            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
-            return_value=None,
-        ):
-            coordinator = AjaxCobrandedCoordinator(
-                hass=hass, client=client, space_ids=["s1"], poll_interval=300
-            )
-        coordinator.hass = hass
-        coordinator.entry_id = "entry-1"
-        coordinator.async_set_updated_data = MagicMock()
-        return coordinator
+        return _coordinator_with_stream()
 
     def test_hub_registry_id_resolves_through_the_scoped_lookup(self) -> None:
         # #444: children link to the hub by registry id (`via_device_id`), so
