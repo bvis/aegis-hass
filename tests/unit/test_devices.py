@@ -329,6 +329,67 @@ class TestParseDevice:
 
         assert captured["payload"]["battery"] == {"level": 97, "is_low": False}
 
+    def test_handle_update_battery_empty_submessage_carries_nothing(self) -> None:
+        """`charge_level_percentage` is a plain proto3 `uint32`, so an unset
+        field is indistinguishable from a real 0. If the hub ever sends a
+        `battery` delta as a bare "something changed" ping, reading it
+        literally would publish 0% on a healthy device — a worse regression
+        than the stale reading this branch exists to fix. Carry nothing
+        instead, and let the coordinator keep what it knows.
+        """
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        lds = light_device_status_pb2.LightDeviceStatus
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "3000AC9E"
+        update.status_update.status.CopyFrom(lds(battery=lds.Battery()))
+        update.status_update.update_type = 2
+
+        captured: dict[str, Any] = {}
+
+        def _on_status(device_id: str, status_name: str, payload: dict[str, Any]) -> None:
+            captured.update(status_name=status_name, payload=payload)
+
+        api = DevicesApi(MagicMock())
+        api._handle_update(update, on_devices_snapshot=lambda _: None, on_status_update=_on_status)
+
+        assert captured["status_name"] == "battery"
+        assert "battery" not in captured["payload"]
+
+    def test_handle_update_battery_state_only_carries_no_level(self) -> None:
+        """A delta that raises the alert without restating the level must
+        carry the alert alone — inventing `level: 0` alongside it would blank
+        the sensor at the exact moment the battery matters most."""
+        from v3.mobilegwsvc.commonmodels.space.device.light import (  # noqa: PLC0415
+            light_device_status_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_light_devices import (  # noqa: PLC0415
+            response_pb2,
+        )
+
+        lds = light_device_status_pb2.LightDeviceStatus
+        update = response_pb2.StreamLightDevicesResponse.Success.Update()
+        update.device_id.hub_light_device_id.device_id = "3000AC9E"
+        update.status_update.status.CopyFrom(
+            lds(battery=lds.Battery(battery_state=4))  # ALERT, no level
+        )
+        update.status_update.update_type = 2
+
+        captured: dict[str, Any] = {}
+
+        def _on_status(device_id: str, status_name: str, payload: dict[str, Any]) -> None:
+            captured.update(payload=payload)
+
+        api = DevicesApi(MagicMock())
+        api._handle_update(update, on_devices_snapshot=lambda _: None, on_status_update=_on_status)
+
+        assert captured["payload"]["battery"] == {"is_low": True}
+
     def test_handle_update_snapshot_remove_routes_to_on_device_removed(self) -> None:
         """A `snapshot_update` with `update_type=REMOVE` is a device deletion
         (#422), not a refresh. The residual record must NOT be merged back —

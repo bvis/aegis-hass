@@ -1475,6 +1475,31 @@ class TestStreamHandlers:
 
         assert coordinator.devices["d1"].battery == known
 
+    def test_handle_status_update_battery_merges_a_partial_delta(self) -> None:
+        """A delta carrying only the alert keeps the last known level."""
+        from custom_components.aegis_ajax.api.models import BatteryInfo
+
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.devices["d1"] = replace(
+            _make_device("d1"), battery=BatteryInfo(level=30, is_low=False)
+        )
+
+        coordinator._handle_status_update("d1", "battery", {"op": 2, "battery": {"is_low": True}})
+
+        assert coordinator.devices["d1"].battery == BatteryInfo(level=30, is_low=True)
+
+    def test_handle_status_update_battery_partial_on_unknown_device_invents_nothing(
+        self,
+    ) -> None:
+        """With no previous reading a level-less delta must not manufacture
+        `level: 0` — a device with no battery record stays without one."""
+        coordinator = self._make_coordinator_with_stream()
+        coordinator.devices["d1"] = _make_device("d1")  # battery=None
+
+        coordinator._handle_status_update("d1", "battery", {"op": 2, "battery": {"is_low": True}})
+
+        assert coordinator.devices["d1"].battery is None
+
     def test_handle_status_update_remove_deletes_status(self) -> None:
         coordinator = self._make_coordinator_with_stream()
         device = Device(

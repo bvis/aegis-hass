@@ -3562,8 +3562,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         battery = device.battery
         if status_name == "battery":
             raw = data.get("battery")
-            if isinstance(raw, dict) and "level" in raw:
-                battery = BatteryInfo(level=int(raw["level"]), is_low=bool(raw["is_low"]))
+            if isinstance(raw, dict) and raw:
+                # A delta may restate only the alert. Merge onto the last known
+                # reading rather than rebuilding from defaults; with no previous
+                # reading a level-less delta invents nothing.
+                if "level" in raw:
+                    battery = BatteryInfo(
+                        level=int(raw["level"]),
+                        is_low=bool(raw.get("is_low", battery.is_low if battery else False)),
+                    )
+                elif battery is not None and "is_low" in raw:
+                    battery = BatteryInfo(level=battery.level, is_low=bool(raw["is_low"]))
             new_statuses.pop(key, None)
 
         # Case-tampering signals also drive the shared `tamper` key the
