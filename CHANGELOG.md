@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.20.2] - 2026-09-13
+
+A battery reading that had stopped following the device now follows it again, and the
+diagnostics dump stops claiming push is configured when it is not.
+
+**Requests to Ajax: none added.** Both changes read data that was already arriving on
+connections the integration has always kept open.
+
+Shipped on unit evidence rather than a field confirmation, and it is worth being plain about
+why. The battery fix cannot be forced: it needs a real battery to move a percentage point,
+which happens when it happens. What is known is that the update arrives — a report carried
+the fingerprint of one being received and discarded — and what is assumed is what it
+contains, because no capture of one exists. The code is written so that both possibilities
+are safe: a complete update is applied, and an update that does not restate the level leaves
+the last known reading alone, which is exactly how the previous version behaved. An
+installation where these updates never arrive runs the same path as `1.20.1`.
 
 ### Fixed
 - **The diagnostics dump no longer claims push is configured when it is not (#507).** The `push` block reported `"configured": true` whenever the integration had a notification listener — which it always has once the entry is set up, credentials or not. On an installation that had never been given FCM credentials the dump therefore said the opposite of the truth, and contradicted both the repair card the user could see and the answer they had given on the issue form. It now reports whether credentials are actually set; whether the listener object exists was already reported separately as `notification_listener`.
