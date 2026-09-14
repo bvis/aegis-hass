@@ -70,6 +70,23 @@ jobs:
             python3 scripts/check_proto_imports.py
           '
 
+  # Home Assistant installs an integration's requirements through pip with its
+  # own homeassistant/package_constraints.txt, which pins several of the packages
+  # we depend on exactly. A floor of ours above the pin of the oldest core we
+  # support cannot be resolved at all: the user gets "Requirements for aegis_ajax
+  # not found" with nothing in our code to blame, which is how the integration
+  # became uninstallable below 2025.11 without anyone noticing (#513). This job
+  # is the guard: it re-derives that answer from the core's own constraints file
+  # instead of trusting the number in hacs.json (#515).
+  ha-requirement-floors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve manifest requirements under the minimum core's constraints
+        run: |
+          docker run --rm -v "$(pwd)":/app -w /app python:3.13-slim \
+            python3 scripts/check_ha_requirement_floors.py
+
   lint:
     runs-on: ubuntu-latest
     steps:
