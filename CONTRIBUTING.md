@@ -37,6 +37,35 @@ make check
 | `make proto` | Compile protobuf files (add `PROTOS="path/rel/to/proto_src.proto"` for just one) |
 | `make cli` | Interactive connection test |
 
+## Supported versions
+
+**Minimum Home Assistant: 2025.11.0. Minimum Python: 3.13.**
+
+The minimum is not a guess about which APIs we call — it is the oldest core that can
+*install* the integration at all. Home Assistant runs every requirement in
+`manifest.json` through pip with its own `homeassistant/package_constraints.txt`, and
+that file pins `grpcio` exactly. Our floor is `grpcio>=1.75.1` (stamped into the
+generated stubs, see above), and:
+
+| Home Assistant | pins `grpcio` | our `grpcio>=1.75.1` resolves? |
+|---|---|---|
+| 2025.10.x and older | `==1.72.1` or older | no — `ResolutionImpossible`, setup fails |
+| 2025.11.0 | `==1.75.1` | yes |
+| 2026.4+ | `==1.78.0` | yes |
+
+So anything below 2025.11.0 fails with *"Requirements for aegis_ajax not found"*, no
+matter which HA APIs the code touches. The Python floor follows from the HA floor:
+2025.11 requires >=3.13.2, and every core from 2026.3 on requires >=3.14.2 — which is
+why CI runs both 3.13 (oldest supported, resolves HA 2026.2.x) and 3.14 (resolves the
+current core).
+
+Six declarations have to agree, and `tests/unit/test_supported_versions.py` fails if
+they drift: `hacs.json` (`homeassistant`), `pyproject.toml` (`requires-python`, the
+`homeassistant>=` dev floor, `tool.ruff.target-version`, `tool.mypy.python_version`),
+`Dockerfile.dev` (`ARG PYTHON_VERSION`) and `.github/workflows/ci.yml` (the test
+matrix). Lint and type-check run at the floor, so `make check` uses the default
+`Dockerfile.dev` interpreter — mypy cannot parse a 3.14-only core while targeting 3.13.
+
 ## Regenerating protobuf stubs
 
 Two rules, both enforced by `tests/unit/test_proto_gencode_version.py`:

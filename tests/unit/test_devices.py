@@ -2152,7 +2152,7 @@ class TestVideoEdgeNetworkProbe:
             )
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2196,7 +2196,7 @@ class TestVideoEdgeNetworkProbe:
             )
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2223,7 +2223,7 @@ class TestVideoEdgeNetworkProbe:
             )
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2411,7 +2411,7 @@ class TestWebRtcInitiateProbe:
             success=initiate_request_pb2.InitiateWebRtcResponse.Success(init=init)
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2454,7 +2454,7 @@ class TestWebRtcInitiateProbe:
             )
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2484,7 +2484,7 @@ class TestWebRtcInitiateProbe:
             )
         )
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             yield msg
 
         class _StubFactory:
@@ -2520,7 +2520,7 @@ class TestWebRtcInitiateProbe:
 
         api = self._make_api()
 
-        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object, None]:
+        async def _aiter(*_a: object, **_k: object) -> AsyncGenerator[object]:
             return
             yield  # pragma: no cover
 
@@ -3021,7 +3021,7 @@ class TestGetDevicesSnapshot:
         mock_msg.success.snapshot.light_devices = [mock_light_device]
 
         # Async iterator for stream
-        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
+        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock]:
             yield mock_msg
 
         mock_stub_instance = MagicMock()
@@ -3060,7 +3060,7 @@ class TestGetDevicesSnapshot:
         mock_msg = MagicMock()
         mock_msg.HasField.side_effect = lambda field: field == "failure"
 
-        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
+        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock]:
             yield mock_msg
 
         mock_stub_instance = MagicMock()
@@ -3105,7 +3105,7 @@ class TestGetDevicesSnapshot:
         mock_msg_snapshot.success.WhichOneof.return_value = "snapshot"
         mock_msg_snapshot.success.snapshot.light_devices = []
 
-        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
+        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock]:
             yield mock_msg_update
             yield mock_msg_snapshot
 
@@ -3170,7 +3170,7 @@ class TestStartDeviceStream:
         mock_msg.success.snapshot.light_devices = [mock_light_device]
 
         # Stream yields snapshot then stops; sleep raises CancelledError to exit the loop.
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield mock_msg
 
         snapshot_received: list[tuple[list[Device], bool]] = []
@@ -3217,7 +3217,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         status_received: list[tuple[str, str, dict]] = []
@@ -3260,7 +3260,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         status_received: list[tuple[str, str, dict]] = []
@@ -3302,7 +3302,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         status_received: list[tuple[str, str, dict]] = []
@@ -3346,7 +3346,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         status_received: list[tuple[str, str, dict]] = []
@@ -3390,7 +3390,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         snapshot_received: list[tuple[list, bool]] = []
@@ -3435,7 +3435,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         removed: list[str] = []
@@ -3469,7 +3469,7 @@ class TestStartDeviceStream:
 
         call_count = 0
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             nonlocal call_count
             call_count += 1
             yield failure_msg
@@ -3498,7 +3498,7 @@ class TestStartDeviceStream:
         """start_device_stream returns a running asyncio.Task."""
         api = self._make_api()
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             # Yield nothing; infinite loop will sleep
             return
             yield  # make this an async generator
@@ -3549,7 +3549,7 @@ class TestStartDeviceStream:
         mock_msg.success.WhichOneof.return_value = "snapshot"
         mock_msg.success.snapshot.light_devices = [good_a, bad, good_b]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield mock_msg
 
         snapshot_received: list[list[Device]] = []
@@ -3610,7 +3610,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [good_a, bad, good_b]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         status_received: list[tuple[str, str, dict]] = []
@@ -3650,7 +3650,7 @@ class TestStartDeviceStream:
 
         update_msg.success.updates.updates = [single_update]
 
-        async def _aiter() -> AsyncGenerator[MagicMock, None]:
+        async def _aiter() -> AsyncGenerator[MagicMock]:
             yield update_msg
 
         snapshot_received: list[list] = []
@@ -3794,7 +3794,7 @@ class TestSnapshotReplay:
         msg = response_pb2.StreamLightDevicesResponse()
         msg.ParseFromString(payload)
 
-        async def _aiter() -> AsyncGenerator[object, None]:
+        async def _aiter() -> AsyncGenerator[object]:
             yield msg
 
         devices_seen: list[Device] = []

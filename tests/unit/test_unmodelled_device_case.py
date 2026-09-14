@@ -108,7 +108,7 @@ class TestProbeReportsTheCaseNumber:
         msg.success.WhichOneof.return_value = "snapshot"
         msg.success.snapshot.hub_device = _hub_device_with_case(81)  # life_quality
 
-        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
+        async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock]:
             yield msg
 
         stub_instance = MagicMock()

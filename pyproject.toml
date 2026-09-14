@@ -4,7 +4,7 @@ name = "aegis-ajax-hass"
 # sync by tests/unit/test_version_consistency.py — bump both when releasing.
 version = "1.20.2"
 description = "Home Assistant integration for Ajax Security Systems (co-branded) via gRPC"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = "MIT"
 dependencies = [
     # Floor dictated by the GRPC_GENERATED_VERSION stamped into the generated
@@ -31,7 +31,12 @@ dev = [
     # runtime (#354). 1.75.1 emits gencode 6.31.1. Bumping this means recompiling
     # the whole proto tree and raising the protobuf floor above to match.
     "grpcio-tools==1.75.1",
-    "homeassistant>=2024.1.0",
+    # Floor dictated by Home Assistant's own package_constraints.txt: HA pins
+    # grpcio for every integration it installs, and 2025.11.0 is the first
+    # release whose pin (1.75.1) satisfies the grpcio floor above. Anything
+    # older cannot install this integration at all (#513). Mirror any change
+    # in hacs.json — tests/unit/test_supported_versions.py enforces it.
+    "homeassistant>=2025.11.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
@@ -50,7 +55,7 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 exclude = ["custom_components/aegis_ajax/proto/"]
 
@@ -59,7 +64,7 @@ select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A", "SIM", "TCH"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
