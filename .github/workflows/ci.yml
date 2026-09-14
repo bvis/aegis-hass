@@ -6,6 +6,13 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main]
+  # Every requirement we declare is an open floor and the dev image installs
+  # Home Assistant unpinned, so the environment our users end up with drifts
+  # underneath us between commits. Rebuilding Dockerfile.dev from scratch
+  # re-resolves all of it, so a weekly run turns "the outside world moved" into
+  # a red build instead of a user report (#514).
+  schedule:
+    - cron: "13 6 * * 1"
 
 permissions:
   contents: read
