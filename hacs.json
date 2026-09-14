@@ -1,7 +1,7 @@
 {
     "name": "Aegis for Ajax",
     "render_readme": true,
-    "homeassistant": "2024.1.0",
+    "homeassistant": "2025.11.0",
     "content_in_root": false,
     "hide_default_branch": false
 }

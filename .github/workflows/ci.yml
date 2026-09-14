@@ -15,7 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        # 3.13 is the oldest interpreter a supported core runs on (Home Assistant
+        # 2025.11, our floor) and resolves the newest core of that band; 3.14 is
+        # what every core from 2026.3 on requires, which is what users are
+        # actually running. Testing below 3.13 tested an install nobody has (#513).
+        python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build dev container
@@ -30,7 +34,7 @@ jobs:
               --cov-report=term-missing \
               --cov-report=json:/coverage/coverage.json
       - name: Coverage summary
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.13'
         run: |
           python3 -c "
           import json
@@ -59,7 +63,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Import every generated stub at the advertised runtime floors
         run: |
-          docker run --rm -v "$(pwd)":/app -w /app python:3.12-slim bash -c '
+          docker run --rm -v "$(pwd)":/app -w /app python:3.13-slim bash -c '
             set -euo pipefail
             pip install --quiet --no-cache-dir --root-user-action=ignore \
               $(python3 scripts/check_proto_imports.py --floors)

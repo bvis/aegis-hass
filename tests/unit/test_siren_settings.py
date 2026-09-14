@@ -216,7 +216,7 @@ def _patch_stream_hub_device(stub_class: MagicMock) -> AbstractContextManager[No
 
 
 def _stub_yielding(msg: MagicMock) -> MagicMock:
-    async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
+    async def _aiter(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock]:
         yield msg
 
     stub_instance = MagicMock()

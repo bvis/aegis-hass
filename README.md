@@ -60,7 +60,9 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 
 ## Requirements
 
-- Home Assistant 2024.1.0 or later
+- Home Assistant 2025.11.0 or later — older cores pin `grpcio` below the version this
+  integration needs, so installing on them fails outright (see
+  [Supported versions](CONTRIBUTING.md#supported-versions))
 - An Ajax Security account (email + password)
 - At least one Ajax hub online
 - The **application label** of your co-branded Ajax app

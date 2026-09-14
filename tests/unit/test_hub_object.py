@@ -184,7 +184,7 @@ class TestGetSimInfo:
         api = self._make_api()
         raw = self._make_raw_msg(active_sim=1, status=2, imei="352999001234567")
 
-        async def _fake_stream() -> AsyncGenerator[bytes, None]:
+        async def _fake_stream() -> AsyncGenerator[bytes]:
             yield raw
 
         mock_method = MagicMock(return_value=_fake_stream())
@@ -207,7 +207,7 @@ class TestGetSimInfo:
         """
         api = self._make_api()
 
-        async def _raising_stream() -> AsyncGenerator[bytes, None]:
+        async def _raising_stream() -> AsyncGenerator[bytes]:
             raise RuntimeError("stream error")
             yield  # make it an async generator
 
@@ -222,7 +222,7 @@ class TestGetSimInfo:
     async def test_returns_none_when_stream_empty(self) -> None:
         api = self._make_api()
 
-        async def _empty_stream() -> AsyncGenerator[bytes, None]:
+        async def _empty_stream() -> AsyncGenerator[bytes]:
             return
             yield  # make it an async generator
 
@@ -357,7 +357,7 @@ class TestGetFirmwareInfo:
         api = self._make_api()
         raw = _build_firmware_snapshot(version="2.17.0", state="downloading")
 
-        async def _fake_stream() -> AsyncGenerator[bytes, None]:
+        async def _fake_stream() -> AsyncGenerator[bytes]:
             yield raw
 
         mock_method = MagicMock(return_value=_fake_stream())
@@ -373,7 +373,7 @@ class TestGetFirmwareInfo:
     async def test_returns_none_on_stream_exception(self) -> None:
         api = self._make_api()
 
-        async def _raising_stream() -> AsyncGenerator[bytes, None]:
+        async def _raising_stream() -> AsyncGenerator[bytes]:
             raise RuntimeError("stream error")
             yield
 
@@ -388,7 +388,7 @@ class TestGetFirmwareInfo:
     async def test_returns_none_when_stream_empty(self) -> None:
         api = self._make_api()
 
-        async def _empty_stream() -> AsyncGenerator[bytes, None]:
+        async def _empty_stream() -> AsyncGenerator[bytes]:
             return
             yield
 
@@ -557,7 +557,7 @@ class TestGetDeviceFirmwareUpdates:
         api = self._make_api()
         raw = _build_device_firmware_snapshot([("AA11BB22", "6.62.3", "downloading", 15, True)])
 
-        async def _fake_stream() -> AsyncGenerator[bytes, None]:
+        async def _fake_stream() -> AsyncGenerator[bytes]:
             yield raw
 
         mock_method = MagicMock(return_value=_fake_stream())
@@ -579,7 +579,7 @@ class TestGetDeviceFirmwareUpdates:
     async def test_returns_empty_on_stream_exception(self) -> None:
         api = self._make_api()
 
-        async def _raising_stream() -> AsyncGenerator[bytes, None]:
+        async def _raising_stream() -> AsyncGenerator[bytes]:
             raise RuntimeError("stream error")
             yield
 
@@ -593,7 +593,7 @@ class TestGetDeviceFirmwareUpdates:
     async def test_returns_empty_when_stream_empty(self) -> None:
         api = self._make_api()
 
-        async def _empty_stream() -> AsyncGenerator[bytes, None]:
+        async def _empty_stream() -> AsyncGenerator[bytes]:
             return
             yield
 
