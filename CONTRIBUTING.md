@@ -59,6 +59,25 @@ matter which HA APIs the code touches. The Python floor follows from the HA floo
 why CI runs both 3.13 (oldest supported, resolves HA 2026.2.x) and 3.14 (resolves the
 current core).
 
+**Never raise a requirement floor above the version the minimum core pins.** Our
+requirements carry no upper caps, so a transitive collision (a dependency of ours
+capped below what the core pins) cannot happen — the exposure is entirely the
+inverse and entirely self-inflicted: bumping `grpcio` or `protobuf` in
+`manifest.json` past the pin above breaks every install at once, silently, with
+the failure surfacing as a Home Assistant setup error rather than anything of
+ours. `scripts/check_ha_requirement_floors.py` is the guard (a CI job runs it, and
+the weekly build re-runs it so a core-side pin change surfaces on its own):
+
+```bash
+python3 scripts/check_ha_requirement_floors.py              # against the hacs.json minimum
+python3 scripts/check_ha_requirement_floors.py --ha 2026.9.2
+python3 scripts/check_ha_requirement_floors.py --pins-only  # no package index access
+```
+
+If it fails, the fix is one of two: lower our floor, or raise the minimum in
+`hacs.json` to a core whose pin satisfies it — and then the rest of the
+declarations below have to follow.
+
 Six declarations have to agree, and `tests/unit/test_supported_versions.py` fails if
 they drift: `hacs.json` (`homeassistant`), `pyproject.toml` (`requires-python`, the
 `homeassistant>=` dev floor, `tool.ruff.target-version`, `tool.mypy.python_version`),
