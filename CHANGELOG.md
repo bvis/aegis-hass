@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.21.0] - unreleased
 
 ### Added
 - **The diagnostics dump now records what the hub's battery updates actually contain (#506).** The battery fix in `1.20.2` applies an update field by field, because the format cannot distinguish a value of zero from a value that was never sent — so an update that raises a low-battery alert without restating the percentage correctly leaves the percentage alone. What nobody knows yet is how often that happens, and the case that matters is silent: if these updates always arrived without a percentage, the reading would stay as stale as it was before the fix and nothing anywhere would say so. The dump now carries four counts — how many battery updates were seen, how many carried a percentage, how many carried an alert state, and how many carried neither — so the question is answered by any diagnostics file rather than by someone happening to run debug logging at the moment a battery moves. The counts survive restarts, for the same reason the push delivery record does: a counter that resets is how a month of silence stayed invisible in #437. Counts only — no device, no reading, no name. **Requests to Ajax:** none added.
