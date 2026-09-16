@@ -1,6 +1,13 @@
-"""AES-128-CBC encryption/decryption for the Ajax HTS binary protocol."""
+"""AES-128-CBC encryption/decryption for the Ajax HTS binary protocol.
 
-from Crypto.Cipher import AES
+Uses `cryptography` rather than `pycryptodome`: Home Assistant core ships it
+and `firebase-messaging` already requires it, so these two calls were the
+only reason `pycryptodome` appeared in `manifest.json` — and every
+requirement we declare is one more thing that has to resolve inside HA's
+constraints before the integration can install at all (#513).
+"""
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 # Protocol-defined AES key and IV used by the Ajax HTS transport layer.
 # These are fixed constants required by the protocol specification;
@@ -23,8 +30,8 @@ def encrypt(data: bytes) -> bytes:
     """
     if len(data) % 16 != 0:
         raise ValueError(f"Input length {len(data)} is not a multiple of 16 (AES block size)")
-    cipher = AES.new(_KEY, AES.MODE_CBC, _IV)
-    return cipher.encrypt(data)
+    encryptor = Cipher(algorithms.AES(_KEY), modes.CBC(_IV)).encryptor()
+    return encryptor.update(data) + encryptor.finalize()
 
 
 def decrypt(data: bytes) -> bytes:
@@ -41,5 +48,5 @@ def decrypt(data: bytes) -> bytes:
     """
     if len(data) % 16 != 0:
         raise ValueError(f"Input length {len(data)} is not a multiple of 16 (AES block size)")
-    cipher = AES.new(_KEY, AES.MODE_CBC, _IV)
-    return cipher.decrypt(data)
+    decryptor = Cipher(algorithms.AES(_KEY), modes.CBC(_IV)).decryptor()
+    return decryptor.update(data) + decryptor.finalize()
