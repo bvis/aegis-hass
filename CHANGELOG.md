@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.21.1] - unreleased
+## [1.21.1] - 2026-09-17
+
+Maintenance only — nothing about how the integration behaves changes.
+
+Confirmed on a live install (Home Assistant 2026.9.2) installed **through HACS**,
+which is the path that matters here: Home Assistant resolved the requirements
+under its own constraints without complaint, the encrypted hub connection came up,
+and the entity registry came back byte-identical.
+
+**Requests to Ajax: none added.**
+
 
 ### Changed
 - **The integration no longer installs `pycryptodome` (#520).** It was declared as a requirement for exactly two AES calls in the encrypted hub transport, and those now use `cryptography` — which Home Assistant core already ships and pins, and which the push library requires directly, so nothing new gets installed in its place. Home Assistant runs every requirement an integration declares through pip under its own constraints file, and a requirement that cannot resolve there stops the integration from setting up at all, with an error that names Home Assistant rather than anything here. One fewer declared package is one fewer thing that can ever collide with a future core. The bytes on the wire are unchanged and pinned by a test, and the encrypted hub connection was confirmed working on a live install before release. Two internal cleanups ride along with no user-visible effect: nine sensor classes that existed only to pass one argument are now built from the table that already described them, and four unused constants are gone. **Requests to Ajax:** none added.
