@@ -135,12 +135,6 @@ CLIENT_DEVICE_MODEL = "SM-A536B"  # Galaxy A53 — paired with CLIENT_VERSION="3
 CLIENT_DEVICE_TYPE = "MOBILE"
 CLIENT_APP_TYPE = "USER"
 
-# Firebase/FCM config keys — credentials provided by user in options flow
-CONF_FCM_PROJECT_ID = "fcm_project_id"
-CONF_FCM_APP_ID = "fcm_app_id"
-CONF_FCM_API_KEY = "fcm_api_key"
-CONF_FCM_SENDER_ID = "fcm_sender_id"
-
 SESSION_REFRESH_INTERVAL = 780  # 13 minutes in seconds
 STREAM_RECONNECT_MAX_BACKOFF = 60  # seconds
 MIN_POLL_INTERVAL = 60  # seconds
