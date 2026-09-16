@@ -183,15 +183,10 @@ async def async_setup_entry(
     # Hub-level network sensors from HTS
     for space in coordinator.spaces.values():
         if space.hub_id and coordinator.devices.get(space.hub_id):
-            entities.append(AjaxHubConnectionTypeSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubWifiSsidSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubWifiSignalSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubWifiIpSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubEthernetIpSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubEthernetGatewaySensor(coordinator, space.hub_id))
-            entities.append(AjaxHubEthernetDnsSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubCellularSignalSensor(coordinator, space.hub_id))
-            entities.append(AjaxHubCellularNetworkSensor(coordinator, space.hub_id))
+            entities.extend(
+                AjaxHubNetworkSensor(coordinator, space.hub_id, spec.translation_key)
+                for spec in _HUB_NET_SPECS
+            )
 
     # Per-device electrical sensors for WallSwitch / Socket family (#123)
     # and Outlet Type E / F (#179, calibrated in 1.5.3-beta.11).
@@ -472,56 +467,6 @@ class AjaxHubNetworkSensor(_HubNetworkSensor):
         if self._spec.empty_is_none and not value:
             return None
         return value
-
-
-# Backwards-compatible aliases — the descriptor collapsed nine near-identical
-# subclasses but tests and `async_setup_entry` reference these names directly,
-# and downstream automations rely on the unique_ids these constructors set.
-# Each subclass freezes one `_HubNetSpec` into the `(coordinator, hub_id)`
-# signature so existing call sites keep working unchanged.
-class AjaxHubConnectionTypeSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "connection_type")
-
-
-class AjaxHubWifiSsidSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "wifi_ssid")
-
-
-class AjaxHubWifiSignalSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "wifi_signal_level")
-
-
-class AjaxHubWifiIpSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "wifi_ip")
-
-
-class AjaxHubEthernetIpSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "ethernet_ip")
-
-
-class AjaxHubEthernetGatewaySensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "ethernet_gateway")
-
-
-class AjaxHubEthernetDnsSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "ethernet_dns")
-
-
-class AjaxHubCellularSignalSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "cellular_signal")
-
-
-class AjaxHubCellularNetworkSensor(AjaxHubNetworkSensor):
-    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
-        super().__init__(coordinator, hub_id, "cellular_network")
 
 
 # ---------------------------------------------------------------------------
