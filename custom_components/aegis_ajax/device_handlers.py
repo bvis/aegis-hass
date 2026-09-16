@@ -155,14 +155,22 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
     # rather than on its name: #499 reported an install whose Ajax app offers
     # Photo on Demand for it, and the same diagnostics dump carries a working
     # `motion_cam_phod` on the same hub — same account, same permissions, one
-    # family getting the entities and the other not. The remaining unmapped
+    # family getting the entities and the other not. `motion_cam_phod_fibra`
+    # joined on the same evidence from #507 (two of them alongside four working
+    # `motion_cam_outdoor_phod` on one hub, with the reporter confirming the
+    # Ajax app offers Photo on Demand for them). The remaining unmapped
     # MotionCam families in the group below still await that confirmation (#472).
+    # Adding a family here is not enough on its own: `is_phod` creates the
+    # capture button, whose wire request carries a SEPARATE device-type map in
+    # `api/devices.PHOD_V2_DEVICE_TYPES`, and an unlisted family there ships a
+    # button that can only fail (#503). `tests/unit/test_devices.py` pins them.
     StaticDeviceHandler(
         (
             "motion_cam_phod",
             "motion_cam_outdoor_phod",
             "motion_cam_fibra_base",
             "motion_cam_outdoor_two_four_phod",
+            "motion_cam_phod_fibra",
         ),
         ("motion_detected", "tamper", "delay_when_leaving"),
         is_camera=True,
@@ -172,7 +180,6 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
         (
             "motion_cam_g3",
             "motion_cam_hd",
-            "motion_cam_phod_fibra",
             "motion_cam_s_phod",
             "motion_cam_s_phod_am",
             "motion_cam_superior_phod",

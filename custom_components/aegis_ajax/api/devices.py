@@ -63,6 +63,7 @@ PHOD_V2_DEVICE_TYPES: dict[str, int] = {
     "motion_cam_outdoor_two_four_phod": 2,
     "motion_cam_fibra": 3,
     "motion_cam_fibra_base": 3,
+    "motion_cam_phod_fibra": 3,
 }
 
 

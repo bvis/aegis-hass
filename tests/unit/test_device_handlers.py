@@ -57,6 +57,7 @@ def test_non_lock_does_not_have_lock_capability() -> None:
         "motion_cam_outdoor_phod",
         "motion_cam_fibra_base",
         "motion_cam_outdoor_two_four_phod",
+        "motion_cam_phod_fibra",
     ],
 )
 def test_camera_capability_is_registered(device_type: str) -> None:
@@ -70,6 +71,7 @@ def test_camera_capability_is_registered(device_type: str) -> None:
         "motion_cam_outdoor_phod",
         "motion_cam_fibra_base",
         "motion_cam_outdoor_two_four_phod",
+        "motion_cam_phod_fibra",
     ],
 )
 def test_phod_capability_is_registered(device_type: str) -> None:
