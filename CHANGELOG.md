@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - unreleased
+
+### Added
+- **Fibra MotionCams with Photo on Demand now get their camera and capture entities (#472).** The `motion_cam_phod_fibra` family had never been confirmed, so the integration left it without them even on installs where the Ajax app clearly offered Photo on demand. The evidence came from a reporter's own system: two of these sitting on the same hub as four MotionCam Outdoor units that already had the entities — same account, same permissions, one family served and the other not — plus their confirmation that the app offers the feature for the Fibra units too. Seven MotionCam families still wait for the same confirmation; if yours is missing its camera entity and the Ajax app offers Photo on demand for it, say so on #472 and it can be enabled the same way. **Requests to Ajax:** none added.
+
+### Documentation
+- **The README now explains how to get person, vehicle and pet detection today (#519).** Ajax cameras that classify what they see publish those detections over ONVIF, and Home Assistant turns them into binary sensors of their own. The point worth knowing is that they fire whether or not the system is armed — which is what the Ajax app will not do — so pairing them with this integration's alarm entities covers the "someone is in the garden while I am at home" case that motivated the request.
+
 ## [1.21.1] - 2026-09-17
 
 Maintenance only — nothing about how the integration behaves changes.
