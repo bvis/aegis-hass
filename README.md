@@ -262,6 +262,15 @@ That's it — from there the camera behaves like any other ONVIF camera in Home 
 
 > If your Home Assistant can't reach the camera on its LAN IP, ONVIF discovery will fail — this is a network reachability issue, not an integration one. As a fallback you can also point the **Generic Camera** integration at the RTSP stream directly (port `8554`).
 
+### Person / vehicle / pet detection
+
+Ajax cameras that classify what they see publish those detections as ONVIF events, and Home Assistant's ONVIF integration turns them into `binary_sensor` entities of their own — separate from the plain motion sensor this integration provides. If your camera offers object detection in the Ajax app, enable it there and the matching sensors appear alongside the `camera` entity.
+
+That combination is worth knowing about, because it answers something the Ajax app cannot: those sensors fire **regardless of whether the system is armed**, so an automation can notify you about someone in the garden while you are at home and disarmed — using this integration's alarm panel and space entities as the condition, and the ONVIF detection as the trigger.
+
+If you would rather not depend on the camera's own classifier, [Frigate](https://frigate.video/) and similar NVR software can consume the same RTSP stream (port `8554`) and do the detection themselves, with the same result in Home Assistant.
+
+
 ## Custom Services
 
 | Service | Description |
