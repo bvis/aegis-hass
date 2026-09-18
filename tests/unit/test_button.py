@@ -278,6 +278,7 @@ class TestCapturePhotoButtonFailures:
         coordinator._media_api = MagicMock()
         coordinator._media_api.get_photo_url = AsyncMock(return_value="http://x/p.jpg")
         listener = MagicMock()
+        listener.has_fcm_credentials = True
         listener.wait_for_notification_id = AsyncMock(return_value="notif-1")
         coordinator._notification_listener = listener
         button = AjaxCapturePhotoButton(
@@ -302,6 +303,7 @@ class TestCapturePhotoButtonFailures:
 
     @pytest.mark.asyncio
     async def test_no_push_listener_raises(self) -> None:
+        """The listener is still absent during the first seconds of setup."""
         from homeassistant.exceptions import HomeAssistantError
 
         button, coordinator = self._make_button()
@@ -310,6 +312,24 @@ class TestCapturePhotoButtonFailures:
         with pytest.raises(HomeAssistantError) as exc:
             await button.async_press()
         assert exc.value.translation_key == "photo_no_push"
+
+    @pytest.mark.asyncio
+    async def test_no_fcm_credentials_raises_without_asking_the_hub(self) -> None:
+        """A listener exists on every install; credentials are what decide (#524).
+
+        Setup starts the listener unconditionally, so the object being there
+        says nothing. Without credentials the photo can never come back, and
+        the capture request must not be sent at all.
+        """
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, coordinator = self._make_button()
+        coordinator._notification_listener.has_fcm_credentials = False
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "photo_no_push"
+        coordinator._devices_api.capture_photo.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_notification_timeout_raises(self) -> None:

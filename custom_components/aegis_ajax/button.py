@@ -117,11 +117,26 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
         raises `HomeAssistantError` (surfaced as a UI notification) instead
         of returning silently. Before this, a capture that the hub never
         completed — common on some camera firmwares where the on-demand
-        request is rejected, or when FCM isn't configured so the photo
-        notification never arrives — left the user staring at an empty
-        media folder with nothing in the default-level log to explain why.
+        request is rejected — left the user staring at an empty media folder
+        with nothing in the default-level log to explain why.
         """
         _LOGGER.debug("Capture photo button pressed for %s", self._device_id)
+
+        # Check the delivery half BEFORE asking the hub for anything (#524).
+        # The photo comes back over the FCM push channel, so with no
+        # credentials the capture is a request that cannot produce a photo —
+        # and the user used to wait out the 15 s timeout only to be told to
+        # check whether the camera was online. Setup starts the listener
+        # unconditionally, credentials or not, so the object existing proves
+        # nothing; `has_fcm_credentials` is the flag that decides (#509).
+        listener = self.coordinator.notification_listener
+        if listener is None or not listener.has_fcm_credentials:
+            _LOGGER.warning(
+                "Photo capture for %s needs FCM push notifications, which are not configured",
+                self._device_id,
+            )
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="photo_no_push")
+
         result = await self.coordinator.devices_api.capture_photo(
             self._hub_id, self._device_id, self._device_type
         )
@@ -130,14 +145,6 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="photo_capture_failed"
             )
-
-        listener = self.coordinator.notification_listener
-        if not listener:
-            _LOGGER.warning(
-                "Photo capture for %s needs FCM push notifications, which are not configured",
-                self._device_id,
-            )
-            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="photo_no_push")
 
         # The hub delivers the captured photo's id asynchronously via an FCM push.
         notification_id = await listener.wait_for_notification_id(self._device_id, timeout=15.0)
