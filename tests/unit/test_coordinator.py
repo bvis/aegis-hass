@@ -5720,3 +5720,34 @@ class TestDeactivationCarryIsVisibleInDiagnostics:
         state = coordinator.deactivation_carry_state()
         assert state["device_carries"] == 1
         assert state["currently_carried_device_ids"] == []
+
+
+class TestSpaceSecurityArmFlagWidth:
+    """#527: the hub status body lists the same low security-object id in more
+    than one table. Only one carries the one-byte arm flag on 0x06; another
+    carries a four-byte value on the same sub-key. Keyed by id alone the
+    tracker saw two flips per body and forced a full refresh every minute.
+    """
+
+    _ONE_BYTE = {0x06: b"\x00", 0x08: b"\x00\x00", 0x0A: b"\x00"}
+    _FOUR_BYTE = {0x02: b"\x01", 0x06: b"\x6a\xac\xe1\x70", 0x07: b"\x00" * 8}
+
+    def _feed_body(self, coordinator: object) -> None:
+        for kv in (self._ONE_BYTE, self._FOUR_BYTE):
+            coordinator._on_hts_device_kv("00338977", "00000001", kv, from_body=True)  # type: ignore[attr-defined]
+
+    def test_repeated_body_with_both_tables_does_not_nudge(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.request_security_snapshot_refresh = MagicMock()
+        self._feed_body(coordinator)
+        self._feed_body(coordinator)
+        self._feed_body(coordinator)
+        coordinator.request_security_snapshot_refresh.assert_not_called()
+
+    def test_real_flip_of_the_one_byte_flag_still_nudges(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.request_security_snapshot_refresh = MagicMock()
+        self._feed_body(coordinator)
+        armed = {**self._ONE_BYTE, 0x06: b"\x01"}
+        coordinator._on_hts_device_kv("00338977", "00000001", armed, from_body=True)
+        coordinator.request_security_snapshot_refresh.assert_called_once()
