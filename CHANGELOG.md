@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.22.0] - unreleased
+## [1.22.0] - 2026-09-20
+
+Photo on demand reaches one more MotionCam family, and the button stops sending
+people to check a camera that was never the problem.
+
+Confirmed on a live install (Home Assistant 2026.9.2) as `1.22.0-beta.2`: both
+photo-capture buttons were pressed and both delivered a complete image to the
+media folder, 11 and 13 seconds after the press, with no warnings. That is the
+path the fix below reorders, so it is the one that mattered. The Fibra family's
+capture is confirmed as far as the hub — a reporter's log shows the request
+accepted and answered — but nobody has yet had push configured on a Fibra unit
+to see the photo itself arrive; that family had no button at all before, so
+there is nothing to regress.
+
+**Requests to Ajax: one fewer.**
 
 ### Added
 - **Fibra MotionCams with Photo on Demand now get their camera and capture entities (#472).** The `motion_cam_phod_fibra` family had never been confirmed, so the integration left it without them even on installs where the Ajax app clearly offered Photo on demand. The evidence came from a reporter's own system: two of these sitting on the same hub as four MotionCam Outdoor units that already had the entities — same account, same permissions, one family served and the other not — plus their confirmation that the app offers the feature for the Fibra units too. Seven MotionCam families still wait for the same confirmation; if yours is missing its camera entity and the Ajax app offers Photo on demand for it, say so on #472 and it can be enabled the same way. **Requests to Ajax:** none added.
