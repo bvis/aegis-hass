@@ -2081,6 +2081,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             or not kv[0x06]
         ):
             return False
+        if len(kv[0x06]) != 1:
+            # The status body lists the same low id in more than one table;
+            # only one carries the one-byte arm flag on 0x06, another reuses
+            # the sub-key for a four-byte value. Keyed by id alone that read
+            # as two flips per body and forced a full refresh every minute
+            # (#527). It is still a security-object row: swallow it.
+            return True
         arm = kv[0x06][0]
         previous = self._space_security_arm_flags.get(device_id_hex)
         self._space_security_arm_flags[device_id_hex] = arm

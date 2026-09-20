@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The security state is no longer re-read every minute on hubs whose status body repeats a group id (#527).** On some hubs the periodic status body lists the group security objects in more than one table: one carries the one-byte armed flag, another reuses the same ids with a four-byte value on the same sub-key. The tracker that follows keypad arms keyed by id alone, saw two flips per body and forced the full refresh plus a snapshot read every 60 seconds instead of the 300-second poll and hourly snapshot. Only a one-byte value is the arm flag now; the other table is ignored. Found in a reporter's log on #519. **Requests to Ajax:** about 60 fewer snapshot reads per hour per space on an affected install.
+
 ## [1.22.0] - 2026-09-20
 
 Photo on demand reaches one more MotionCam family, and the button stops sending
