@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.22.1] - 2026-09-20
+
+A quieter integration on hubs that repeat their group ids: one status-body
+table was being read as an arm flag it never was, and the integration answered
+every minute with a full re-read of the security state.
+
+Not confirmed on a live install: the trigger exists only on hubs that emit the
+second table, and the one known install is a reporter's. The evidence is that
+reporter's debug log — four flips and a forced refresh exactly one debounce
+cooldown after every status body — plus two unit tests that replay both tables
+and fail on the previous code. The change only removes calls; nothing new is
+sent.
+
+**Requests to Ajax: about 60 fewer snapshot reads per hour per space on an
+affected install.**
 
 ### Fixed
 - **The security state is no longer re-read every minute on hubs whose status body repeats a group id (#527).** On some hubs the periodic status body lists the group security objects in more than one table: one carries the one-byte armed flag, another reuses the same ids with a four-byte value on the same sub-key. The tracker that follows keypad arms keyed by id alone, saw two flips per body and forced the full refresh plus a snapshot read every 60 seconds instead of the 300-second poll and hourly snapshot. Only a one-byte value is the arm flag now; the other table is ignored. Found in a reporter's log on #519. **Requests to Ajax:** about 60 fewer snapshot reads per hour per space on an affected install.
