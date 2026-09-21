@@ -2,7 +2,7 @@
 
 Prioritized list of remaining improvements based on HA platinum integration patterns and real-world testing.
 
-_Last reconciled against shipped code: 2026-09-05 (v1.18.0 stable)._
+_Last reconciled against shipped code: 2026-09-21 (v1.22.1 stable)._
 
 ## Completed
 
@@ -94,17 +94,16 @@ _Last reconciled against shipped code: 2026-09-05 (v1.18.0 stable)._
 **Effort:** Low (1-2 hours) if the data is in a snapshot we already fetch — must add zero Ajax API calls.
 
 ### 3.3 Device Handler Architecture Refactor — tracked in #332
-**Status:** In progress, contributor-driven (@aavdberg). PR-0+PR-1 (`device_handlers.py` scaffolding + `binary_sensor.py`, #461), PR-2 (SmartLock dedupe, #467) and PR-3 (camera / photo-on-demand, #469) are merged and shipped in the `1.19.0` betas. Remaining: PR-4 (`light`, `valve`, `number`, `select`, `event`) and PR-5 (`sensor` electrical / temperature).
+**Status:** Done, contributor-driven (@aavdberg). All six parts merged: PR-0+PR-1 (`device_handlers.py` scaffolding + `binary_sensor.py`, #461), PR-2 (SmartLock dedupe, #467), PR-3 (camera / photo-on-demand, #469), PR-4 (`light`, `valve`, `number`, `select`, `event`, #479), PR-5 (`sensor` electrical / temperature, #481) and the permanent neutrality proof (#482) in `1.19.1`; the closing PR-6 (#486) shipped in `1.20.0`. #332 closed.
 
 **What every remaining PR must carry**, since these conditions have now paid for themselves three times: the characterization fixture is permanent and its coverage test forces a snapshot entry per registered family; a family that was previously *unmapped* gets its neutrality proven by removing the new registration and re-running its snapshot (a fixture entry the PR itself wrote is otherwise circular); each capability must be consumed by the PR that introduces it, which is also what keeps `vulture` quiet; and an entity-layer swap is validated on a real install with a before/after entity-registry census, not an unavailable-count.
 
-**One gap the refactor made visible** (#472): the six camera families and three photo-on-demand families are a subset of the MotionCam families the registry knows, so six MotionCam variants get no camera entity and four with `phod` in their own device-type name get no capture button. Preserved deliberately by #469 — widening it needs a hardware confirmation per family, not an inference from a name.
+**One gap the refactor made visible** (#472): the camera / photo-on-demand families are a subset of the MotionCam families the registry knows. Two were confirmed and enabled since (`motion_cam_outdoor_two_four_phod` in `1.20.0`, `motion_cam_phod_fibra` in `1.22.0`); seven MotionCam families — three with `phod` in their own device-type name — still have no camera entity or capture button. Preserved deliberately — widening it needs a hardware confirmation per family, not an inference from a name.
 
 ### Parked with recorded reasons (see memory / docs/internal)
 - `HtsLifecycleManager` extraction — parked 2026-05-27, revisit triggers documented in `docs/internal/2026-05-27-hts-lifecycle-refactor-parked.md`.
 - Narrow wide `try` blocks in `notification.py` / `hub_object.py` — only if telemetry surfaces a swallowed error.
 - `const.py` split, proto-package pruning (~28 MB), `Any`-typing cleanup — low ROI, deferred.
-- Active-sessions feature (#330) — blocked: sessions ride the HTS gw channel, not gRPC; needs a capture nobody has scheduled.
 - FCM reconnect-storm hardening (#297) — blocked upstream on `firebase-messaging#39`.
 
 ---

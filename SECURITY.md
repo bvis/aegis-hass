@@ -43,14 +43,14 @@ tunnel the HTS connection runs over (`ssl.create_default_context()`, full
 certificate validation). An attacker would have to defeat TLS first; the static
 AES layer cannot be changed without breaking compatibility with Ajax hubs.
 
-### FCM push depends on a reverse-engineered client
+### FCM push depends on an unofficial client
 
-Push notifications use `firebase-messaging`, an unofficial reverse-engineered FCM
-client, not a Google-supported library. Push is an optional feature: if the
+Push notifications use `firebase-messaging`, an independent open-source
+implementation of the FCM client protocol, not a Google-supported library. Push is an optional feature: if the
 library is missing or Google changes the FCM protocol, the integration logs a
 warning and continues without push (polling still works). Treat push delivery as
 best-effort rather than a guaranteed channel.
 
 The Firebase Web/Android API key bundled in the public Ajax cobranded apps is a
-public client identifier (extracted from a published APK), not a secret. It is
+public client identifier shipped inside the published app package, not a secret. It is
 allowlisted in `.gitleaks.toml` for that reason.

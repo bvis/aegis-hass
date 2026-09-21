@@ -15,13 +15,14 @@ maintainer close issues manually after release validation).
 
 <!--
 Tick what applies, add anything project-specific. CI runs lint, format,
-typecheck, unit tests and dead-code analysis on every push — keep it green.
+typecheck, unit tests, dead-code analysis and the dependency-floor checks on
+every pull request — keep it green.
 -->
 
-- [ ] `make check` passes locally on a freshly built Docker image
+- [ ] `make check` passes inside a freshly built dev image (`make build-docker`)
 - [ ] New behaviour covered by unit tests in `tests/unit/`
 - [ ] Coverage stays at or above the 80% threshold
-- [ ] User-facing strings updated in `strings.json` and the 14 translation files
+- [ ] User-facing strings updated in `strings.json` and every file under `translations/` (a test pins key parity)
 - [ ] `README.md` / `CHANGELOG.md` updated when the change is user-visible
 
 ## Notes for the reviewer

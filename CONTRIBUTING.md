@@ -4,13 +4,19 @@ Beyond code, the most useful contribution most people can make is **hands-on tes
 
 ## Development Setup
 
-Everything runs in Docker. No local dependencies needed.
+The dev image (`Dockerfile.dev`) carries every tool at the supported floor. Build it once and run the `make` targets inside it:
+
+```bash
+docker run --rm -v "$PWD":/app -w /app aegis-ajax-dev make check
+```
+
+The targets themselves call `pytest`, `ruff`, `mypy` and `vulture` directly, so they also work on a host that has the dev dependencies installed (`pip install -e .[dev]`).
 
 ```bash
 git clone https://github.com/bvis/aegis-hass.git
 cd aegis-hass
 
-# Configure git hooks (one-time; pre-push runs the full CI pipeline locally)
+# Configure git hooks (one-time; pre-push runs lint, format, typecheck, dead-code and tests in the dev image)
 make setup
 
 # Build dev container
@@ -28,6 +34,7 @@ make check
 | Command | Description |
 |---|---|
 | `make setup` | One-time: configure git hooks (`core.hooksPath = .githooks`) |
+| `make build-docker` | Build the `aegis-ajax-dev` image from `Dockerfile.dev` |
 | `make check` | Run all checks (lint, format, typecheck, tests, dead code) |
 | `make test` | Run unit tests with coverage |
 | `make test-e2e` | Run E2E tests (requires AJAX_EMAIL + AJAX_PASSWORD) |
@@ -82,8 +89,10 @@ Six declarations have to agree, and `tests/unit/test_supported_versions.py` fail
 they drift: `hacs.json` (`homeassistant`), `pyproject.toml` (`requires-python`, the
 `homeassistant>=` dev floor, `tool.ruff.target-version`, `tool.mypy.python_version`),
 `Dockerfile.dev` (`ARG PYTHON_VERSION`) and `.github/workflows/ci.yml` (the test
-matrix). Lint and type-check run at the floor, so `make check` uses the default
-`Dockerfile.dev` interpreter — mypy cannot parse a 3.14-only core while targeting 3.13.
+matrix). Lint and type-check run at the floor, so run `make check` inside the default
+`Dockerfile.dev` image — mypy cannot parse a 3.14-only core while targeting 3.13.
+Two CI jobs have no local equivalent in the pre-push hook: `proto-runtime-floor`
+and `ha-requirement-floors` (`scripts/check_ha_requirement_floors.py`, below).
 
 ## Regenerating protobuf stubs
 
@@ -120,7 +129,7 @@ GitHub's secret scanning runs on every push. Alerts on credentials in current co
 ## Adding a New Device Type
 
 1. Find the device's `ObjectType` variant in the proto files
-2. Add the mapping to `_DEVICE_TYPE_SENSORS` in `binary_sensor.py`
+2. Register it in the handler table in `device_handlers.py` (binary-sensor keys plus any capability flag: `is_camera`, `is_phod`, `is_doorbell`, `has_siren_settings`, …)
 3. If it has switch/relay capabilities, add to `SWITCH_DEVICE_TYPES` in `switch.py`
 4. Write tests for the new mappings
 5. Update `README.md` device table
