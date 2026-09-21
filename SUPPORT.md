@@ -28,7 +28,7 @@ Open a **[Feature Request](https://github.com/bvis/aegis-hass/issues/new?templat
 
 ## Asking a question
 
-GitHub Discussions are not enabled on this repo. For now, open a regular issue with the title prefixed `[Question]` — they'll be triaged like the rest.
+Use **[GitHub Discussions](https://github.com/bvis/aegis-hass/discussions)** (Q&A category). If it turns out to be a bug, it will be moved to an issue.
 
 ## Reporting a security vulnerability
 

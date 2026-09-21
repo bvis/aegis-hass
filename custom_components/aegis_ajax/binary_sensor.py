@@ -80,9 +80,9 @@ BINARY_SENSOR_TYPES: dict[str, BinarySensorTypeInfo] = {
     # #443: read-only mirror of the detector's "Delay when leaving" setting,
     # which rides the light-device stream as a presence-only status. A
     # configuration flag, not a state: no device class fits, diagnostic, and
-    # off by default like the hub siren settings (#438). The hub-side exit
-    # delay itself never surfaces as `arming` (the app's own timer does), so
-    # this is the one thing about the delay HA can currently show.
+    # off by default like the hub siren settings (#438). The running delay
+    # itself is a separate, opt-in thing: `delay_panel_states` (#454) turns
+    # the hub's delay events into the panel's `arming` / `pending`.
     "delay_when_leaving": BinarySensorTypeInfo(
         None,
         "delay_when_leaving",

@@ -4,11 +4,11 @@
 # A professional, clean alarm dashboard using standard HA cards.
 # Add this as a view/tab in your Lovelace configuration.
 #
-# Optional: Install mushroom cards (via HACS) for a more polished look.
-# The dashboard works without mushroom cards — just uses standard cards.
+# Standard cards only — no custom cards required.
 #
-# Entity naming follows the aegis_ajax integration conventions.
-# Adjust entity IDs if your HA slugifies device names differently.
+# Entity ids are <device name slug>_<entity name slug>, with the entity
+# names the integration ships in English. Replace the device-name part with
+# your own device names.
 ###############################################################################
 
 title: Security
@@ -97,7 +97,7 @@ sections:
           - entity: binary_sensor.my_hub_ethernet
             name: Ethernet
             icon: mdi:ethernet
-          - entity: sensor.my_hub_ethernet_ip
+          - entity: sensor.my_hub_ethernet_ip_address
             name: IP Ethernet
             icon: mdi:ip-network
           - entity: sensor.my_hub_ethernet_gateway
@@ -106,13 +106,13 @@ sections:
           - entity: sensor.my_hub_ethernet_dns
             name: DNS
             icon: mdi:dns
-          - entity: binary_sensor.my_hub_wifi_connected
+          - entity: binary_sensor.my_hub_wi_fi
             name: Wi-Fi
             icon: mdi:wifi
-          - entity: sensor.my_hub_wifi_ssid
+          - entity: sensor.my_hub_wi_fi_ssid
             name: SSID
             icon: mdi:wifi-settings
-          - entity: sensor.my_hub_wifi_signal_level
+          - entity: sensor.my_hub_wi_fi_signal_level
             name: Wi-Fi Signal
             icon: mdi:wifi-strength-3
           - entity: binary_sensor.my_hub_mains_power
@@ -184,13 +184,13 @@ sections:
     cards:
       # ─── Camera Feeds ───
       - type: picture-entity
-        entity: camera.hallway_camera
+        entity: camera.hallway
         name: Hallway
         camera_view: auto
         show_state: true
 
       - type: picture-entity
-        entity: camera.dining_camera
+        entity: camera.dining
         name: Living
         camera_view: auto
         show_state: true
@@ -302,23 +302,23 @@ sections:
         icon: mdi:shield-alert
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.main_door_tamper
+          - entity: binary_sensor.main_door_case_tamper
             name: Main Door
-          - entity: binary_sensor.kitchen_door_tamper
+          - entity: binary_sensor.kitchen_door_case_tamper
             name: Kitchen Door
-          - entity: binary_sensor.bedroom_door_tamper
+          - entity: binary_sensor.bedroom_door_case_tamper
             name: Bedroom Door
-          - entity: binary_sensor.bedroom_window_tamper
+          - entity: binary_sensor.bedroom_window_case_tamper
             name: Bedroom Window
-          - entity: binary_sensor.bedroom2_window_tamper
+          - entity: binary_sensor.bedroom2_window_case_tamper
             name: Bedroom 2 Window
-          - entity: binary_sensor.dressing_window_tamper
+          - entity: binary_sensor.dressing_window_case_tamper
             name: Dressing Window
-          - entity: binary_sensor.hallway_tamper
+          - entity: binary_sensor.hallway_case_tamper
             name: Hallway
-          - entity: binary_sensor.dining_tamper
+          - entity: binary_sensor.dining_case_tamper
             name: Living
-          - entity: binary_sensor.keypad_tamper
+          - entity: binary_sensor.keypad_case_tamper
             name: Keypad
 
       # ─── Device Connectivity ───
@@ -352,25 +352,25 @@ sections:
         icon: mdi:alert-circle
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.my_hub_problem
+          - entity: binary_sensor.my_hub_device_problem
             name: Hub
-          - entity: binary_sensor.main_door_problem
+          - entity: binary_sensor.main_door_device_problem
             name: Main Door
-          - entity: binary_sensor.kitchen_door_problem
+          - entity: binary_sensor.kitchen_door_device_problem
             name: Kitchen Door
-          - entity: binary_sensor.bedroom_door_problem
+          - entity: binary_sensor.bedroom_door_device_problem
             name: Bedroom Door
-          - entity: binary_sensor.bedroom_window_problem
+          - entity: binary_sensor.bedroom_window_device_problem
             name: Bedroom Window
-          - entity: binary_sensor.bedroom2_window_problem
+          - entity: binary_sensor.bedroom2_window_device_problem
             name: Bedroom 2 Window
-          - entity: binary_sensor.dressing_window_problem
+          - entity: binary_sensor.dressing_window_device_problem
             name: Dressing Window
-          - entity: binary_sensor.hallway_problem
+          - entity: binary_sensor.hallway_device_problem
             name: Hallway
-          - entity: binary_sensor.dining_problem
+          - entity: binary_sensor.dining_device_problem
             name: Living
-          - entity: binary_sensor.keypad_problem
+          - entity: binary_sensor.keypad_device_problem
             name: Keypad
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -433,7 +433,7 @@ sections:
             name: Cellular
           - entity: binary_sensor.my_hub_ethernet
             name: Ethernet
-          - entity: binary_sensor.my_hub_wifi_connected
+          - entity: binary_sensor.my_hub_wi_fi
             name: Wi-Fi
           - entity: binary_sensor.my_hub_mains_power
             name: Mains Power
