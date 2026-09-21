@@ -170,20 +170,20 @@
             }
         },
         "set_photo_on_demand_mode": {
-            "name": "Set Photo on Demand mode",
-            "description": "Enable or disable Photo on Demand mode on a hub. Two independent channels can be toggled separately — user requests (whether hub users can request photos from the Ajax app) and scenarios (whether scenarios / automations can trigger captures). Leave a field unset to keep its current value. At least one is required.",
+            "name": "Setează modul Fotografie la cerere",
+            "description": "Activează sau dezactivează modul Fotografie la cerere pe un hub. Două canale independente pot fi comutate separat: cererile utilizatorilor (dacă utilizatorii hub-ului pot cere fotografii din aplicația Ajax) și scenariile (dacă scenariile / automatizările pot declanșa capturi). Lasă un câmp necompletat pentru a-i păstra valoarea curentă. Cel puțin unul este obligatoriu.",
             "fields": {
                 "user": {
-                    "name": "User requests",
-                    "description": "When set, enables or disables on-demand photo requests initiated by hub users. Leave unset to keep the current value."
+                    "name": "Cererile utilizatorilor",
+                    "description": "Când este setat, activează sau dezactivează cererile de fotografii inițiate de utilizatorii hub-ului. Lasă necompletat pentru a păstra valoarea curentă."
                 },
                 "scenario": {
-                    "name": "Scenarios",
-                    "description": "When set, enables or disables Photo on Demand captures triggered by Ajax scenarios / automations. Leave unset to keep the current value."
+                    "name": "Scenarii",
+                    "description": "Când este setat, activează sau dezactivează capturile Fotografie la cerere declanșate de scenarii sau automatizări Ajax. Lasă necompletat pentru a păstra valoarea curentă."
                 },
                 "entity_id": {
-                    "name": "Entity",
-                    "description": "Alarm panel entity for the space whose hub mode to update. If omitted, applies to every configured space."
+                    "name": "Entitate",
+                    "description": "Entitatea panoului de alarmă a spațiului al cărui mod al hub-ului se actualizează. Dacă este omisă, se aplică tuturor spațiilor configurate."
                 }
             }
         },
@@ -198,44 +198,44 @@
             }
         },
         "list_client_sessions": {
-            "name": "List account sessions",
-            "description": "Return active Ajax account sessions for manual inspection on demand. This service calls an internal Ajax endpoint that may rate limit frequent requests; do not poll it in automations. The currently active Aegis session is marked is_current when it can be identified.",
+            "name": "Listează sesiunile contului",
+            "description": "Returnează la cerere sesiunile active ale contului Ajax, pentru inspecție manuală. Acest serviciu apelează un endpoint intern Ajax care poate limita cererile frecvente; nu îl interoga ciclic în automatizări. Sesiunea Aegis activă în prezent este marcată cu is_current atunci când poate fi identificată.",
             "fields": {
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID intrare de configurare",
+                    "description": "Necesar când este configurat mai mult de un cont Aegis."
                 }
             }
         },
         "terminate_client_session": {
-            "name": "Terminate account session",
-            "description": "Immediately log the selected other device out of the Ajax account. Obtain its session ID through list_client_sessions. The integration never terminates its own session.",
+            "name": "Încheie sesiunea contului",
+            "description": "Deconectează imediat de la contul Ajax celălalt dispozitiv selectat. Obține ID-ul sesiunii sale prin list_client_sessions. Integrarea nu își încheie niciodată propria sesiune.",
             "fields": {
                 "session_id": {
-                    "name": "Session ID",
-                    "description": "Session ID returned by list_client_sessions."
+                    "name": "ID sesiune",
+                    "description": "ID-ul sesiunii returnat de list_client_sessions."
                 },
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate the selected session."
+                    "name": "Confirmă încheierea",
+                    "description": "Trebuie să fie true pentru a încheia imediat sesiunea selectată."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID intrare de configurare",
+                    "description": "Necesar când este configurat mai mult de un cont Aegis."
                 }
             }
         },
         "terminate_other_client_sessions": {
-            "name": "Terminate all other account sessions",
-            "description": "Immediately log all other devices out of the Ajax account. This signs out other active Ajax mobile and desktop apps. The integration never terminates its own session.",
+            "name": "Încheie toate celelalte sesiuni ale contului",
+            "description": "Deconectează imediat de la contul Ajax toate celelalte dispozitive. Aceasta deconectează celelalte aplicații Ajax mobile și desktop active. Integrarea nu își încheie niciodată propria sesiune.",
             "fields": {
                 "confirm": {
-                    "name": "Confirm termination",
-                    "description": "Must be true to immediately terminate all other sessions."
+                    "name": "Confirmă încheierea",
+                    "description": "Trebuie să fie true pentru a încheia imediat toate celelalte sesiuni."
                 },
                 "entry_id": {
-                    "name": "Config entry ID",
-                    "description": "Required when more than one Aegis account is configured."
+                    "name": "ID intrare de configurare",
+                    "description": "Necesar când este configurat mai mult de un cont Aegis."
                 }
             }
         }
