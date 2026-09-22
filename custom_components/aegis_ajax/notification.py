@@ -237,6 +237,10 @@ class AjaxNotificationListener:
         # credential set has never delivered (#437). The denominator: zero
         # deliveries means nothing without knowing how many chances there were.
         self._hub_events_while_connected: int = 0
+        # Counter value the Repair was last raised for: the review runs every
+        # supervisor tick, and re-logging an unchanged count each minute
+        # buried the warning under 194 copies of itself in a field log.
+        self._reviewed_hub_events: int | None = None
 
     @property
     def pushes_received(self) -> int:
@@ -1097,9 +1101,14 @@ class AjaxNotificationListener:
             return
         if self._hub_events_while_connected < FCM_NEVER_DELIVERED_EVENT_THRESHOLD:
             return
+        if self._hub_events_while_connected == self._reviewed_hub_events:
+            return
+        self._reviewed_hub_events = self._hub_events_while_connected
+        # "running", not "connected": `is_fcm_connected` only knows the client
+        # object exists, not that its connection to Google is up.
         _LOGGER.warning(
             "Push notifications appear not to be delivering: %d hub space event(s) "
-            "have been seen with the push client connected and this credential set "
+            "have been seen with the push client running and this credential set "
             "has never delivered a push. Alarm state is unaffected; real-time "
             "events are not arriving. See the Repair under Settings > Repairs.",
             self._hub_events_while_connected,

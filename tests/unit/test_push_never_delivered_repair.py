@@ -183,6 +183,25 @@ class TestTheRepair:
         assert reg.call_args.kwargs["events"] == FCM_NEVER_DELIVERED_EVENT_THRESHOLD
 
     @pytest.mark.asyncio
+    async def test_it_warns_once_per_counter_value_not_once_per_tick(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The supervisor ticks every minute; one field log logged it 194 times."""
+        listener = _make_listener()
+        listener._hub_events_while_connected = FCM_NEVER_DELIVERED_EVENT_THRESHOLD
+        register, clear = self._repairs()
+
+        with register as reg, clear:
+            await listener._async_review_push_delivery()
+            await listener._async_review_push_delivery()
+            listener._hub_events_while_connected += 1
+            await listener._async_review_push_delivery()
+
+        warnings = [r for r in caplog.records if "appear not to be delivering" in r.message]
+        assert len(warnings) == 2
+        assert reg.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_it_is_not_raised_one_event_short(self) -> None:
         listener = _make_listener()
         listener._hub_events_while_connected = FCM_NEVER_DELIVERED_EVENT_THRESHOLD - 1
