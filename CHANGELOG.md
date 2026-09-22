@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.2] - unreleased
+
+### Fixed
+- **The "push notifications appear not to be delivering" warning is logged once, not every minute (#437).** The check behind the Repair runs on the one-minute supervisor tick, and it wrote the same WARNING on every tick even when nothing had changed. One reporter's log had 194 identical copies in about three hours. It now logs, and registers the Repair, only when the event count moves, plus once after each restart. The log line also says the push client is *running* rather than *connected*: the check knows the client exists, not that its connection to Google is up. **Requests to Ajax:** none added.
+
+### Changed
+- **Czech, Polish, Romanian and Turkish now translate the four action blocks that were still in English (#475).** **Requests to Ajax:** none added.
+
 ## [1.22.1] - 2026-09-20
 
 A quieter integration on hubs that repeat their group ids: one status-body
