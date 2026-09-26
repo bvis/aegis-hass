@@ -97,7 +97,7 @@
                     "bypass_switches": "Bypass-kontakter gør det muligt at deaktivere en enhed, før systemet aktiveres. \"Auto\" opretter dem kun, hvis din Ajax-konto har tilladelse til at deaktivere enheder.",
                     "expose_arm_home": "Tilføjer en \"Aktiver hjemme\"-mulighed til alarmpanelet. Den spejler natfunktionen og er primært nødvendig til Amazon Alexa eller Nabu Casa Cloud. Slå den fra for at skjule den ekstra knap, hvis du ikke bruger disse.",
                     "delay_panel_states": "Når denne er slået til, viser alarmpanelet \"aktiverer\", mens hub'en kører en detektors \"Forsinkelse ved udgang\", og \"afventer\", mens en \"Forsinkelse ved indgang\" kører — begge dele styres af hub'ens egne signaler, ikke af en timer fra vores side. Detektorer uden forsinkelse (Instant Alarm) er allerede aktive under \"aktiverer\". Automatiseringer, der venter på \"armed_away\", udløses, når udgangsforsinkelsen er afsluttet. Hub'ens rå status ligger fortsat i attributten \"hub_state\".",
-                    "disable_push_warning": "Slå denne til, hvis du bevidst kører uden push. Den skjuler den gentagne \"FCM ikke konfigureret\"-påmindelse og reparationskortet. Hændelser i realtid (dørklokke, aktiver/deaktiver, alarm) når stadig ikke Home Assistant, før du konfigurerer FCM.",
+                    "disable_push_warning": "Slå denne til, hvis du bevidst kører uden push. Den skjuler den gentagne \"FCM ikke konfigureret\"-påmindelse og reparationskortet. Hændelser i realtid (dørklokke, aktiver/deaktiver, alarm, bevægelse) når stadig ikke Home Assistant, før du konfigurerer FCM.",
                     "persistent_notifications": "Når denne er slået til, vises de valgte hændelser som vedvarende notifikationer i Home Assistant, der forbliver synlige, indtil de afvises, eller Home Assistant genstartes. Disse hændelser leveres via push (FCM), så push skal være konfigureret, for at de kan modtages.",
                     "persistent_notification_events": "Hvilke hændelser der udløser en vedvarende notifikation. Som standard reelle hændelser (alarm, panik, sabotage, brand, CO, oversvømmelse, glasbrud). Tilføj aktiver/deaktiver, bevægelse eller dørklokke, hvis du også ønsker disse."
                 }
@@ -295,7 +295,7 @@
                 "step": {
                     "init": {
                         "title": "Konfigurer Aegis' FCM-loginoplysninger",
-                        "description": "FCM-loginoplysninger er aldrig blevet angivet for denne konto, så hændelser i realtid fra Ajax (dørklokke, push ved aktiver/deaktiver, alarm) kan ikke nå Home Assistant — integrationen falder i stedet tilbage til polling hvert 5. minut. Indtast de fire FCM-værdier for din co-brandede Ajax-app nedenfor, hvorefter integrationen genindlæses. Se afsnittet \"How to obtain FCM credentials\" i README-filen for, hvordan du udtrækker dem fra din Ajax-app.",
+                        "description": "FCM-loginoplysninger er aldrig blevet angivet for denne konto, så hændelser i realtid fra Ajax (dørklokke, push ved aktiver/deaktiver, alarm, bevægelse) kan ikke nå Home Assistant — integrationen falder i stedet tilbage til polling hvert 5. minut. Indtast de fire FCM-værdier for din co-brandede Ajax-app nedenfor, hvorefter integrationen genindlæses. Se afsnittet \"How to obtain FCM credentials\" i README-filen for, hvordan du udtrækker dem fra din Ajax-app.",
                         "data": {
                             "fcm_project_id": "FCM-projekt-ID",
                             "fcm_app_id": "FCM-app-ID",

@@ -97,7 +97,7 @@
                     "bypass_switches": "Comutatoarele de excludere permit dezactivarea unui dispozitiv înainte de armare. „Auto” le creează doar dacă contul tău Ajax are permisiunea de a dezactiva dispozitive.",
                     "expose_arm_home": "Adaugă un mod Armare acasă în panoul de alarmă. Reproduce modul de noapte și este necesar în principal pentru Amazon Alexa sau Nabu Casa Cloud. Dezactivează pentru a ascunde butonul duplicat dacă nu le folosești.",
                     "delay_panel_states": "Când este activă, panoul de alarmă afișează \"arming\" cât timp hub-ul rulează \"Întârzierea la ieșire\" a unui detector și \"pending\" cât timp rulează o \"Întârziere la intrare\", ambele pe baza semnalelor hub-ului însuși, nu ale unui temporizator al nostru. Detectoarele fără întârziere (alarmă instantanee) sunt deja active în timpul \"arming\". Automatizările care așteaptă \"armed_away\" se vor declanșa când întârzierea de ieșire se încheie. Starea brută a hub-ului rămâne în atributul \"hub_state\".",
-                    "disable_push_warning": "Activează dacă rulezi intenționat fără push. Ascunde memento-ul recurent „FCM neconfigurat” și cardul de reparație. Evenimentele în timp real (sonerie, armare/dezarmare, alarmă) tot nu vor ajunge în Home Assistant până nu configurezi FCM.",
+                    "disable_push_warning": "Activează dacă rulezi intenționat fără push. Ascunde memento-ul recurent „FCM neconfigurat” și cardul de reparație. Evenimentele în timp real (sonerie, armare/dezarmare, alarmă, mișcare) tot nu vor ajunge în Home Assistant până nu configurezi FCM.",
                     "persistent_notifications": "Când este activat, evenimentele selectate apar ca notificări persistente Home Assistant care rămân vizibile până sunt închise sau Home Assistant repornește. Aceste evenimente sosesc prin push (FCM), deci push trebuie configurat pentru a ajunge.",
                     "persistent_notification_events": "Ce evenimente generează o notificare persistentă. Implicit, incidente reale (alarmă, panică, sabotaj, incendiu, CO, inundație, spargere de geam). Adaugă armare/dezarmare, mișcare sau sonerie dacă le vrei și pe acestea."
                 }
@@ -303,7 +303,7 @@
                 "step": {
                     "init": {
                         "title": "Configureaza credentialele FCM pentru Aegis",
-                        "description": "Credentialele FCM nu au fost niciodata setate pentru acest cont, asa ca evenimentele in timp real de la Ajax (sonerie, armare/dezarmare, alarma) nu pot ajunge la Home Assistant — integrarea cade pe polling la fiecare 5 minute. Introdu mai jos cele patru valori FCM pentru aplicatia ta Ajax co-brand si integrarea va fi reincarcata. Consulta sectiunea 'How to obtain FCM credentials' din README pentru a le extrage.",
+                        "description": "Credentialele FCM nu au fost niciodata setate pentru acest cont, asa ca evenimentele in timp real de la Ajax (sonerie, armare/dezarmare, alarma, miscare) nu pot ajunge la Home Assistant — integrarea cade pe polling la fiecare 5 minute. Introdu mai jos cele patru valori FCM pentru aplicatia ta Ajax co-brand si integrarea va fi reincarcata. Consulta sectiunea 'How to obtain FCM credentials' din README pentru a le extrage.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",
