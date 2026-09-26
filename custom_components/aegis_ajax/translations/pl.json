@@ -97,7 +97,7 @@
                     "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
                     "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz.",
                     "delay_panel_states": "Po włączeniu panel alarmowy pokazuje \"arming\", gdy hub odlicza \"Opóźnienie przy wyjściu\" czujnika, oraz \"pending\", gdy trwa \"Opóźnienie przy wejściu\" — oba na podstawie sygnałów samego huba, a nie naszego zegara. Czujniki bez opóźnienia (alarm natychmiastowy) są już aktywne podczas \"arming\". Automatyzacje czekające na \"armed_away\" uruchomią się po zakończeniu opóźnienia wyjścia. Surowy stan huba pozostaje w atrybucie \"hub_state\".",
-                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM.",
+                    "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm, ruch) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM.",
                     "persistent_notifications": "Po włączeniu wybrane zdarzenia pojawiają się jako trwałe powiadomienia Home Assistant, widoczne do ich zamknięcia lub restartu Home Assistant. Zdarzenia te są dostarczane przez push (FCM), więc push musi być skonfigurowany, aby docierały.",
                     "persistent_notification_events": "Które zdarzenia wywołują trwałe powiadomienie. Domyślnie rzeczywiste incydenty (alarm, panika, sabotaż, pożar, CO, zalanie, zbicie szyby). Dodaj uzbrojenie/rozbrojenie, ruch lub dzwonek, jeśli też ich chcesz."
                 }
@@ -303,7 +303,7 @@
                 "step": {
                     "init": {
                         "title": "Skonfiguruj poswiadczenia FCM dla Aegis",
-                        "description": "Poswiadczenia FCM nigdy nie zostaly ustawione dla tego konta, wiec zdarzenia w czasie rzeczywistym z Ajax (dzwonek do drzwi, uzbrajanie/rozbrajanie, alarm) nie moga dotrzec do Home Assistant — integracja korzysta z pollingu co 5 minut. Wprowadz ponizej cztery wartosci FCM dla swojej aplikacji Ajax co-brand i integracja zostanie ponownie zaladowana. Zobacz sekcje 'How to obtain FCM credentials' w README jak je wyodrebnic.",
+                        "description": "Poswiadczenia FCM nigdy nie zostaly ustawione dla tego konta, wiec zdarzenia w czasie rzeczywistym z Ajax (dzwonek do drzwi, uzbrajanie/rozbrajanie, alarm, ruch) nie moga dotrzec do Home Assistant — integracja korzysta z pollingu co 5 minut. Wprowadz ponizej cztery wartosci FCM dla swojej aplikacji Ajax co-brand i integracja zostanie ponownie zaladowana. Zobacz sekcje 'How to obtain FCM credentials' w README jak je wyodrebnic.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",

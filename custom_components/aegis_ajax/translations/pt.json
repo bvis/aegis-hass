@@ -97,7 +97,7 @@
                     "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se a tua conta Ajax tiver permissão para desativar dispositivos.",
                     "expose_arm_home": "Adiciona um modo Armar em casa ao painel de alarme. Espelha o modo Noturno e é necessário sobretudo para o Amazon Alexa ou o Nabu Casa Cloud. Desative para ocultar o botão duplicado se não os utilizar.",
                     "delay_panel_states": "Quando ativo, o painel de alarme mostra \"arming\" enquanto o hub executa o \"Atraso ao sair\" de um detetor e \"pending\" enquanto decorre um \"Atraso ao entrar\", ambos a partir dos sinais do próprio hub e não de um temporizador nosso. Os detetores sem atraso (alarme instantâneo) já estão ativos durante \"arming\". As automações que aguardam \"armed_away\" serão acionadas quando o atraso de saída terminar. O estado bruto do hub mantém-se no atributo \"hub_state\".",
-                    "disable_push_warning": "Ative se executa propositadamente sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparação. Os eventos em tempo real (campainha, armar/desarmar, alarme) só chegarão ao Home Assistant depois de configurar o FCM.",
+                    "disable_push_warning": "Ative se executa propositadamente sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparação. Os eventos em tempo real (campainha, armar/desarmar, alarme, movimento) só chegarão ao Home Assistant depois de configurar o FCM.",
                     "persistent_notifications": "Quando ativado, os eventos selecionados aparecem como notificações persistentes do Home Assistant que permanecem visíveis até serem dispensadas ou o Home Assistant reiniciar. Estes eventos são entregues por push (FCM), pelo que o push tem de estar configurado para chegarem.",
                     "persistent_notification_events": "Que eventos geram uma notificação persistente. Por predefinição, incidentes reais (alarme, pânico, sabotagem, incêndio, CO, inundação, quebra de vidro). Adicione armar/desarmar, movimento ou campainha se também os quiser."
                 }
@@ -303,7 +303,7 @@
                 "step": {
                     "init": {
                         "title": "Configurar credenciais FCM do Aegis",
-                        "description": "As credenciais FCM nunca foram definidas para esta conta, por isso os eventos em tempo real do Ajax (campainha, armar/desarmar, alarme) nao chegam ao Home Assistant — a integracao recorre a polling a cada 5 minutos. Introduz abaixo os quatro valores FCM para a tua app Ajax co-brand e a integracao sera recarregada. Consulta a seccao 'How to obtain FCM credentials' do README para os extrair.",
+                        "description": "As credenciais FCM nunca foram definidas para esta conta, por isso os eventos em tempo real do Ajax (campainha, armar/desarmar, alarme, movimento) nao chegam ao Home Assistant — a integracao recorre a polling a cada 5 minutos. Introduz abaixo os quatro valores FCM para a tua app Ajax co-brand e a integracao sera recarregada. Consulta a seccao 'How to obtain FCM credentials' do README para os extrair.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",

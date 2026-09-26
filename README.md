@@ -140,7 +140,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 | Show exit / entry delays as panel states | disabled | Shows the hub's per-detector **Delay when leaving** as the panel's `arming` state and **Delay when entering** as `pending`, driven by the hub's own signals. Opt-in because automations waiting for `armed_away` then fire once the exit delay completes. See [Exit and entry delays](#exit-and-entry-delays). |
 | PIN code | disabled | Require PIN for arm/disarm from HA UI |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
-| I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
+| I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
 | Photo retention (days) | 30 | How many days to keep captured photos (1-365) |
 | Max photos per device | 100 | Maximum photos stored per camera (0 = unlimited) |
 | Auto-create labels | enabled | Create and assign `aegis_*` labels (camera, hub, door, motion, …) to your entities for easy grouping in dashboards/automations. Disable if you prefer to manage labels manually — with the option enabled the integration re-creates the labels on every restart. |
@@ -198,7 +198,7 @@ You can type any custom label during setup if yours is not listed.
 |---|---|---|
 | Hub | Hub, Hub Plus, Hub 4G, Hub Lite, Hub 2, Hub 2 Plus, Hub 2 4G, Hub 2 LTE (RTK), Hub 3, Hub Hybrid (2 / 4G), Hub Mega, Hub Void 4G, Hub Fibra, Hub Yavir / Yavir Plus, Hub Fire, Hub Superior | Alarm panel, battery, GSM type/connected, CRA monitoring status, CRA company (diagnostic), lid tamper, IMEI, hub network sensors (Ethernet/Wi-Fi/GSM, IP data, cellular signal/network, mains power) |
 | Door Sensors | DoorProtect, DoorProtect Plus, DoorProtect Fibra, DoorProtect S, DoorProtect S Plus, DoorProtect Plus Fibra, DoorProtect Plus G3 Fibra, DoorProtect G3 | Door open/close, tamper, vibration (Plus), tilt (Plus, accelerometer), battery, temperature, signal, external contact alert (wired contact triggered), external contact fault (wiring broken) |
-| Motion Sensors | MotionProtect, MotionProtect Plus, MotionProtect Outdoor, MotionProtect Curtain (and outdoor / mini / plus base variants), MotionProtect S / S Plus, MotionProtect G3 family (incl. Fibra), MotionProtect Plus Fibra / G3 | Motion detected (real-time), tamper, battery, temperature, signal |
+| Motion Sensors | MotionProtect, MotionProtect Plus, MotionProtect Outdoor, MotionProtect Curtain (and outdoor / mini / plus base variants), MotionProtect S / S Plus, MotionProtect G3 family (incl. Fibra), MotionProtect Plus Fibra / G3 | Motion detected (needs push, see [Motion sensors](#motion-sensors-need-push)), tamper, battery, temperature, signal |
 | Cameras | MotionCam, MotionCam Outdoor, MotionCam Fibra (& base), MotionCam G3, MotionCam HD, MotionCam PhOD, MotionCam PhOD Fibra, MotionCam Outdoor PhOD, MotionCam Outdoor 2/4 PhOD, MotionCam S PhOD (& AM), MotionCam Superior PhOD, MotionCam Video (& Indoor) | Motion detected, tamper, battery on all. Camera entity, photo-on-demand capture and alarm albums on **MotionCam PhOD, MotionCam PhOD Fibra, MotionCam Outdoor PhOD, MotionCam Outdoor 2/4 PhOD and MotionCam Fibra base** — the families confirmed on real hardware. MotionCam G3, HD, S PhOD (& AM), Superior PhOD and Video have no camera or capture entity yet: each needs one owner to confirm the Ajax app offers Photo on demand for it, see [#472](https://github.com/bvis/aegis-hass/issues/472). Internal temperature on MotionCam Outdoor PhOD (confirmed on hardware) |
 | Glass Break | GlassProtect, GlassProtect S, GlassProtect Fibra | Glass break detection, tamper, battery |
 | Combi | CombiProtect, CombiProtect S, CombiProtect Fibra | Motion, glass break, tamper, battery |
@@ -393,7 +393,11 @@ An [example automations file](docs/automations.yaml) is also available with 24 a
 > **Note on hub network sensors**: These entities are backed by the HTS connection. If HTS is unavailable or reconnecting, they may temporarily become unavailable instead of showing stale data.
 
 ### Real-time event sensors
-Door open/close and motion detection are **transient events** — they appear when the event occurs and clear automatically. The integration uses a persistent gRPC stream for instant delivery (typically < 1 second latency).
+Door open/close arrives over the hub's persistent gRPC stream, typically in under a second, with or without push.
+
+<a id="motion-sensors-need-push"></a>
+
+**Motion sensors need push.** On the detectors checked so far (MotionCam models and the MotionProtect Outdoor Curtain), the hub stream never carries a motion detection, so the **Motion** binary sensor is turned on by the push for that detection and turns itself off 30 seconds later. Without FCM configured, those motion sensors stay `off` while temperature, battery and signal keep updating, which looks like a broken sensor but is not ([#507](https://github.com/bvis/aegis-hass/issues/507), [#521](https://github.com/bvis/aegis-hass/issues/521)). Other motion detectors may behave the same way, so if motion matters to you, set up [push notifications](#push-notifications-fcm).
 
 > **Note on motion detection**: Ajax motion sensors only report motion events when the system is **armed**. This is a firmware-level behavior — when disarmed, motion detectors are inactive for battery conservation.
 
@@ -463,8 +467,8 @@ You can also manually copy the blueprint files from `custom_components/aegis_aja
 | Hub shows offline | Verify hub has internet in your Ajax app |
 | 2FA code rejected | Ensure your device clock is synchronized |
 | Unexpected errors | Verify your app label matches your co-branded app exactly |
-| Motion/door not updating | Check that the gRPC stream is connected (look for "Device stream started" in logs) |
-| Sensors unavailable after reload | Use full HA restart instead of integration reload (gRPC streams require restart) |
+| Door not updating | Check that the gRPC stream is connected (look for "Device stream started" in logs) |
+| Motion sensor never turns on | Motion needs push: configure FCM (see [Motion sensors need push](#motion-sensors-need-push)), and test while the system is **armed** |
 | Photo capture button missing | Only MotionCam PhOD models support on-demand capture |
 | Arm fails with "malfunctions detected" | Open sensors or low batteries prevent arming. Enable **Force arm** in Options, or use the `aegis_ajax.force_arm` service. The error message lists the blocking devices. |
 | Disarm not working | Check HA logs for specific error; ensure the system is armed before disarming |
@@ -475,16 +479,16 @@ This integration uses three communication channels. Each entity type depends on 
 
 | Protocol | Entities | Transport | Notes |
 |----------|----------|-----------|-------|
-| **gRPC stream** | Door open/close, motion, tamper, connectivity, problem, battery, temperature, signal, alarm panel state, switches, lights | `mobile-gw.prod.ajax.systems:443` | Persistent stream, < 1s latency. Case tampering is dual-sourced: some hubs report it here, others only over HTS (see below) |
+| **gRPC stream** | Door open/close, tamper, connectivity, problem, battery, temperature, signal, alarm panel state, switches, lights | `mobile-gw.prod.ajax.systems:443` | Persistent stream, < 1s latency. Case tampering is dual-sourced: some hubs report it here, others only over HTS (see below) |
 | **gRPC space snapshot** | CRA connection, CRA company, room metadata | Same server | One-shot `SpaceService/stream` snapshot read at startup / refresh time, then cached between polls |
 | **gRPC request** | Arm/disarm, force arm, photo capture trigger | Same server | On-demand commands |
 | **HTS** | Ethernet (IP, gateway, DNS), Wi-Fi (SSID, signal, IP), cellular (signal, network), mains power, connection type, per-device internal temperature (sirens, MotionProtect Curtain / Outdoor, MotionCam Outdoor PhoD), case tampering (families confirmed on hardware only — [#406](https://github.com/bvis/aegis-hass/issues/406)), keyfob activity, exit / entry delay events and per-detector delay settings (the opt-in `arming` / `pending` panel states, [#454](https://github.com/bvis/aegis-hass/issues/454)) | `hts.prod.ajax.systems:443` | Proprietary binary protocol over TCP+TLS |
-| **FCM push** | Security events (alarm, arm/disarm, tamper, panic, fire, flood, motion, door_open, etc.), photo URL retrieval | Firebase Cloud Messaging | Requires FCM credentials (configured in Options) |
+| **FCM push** | Security events (alarm, arm/disarm, tamper, panic, fire, flood, motion, door_open, etc.), the motion binary sensors, photo URL retrieval | Firebase Cloud Messaging | Requires FCM credentials (configured in Options) |
 
 If a specific group of sensors stops working:
-- **Door/motion/battery unavailable** → gRPC stream disconnected (check logs for "Device stream started")
+- **Door/battery unavailable** → gRPC stream disconnected (check logs for "Device stream started")
 - **Hub network sensors unavailable** → HTS connection lost (auto-reconnects on next poll cycle)
-- **Security events not firing** → FCM not configured or push client not started (check logs for "FCM push client started")
+- **Security events not firing, or motion never turning on** → FCM not configured or push client not started (check logs for "FCM push client started")
 - **Arm/disarm fails** → gRPC request issue (check logs for specific error)
 
 ## Roadmap
@@ -501,7 +505,7 @@ This integration covers the hardware I personally own and can validate against a
 Areas where the integration could grow with community input:
 
 - **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR, and any in-integration (proxied) streaming.
-- **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. It has to be one your **installer or monitoring company** deactivated: the app's own *forced deactivation* is a different, temporary mechanism and doesn't produce the example. A diagnostics dump + debug log would let us finalize the indicator — see #311.
+- **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. It has to be one your **installer or monitoring company** deactivated: the app's own *forced deactivation* is a different, temporary mechanism and doesn't produce the example. A diagnostics dump + debug log would let us finalize the indicator — reopen #311 with it.
 - **Device settings beyond sirens** — siren volume and alarm duration are covered since `1.15.0` (#310); detector sensitivity, LED brightness and alert thresholds still need captures from owners of that hardware.
 - **Co-branded apps** the integration doesn't yet recognise in the `App Label` dropdown.
 - **Any new device family** that shows up in the snapshot without entities.
@@ -521,9 +525,10 @@ The integration can run with or without Firebase Cloud Messaging (FCM) push, but
 | Event entity firings (alarm, tamper, panic, doorbell ring, fire / smoke, CO, flood, glass break, motion, door open, battery low, connection lost, malfunction) | Real-time | Never — these only ride the FCM channel |
 | Photo-on-Demand URL retrieval (snapshot pulls) | Available | Not available |
 | Device sensor state (temperature, signal strength, open / closed contacts, …) | Real-time (gRPC stream) | Real-time (gRPC stream) |
+| Motion binary sensors | On for 30 s per detection, while armed | Stay `off` ([why](#motion-sensors-need-push)) |
 | Hub network info, SIM info, room / space topology | Polled | Polled |
 
-If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events will not fire. You can **dismiss** the *FCM not configured* Repair card and it stays dismissed across restarts — the integration will not break and won't keep re-raising the card on every reboot. The WARNING line under **Settings → System → Logs** is the only remaining reminder.
+If you cannot configure FCM, the integration still works as a polled view of your Ajax installation, but automations that rely on alarm-panel events or motion will not fire. You can **dismiss** the *FCM not configured* Repair card and it stays dismissed across restarts — the integration will not break and won't keep re-raising the card on every reboot. The WARNING line under **Settings → System → Logs** is the only remaining reminder.
 
 You can enter the four FCM values later from either place — no need to remove and re-add the integration:
 
@@ -588,7 +593,7 @@ The fourth, `google_api_key`, is **not** in `strings.xml` (the entry there is a 
 
 > **If you downloaded the APK as a `.xapk` split bundle**, the native library does NOT live inside the base `com.ajaxsystems.apk` — it ships in one of the architecture-specific config splits (`config.armeabi_v7a.apk` / `config.arm64_v8a.apk`). Unpack the XAPK first, then unpack the matching architecture split, then read `lib/<arch>/libnative-lib.so` from there.
 
-> **Watch out — the native library typically contains more than one `AIza…` string.** Google Cloud SDKs share the same key format across services, and an Ajax APK can ship a separate key for FCM, another for ML Kit, and so on; only the **FCM-scoped** one is what Firebase Installations accepts. There is no label next to the keys to tell them apart. The pragmatic recipe is to list every match (`strings libnative-lib.so | grep -oE 'AIza[A-Za-z0-9_-]+' | sort -u`) and try each one through the integration's Repair flow until registration succeeds. If you get `Push notifications disabled — FCM credentials rejected by Google` with the warning text mentioning `API_KEY_ANDROID_APP_BLOCKED`, that's the signal you've picked a non-FCM key — pull the next candidate from the list and retry.
+> **Watch out — the native library typically contains more than one `AIza…` string.** Google Cloud SDKs share the same key format across services, and an Ajax APK can ship a separate key for FCM, another for ML Kit, and so on; only the **FCM-scoped** one is what Firebase Installations accepts. There is no label next to the keys to tell them apart. The pragmatic recipe is to list every match (`strings libnative-lib.so | grep -oE 'AIza[A-Za-z0-9_-]{35}' | sort -u` — the `{35}` keeps each match at exactly 39 characters, so a copy can't pick up a stray character at the end) and try each one through the integration's Repair flow until registration succeeds. If you get `Push notifications disabled — FCM credentials rejected by Google` with the warning text mentioning `API_KEY_ANDROID_APP_BLOCKED`, that's the signal you've picked a non-FCM key — pull the next candidate from the list and retry.
 
 > **Using the Ajax app on iPhone?** The iOS build ships these values in `GoogleService-Info.plist` inside the signed `.ipa` bundle, which is encrypted and unreadable without a jailbroken device. The Firebase project is identical on both platforms, so extract the four values from the Android APK regardless of which OS you use day-to-day — pulled from the Android build, they work for FCM push delivery on a Home Assistant install on any phone OS.
 

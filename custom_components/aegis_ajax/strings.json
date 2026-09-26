@@ -97,7 +97,7 @@
                     "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
                     "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them.",
                     "delay_panel_states": "When on, the alarm panel shows \"arming\" while the hub runs a detector's \"Delay when leaving\" and \"pending\" while a \"Delay when entering\" runs — both driven by the hub's own signals, not a timer of ours. Detectors without a delay (Instant Alarm) are already live during \"arming\". Automations waiting for \"armed_away\" will fire once the exit delay completes. The hub's raw state stays in the \"hub_state\" attribute.",
-                    "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm) still won't reach Home Assistant until you configure FCM.",
+                    "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM.",
                     "persistent_notifications": "When on, the selected events appear as Home Assistant persistent notifications that stay visible until dismissed or Home Assistant restarts. These events are delivered over push (FCM), so push must be configured for them to arrive.",
                     "persistent_notification_events": "Which events raise a persistent notification. Defaults to real incidents (alarm, panic, tamper, fire, CO, flood, glass break). Add arm/disarm, motion or doorbell if you want those too."
                 }
@@ -295,7 +295,7 @@
                 "step": {
                     "init": {
                         "title": "Configure Aegis FCM credentials",
-                        "description": "FCM credentials have never been set for this account, so real-time events from Ajax (doorbell ring, arm/disarm pushes, alarm) cannot reach Home Assistant — the integration falls back to polling every 5 minutes. Enter the four FCM values for your co-branded Ajax app below and the integration will reload. See the README's 'How to obtain FCM credentials' section for how to extract them from your Ajax app.",
+                        "description": "FCM credentials have never been set for this account, so real-time events from Ajax (doorbell ring, arm/disarm pushes, alarm, motion) cannot reach Home Assistant — the integration falls back to polling every 5 minutes. Enter the four FCM values for your co-branded Ajax app below and the integration will reload. See the README's 'How to obtain FCM credentials' section for how to extract them from your Ajax app.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",

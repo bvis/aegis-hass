@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Czech, Polish, Romanian and Turkish now translate the four action blocks that were still in English (#475).** **Requests to Ajax:** none added.
+- **The "push not configured" Repair and the "I don't use push notifications" option now list motion among the events that need push (#507, #521).** On the detectors checked so far, MotionCam models and the MotionProtect Outdoor Curtain, the hub stream never reports a motion detection, so without FCM the motion sensor stays off while temperature and battery keep updating. It was the most common report on the tracker, and nothing on screen explained it. The README now says so where motion is described, in the push table and in Troubleshooting. Its channel table no longer lists motion under the gRPC stream, and the Troubleshooting row that told people to restart Home Assistant after reloading the integration is gone, since a reload has worked for a long time. The key-extraction command now matches exactly 39 characters, so a copied key can't pick up a stray character. **Requests to Ajax:** none added.
 
 ## [1.22.1] - 2026-09-20
 

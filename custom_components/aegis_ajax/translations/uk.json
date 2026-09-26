@@ -97,7 +97,7 @@
                     "bypass_switches": "Перемикачі обходу дозволяють деактивувати пристрій перед взяттям під охорону. «Авто» створює їх лише якщо ваш обліковий запис Ajax має дозвіл деактивувати пристрої.",
                     "expose_arm_home": "Додає до панелі сигналізації режим «Охорона вдома». Він дублює нічний режим і потрібен переважно для Amazon Alexa або Nabu Casa Cloud. Вимкніть, щоб приховати дубльовану кнопку, якщо ви ними не користуєтесь.",
                     "delay_panel_states": "Якщо увімкнено, панель сигналізації показує \"arming\", поки хаб відлічує \"Затримку на вихід\" датчика, і \"pending\", поки триває \"Затримка на вхід\" — обидва за сигналами самого хаба, а не за нашим таймером. Датчики без затримки (миттєва тривога) уже активні під час \"arming\". Автоматизації, що чекають на \"armed_away\", спрацюють після завершення затримки на вихід. Необроблений стан хаба залишається в атрибуті \"hub_state\".",
-                    "disable_push_warning": "Увімкніть, якщо ви свідомо працюєте без push. Приховує повторюване нагадування «FCM не налаштовано» та картку відновлення. Події в реальному часі (дзвінок, увімкнення/вимкнення, тривога) не надходитимуть до Home Assistant, доки ви не налаштуєте FCM.",
+                    "disable_push_warning": "Увімкніть, якщо ви свідомо працюєте без push. Приховує повторюване нагадування «FCM не налаштовано» та картку відновлення. Події в реальному часі (дзвінок, увімкнення/вимкнення, тривога, рух) не надходитимуть до Home Assistant, доки ви не налаштуєте FCM.",
                     "persistent_notifications": "Якщо ввімкнено, вибрані події з'являються як постійні сповіщення Home Assistant, які залишаються видимими, доки їх не закрити або Home Assistant не перезапуститься. Ці події надходять через push (FCM), тому push має бути налаштований, щоб вони надходили.",
                     "persistent_notification_events": "Які події створюють постійне сповіщення. Типово — реальні інциденти (тривога, паніка, саботаж, пожежа, CO, затоплення, розбиття скла). Додайте постановку/зняття з охорони, рух або дзвінок, якщо потрібно."
                 }
@@ -303,7 +303,7 @@
                 "step": {
                     "init": {
                         "title": "Nalashtuvaty FCM-poslidninnia dlia Aegis",
-                        "description": "FCM-poslidninnia nikoli ne buly nalashtovani dlia tsoho oblikovoho zapisu, tomu podii v realnomu chasi vid Ajax (dzvinok, armuvannia/rozarmuvannia, alarm) ne mozhut dosiahty Home Assistant — intehratsiia perekhodyt na opytuvannia kozhni 5 khvylyn. Vvedit nyzhche chotyry znachennia FCM dlia vashoho co-brand dodatka Ajax, i intehratsiia bude perezavantazhena. Dyvit sektsiiu 'How to obtain FCM credentials' u README, shchob yikh vydobuty.",
+                        "description": "FCM-poslidninnia nikoli ne buly nalashtovani dlia tsoho oblikovoho zapisu, tomu podii v realnomu chasi vid Ajax (dzvinok, armuvannia/rozarmuvannia, alarm, rukh) ne mozhut dosiahty Home Assistant — intehratsiia perekhodyt na opytuvannia kozhni 5 khvylyn. Vvedit nyzhche chotyry znachennia FCM dlia vashoho co-brand dodatka Ajax, i intehratsiia bude perezavantazhena. Dyvit sektsiiu 'How to obtain FCM credentials' u README, shchob yikh vydobuty.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",

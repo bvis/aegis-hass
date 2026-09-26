@@ -97,7 +97,7 @@
                     "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
                     "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın.",
                     "delay_panel_states": "Açıkken alarm paneli, hub bir dedektörün \"Çıkarken gecikme\" süresini işletirken \"arming\", bir \"Girerken gecikme\" sürerken \"pending\" gösterir; ikisi de bizim bir zamanlayıcımıza değil hub'ın kendi sinyallerine dayanır. Gecikmesi olmayan dedektörler (anlık alarm) \"arming\" sırasında zaten etkindir. \"armed_away\" bekleyen otomasyonlar çıkış gecikmesi tamamlandığında tetiklenir. Hub'ın ham durumu \"hub_state\" özniteliğinde kalır.",
-                    "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz.",
+                    "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm, hareket) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz.",
                     "persistent_notifications": "Açıldığında, seçilen olaylar kapatılana veya Home Assistant yeniden başlatılana kadar görünür kalan kalıcı Home Assistant bildirimleri olarak gösterilir. Bu olaylar push (FCM) üzerinden iletilir; ulaşmaları için push yapılandırılmış olmalıdır.",
                     "persistent_notification_events": "Hangi olayların kalıcı bildirim oluşturacağı. Varsayılan olarak gerçek olaylar (alarm, panik, kurcalama, yangın, CO, su baskını, cam kırılması). Kurma/çözme, hareket veya zili de istiyorsanız ekleyin."
                 }
@@ -303,7 +303,7 @@
                 "step": {
                     "init": {
                         "title": "Aegis FCM kimlik bilgilerini yapilandir",
-                        "description": "Bu hesap icin FCM kimlik bilgileri hic ayarlanmadi, bu yuzden Ajax'tan gelen gercek zamanli olaylar (kapi zili, kurma/devre disi birakma, alarm) Home Assistant'a ulasamiyor — entegrasyon her 5 dakikada bir polling'e duser. Asagida co-brand Ajax uygulamaniz icin dort FCM degerini girin ve entegrasyon yeniden yuklenecek. Bunlari uygulamanizdan cikarmak icin README'deki 'How to obtain FCM credentials' bolumune bakin.",
+                        "description": "Bu hesap icin FCM kimlik bilgileri hic ayarlanmadi, bu yuzden Ajax'tan gelen gercek zamanli olaylar (kapi zili, kurma/devre disi birakma, alarm, hareket) Home Assistant'a ulasamiyor — entegrasyon her 5 dakikada bir polling'e duser. Asagida co-brand Ajax uygulamaniz icin dort FCM degerini girin ve entegrasyon yeniden yuklenecek. Bunlari uygulamanizdan cikarmak icin README'deki 'How to obtain FCM credentials' bolumune bakin.",
                         "data": {
                             "fcm_project_id": "FCM Project ID",
                             "fcm_app_id": "FCM App ID",
