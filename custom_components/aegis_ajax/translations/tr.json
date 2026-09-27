@@ -78,6 +78,7 @@
                     "force_arm": "Zorla kurma (açık sensörleri ve arızaları yoksay)",
                     "expose_arm_home": "\"Evde Devreye Al\" düğmesini göster",
                     "delay_panel_states": "Çıkış / giriş gecikmelerini panel durumu olarak göster",
+                    "cloud_video": "Video kameralar için bulut üzerinden canlı izleme (deneysel)",
                     "use_pin_code": "Kurma/devre dışı bırakma için PIN kodu gerektir",
                     "pin_code": "PIN kodu",
                     "fcm_project_id": "FCM Proje Kimliği (anlık bildirimler için)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
                     "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın.",
                     "delay_panel_states": "Açıkken alarm paneli, hub bir dedektörün \"Çıkarken gecikme\" süresini işletirken \"arming\", bir \"Girerken gecikme\" sürerken \"pending\" gösterir; ikisi de bizim bir zamanlayıcımıza değil hub'ın kendi sinyallerine dayanır. Gecikmesi olmayan dedektörler (anlık alarm) \"arming\" sırasında zaten etkindir. \"armed_away\" bekleyen otomasyonlar çıkış gecikmesi tamamlandığında tetiklenir. Hub'ın ham durumu \"hub_state\" özniteliğinde kalır.",
+                    "cloud_video": "Her Ajax video kamerası için, uygulamanın evden uzaktayken yaptığı gibi Ajax bulutu üzerinden aktarılan bir canlı izleme kamerası ekler; bu yüzden Home Assistant kameranın ağında olmadığında da çalışır. Deneysel: henüz her kamerada çalışmayabilir. Her izleme bir video oturumu açar; kimse izlemezken hiçbir şey çalışmaz.",
                     "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm, hareket) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz.",
                     "persistent_notifications": "Açıldığında, seçilen olaylar kapatılana veya Home Assistant yeniden başlatılana kadar görünür kalan kalıcı Home Assistant bildirimleri olarak gösterilir. Bu olaylar push (FCM) üzerinden iletilir; ulaşmaları için push yapılandırılmış olmalıdır.",
                     "persistent_notification_events": "Hangi olayların kalıcı bildirim oluşturacağı. Varsayılan olarak gerçek olaylar (alarm, panik, kurcalama, yangın, CO, su baskını, cam kırılması). Kurma/çözme, hareket veya zili de istiyorsanız ekleyin."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Donanım yazılımı"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Canlı izleme"
             }
         }
     },

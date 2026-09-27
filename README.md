@@ -138,6 +138,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 | Force arm | disabled | Arm ignoring open sensors and malfunctions (bypasses hub safety checks) |
 | Show "Arm Home" button | enabled | Whether the alarm panel advertises **Arm Home**. It duplicates Ajax's single partial (Night) mode and exists mainly so the Nabu Casa / Alexa skill discovers the panel. Disable to hide the redundant button if you don't use Alexa / Home Assistant Cloud — **Arm Away** and **Arm Night** are unaffected. |
 | Show exit / entry delays as panel states | disabled | Shows the hub's per-detector **Delay when leaving** as the panel's `arming` state and **Delay when entering** as `pending`, driven by the hub's own signals. Opt-in because automations waiting for `armed_away` then fire once the exit delay completes. See [Exit and entry delays](#exit-and-entry-delays). |
+| Cloud live view for video cameras | disabled | Experimental. Adds a **Live view** camera per Ajax video camera, streamed through the Ajax cloud, for installs where Home Assistant can't reach the camera locally. See [Cloud live view](#cloud-live-view-experimental). |
 | PIN code | disabled | Require PIN for arm/disarm from HA UI |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
 | I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
@@ -264,6 +265,19 @@ Ajax video hardware (the **NVR** and the IP cameras / doorbell channels bridged 
 That's it — from there the camera behaves like any other ONVIF camera in Home Assistant (live view, snapshots, recording, use in automations), while Aegis keeps providing the device's motion/tamper sensors and the doorbell `ring` event.
 
 > If your Home Assistant can't reach the camera on its LAN IP, ONVIF discovery will fail — this is a network reachability issue, not an integration one. As a fallback you can also point the **Generic Camera** integration at the RTSP stream directly (port `8554`).
+
+### Cloud live view (experimental)
+
+If Home Assistant can't reach the camera on its network (for example Home Assistant running on a VPS), the **Cloud live view for video cameras** option (Configure, off by default) adds a **Live view** camera for each Ajax video camera, streamed through the Ajax cloud the way the app does when you're away from home.
+
+Home Assistant only relays the setup of the stream: the video goes straight from the Ajax cloud to your browser and never passes through Home Assistant. Each time you open the camera one video session starts, and it ends when you close it. Nothing runs while nobody is watching.
+
+This is **experimental and not yet confirmed on real hardware** ([#322](https://github.com/bvis/aegis-hass/issues/322)). Two things are known in advance:
+
+- Cameras set to **H.265** in the Ajax app may only play in Safari, and in Chrome on hardware that decodes H.265. **H.264** plays in every browser.
+- There's no still image yet, so the entity shows no picture until you open it.
+
+If it doesn't play, **Download diagnostics** and look at the `cloud_video` section. It records how far the last session got and which codec the camera answered with, without any stream details or credentials. Attaching it to #322 is the fastest way to get it working for your camera.
 
 ### Person / vehicle / pet detection
 
@@ -493,7 +507,7 @@ If a specific group of sensors stops working:
 
 ## Roadmap
 
-- [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). Native/proxied streaming and the radio MotionCam Video family (not behind an NVR) are still open
+- [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). A cloud live view that doesn't need the camera's network is experimental since `1.23.0` ([Cloud live view](#cloud-live-view-experimental), #322). The radio MotionCam Video family (not behind an NVR) is still open
 - [x] Valve platform — bidirectional control. Read-only `valve` entity shipped in `1.3.0`; open / close added in `1.12.0` over the generic device on/off command path
 - [x] Number/Select platforms for device settings — siren **volume** and **alarm duration** shipped in `1.15.0` (#310), read and written over the hub's per-device update path. Other settings (detector sensitivity, LED brightness, alert thresholds) are still open and need captures from people running that hardware
 - [x] SpaceControl (keyfob) detection — keyfobs surface as a **Keyfobs** device with an experimental per-keyfob active sensor (`1.10.0`); the active/inactive value still awaits confirmation from a deactivated-keyfob log (#311). (Who armed/disarmed via a keyfob was already attributed in the logbook.)
@@ -504,7 +518,7 @@ This integration covers the hardware I personally own and can validate against a
 
 Areas where the integration could grow with community input:
 
-- **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR, and any in-integration (proxied) streaming.
+- **Video streaming** — cameras behind an Ajax **NVR** already have a live-view path via Home Assistant's native ONVIF integration ([guide](#video-cameras-onvif--rtsp)). The experimental [cloud live view](#cloud-live-view-experimental) needs owners of Ajax video cameras to confirm it plays (#322). Still open: the radio **MotionCam Video** family that isn't bridged through an NVR.
 - **A deactivated SpaceControl keyfob** — keyfobs now appear as a *Keyfobs* device with an experimental per-keyfob **Active** sensor (`1.10.0`), but the active/inactive value is unconfirmed because every keyfob seen so far is active. It has to be one your **installer or monitoring company** deactivated: the app's own *forced deactivation* is a different, temporary mechanism and doesn't produce the example. A diagnostics dump + debug log would let us finalize the indicator — reopen #311 with it.
 - **Device settings beyond sirens** — siren volume and alarm duration are covered since `1.15.0` (#310); detector sensitivity, LED brightness and alert thresholds still need captures from owners of that hardware.
 - **Co-branded apps** the integration doesn't yet recognise in the `App Label` dropdown.

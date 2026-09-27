@@ -477,6 +477,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._spaces_api = SpacesApi(client)
         self._security_api = SecurityApi(client)
         self._devices_api = DevicesApi(client)
+        # Last cloud-video session outcome per device (#322), PII-free, for
+        # diagnostics: the experimental path's only feedback channel.
+        self.cloud_video_outcomes: dict[str, Any] = {}
         self._hub_object_api = HubObjectApi(client)
         self._media_api = MediaApi(client)
         self.spaces: dict[str, Space] = {}
@@ -729,6 +732,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def devices_api(self) -> DevicesApi:
         return self._devices_api
+
+    @property
+    def grpc_client(self) -> AjaxGrpcClient:
+        return self._client
 
     @property
     def hub_object_api(self) -> HubObjectApi:

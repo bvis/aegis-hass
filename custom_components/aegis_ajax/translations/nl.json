@@ -78,6 +78,7 @@
                     "force_arm": "Geforceerd inschakelen (open sensoren en storingen negeren)",
                     "expose_arm_home": "Knop \"Thuis inschakelen\" tonen",
                     "delay_panel_states": "Uitloop-/inloopvertraging tonen als paneelstatus",
+                    "cloud_video": "Live weergave via de cloud voor videocamera's (experimenteel)",
                     "use_pin_code": "PIN-code vereisen voor in-/uitschakelen",
                     "pin_code": "PIN-code",
                     "fcm_project_id": "FCM-project-ID (voor pushmeldingen)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Met overbrugschakelaars kun je een apparaat deactiveren vóór het inschakelen. 'Auto' maakt ze alleen aan als je Ajax-account toestemming heeft om apparaten te deactiveren.",
                     "expose_arm_home": "Voegt een modus Thuis inschakelen toe aan het alarmpaneel. Dit is gelijk aan de Nachtmodus en is voornamelijk nodig voor Amazon Alexa of Nabu Casa Cloud. Schakel uit om de dubbele knop te verbergen als je deze niet gebruikt.",
                     "delay_panel_states": "Indien ingeschakeld toont het alarmpaneel \"arming\" terwijl de hub de \"Vertraging bij vertrek\" van een detector uitvoert en \"pending\" terwijl een \"Vertraging bij binnenkomst\" loopt — beide op basis van de signalen van de hub zelf, niet van een eigen timer. Detectoren zonder vertraging (direct alarm) zijn tijdens \"arming\" al actief. Automatiseringen die op \"armed_away\" wachten, worden geactiveerd zodra de uitloopvertraging is voltooid. De ruwe status van de hub blijft in het attribuut \"hub_state\".",
+                    "cloud_video": "Voegt voor elke Ajax-videocamera een camera met live weergave toe, gestreamd via de Ajax-cloud zoals de app dat buitenshuis doet, zodat het ook werkt wanneer Home Assistant niet op het netwerk van de camera zit. Experimenteel: werkt mogelijk nog niet met elke camera. Elke weergave opent één videosessie; er draait niets zolang niemand kijkt.",
                     "disable_push_warning": "Schakel dit in als je bewust zonder push werkt. Verbergt de terugkerende herinnering \"FCM niet geconfigureerd\" en de reparatiekaart. Realtime gebeurtenissen (deurbel, in-/uitschakelen, alarm, beweging) bereiken Home Assistant pas als je FCM configureert.",
                     "persistent_notifications": "Indien ingeschakeld verschijnen de geselecteerde gebeurtenissen als blijvende Home Assistant-meldingen die zichtbaar blijven totdat ze worden gesloten of Home Assistant opnieuw start. Deze gebeurtenissen komen binnen via push (FCM), dus push moet geconfigureerd zijn om ze te ontvangen.",
                     "persistent_notification_events": "Welke gebeurtenissen een blijvende melding veroorzaken. Standaard echte incidenten (alarm, paniek, sabotage, brand, CO, overstroming, glasbreuk). Voeg in-/uitschakelen, beweging of deurbel toe als je die ook wilt."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Firmware"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Live weergave"
             }
         }
     },

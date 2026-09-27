@@ -195,6 +195,12 @@ async def async_get_config_entry_diagnostics(
         # healthy install and on one that never had a keyfob.
         "keyfob_unrecognised_rows": coordinator.keyfob_unrecognised_rows,
         "video_edge_onvif_rtsp": video_edge_probe,
+        # Experimental cloud live view (#322): how far the latest session per
+        # camera got (stage, codecs, candidate counts). No SDP or credentials.
+        "cloud_video": {
+            device_id: outcome.as_dict()
+            for device_id, outcome in coordinator.cloud_video_outcomes.items()
+        },
         # What decides whether a hub gets an IMEI sensor at all (#379). A
         # `null` here is the answer to "why is my IMEI sensor unavailable":
         # the read never succeeded, so the entity was never offered this

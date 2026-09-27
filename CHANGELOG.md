@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - unreleased
+
+### Added
+- **Experimental cloud live view for Ajax video cameras (#322).** A new option, *Cloud live view for video cameras* (off by default), adds a **Live view** camera for each Ajax video camera, streamed through the Ajax cloud the way the app does away from home. It works when Home Assistant can't reach the camera's network, such as on a VPS. Home Assistant only relays the stream setup: the browser's WebRTC offer goes to the camera and the answer and connection candidates come back, and the video itself never passes through Home Assistant. It is not yet confirmed on real hardware. The diagnostics dump has a `cloud_video` section recording how far the last session got and the codec the camera answered with, and it never includes stream details or credentials. **Requests to Ajax:** one video session per camera view, opened when you open the camera and closed when you close it. Nothing is added while nobody is watching.
+
 ## [1.22.2] - 2026-09-27
 
 A quieter log and clearer wording around push. The "push notifications are not arriving" check no longer repeats its warning every minute (confirmed on a reporter's install, where it had written 194 copies in three hours). Motion is now named among the events that need push, which was the most common report on the tracker. Czech, Polish, Romanian and Turkish translate the last blocks that were still in English.

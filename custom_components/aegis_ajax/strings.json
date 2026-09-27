@@ -78,6 +78,7 @@
                     "force_arm": "Force arm (ignore open sensors and malfunctions)",
                     "expose_arm_home": "Show \"Arm Home\" button",
                     "delay_panel_states": "Show exit / entry delays as panel states",
+                    "cloud_video": "Cloud live view for video cameras (experimental)",
                     "use_pin_code": "Require PIN code for arm/disarm",
                     "pin_code": "PIN code",
                     "fcm_project_id": "FCM Project ID (for push notifications)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
                     "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them.",
                     "delay_panel_states": "When on, the alarm panel shows \"arming\" while the hub runs a detector's \"Delay when leaving\" and \"pending\" while a \"Delay when entering\" runs — both driven by the hub's own signals, not a timer of ours. Detectors without a delay (Instant Alarm) are already live during \"arming\". Automations waiting for \"armed_away\" will fire once the exit delay completes. The hub's raw state stays in the \"hub_state\" attribute.",
+                    "cloud_video": "Adds a live-view camera for each Ajax video camera, streamed through the Ajax cloud the way the app does away from home, so it also works when Home Assistant is not on the camera's network. Experimental: it may not work on every camera yet. Each view opens one video session; nothing runs while nobody is watching.",
                     "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM.",
                     "persistent_notifications": "When on, the selected events appear as Home Assistant persistent notifications that stay visible until dismissed or Home Assistant restarts. These events are delivered over push (FCM), so push must be configured for them to arrive.",
                     "persistent_notification_events": "Which events raise a persistent notification. Defaults to real incidents (alarm, panic, tamper, fire, CO, flood, glass break). Add arm/disarm, motion or doorbell if you want those too."
@@ -601,6 +603,11 @@
             },
             "device_firmware": {
                 "name": "Firmware"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Live view"
             }
         }
     },
