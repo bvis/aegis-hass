@@ -12,11 +12,12 @@ it. Media flows browser <-> Ajax cloud and never passes through Home
 Assistant.
 
 The app normally lets the camera make the offer and only offers itself
-when it renegotiates. Whether the camera accepts a client offer as the
-*first* offer is the open question this experimental path answers, so the
-outcome of every session is recorded (stage reached, codec in the answer)
-for diagnostics. No SDP, candidate or ICE credential is ever logged or
-stored.
+when it renegotiates. Sending the streams in ``init`` makes the camera
+offer straight away (first field test, #322), so the streams are asked for
+only after the camera has answered the browser's offer. The outcome of
+every session is recorded (stage reached, codecs, when the camera offered
+on its own) for diagnostics. No SDP, candidate or ICE credential is ever
+logged or stored.
 
 API delta: one stream per camera view, opened when the frontend asks for
 it and closed when the view closes. Nothing runs while nobody watches.
@@ -69,6 +70,8 @@ class SessionOutcome:
     error: str | None = None
     answer_codecs: list[str] = field(default_factory=list)
     offer_codecs: list[str] = field(default_factory=list)
+    edge_offer_codecs: list[str] = field(default_factory=list)
+    edge_offer_stage: str | None = None
     granted_streams: int | None = None
     ice_servers: int | None = None
     edge_sent_offer: bool = False
@@ -82,6 +85,8 @@ class SessionOutcome:
             "error": self.error,
             "offer_codecs": self.offer_codecs,
             "answer_codecs": self.answer_codecs,
+            "edge_offer_codecs": self.edge_offer_codecs,
+            "edge_offer_stage": self.edge_offer_stage,
             "granted_streams": self.granted_streams,
             "ice_servers": self.ice_servers,
             "edge_sent_offer": self.edge_sent_offer,
@@ -127,17 +132,11 @@ class CloudVideoSession:
 
     # -- request builders ---------------------------------------------------
 
-    def _init_request(self) -> Any:  # noqa: ANN401
-        from systems.ajax.api.mobile.v2.common.space import space_locator_pb2  # noqa: PLC0415
+    def _live_stream(self) -> Any:  # noqa: ANN401
         from systems.ajax.api.mobile.v2.common.video import types_pb2  # noqa: PLC0415
-        from systems.ajax.api.mobile.v2.common.video.webrtc import (  # noqa: PLC0415
-            ice_candidate_filters_pb2,
-            stream_pb2,
-        )
-        from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
+        from systems.ajax.api.mobile.v2.common.video.webrtc import stream_pb2  # noqa: PLC0415
 
-        filters = ice_candidate_filters_pb2.IceCandidateFilters
-        stream = stream_pb2.Stream(
+        return stream_pb2.Stream(
             id=LIVE_MAIN_STREAM_ID,
             channel_guid=self._channel_id,
             dcp_tag=1,
@@ -145,18 +144,34 @@ class CloudVideoSession:
             filter=[types_pb2.FrameTypeId(frame_type=types_pb2.FT_VIDEO)],
             live=stream_pb2.Stream.Live(),
         )
-        # Same filters the app sends: every candidate type, both protocols.
+
+    def _init_request(self) -> Any:  # noqa: ANN401
+        from systems.ajax.api.mobile.v2.common.space import space_locator_pb2  # noqa: PLC0415
+        from systems.ajax.api.mobile.v2.common.video.webrtc import (  # noqa: PLC0415
+            ice_candidate_filters_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
+
+        filters = ice_candidate_filters_pb2.IceCandidateFilters
+        # No initial streams: with them the camera offers right after init and
+        # never answers the browser. Same ICE filters the app sends.
         return request_pb2.StreamWebrtcRequest(
             init=request_pb2.StreamWebrtcRequest.Init(
                 space_locator=space_locator_pb2.SpaceLocator(space_id=self._space_id),
                 video_edge_id=self._video_edge_id,
-                initial_streams=[stream],
                 ice_filters=filters(
                     type_filter=filters.TypeFilter(host=True, reflexive=True, relay=True),
                     protocol_filter=filters.ProtocolFilter(tcp=True, udp=True),
                 ),
                 allow_large_rtp_packets=False,
             )
+        )
+
+    def _ask_streams_request(self) -> Any:  # noqa: ANN401
+        from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
+
+        return request_pb2.StreamWebrtcRequest(
+            ask_streams=request_pb2.StreamWebrtcRequest.AskStreams(streams=[self._live_stream()])
         )
 
     @staticmethod
@@ -270,6 +285,7 @@ class CloudVideoSession:
                 ", ".join(self.outcome.answer_codecs) or "none",
             )
             self._on_answer(sdp)
+            self._outbox.put_nowait(self._ask_streams_request())
         elif kind == "new_ice_candidate":
             cand = success.new_ice_candidate.candidate
             self.outcome.remote_candidates += 1
@@ -285,14 +301,21 @@ class CloudVideoSession:
             # browser can't take a remote offer through Home Assistant, so this
             # is the "client offers are not accepted" outcome.
             self.outcome.edge_sent_offer = True
-            self.outcome.offer_codecs = sdp_codecs(success.offer.session_description.sdp)
+            self.outcome.edge_offer_stage = self.outcome.stage
+            self.outcome.edge_offer_codecs = sdp_codecs(success.offer.session_description.sdp)
             self._fail(
                 "edge_sent_offer",
                 "the camera sent its own offer instead of answering the browser's",
             )
             return False
         elif kind == "ask_streams_response":
-            _LOGGER.debug("Cloud video: ask_streams_response %s", success.ask_streams_response)
+            asked = success.ask_streams_response
+            if asked.WhichOneof("response") == "failure":
+                reason = asked.failure.WhichOneof("error") or "failure"
+                self._fail(reason, f"Ajax refused the live stream ({reason})")
+                return False
+            self.outcome.granted_streams = len(asked.success.streams)
+            self.outcome.stage = "streaming"
         return True
 
     async def _run(self) -> None:
@@ -306,7 +329,7 @@ class CloudVideoSession:
                 async for msg in call:
                     if not self._handle(msg):
                         return
-                    if self.outcome.stage == "answered":
+                    if self.outcome.stage in ("answered", "streaming"):
                         # Negotiated: keep relaying candidates for as long as
                         # the browser keeps the view open.
                         deadline.reschedule(None)

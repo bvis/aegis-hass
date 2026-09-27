@@ -103,12 +103,34 @@ def _server(react: Callable[[Any], list[Any]]) -> tuple[Any, list[FakeCall]]:  #
     return Stub, calls
 
 
+def _streams_msg(*, granted: bool = True) -> Any:  # noqa: ANN401
+    asked = Resp.Success.AskStreamsResponse
+    if granted:
+        return _success(
+            ask_streams_response=asked(
+                success=asked.AskStreamsSuccess(streams=[stream_pb2.Stream(id="0-lm")])
+            )
+        )
+    return _success(
+        ask_streams_response=asked(
+            failure=asked.AskStreamsFailure(permission_denied=common_response_pb2.Error())
+        )
+    )
+
+
+def _edge_offer_msg() -> Any:  # noqa: ANN401
+    sd = session_description_pb2.SessionDescription(type="offer", sdp=CAMERA_ANSWER)
+    return _success(offer=Resp.Success.Offer(session_description=sd))
+
+
 def _happy(request: Any) -> list[Any]:  # noqa: ANN401
     kind = request.WhichOneof("signaling_message")
     if kind == "init":
         return [_init_msg()]
     if kind == "offer":
         return [_answer_msg(), _candidate_msg()]
+    if kind == "ask_streams":
+        return [_streams_msg()]
     return []
 
 
@@ -155,18 +177,23 @@ async def test_forwards_browser_offer_after_init_and_relays_answer() -> None:
         "init",
         "offer",
         "new_ice_candidate",
+        "ask_streams",
     ]
     init = sent[0].init
     assert init.video_edge_id == "ve-1"
     assert init.space_locator.space_id == "space-1"
-    stream = init.initial_streams[0]
+    # Streams in init make the camera offer first (#322 field test), so
+    # they are only asked for once the camera has answered.
+    assert list(init.initial_streams) == []
+    stream = sent[3].ask_streams.streams[0]
     assert (stream.id, stream.channel_guid, stream.type) == ("0-lm", "chan-1", types_pb2.ST_MAIN)
     assert [f.frame_type for f in stream.filter] == [types_pb2.FT_VIDEO]
     assert sent[1].offer.session_description.sdp == BROWSER_OFFER
     assert answers == [CAMERA_ANSWER]
     assert candidates[0].candidate.endswith("typ relay")
     assert candidates[0].sdp_mid == "0"
-    assert session.outcome.stage == "answered"
+    assert session.outcome.stage == "streaming"
+    assert session.outcome.granted_streams == 1
     assert session.outcome.answer_codecs == ["H264"]
     assert session.outcome.ice_servers == 1
     session.close()
@@ -178,8 +205,7 @@ async def test_camera_offering_itself_is_reported_not_forwarded() -> None:
 
     def react(request: Any) -> list[Any]:  # noqa: ANN401
         if request.WhichOneof("signaling_message") == "init":
-            sd = session_description_pb2.SessionDescription(type="offer", sdp=CAMERA_ANSWER)
-            return [_init_msg(), _success(offer=Resp.Success.Offer(session_description=sd))]
+            return [_init_msg(), _edge_offer_msg()]
         return []
 
     stub, _calls = _server(react)
@@ -191,6 +217,50 @@ async def test_camera_offering_itself_is_reported_not_forwarded() -> None:
         await _settle()
     assert errors == ["edge_sent_offer"]
     assert session.outcome.edge_sent_offer is True
+    assert session.outcome.edge_offer_stage == "offer_sent"
+    assert session.outcome.edge_offer_codecs == ["H264"]
+    # The browser's own offer stays recorded apart from the camera's.
+    assert session.outcome.offer_codecs == ["VP8", "H264"]
+
+
+@pytest.mark.asyncio
+async def test_camera_renegotiating_after_ask_streams_is_reported() -> None:
+    errors: list[str] = []
+
+    def react(request: Any) -> list[Any]:  # noqa: ANN401
+        replies = _happy(request)
+        if request.WhichOneof("signaling_message") == "ask_streams":
+            return [*replies, _edge_offer_msg()]
+        return replies
+
+    stub, _calls = _server(react)
+    session = _session(on_error=lambda code, _m: errors.append(code))
+    with patch(
+        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
+    ):
+        session.start(BROWSER_OFFER)
+        await _settle()
+    assert errors == ["edge_sent_offer"]
+    assert session.outcome.edge_offer_stage == "streaming"
+
+
+@pytest.mark.asyncio
+async def test_refused_live_stream_reaches_the_browser() -> None:
+    errors: list[str] = []
+
+    def react(request: Any) -> list[Any]:  # noqa: ANN401
+        if request.WhichOneof("signaling_message") == "ask_streams":
+            return [_streams_msg(granted=False)]
+        return _happy(request)
+
+    stub, _calls = _server(react)
+    session = _session(on_error=lambda code, _m: errors.append(code))
+    with patch(
+        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
+    ):
+        session.start(BROWSER_OFFER)
+        await _settle()
+    assert errors == ["permission_denied"]
 
 
 @pytest.mark.asyncio
