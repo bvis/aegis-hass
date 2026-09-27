@@ -5,9 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.22.2] - unreleased
+## [1.22.2] - 2026-09-27
+
+A quieter log and clearer wording around push. The "push notifications are not arriving" check no longer repeats its warning every minute (confirmed on a reporter's install, where it had written 194 copies in three hours). Motion is now named among the events that need push, which was the most common report on the tracker. Czech, Polish, Romanian and Turkish translate the last blocks that were still in English.
 
 ### Fixed
+- **The "Push notifications are not arriving" Repair no longer says the push connection was up.** It said the events were seen "while the push connection was up", but the check only knows the push client is running, not that its connection to Google completed, and a connection that never completed is one of the three causes the card itself lists. It now says "while the push client was running", in all 15 languages, matching the log line fixed in #531. **Requests to Ajax:** none added.
 - **The "push notifications appear not to be delivering" warning is logged once, not every minute (#437).** The check behind the Repair runs on the one-minute supervisor tick, and it wrote the same WARNING on every tick even when nothing had changed. One reporter's log had 194 identical copies in about three hours. It now logs, and registers the Repair, only when the event count moves, plus once after each restart. The log line also says the push client is *running* rather than *connected*: the check knows the client exists, not that its connection to Google is up. **Requests to Ajax:** none added.
 
 ### Changed
