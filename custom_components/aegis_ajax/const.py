@@ -379,6 +379,12 @@ DEFAULT_EXPOSE_ARM_HOME = True
 # should get by upgrading.
 CONF_DELAY_PANEL_STATES = "delay_panel_states"
 DEFAULT_DELAY_PANEL_STATES = False
+# Experimental cloud live view for Ajax video devices (#322): a camera entity
+# per video channel whose WebRTC session is negotiated through the Ajax cloud,
+# as the app does off-LAN. Off by default until a real camera confirms it; each
+# view opens one signalling stream, nothing runs while nobody watches.
+CONF_CLOUD_VIDEO = "cloud_video"
+DEFAULT_CLOUD_VIDEO = False
 CONF_PHOTO_RETENTION_DAYS = "photo_retention_days"
 CONF_PHOTO_MAX_PER_DEVICE = "photo_max_per_device"
 CONF_AUTO_CREATE_LABELS = "auto_create_labels"

@@ -78,6 +78,7 @@
                     "force_arm": "Armar forçat (ignorar sensors oberts i avaries)",
                     "expose_arm_home": "Mostra el botó \"Arma a casa\"",
                     "delay_panel_states": "Mostrar els retards de sortida / entrada com a estats del panell",
+                    "cloud_video": "Visualització en directe pel núvol per a càmeres de vídeo (experimental)",
                     "use_pin_code": "Requerir codi PIN per armar/desarmar",
                     "pin_code": "Codi PIN",
                     "fcm_project_id": "ID de projecte FCM (per a notificacions push)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Els switches de bypass permeten desactivar un dispositiu abans d'armar. 'Auto' només els crea si el teu compte d'Ajax té permís per desactivar dispositius.",
                     "expose_arm_home": "Afegeix un mode Arma a casa al tauler d'alarma. Replica el mode Nit i només cal per a Amazon Alexa o Nabu Casa Cloud. Desactiva'l per amagar el botó duplicat si no els fas servir.",
                     "delay_panel_states": "Quan és actiu, el panell d'alarma mostra \"arming\" mentre el hub executa el \"Retard en sortir\" d'un detector i \"pending\" mentre corre un \"Retard en entrar\", tots dos a partir dels senyals del mateix hub, no d'un temporitzador nostre. Els detectors sense retard (alarma instantània) ja estan actius durant \"arming\". Les automatitzacions que esperen \"armed_away\" es dispararan quan acabi el retard de sortida. L'estat brut del hub es manté a l'atribut \"hub_state\".",
+                    "cloud_video": "Afegeix una càmera de visualització en directe per a cada càmera de vídeo Ajax, transmesa a través del núvol d'Ajax com fa l'app fora de casa, de manera que també funciona quan Home Assistant no és a la xarxa de la càmera. Experimental: potser encara no funciona amb totes les càmeres. Cada visualització obre una sessió de vídeo; no s'executa res mentre ningú no mira.",
                     "disable_push_warning": "Activa'l si funciones expressament sense push. Amaga el recordatori recurrent \"FCM no configurat\" i la targeta de reparació. Els esdeveniments en temps real (timbre, armar/desarmar, alarma, moviment) continuaran sense arribar a Home Assistant fins que configuris FCM.",
                     "persistent_notifications": "Quan s'activa, els esdeveniments seleccionats apareixen com a notificacions persistents de Home Assistant que romanen visibles fins que es descarten o Home Assistant es reinicia. Aquests esdeveniments arriben per push (FCM), així que el push ha d'estar configurat perquè arribin.",
                     "persistent_notification_events": "Quins esdeveniments generen una notificació persistent. Per defecte, incidents reals (alarma, pànic, sabotatge, foc, CO, inundació, trencament de vidre). Afegeix armat/desarmat, moviment o timbre si també els vols."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Microprogramari"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Visualització en directe"
             }
         }
     },

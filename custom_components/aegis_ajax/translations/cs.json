@@ -78,6 +78,7 @@
                     "force_arm": "Nucené zastřežení (ignorovat otevřené senzory a poruchy)",
                     "expose_arm_home": "Zobrazit tlačítko „Aktivovat doma“",
                     "delay_panel_states": "Zobrazovat odchodové / příchodové zpoždění jako stavy panelu",
+                    "cloud_video": "Živý náhled přes cloud pro videokamery (experimentální)",
                     "use_pin_code": "Vyžadovat PIN kód pro střežení/odstřežení",
                     "pin_code": "PIN kód",
                     "fcm_project_id": "ID projektu FCM (pro push notifikace)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Přepínače vyřazení umožňují deaktivovat zařízení před zastřežením. 'Auto' je vytvoří jen tehdy, má-li tvůj účet Ajax oprávnění deaktivovat zařízení.",
                     "expose_arm_home": "Přidá na panel alarmu režim Aktivovat doma. Kopíruje noční režim a je potřeba hlavně pro Amazon Alexa nebo Nabu Casa Cloud. Vypněte pro skrytí duplicitního tlačítka, pokud je nepoužíváte.",
                     "delay_panel_states": "Je-li zapnuto, panel alarmu zobrazuje \"arming\", dokud hub odpočítává \"Zpoždění při odchodu\" detektoru, a \"pending\", dokud běží \"Zpoždění při příchodu\" — obojí podle signálů samotného hubu, nikoli našeho časovače. Detektory bez zpoždění (okamžitý alarm) jsou během \"arming\" již aktivní. Automatizace čekající na \"armed_away\" se spustí po dokončení odchodového zpoždění. Surový stav hubu zůstává v atributu \"hub_state\".",
+                    "cloud_video": "Přidá kameru s živým náhledem pro každou videokameru Ajax, streamovanou přes cloud Ajax stejně jako v aplikaci mimo domov, takže funguje i tehdy, když Home Assistant není v síti kamery. Experimentální: zatím nemusí fungovat se všemi kamerami. Každé sledování otevře jednu video relaci; když se nikdo nedívá, nic neběží.",
                     "disable_push_warning": "Zapněte, pokud záměrně běžíte bez push. Skryje opakující se připomínku „FCM není nakonfigurováno“ i kartu opravy. Události v reálném čase (zvonek, aktivace/deaktivace, poplach, pohyb) se do Home Assistant nedostanou, dokud nenastavíte FCM.",
                     "persistent_notifications": "Po zapnutí se vybrané události zobrazí jako trvalá oznámení Home Assistant, která zůstanou viditelná, dokud je nezavřete nebo se Home Assistant nerestartuje. Tyto události přicházejí přes push (FCM), takže push musí být nakonfigurován, aby dorazily.",
                     "persistent_notification_events": "Které události vyvolají trvalé oznámení. Výchozí jsou skutečné incidenty (alarm, panika, sabotáž, požár, CO, zaplavení, rozbití skla). Přidejte zapnutí/vypnutí ostrahy, pohyb nebo zvonek, pokud je chcete také."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Firmware"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Živý náhled"
             }
         }
     },

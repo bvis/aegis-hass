@@ -78,6 +78,7 @@
                     "force_arm": "Tving aktivering (ignorer åbne sensorer og fejl)",
                     "expose_arm_home": "Vis knappen \"Aktiver hjemme\"",
                     "delay_panel_states": "Vis ud-/indgangsforsinkelser som panelstatusser",
+                    "cloud_video": "Livevisning via skyen for videokameraer (eksperimentel)",
                     "use_pin_code": "Kræv PIN-kode ved aktivering/deaktivering",
                     "pin_code": "PIN-kode",
                     "fcm_project_id": "FCM-projekt-ID (til pushnotifikationer)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Bypass-kontakter gør det muligt at deaktivere en enhed, før systemet aktiveres. \"Auto\" opretter dem kun, hvis din Ajax-konto har tilladelse til at deaktivere enheder.",
                     "expose_arm_home": "Tilføjer en \"Aktiver hjemme\"-mulighed til alarmpanelet. Den spejler natfunktionen og er primært nødvendig til Amazon Alexa eller Nabu Casa Cloud. Slå den fra for at skjule den ekstra knap, hvis du ikke bruger disse.",
                     "delay_panel_states": "Når denne er slået til, viser alarmpanelet \"aktiverer\", mens hub'en kører en detektors \"Forsinkelse ved udgang\", og \"afventer\", mens en \"Forsinkelse ved indgang\" kører — begge dele styres af hub'ens egne signaler, ikke af en timer fra vores side. Detektorer uden forsinkelse (Instant Alarm) er allerede aktive under \"aktiverer\". Automatiseringer, der venter på \"armed_away\", udløses, når udgangsforsinkelsen er afsluttet. Hub'ens rå status ligger fortsat i attributten \"hub_state\".",
+                    "cloud_video": "Tilføjer et kamera med livevisning for hvert Ajax-videokamera, streamet via Ajax-skyen, som appen gør hjemmefra, så det også virker, når Home Assistant ikke er på kameraets netværk. Eksperimentel: virker måske ikke med alle kameraer endnu. Hver visning åbner én videosession; intet kører, mens ingen ser med.",
                     "disable_push_warning": "Slå denne til, hvis du bevidst kører uden push. Den skjuler den gentagne \"FCM ikke konfigureret\"-påmindelse og reparationskortet. Hændelser i realtid (dørklokke, aktiver/deaktiver, alarm, bevægelse) når stadig ikke Home Assistant, før du konfigurerer FCM.",
                     "persistent_notifications": "Når denne er slået til, vises de valgte hændelser som vedvarende notifikationer i Home Assistant, der forbliver synlige, indtil de afvises, eller Home Assistant genstartes. Disse hændelser leveres via push (FCM), så push skal være konfigureret, for at de kan modtages.",
                     "persistent_notification_events": "Hvilke hændelser der udløser en vedvarende notifikation. Som standard reelle hændelser (alarm, panik, sabotage, brand, CO, oversvømmelse, glasbrud). Tilføj aktiver/deaktiver, bevægelse eller dørklokke, hvis du også ønsker disse."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Firmware"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Livevisning"
             }
         }
     },

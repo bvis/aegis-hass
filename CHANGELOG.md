@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.22.2] - unreleased
+## [1.23.0] - unreleased
+
+### Added
+- **Experimental cloud live view for Ajax video cameras (#322).** A new option, *Cloud live view for video cameras* (off by default), adds a **Live view** camera for each Ajax video camera, streamed through the Ajax cloud the way the app does away from home. It works when Home Assistant can't reach the camera's network, such as on a VPS. Home Assistant only relays the stream setup: the browser's WebRTC offer goes to the camera and the answer and connection candidates come back, and the video itself never passes through Home Assistant. It is not yet confirmed on real hardware. The diagnostics dump has a `cloud_video` section recording how far the last session got and the codec the camera answered with, and it never includes stream details or credentials. **Requests to Ajax:** one video session per camera view, opened when you open the camera and closed when you close it. Nothing is added while nobody is watching.
 
 ### Fixed
 - **The "push notifications appear not to be delivering" warning is logged once, not every minute (#437).** The check behind the Repair runs on the one-minute supervisor tick, and it wrote the same WARNING on every tick even when nothing had changed. One reporter's log had 194 identical copies in about three hours. It now logs, and registers the Repair, only when the event count moves, plus once after each restart. The log line also says the push client is *running* rather than *connected*: the check knows the client exists, not that its connection to Google is up. **Requests to Ajax:** none added.

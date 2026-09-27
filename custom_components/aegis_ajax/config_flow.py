@@ -42,6 +42,7 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_NEVER,
     CONF_AUTO_CREATE_LABELS,
     CONF_BYPASS_SWITCHES,
+    CONF_CLOUD_VIDEO,
     CONF_DELAY_PANEL_STATES,
     CONF_DISABLE_PUSH_WARNING,
     CONF_EXPOSE_ARM_HOME,
@@ -52,6 +53,7 @@ from custom_components.aegis_ajax.const import (
     CONF_PHOTO_RETENTION_DAYS,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
+    DEFAULT_CLOUD_VIDEO,
     DEFAULT_DELAY_PANEL_STATES,
     DEFAULT_DISABLE_PUSH_WARNING,
     DEFAULT_EXPOSE_ARM_HOME,
@@ -643,6 +645,10 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                         default=self._entry.options.get(
                             CONF_DELAY_PANEL_STATES, DEFAULT_DELAY_PANEL_STATES
                         ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_CLOUD_VIDEO,
+                        default=self._entry.options.get(CONF_CLOUD_VIDEO, DEFAULT_CLOUD_VIDEO),
                     ): bool,
                     vol.Optional(
                         "use_pin_code",

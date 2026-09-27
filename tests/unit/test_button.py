@@ -2,29 +2,9 @@
 
 from __future__ import annotations
 
-import sys
-from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-
-def _stub_camera_module() -> None:
-    """Stub `homeassistant.components.camera` so importing button.py does not
-    drag in HA's stream component (which needs numpy, not in the dev image).
-    Same trick as `tests/unit/test_camera.py`."""
-    if "homeassistant.components.camera" not in sys.modules:
-        camera_mod = ModuleType("homeassistant.components.camera")
-
-        class Camera:
-            def __init__(self) -> None:
-                pass
-
-        camera_mod.Camera = Camera  # type: ignore[attr-defined]
-        sys.modules["homeassistant.components.camera"] = camera_mod
-
-
-_stub_camera_module()
 
 from custom_components.aegis_ajax.api.models import (  # noqa: E402
     Device,

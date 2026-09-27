@@ -78,6 +78,7 @@
                     "force_arm": "Wymuszone uzbrojenie (ignoruj otwarte czujniki i awarie)",
                     "expose_arm_home": "Pokaż przycisk „Uzbrój w domu”",
                     "delay_panel_states": "Pokazuj opóźnienia wyjścia / wejścia jako stany panelu",
+                    "cloud_video": "Podgląd na żywo przez chmurę dla kamer wideo (eksperymentalne)",
                     "use_pin_code": "Wymagaj kodu PIN do uzbrojenia/rozbrojenia",
                     "pin_code": "Kod PIN",
                     "fcm_project_id": "ID projektu FCM (dla powiadomień push)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
                     "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz.",
                     "delay_panel_states": "Po włączeniu panel alarmowy pokazuje \"arming\", gdy hub odlicza \"Opóźnienie przy wyjściu\" czujnika, oraz \"pending\", gdy trwa \"Opóźnienie przy wejściu\" — oba na podstawie sygnałów samego huba, a nie naszego zegara. Czujniki bez opóźnienia (alarm natychmiastowy) są już aktywne podczas \"arming\". Automatyzacje czekające na \"armed_away\" uruchomią się po zakończeniu opóźnienia wyjścia. Surowy stan huba pozostaje w atrybucie \"hub_state\".",
+                    "cloud_video": "Dodaje kamerę z podglądem na żywo dla każdej kamery wideo Ajax, przesyłanym przez chmurę Ajax tak jak w aplikacji poza domem, więc działa także wtedy, gdy Home Assistant nie jest w sieci kamery. Eksperymentalne: może jeszcze nie działać z każdą kamerą. Każde oglądanie otwiera jedną sesję wideo; gdy nikt nie ogląda, nic nie działa.",
                     "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm, ruch) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM.",
                     "persistent_notifications": "Po włączeniu wybrane zdarzenia pojawiają się jako trwałe powiadomienia Home Assistant, widoczne do ich zamknięcia lub restartu Home Assistant. Zdarzenia te są dostarczane przez push (FCM), więc push musi być skonfigurowany, aby docierały.",
                     "persistent_notification_events": "Które zdarzenia wywołują trwałe powiadomienie. Domyślnie rzeczywiste incydenty (alarm, panika, sabotaż, pożar, CO, zalanie, zbicie szyby). Dodaj uzbrojenie/rozbrojenie, ruch lub dzwonek, jeśli też ich chcesz."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Oprogramowanie"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Podgląd na żywo"
             }
         }
     },

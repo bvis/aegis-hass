@@ -78,6 +78,7 @@
                     "force_arm": "Armar forçado (ignorar sensores abertos e falhas)",
                     "expose_arm_home": "Mostrar botão \"Armar em casa\"",
                     "delay_panel_states": "Mostrar atrasos de saída / entrada como estados do painel",
+                    "cloud_video": "Visualização ao vivo pela nuvem para câmeras de vídeo (experimental)",
                     "use_pin_code": "Exigir código PIN para armar/desarmar",
                     "pin_code": "Código PIN",
                     "fcm_project_id": "ID do projeto FCM (para notificações push)",
@@ -97,6 +98,7 @@
                     "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos.",
                     "expose_arm_home": "Adiciona um modo Armar em casa ao painel de alarme. Ele espelha o modo Noturno e é necessário principalmente para Amazon Alexa ou Nabu Casa Cloud. Desative para ocultar o botão duplicado se você não os usa.",
                     "delay_panel_states": "Quando ativado, o painel de alarme mostra \"arming\" enquanto o hub executa o \"Atraso ao sair\" de um detector e \"pending\" enquanto um \"Atraso ao entrar\" está em andamento, ambos a partir dos sinais do próprio hub, não de um temporizador nosso. Detectores sem atraso (alarme instantâneo) já estão ativos durante \"arming\". Automações que aguardam \"armed_away\" serão disparadas quando o atraso de saída terminar. O estado bruto do hub permanece no atributo \"hub_state\".",
+                    "cloud_video": "Adiciona uma câmera de visualização ao vivo para cada câmera de vídeo Ajax, transmitida pela nuvem da Ajax como o app faz fora de casa, então também funciona quando o Home Assistant não está na rede da câmera. Experimental: pode ainda não funcionar com todas as câmeras. Cada visualização abre uma sessão de vídeo; nada roda enquanto ninguém está assistindo.",
                     "disable_push_warning": "Ative se você roda de propósito sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparo. Eventos em tempo real (campainha, armar/desarmar, alarme, movimento) ainda não chegarão ao Home Assistant até você configurar o FCM.",
                     "persistent_notifications": "Quando ativado, os eventos selecionados aparecem como notificações persistentes do Home Assistant que permanecem visíveis até serem dispensadas ou o Home Assistant reiniciar. Esses eventos são entregues via push (FCM), então o push precisa estar configurado para que cheguem.",
                     "persistent_notification_events": "Quais eventos geram uma notificação persistente. O padrão são incidentes reais (alarme, pânico, violação, incêndio, CO, inundação, quebra de vidro). Adicione armar/desarmar, movimento ou campainha se também os quiser."
@@ -560,6 +562,11 @@
             },
             "device_firmware": {
                 "name": "Firmware"
+            }
+        },
+        "camera": {
+            "cloud_video": {
+                "name": "Visualização ao vivo"
             }
         }
     },
