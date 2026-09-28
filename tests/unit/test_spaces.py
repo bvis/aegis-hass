@@ -1060,6 +1060,89 @@ class TestGetMemberSpacePermissions:
         assert perms == {"ARM", "DEVICE_EDIT"}
 
     @pytest.mark.asyncio
+    async def test_records_the_members_push_preferences(self) -> None:
+        """Ajax filters pushes per space member (#519), so the same fetch keeps them."""
+        from systems.ajax.api.mobile.v2.common.space.member import (
+            display_member_notification_preferences_pb2 as prefs_pb2,
+        )
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (
+            endpoint_pb2_grpc as full_grpc,
+        )
+
+        api = self._make_api()
+        lite = self._lite_response([("mid-1", "AAAA1111")])
+        full = self._full_response([])
+        prefs = full.success.snapshot.space_member.display_member_notification_preferences
+        prefs.member_push_preferences.push_preferences.append(
+            prefs_pb2.DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_ALARM
+        )
+        v2 = prefs.member_push_preferences_v2
+        v2.alarm.video.state = prefs_pb2.DisplayMemberPushPreferencesV2.PUSH_PREFERENCE_STATE_NORMAL
+        v2.video.human.enabled = True
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([lite])
+
+        class _FullStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([full])
+
+        with (
+            patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub),
+            patch.object(full_grpc, "StreamSpaceMemberServiceStub", _FullStub),
+        ):
+            await api.get_member_space_permissions("space-1", "AAAA1111")
+
+        assert api.member_push_preferences == {
+            "space-1": {
+                "legacy": ["ALARM"],
+                "alarm_video": "NORMAL",
+                "video": {"motion": False, "human": True, "pet": False, "vehicle": False},
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_absent_v2_preferences_read_as_none(self) -> None:
+        """An unset message is not 'everything off': keep that distinguishable."""
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (
+            endpoint_pb2_grpc as full_grpc,
+        )
+
+        api = self._make_api()
+        lite = self._lite_response([("mid-1", "AAAA1111")])
+        full = self._full_response([])
+        full.success.snapshot.space_member.id = "mid-1"
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([lite])
+
+        class _FullStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([full])
+
+        with (
+            patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub),
+            patch.object(full_grpc, "StreamSpaceMemberServiceStub", _FullStub),
+        ):
+            await api.get_member_space_permissions("space-1", "AAAA1111")
+
+        assert api.member_push_preferences == {
+            "space-1": {"legacy": [], "alarm_video": None, "video": None}
+        }
+
+    @pytest.mark.asyncio
     async def test_returns_none_when_user_not_a_member(self) -> None:
         from v3.mobilegwsvc.service.stream_lite_space_members import (
             endpoint_pb2_grpc as lite_grpc,

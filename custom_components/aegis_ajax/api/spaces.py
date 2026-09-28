@@ -49,6 +49,12 @@ class SpacesApi:
 
     def __init__(self, client: AjaxGrpcClient) -> None:
         self._client = client
+        # The logged-in member's push preferences per space, kept from the
+        # permission lookup (#519). Ajax filters pushes per member, so a
+        # dedicated Home Assistant account can have video pushes off while the
+        # owner's phone gets them. Only filled when that lookup runs
+        # (bypass switches on `auto`); no call is made for it.
+        self.member_push_preferences: dict[str, dict[str, Any]] = {}
 
     @staticmethod
     def parse_space(proto_space: Any) -> Space:  # noqa: ANN401
@@ -447,6 +453,9 @@ class SpacesApi:
             ):
                 if msg.HasField("success") and msg.success.HasField("snapshot"):
                     member = msg.success.snapshot.space_member
+                    self.member_push_preferences[space_id] = _push_preferences_summary(
+                        member.display_member_notification_preferences
+                    )
                     return {perm_names.get(p, str(p)) for p in member.space_permissions.permissions}
                 if msg.HasField("failure"):
                     return None
@@ -456,3 +465,31 @@ class SpacesApi:
             )
             return None
         return None
+
+
+def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Reduce a member's notification preferences to what gates video pushes.
+
+    `None` means Ajax did not send that part, which is not the same as off.
+    """
+    from systems.ajax.api.mobile.v2.common.space.member import (  # noqa: PLC0415
+        display_member_notification_preferences_pb2 as prefs_pb2,
+    )
+
+    prefix = "DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_"
+    legacy = sorted(
+        prefs_pb2.DisplayMemberPushPreference.Name(p).removeprefix(prefix)
+        for p in prefs.member_push_preferences.push_preferences
+    )
+    v2 = prefs.member_push_preferences_v2
+    alarm_video = None
+    if v2.HasField("alarm") and v2.alarm.HasField("video"):
+        alarm_video = prefs_pb2.DisplayMemberPushPreferencesV2.PushPreferenceState.Name(
+            v2.alarm.video.state
+        ).removeprefix("PUSH_PREFERENCE_STATE_")
+    video = None
+    if v2.HasField("video"):
+        video = {
+            kind: getattr(v2.video, kind).enabled for kind in ("motion", "human", "pet", "vehicle")
+        }
+    return {"legacy": legacy, "alarm_video": alarm_video, "video": video}
