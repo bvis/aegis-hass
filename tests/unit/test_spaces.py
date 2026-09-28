@@ -1107,6 +1107,67 @@ class TestGetMemberSpacePermissions:
             }
         }
 
+    async def _fetch(self, api: SpacesApi, full: object) -> set[str] | None:
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_space_member import (
+            endpoint_pb2_grpc as full_grpc,
+        )
+
+        lite = self._lite_response([("mid-1", "AAAA1111")])
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([lite])
+
+        class _FullStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([full])
+
+        with (
+            patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub),
+            patch.object(full_grpc, "StreamSpaceMemberServiceStub", _FullStub),
+        ):
+            return await api.get_member_space_permissions("space-1", "AAAA1111")
+
+    @pytest.mark.asyncio
+    async def test_unknown_preference_value_is_kept_as_its_number(self) -> None:
+        """Ajax adds values our proto lacks (14 = line crossing, seen live on 1.23.0-beta.3)."""
+        from systems.ajax.api.mobile.v2.common.space.member import space_permission_pb2 as sp
+
+        api = self._make_api()
+        full = self._full_response([sp.SpacePermission.DEVICE_EDIT])
+        prefs = full.success.snapshot.space_member.display_member_notification_preferences
+        prefs.member_push_preferences.push_preferences.extend([1, 14])
+        prefs.member_push_preferences_v2.alarm.video.state = 9
+
+        perms = await self._fetch(api, full)
+
+        assert perms == {"DEVICE_EDIT"}
+        summary = api.member_push_preferences["space-1"]
+        assert summary["legacy"] == ["14", "ALARM"]
+        assert summary["alarm_video"] == "9"
+
+    @pytest.mark.asyncio
+    async def test_a_failing_summary_never_costs_the_permissions(self) -> None:
+        """The bypass lookup fails open on None, so the summary must not reach it."""
+        from systems.ajax.api.mobile.v2.common.space.member import space_permission_pb2 as sp
+
+        api = self._make_api()
+        full = self._full_response([sp.SpacePermission.ARM])
+
+        with patch(
+            "custom_components.aegis_ajax.api.spaces._push_preferences_summary",
+            side_effect=ValueError("boom"),
+        ):
+            perms = await self._fetch(api, full)
+
+        assert perms == {"ARM"}
+        assert api.member_push_preferences == {}
+
     @pytest.mark.asyncio
     async def test_absent_v2_preferences_read_as_none(self) -> None:
         """An unset message is not 'everything off': keep that distinguishable."""

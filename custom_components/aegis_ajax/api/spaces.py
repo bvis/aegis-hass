@@ -453,9 +453,14 @@ class SpacesApi:
             ):
                 if msg.HasField("success") and msg.success.HasField("snapshot"):
                     member = msg.success.snapshot.space_member
-                    self.member_push_preferences[space_id] = _push_preferences_summary(
-                        member.display_member_notification_preferences
-                    )
+                    # Diagnostics only: a failure here must never cost the
+                    # permissions, since the bypass lookup fails open on None.
+                    try:
+                        self.member_push_preferences[space_id] = _push_preferences_summary(
+                            member.display_member_notification_preferences
+                        )
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.debug("Could not read push preferences", exc_info=True)
                     return {perm_names.get(p, str(p)) for p in member.space_permissions.permissions}
                 if msg.HasField("failure"):
                     return None
@@ -476,17 +481,23 @@ def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
         display_member_notification_preferences_pb2 as prefs_pb2,
     )
 
-    prefix = "DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_"
+    def name(enum: Any, value: int, prefix: str) -> str:  # noqa: ANN401
+        # Ajax adds values our proto doesn't have yet (14 = line crossing).
+        known = enum.DESCRIPTOR.values_by_number.get(value)
+        return known.name.removeprefix(prefix) if known else str(value)
+
     legacy = sorted(
-        prefs_pb2.DisplayMemberPushPreference.Name(p).removeprefix(prefix)
+        name(prefs_pb2.DisplayMemberPushPreference, p, "DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_")
         for p in prefs.member_push_preferences.push_preferences
     )
     v2 = prefs.member_push_preferences_v2
     alarm_video = None
     if v2.HasField("alarm") and v2.alarm.HasField("video"):
-        alarm_video = prefs_pb2.DisplayMemberPushPreferencesV2.PushPreferenceState.Name(
-            v2.alarm.video.state
-        ).removeprefix("PUSH_PREFERENCE_STATE_")
+        alarm_video = name(
+            prefs_pb2.DisplayMemberPushPreferencesV2.PushPreferenceState,
+            v2.alarm.video.state,
+            "PUSH_PREFERENCE_STATE_",
+        )
     video = None
     if v2.HasField("video"):
         video = {
