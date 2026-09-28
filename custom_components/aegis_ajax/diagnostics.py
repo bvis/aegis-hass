@@ -310,6 +310,12 @@ async def async_get_config_entry_diagnostics(
         # percentage, which leaves the level as stale as it was before the fix
         # and is invisible anywhere else. Counts only — no device, no value.
         "battery_delta_shapes": coordinator.battery_delta_shapes,
+        # This account's own push preferences per space (#519). Ajax filters
+        # pushes per member, so a dedicated Home Assistant account can have
+        # video detections off while the owner's phone gets them, and nothing
+        # else shows it. Kept from the bypass permission lookup, so it is empty
+        # unless bypass switches are on `auto`. Booleans and enum names only.
+        "member_push_preferences": coordinator.spaces_api.member_push_preferences,
     }
 
 

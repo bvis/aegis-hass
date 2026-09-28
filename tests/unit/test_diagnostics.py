@@ -158,6 +158,17 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert result["push"] == {"configured": False}
 
     @pytest.mark.asyncio
+    async def test_member_push_preferences_are_reported(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        prefs = {"space-1": {"legacy": [], "alarm_video": "DISABLE", "video": None}}
+        coordinator.spaces_api.member_push_preferences = prefs
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["member_push_preferences"] == prefs
+
+    @pytest.mark.asyncio
     async def test_push_block_carries_no_fcm_credentials(
         self, coordinator: MagicMock, entry: MagicMock
     ) -> None:
