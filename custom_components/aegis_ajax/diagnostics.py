@@ -13,6 +13,7 @@ from custom_components.aegis_ajax.api.models import (
     device_deactivation_kinds,
     is_device_deactivated,
 )
+from custom_components.aegis_ajax.const import CONF_BYPASS_SWITCHES, DEFAULT_BYPASS_SWITCHES
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -314,8 +315,11 @@ async def async_get_config_entry_diagnostics(
         # pushes per member, so a dedicated Home Assistant account can have
         # video detections off while the owner's phone gets them, and nothing
         # else shows it. Kept from the bypass permission lookup, so it is empty
-        # unless bypass switches are on `auto`. Booleans and enum names only.
+        # unless bypass switches are on `auto`, and the lookup entry says how it
+        # ended when it is. Booleans and enum names only.
         "member_push_preferences": coordinator.spaces_api.member_push_preferences,
+        "member_push_preferences_lookup": coordinator.spaces_api.member_push_preferences_lookup,
+        "bypass_switches": entry.options.get(CONF_BYPASS_SWITCHES, DEFAULT_BYPASS_SWITCHES),
     }
 
 

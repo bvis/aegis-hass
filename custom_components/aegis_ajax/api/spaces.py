@@ -55,6 +55,8 @@ class SpacesApi:
         # owner's phone gets them. Only filled when that lookup runs
         # (bypass switches on `auto`); no call is made for it.
         self.member_push_preferences: dict[str, dict[str, Any]] = {}
+        # How that lookup ended per space, so an empty section says why.
+        self.member_push_preferences_lookup: dict[str, str] = {}
 
     @staticmethod
     def parse_space(proto_space: Any) -> Space:  # noqa: ANN401
@@ -438,8 +440,11 @@ class SpacesApi:
                             break
                     break
                 if msg.HasField("failure"):
+                    reason = msg.failure.WhichOneof("error") or "failure"
+                    self.member_push_preferences_lookup[space_id] = f"members_failure:{reason}"
                     return None
             if not member_id:
+                self.member_push_preferences_lookup[space_id] = "not_a_member"
                 return None
 
             perm_names = {
@@ -459,16 +464,24 @@ class SpacesApi:
                         self.member_push_preferences[space_id] = _push_preferences_summary(
                             member.display_member_notification_preferences
                         )
-                    except Exception:  # noqa: BLE001
+                        self.member_push_preferences_lookup[space_id] = "ok"
+                    except Exception as exc:  # noqa: BLE001
+                        self.member_push_preferences_lookup[space_id] = (
+                            f"summary_error:{type(exc).__name__}"
+                        )
                         _LOGGER.debug("Could not read push preferences", exc_info=True)
                     return {perm_names.get(p, str(p)) for p in member.space_permissions.permissions}
                 if msg.HasField("failure"):
+                    reason = msg.failure.WhichOneof("error") or "failure"
+                    self.member_push_preferences_lookup[space_id] = f"member_failure:{reason}"
                     return None
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            self.member_push_preferences_lookup[space_id] = f"error:{type(exc).__name__}"
             _LOGGER.debug(
                 "Could not fetch member permissions for space %s", space_id, exc_info=True
             )
             return None
+        self.member_push_preferences_lookup[space_id] = "no_snapshot"
         return None
 
 
