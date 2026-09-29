@@ -505,6 +505,16 @@ If a specific group of sensors stops working:
 - **Security events not firing, or motion never turning on** → FCM not configured or push client not started (check logs for "FCM push client started")
 - **Arm/disarm fails** → gRPC request issue (check logs for specific error)
 
+### Why some values from the Ajax app are missing
+
+The integration never sends more requests to Ajax's servers than the official app does. Everything it shows comes from data the app also keeps flowing all the time: the device stream, the hub's status channel, push, and the periodic status refresh. If Ajax saw unusual traffic from this integration it could block it, and that would break it for every user at once.
+
+Some screens in the app load their values only while the screen is open. Those values aren't in the data that flows continuously. Showing them as sensors would mean fetching them on a schedule, which the app never does, so the integration leaves them out.
+
+The main example is the NVR detail screen. CPU and RAM usage, hard disk state and temperature, archive length and uptime are only fetched while that screen is open. The NVR's local ONVIF/RTSP service carries video, not these readings, so there's no local route either. The recorder card in Home Assistant shows what does flow continuously: connection, tamper, channels online and total, and firmware. ([#425](https://github.com/bvis/aegis-hass/issues/425), [#542](https://github.com/bvis/aegis-hass/issues/542))
+
+If one of these values turns up in the data that already flows, it can be added at no cost, so a request with a diagnostics dump is still welcome.
+
 ## Roadmap
 
 - [x] Video stream support (VideoEdge / NVR) — cameras bridged through an Ajax NVR expose a local ONVIF/RTSP service; the integration surfaces their IP + ports so you can use Home Assistant's native ONVIF integration for live view. See [Video cameras (ONVIF / RTSP)](#video-cameras-onvif--rtsp). A cloud live view that doesn't need the camera's network is experimental since `1.23.0` ([Cloud live view](#cloud-live-view-experimental), #322). The radio MotionCam Video family (not behind an NVR) is still open
