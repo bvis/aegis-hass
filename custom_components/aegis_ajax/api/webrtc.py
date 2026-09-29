@@ -61,6 +61,49 @@ def sdp_codecs(sdp: str) -> list[str]:
     return seen
 
 
+_DIRECTIONS = ("sendrecv", "sendonly", "recvonly", "inactive")
+
+
+def sdp_shape(sdp: str) -> list[str]:
+    """Describe each media section as kind, mid, direction and codecs (no other data).
+
+    The camera re-offers after the stream is asked for (#322); comparing the
+    shape of its answer with its own offer shows what it wanted to change.
+    Addresses, ports, ICE credentials and fingerprints are never kept.
+    """
+    sections: list[dict[str, Any]] = []
+    for line in sdp.splitlines():
+        line = line.strip()
+        if line.startswith("m="):
+            kind = line[2:].split(" ", 1)[0]
+            sections.append(
+                {"kind": kind, "mid": "?", "dir": "sendrecv", "msid": False, "codecs": []}
+            )
+            continue
+        if not sections:
+            continue
+        current = sections[-1]
+        if line.startswith("a=mid:"):
+            current["mid"] = line[6:]
+        elif line.startswith("a=") and line[2:] in _DIRECTIONS:
+            current["dir"] = line[2:]
+        elif line.startswith("a=msid:"):
+            current["msid"] = True
+        else:
+            match = _RTPMAP_RE.match(line)
+            if match and match.group(1).upper() not in current["codecs"]:
+                current["codecs"].append(match.group(1).upper())
+    out = []
+    for sec in sections:
+        parts = [sec["kind"], f"mid={sec['mid']}", sec["dir"]]
+        if sec["msid"]:
+            parts.append("msid")
+        if sec["codecs"]:
+            parts.append(",".join(sec["codecs"]))
+        out.append(" ".join(parts))
+    return out
+
+
 @dataclass
 class SessionOutcome:
     """PII-free record of how one cloud-video session went, for diagnostics."""
@@ -72,6 +115,9 @@ class SessionOutcome:
     offer_codecs: list[str] = field(default_factory=list)
     edge_offer_codecs: list[str] = field(default_factory=list)
     edge_offer_stage: str | None = None
+    offer_shape: list[str] = field(default_factory=list)
+    answer_shape: list[str] = field(default_factory=list)
+    edge_offer_shape: list[str] = field(default_factory=list)
     granted_streams: int | None = None
     ice_servers: int | None = None
     edge_sent_offer: bool = False
@@ -87,6 +133,9 @@ class SessionOutcome:
             "answer_codecs": self.answer_codecs,
             "edge_offer_codecs": self.edge_offer_codecs,
             "edge_offer_stage": self.edge_offer_stage,
+            "offer_shape": self.offer_shape,
+            "answer_shape": self.answer_shape,
+            "edge_offer_shape": self.edge_offer_shape,
             "granted_streams": self.granted_streams,
             "ice_servers": self.ice_servers,
             "edge_sent_offer": self.edge_sent_offer,
@@ -211,6 +260,7 @@ class CloudVideoSession:
     def start(self, offer_sdp: str) -> None:
         """Open the signalling stream and forward the browser's offer."""
         self.outcome.offer_codecs = sdp_codecs(offer_sdp)
+        self.outcome.offer_shape = sdp_shape(offer_sdp)
         self._offer_sdp = offer_sdp
         self._outbox.put_nowait(self._init_request())
         self._task = asyncio.get_running_loop().create_task(self._run())
@@ -279,6 +329,7 @@ class CloudVideoSession:
         elif kind == "answer":
             sdp = success.answer.session_description.sdp
             self.outcome.answer_codecs = sdp_codecs(sdp)
+            self.outcome.answer_shape = sdp_shape(sdp)
             self.outcome.stage = "answered"
             _LOGGER.info(
                 "Cloud video (experimental, #322): camera answered the client offer, codecs %s",
@@ -303,6 +354,7 @@ class CloudVideoSession:
             self.outcome.edge_sent_offer = True
             self.outcome.edge_offer_stage = self.outcome.stage
             self.outcome.edge_offer_codecs = sdp_codecs(success.offer.session_description.sdp)
+            self.outcome.edge_offer_shape = sdp_shape(success.offer.session_description.sdp)
             self._fail(
                 "edge_sent_offer",
                 "the camera sent its own offer instead of answering the browser's",
