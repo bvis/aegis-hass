@@ -19,7 +19,12 @@ from v3.mobilegwsvc.service.stream_webrtc import response_pb2
 
 from custom_components.aegis_ajax.api import webrtc
 from custom_components.aegis_ajax.api.models import Device
-from custom_components.aegis_ajax.api.webrtc import CloudVideoSession, RemoteCandidate, sdp_codecs
+from custom_components.aegis_ajax.api.webrtc import (
+    CloudVideoSession,
+    RemoteCandidate,
+    sdp_codecs,
+    sdp_shape,
+)
 from custom_components.aegis_ajax.camera import cloud_video_source
 from custom_components.aegis_ajax.const import DeviceState
 
@@ -153,6 +158,23 @@ async def _settle() -> None:
         await asyncio.sleep(0)
 
 
+def test_sdp_shape_lists_each_media_section_only() -> None:
+    sdp = (
+        "v=0\r\no=- 1 2 IN IP4 10.0.0.1\r\na=ice-ufrag:secret\r\n"
+        "m=audio 9 UDP/TLS/RTP/SAVPF 9\r\nc=IN IP4 10.0.0.1\r\na=mid:0\r\na=recvonly\r\n"
+        "a=rtpmap:9 G722/8000\r\n"
+        "m=video 9 UDP/TLS/RTP/SAVPF 102 26\r\na=mid:1\r\na=sendonly\r\n"
+        "a=msid:0-lm 0-lm-v\r\na=rtpmap:102 H264/90000\r\na=rtpmap:26 JPEG/90000\r\n"
+        "m=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=mid:2\r\n"
+    )
+    assert sdp_shape(sdp) == [
+        "audio mid=0 recvonly G722",
+        "video mid=1 sendonly msid H264,JPEG",
+        "application mid=2 sendrecv",
+    ]
+    assert sdp_shape("v=0\r\n") == []
+
+
 def test_sdp_codecs_lists_distinct_names_only() -> None:
     assert sdp_codecs(BROWSER_OFFER) == ["VP8", "H264"]
     assert sdp_codecs("v=0\r\n") == []
@@ -242,6 +264,10 @@ async def test_camera_renegotiating_after_ask_streams_is_reported() -> None:
         await _settle()
     assert errors == ["edge_sent_offer"]
     assert session.outcome.edge_offer_stage == "streaming"
+    # What changed between the camera's answer and its own offer is the point.
+    assert session.outcome.offer_shape == sdp_shape(BROWSER_OFFER)
+    assert session.outcome.answer_shape == sdp_shape(CAMERA_ANSWER)
+    assert session.outcome.edge_offer_shape
 
 
 @pytest.mark.asyncio
@@ -314,6 +340,7 @@ async def test_close_ends_the_stream_without_an_error() -> None:
 def test_outcome_never_carries_sdp_or_credentials() -> None:
     session = _session()
     session.outcome.offer_codecs = sdp_codecs(BROWSER_OFFER)
+    session.outcome.offer_shape = sdp_shape(BROWSER_OFFER)
     dumped = repr(session.outcome.as_dict())
     for secret in ("v=0", "candidate:", "turn:", "rtpmap"):
         assert secret not in dumped
