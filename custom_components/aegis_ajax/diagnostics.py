@@ -316,9 +316,13 @@ async def async_get_config_entry_diagnostics(
         # video detections off while the owner's phone gets them, and nothing
         # else shows it. Kept from the bypass permission lookup, so it is empty
         # unless bypass switches are on `auto`, and the lookup entry says how it
-        # ended when it is. Booleans and enum names only.
+        # ended when it is, or `not_run` for a space it never ran for.
+        # Booleans and enum names only.
         "member_push_preferences": coordinator.spaces_api.member_push_preferences,
-        "member_push_preferences_lookup": coordinator.spaces_api.member_push_preferences_lookup,
+        "member_push_preferences_lookup": {
+            **dict.fromkeys(coordinator.spaces, "not_run"),
+            **coordinator.spaces_api.member_push_preferences_lookup,
+        },
         "bypass_switches": entry.options.get(CONF_BYPASS_SWITCHES, DEFAULT_BYPASS_SWITCHES),
     }
 
