@@ -1099,6 +1099,7 @@ class TestGetMemberSpacePermissions:
         ):
             await api.get_member_space_permissions("space-1", "AAAA1111")
 
+        assert api.member_push_preferences_lookup == {"space-1": "ok"}
         assert api.member_push_preferences == {
             "space-1": {
                 "legacy": ["ALARM"],
@@ -1221,6 +1222,7 @@ class TestGetMemberSpacePermissions:
             perms = await api.get_member_space_permissions("space-1", "NOPE9999")
 
         assert perms is None
+        assert api.member_push_preferences_lookup == {"space-1": "not_a_member"}
 
     @pytest.mark.asyncio
     async def test_returns_none_on_exception(self) -> None:
@@ -1230,3 +1232,29 @@ class TestGetMemberSpacePermissions:
         perms = await api.get_member_space_permissions("space-1", "AAAA1111")
 
         assert perms is None
+        assert api.member_push_preferences_lookup == {"space-1": "error:RuntimeError"}
+
+    @pytest.mark.asyncio
+    async def test_a_refused_members_list_is_recorded(self) -> None:
+        """A non-admin account may not list members (#519): say so, don't go blank."""
+        from v3.mobilegwsvc.service.stream_lite_space_members import (
+            endpoint_pb2_grpc as lite_grpc,
+        )
+        from v3.mobilegwsvc.service.stream_lite_space_members import response_pb2 as r
+
+        api = self._make_api()
+        refused = r.StreamLiteSpaceMembersResponse()
+        refused.failure.permission_denied.SetInParent()
+
+        class _LiteStub:
+            def __init__(self, ch: object) -> None: ...
+            def execute(self, *a: object, **k: object) -> object:
+                return TestGetMemberSpacePermissions._aiter([refused])
+
+        with patch.object(lite_grpc, "StreamLiteSpaceMembersServiceStub", _LiteStub):
+            perms = await api.get_member_space_permissions("space-1", "AAAA1111")
+
+        assert perms is None
+        assert api.member_push_preferences_lookup == {
+            "space-1": "members_failure:permission_denied"
+        }

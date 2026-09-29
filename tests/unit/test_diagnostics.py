@@ -169,6 +169,23 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert result["member_push_preferences"] == prefs
 
     @pytest.mark.asyncio
+    async def test_member_push_preferences_say_why_they_are_empty(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        coordinator.spaces_api.member_push_preferences = {}
+        coordinator.spaces_api.member_push_preferences_lookup = {
+            "space-1": "members_failure:permission_denied"
+        }
+        entry.options = {"bypass_switches": "never"}
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["member_push_preferences_lookup"] == {
+            "space-1": "members_failure:permission_denied"
+        }
+        assert result["bypass_switches"] == "never"
+
+    @pytest.mark.asyncio
     async def test_push_block_carries_no_fcm_credentials(
         self, coordinator: MagicMock, entry: MagicMock
     ) -> None:
