@@ -102,6 +102,10 @@ Two rules, both enforced by `tests/unit/test_proto_gencode_version.py`:
 
 **Regenerate only what you changed:** `make proto PROTOS="systems/ajax/.../hub_device.proto"`. A full `make proto` rewrites ~2600 files and buries the real change; a partial one keeps the diff reviewable. Bumping the `grpcio-tools` pin is the exception — that requires a full recompile so the whole tree stays on one version, plus raising the `protobuf`/`grpcio` floors in **both** `manifest.json` and `pyproject.toml` to whatever the new compiler stamps in.
 
+## Requests to Ajax
+
+Never make the integration call Ajax's servers more than the official app would. Use data that already flows (device stream, hub status channel, push, the periodic refresh) rather than adding a request. Any PR that touches the network must say how many extra calls it makes; the answer should almost always be zero. See [Why some values from the Ajax app are missing](README.md#why-some-values-from-the-ajax-app-are-missing).
+
 ## Commit Conventions
 
 We use [Conventional Commits](https://www.conventionalcommits.org/):
