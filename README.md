@@ -270,14 +270,14 @@ That's it — from there the camera behaves like any other ONVIF camera in Home 
 
 If Home Assistant can't reach the camera on its network (for example Home Assistant running on a VPS), the **Cloud live view for video cameras** option (Configure, off by default) adds a **Live view** camera for each Ajax video camera, streamed through the Ajax cloud the way the app does when you're away from home.
 
-Home Assistant only relays the setup of the stream: the video goes straight from the Ajax cloud to your browser and never passes through Home Assistant. Each time you open the camera one video session starts, and it ends when you close it. Nothing runs while nobody is watching.
+It needs Home Assistant's built-in **go2rtc** integration, which is loaded by `default_config` on Home Assistant OS and Container. go2rtc answers the camera the way the app does and passes the video on to your browser without re-encoding it, so the video goes through Home Assistant but costs very little CPU. Opening the camera starts one video session, shared by everyone watching, and it ends when the last viewer closes it. Nothing runs while nobody is watching, and the camera shows no still image, so thumbnails never start a session.
 
 This is **experimental and not yet confirmed on real hardware** ([#322](https://github.com/bvis/aegis-hass/issues/322)). Two things are known in advance:
 
 - Cameras set to **H.265** in the Ajax app may only play in Safari, and in Chrome on hardware that decodes H.265. **H.264** plays in every browser.
 - There's no still image yet, so the entity shows no picture until you open it.
 
-If it doesn't play, **Download diagnostics** and look at the `cloud_video` section. It records how far the last session got and which codec the camera answered with, without any stream details or credentials. Attaching it to #322 is the fastest way to get it working for your camera.
+If it doesn't play, **Download diagnostics** and look at the `cloud_video` section and `cloud_video_go2rtc` (which should be `true`). It records how far the last session got and the layout of the camera's offer and of the answer, without any stream details or credentials. Attaching it to #322 is the fastest way to get it working for your camera.
 
 ### Person / vehicle / pet detection
 

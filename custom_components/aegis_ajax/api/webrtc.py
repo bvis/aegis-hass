@@ -2,25 +2,23 @@
 
 The Ajax app pulls remote live video over WebRTC, negotiated on one
 bidirectional ``StreamWebrtcService.execute`` stream: the client sends
-``init``, the server answers with ICE servers and the granted streams, then
-SDP and ICE candidates travel both ways on the same stream.
+``init`` with the streams it wants, the server answers with ICE servers and
+the granted streams, the camera sends its offer, and the client answers.
+ICE candidates travel both ways on the same stream.
 
-This module only relays signalling. The browser that opened the camera in
-Home Assistant is the WebRTC peer: its offer is forwarded to the camera as
-the client offer, and the camera's answer and candidates are sent back to
-it. Media flows browser <-> Ajax cloud and never passes through Home
-Assistant.
+The browser can't be that client: the camera answers a browser offer with
+every track inactive and then offers a new video track and a data channel
+of its own, and Home Assistant's camera API has no way to hand the browser
+an offer (second field test, #322). So Home Assistant's go2rtc answers the
+camera instead (see ``video_bridge``), the way the app does, and serves the
+browser itself. Video passes through go2rtc without being re-encoded.
 
-The app normally lets the camera make the offer and only offers itself
-when it renegotiates. Sending the streams in ``init`` makes the camera
-offer straight away (first field test, #322), so the streams are asked for
-only after the camera has answered the browser's offer. The outcome of
-every session is recorded (stage reached, codecs, when the camera offered
-on its own) for diagnostics. No SDP, candidate or ICE credential is ever
-logged or stored.
+The outcome of every session is recorded (stage reached, codecs, the layout
+of the camera's offer and of the answer) for diagnostics. No SDP, candidate
+or ICE credential is ever logged or stored.
 
-API delta: one stream per camera view, opened when the frontend asks for
-it and closed when the view closes. Nothing runs while nobody watches.
+API delta: one stream per live view, opened when go2rtc asks for it and
+closed when the last viewer leaves. Nothing runs while nobody watches.
 """
 
 from __future__ import annotations
@@ -40,9 +38,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# The camera's answer (or an explicit failure) must arrive within this window
-# after the offer is sent; past it the session is abandoned and the browser
-# told, instead of leaving the player spinning.
+# The camera's offer and our answer (or an explicit failure) must happen within
+# this window after init; past it the session is abandoned instead of leaving
+# the player spinning.
 ANSWER_TIMEOUT = 20.0
 
 # Id of the first live main stream (`<n>-l` + `m`); tracks come back as `<id>-v` / `<id>-a`.
@@ -111,16 +109,12 @@ class SessionOutcome:
     started_at: float = field(default_factory=time.time)
     stage: str = "starting"
     error: str | None = None
-    answer_codecs: list[str] = field(default_factory=list)
     offer_codecs: list[str] = field(default_factory=list)
-    edge_offer_codecs: list[str] = field(default_factory=list)
-    edge_offer_stage: str | None = None
+    answer_codecs: list[str] = field(default_factory=list)
     offer_shape: list[str] = field(default_factory=list)
     answer_shape: list[str] = field(default_factory=list)
-    edge_offer_shape: list[str] = field(default_factory=list)
     granted_streams: int | None = None
     ice_servers: int | None = None
-    edge_sent_offer: bool = False
     remote_candidates: int = 0
     local_candidates: int = 0
 
@@ -131,14 +125,10 @@ class SessionOutcome:
             "error": self.error,
             "offer_codecs": self.offer_codecs,
             "answer_codecs": self.answer_codecs,
-            "edge_offer_codecs": self.edge_offer_codecs,
-            "edge_offer_stage": self.edge_offer_stage,
             "offer_shape": self.offer_shape,
             "answer_shape": self.answer_shape,
-            "edge_offer_shape": self.edge_offer_shape,
             "granted_streams": self.granted_streams,
             "ice_servers": self.ice_servers,
-            "edge_sent_offer": self.edge_sent_offer,
             "remote_candidates": self.remote_candidates,
             "local_candidates": self.local_candidates,
         }
@@ -152,7 +142,11 @@ class RemoteCandidate:
 
 
 class CloudVideoSession:
-    """One browser <-> camera signalling session over the Ajax cloud."""
+    """One camera -> local peer signalling session over the Ajax cloud.
+
+    The camera offers (``on_offer``); the local peer answers through
+    ``send_answer``, as the app does.
+    """
 
     def __init__(
         self,
@@ -161,7 +155,7 @@ class CloudVideoSession:
         space_id: str,
         video_edge_id: str,
         channel_id: str,
-        on_answer: Callable[[str], None],
+        on_offer: Callable[[str], None],
         on_candidate: Callable[[RemoteCandidate], None],
         on_error: Callable[[str, str], None],
     ) -> None:
@@ -169,14 +163,13 @@ class CloudVideoSession:
         self._space_id = space_id
         self._video_edge_id = video_edge_id
         self._channel_id = channel_id
-        self._on_answer = on_answer
+        self._on_offer = on_offer
         self._on_candidate = on_candidate
         self._on_error = on_error
         self._outbox: asyncio.Queue[Any] = asyncio.Queue()
-        self._pending_candidates: list[Any] = []
-        self._offer_sent = False
         self._closed = False
         self._task: asyncio.Task[None] | None = None
+        self._deadline: asyncio.Timeout | None = None
         self.outcome = SessionOutcome()
 
     # -- request builders ---------------------------------------------------
@@ -202,12 +195,13 @@ class CloudVideoSession:
         from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
 
         filters = ice_candidate_filters_pb2.IceCandidateFilters
-        # No initial streams: with them the camera offers right after init and
-        # never answers the browser. Same ICE filters the app sends.
+        # The stream goes in init so the camera offers straight away, as it
+        # does for the app. Same ICE filters the app sends.
         return request_pb2.StreamWebrtcRequest(
             init=request_pb2.StreamWebrtcRequest.Init(
                 space_locator=space_locator_pb2.SpaceLocator(space_id=self._space_id),
                 video_edge_id=self._video_edge_id,
+                initial_streams=[self._live_stream()],
                 ice_filters=filters(
                     type_filter=filters.TypeFilter(host=True, reflexive=True, relay=True),
                     protocol_filter=filters.ProtocolFilter(tcp=True, udp=True),
@@ -216,24 +210,17 @@ class CloudVideoSession:
             )
         )
 
-    def _ask_streams_request(self) -> Any:  # noqa: ANN401
-        from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
-
-        return request_pb2.StreamWebrtcRequest(
-            ask_streams=request_pb2.StreamWebrtcRequest.AskStreams(streams=[self._live_stream()])
-        )
-
     @staticmethod
-    def _offer_request(sdp: str) -> Any:  # noqa: ANN401
+    def _answer_request(sdp: str) -> Any:  # noqa: ANN401
         from systems.ajax.api.mobile.v2.common.video.webrtc import (  # noqa: PLC0415
             session_description_pb2,
         )
         from v3.mobilegwsvc.service.stream_webrtc import request_pb2  # noqa: PLC0415
 
         return request_pb2.StreamWebrtcRequest(
-            offer=request_pb2.StreamWebrtcRequest.Offer(
+            answer=request_pb2.StreamWebrtcRequest.Answer(
                 session_description=session_description_pb2.SessionDescription(
-                    type="offer", sdp=sdp
+                    type="answer", sdp=sdp
                 )
             )
         )
@@ -257,26 +244,34 @@ class CloudVideoSession:
 
     # -- public API ----------------------------------------------------------
 
-    def start(self, offer_sdp: str) -> None:
-        """Open the signalling stream and forward the browser's offer."""
-        self.outcome.offer_codecs = sdp_codecs(offer_sdp)
-        self.outcome.offer_shape = sdp_shape(offer_sdp)
-        self._offer_sdp = offer_sdp
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def start(self) -> None:
+        """Open the signalling stream and ask for the live stream."""
         self._outbox.put_nowait(self._init_request())
         self._task = asyncio.get_running_loop().create_task(self._run())
+
+    def send_answer(self, sdp: str) -> None:
+        """Answer the camera's offer; from here the session runs until closed."""
+        if self._closed:
+            return
+        self.outcome.answer_codecs = sdp_codecs(sdp)
+        self.outcome.answer_shape = sdp_shape(sdp)
+        self.outcome.stage = "answered"
+        self._outbox.put_nowait(self._answer_request(sdp))
+        if self._deadline is not None:
+            self._deadline.reschedule(None)
 
     def add_local_candidate(
         self, candidate: str, sdp_mid: str | None, sdp_mline_index: int | None
     ) -> None:
-        """Forward a browser ICE candidate (buffered until the offer is sent)."""
+        """Forward one of the local peer's ICE candidates."""
         if self._closed or not candidate:
             return
-        request = self._candidate_request(candidate, sdp_mid, sdp_mline_index)
         self.outcome.local_candidates += 1
-        if self._offer_sent:
-            self._outbox.put_nowait(request)
-        else:
-            self._pending_candidates.append(request)
+        self._outbox.put_nowait(self._candidate_request(candidate, sdp_mid, sdp_mline_index))
 
     def close(self) -> None:
         """Close the stream; the camera stops sending."""
@@ -302,14 +297,6 @@ class CloudVideoSession:
         _LOGGER.warning("Cloud video (experimental, #322): %s — %s", code, message)
         self._on_error(code, message)
 
-    def _send_offer(self) -> None:
-        self._outbox.put_nowait(self._offer_request(self._offer_sdp))
-        self._offer_sent = True
-        for request in self._pending_candidates:
-            self._outbox.put_nowait(request)
-        self._pending_candidates.clear()
-        self.outcome.stage = "offer_sent"
-
     def _handle(self, msg: Any) -> bool:  # noqa: ANN401
         """Apply one server message; return False to end the session."""
         which = msg.WhichOneof("response")
@@ -325,18 +312,21 @@ class CloudVideoSession:
             self.outcome.ice_servers = len(success.init.ice_servers)
             self.outcome.granted_streams = len(success.init.streams)
             self.outcome.stage = "init"
-            self._send_offer()
-        elif kind == "answer":
-            sdp = success.answer.session_description.sdp
-            self.outcome.answer_codecs = sdp_codecs(sdp)
-            self.outcome.answer_shape = sdp_shape(sdp)
-            self.outcome.stage = "answered"
+        elif kind == "offer":
+            sdp = success.offer.session_description.sdp
+            self.outcome.offer_codecs = sdp_codecs(sdp)
+            self.outcome.offer_shape = sdp_shape(sdp)
+            if self.outcome.stage == "answered":
+                # A renegotiation after we answered: not handled yet, but
+                # recorded so a field dump shows it.
+                self._fail("renegotiation", "the camera renegotiated the session")
+                return False
+            self.outcome.stage = "offered"
             _LOGGER.info(
-                "Cloud video (experimental, #322): camera answered the client offer, codecs %s",
-                ", ".join(self.outcome.answer_codecs) or "none",
+                "Cloud video (experimental, #322): camera offered, codecs %s",
+                ", ".join(self.outcome.offer_codecs) or "none",
             )
-            self._on_answer(sdp)
-            self._outbox.put_nowait(self._ask_streams_request())
+            self._on_offer(sdp)
         elif kind == "new_ice_candidate":
             cand = success.new_ice_candidate.candidate
             self.outcome.remote_candidates += 1
@@ -347,18 +337,10 @@ class CloudVideoSession:
                     sdp_mline_index=cand.sdp_mline_index,
                 )
             )
-        elif kind == "offer":
-            # The camera made its own offer instead of answering ours: the
-            # browser can't take a remote offer through Home Assistant, so this
-            # is the "client offers are not accepted" outcome.
-            self.outcome.edge_sent_offer = True
-            self.outcome.edge_offer_stage = self.outcome.stage
-            self.outcome.edge_offer_codecs = sdp_codecs(success.offer.session_description.sdp)
-            self.outcome.edge_offer_shape = sdp_shape(success.offer.session_description.sdp)
-            self._fail(
-                "edge_sent_offer",
-                "the camera sent its own offer instead of answering the browser's",
-            )
+        elif kind == "answer":
+            # We never offer, so an answer means the camera and we disagree
+            # on who leads; record it rather than guess.
+            self._fail("unexpected_answer", "the camera sent an answer to an offer we never made")
             return False
         elif kind == "ask_streams_response":
             asked = success.ask_streams_response
@@ -367,7 +349,6 @@ class CloudVideoSession:
                 self._fail(reason, f"Ajax refused the live stream ({reason})")
                 return False
             self.outcome.granted_streams = len(asked.success.streams)
-            self.outcome.stage = "streaming"
         return True
 
     async def _run(self) -> None:
@@ -378,17 +359,14 @@ class CloudVideoSession:
         call = stub.execute(self._requests(), metadata=metadata)
         try:
             async with asyncio.timeout(ANSWER_TIMEOUT) as deadline:
+                self._deadline = deadline
                 async for msg in call:
                     if not self._handle(msg):
                         return
-                    if self.outcome.stage in ("answered", "streaming"):
-                        # Negotiated: keep relaying candidates for as long as
-                        # the browser keeps the view open.
-                        deadline.reschedule(None)
             if not self._closed:
                 self._fail("stream_ended", "Ajax closed the video session")
         except TimeoutError:
-            self._fail("timeout", "no answer from the camera")
+            self._fail("timeout", f"no answer to the camera's offer (stage {self.outcome.stage})")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001

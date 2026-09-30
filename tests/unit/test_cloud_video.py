@@ -31,11 +31,18 @@ from custom_components.aegis_ajax.const import DeviceState
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-BROWSER_OFFER = (
-    "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 102\r\n"
-    "a=rtpmap:96 VP8/90000\r\na=rtpmap:102 H264/90000\r\n"
+# Shape of the camera's real offer in the second field test (#322).
+CAMERA_OFFER = (
+    "v=0\r\n"
+    "m=audio 9 UDP/TLS/RTP/SAVPF 9\r\na=mid:0\r\na=recvonly\r\na=rtpmap:9 G722/8000\r\n"
+    "m=video 9 UDP/TLS/RTP/SAVPF 102\r\na=mid:2\r\na=sendrecv\r\n"
+    "a=msid:0-lm 0-lm-v\r\na=rtpmap:102 H264/90000\r\n"
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=mid:3\r\n"
 )
-CAMERA_ANSWER = "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 102\r\na=rtpmap:102 H264/90000\r\n"
+LOCAL_ANSWER = (
+    "v=0\r\nm=audio 0 UDP/TLS/RTP/SAVPF 9\r\na=mid:0\r\na=inactive\r\n"
+    "m=video 9 UDP/TLS/RTP/SAVPF 102\r\na=mid:2\r\na=recvonly\r\na=rtpmap:102 H264/90000\r\n"
+)
 Resp = response_pb2.StreamWebrtcResponse
 
 
@@ -50,11 +57,6 @@ def _init_msg() -> Any:  # noqa: ANN401
             streams=[stream_pb2.Stream(id="0-lm")],
         )
     )
-
-
-def _answer_msg() -> Any:  # noqa: ANN401
-    sd = session_description_pb2.SessionDescription(type="answer", sdp=CAMERA_ANSWER)
-    return _success(answer=Resp.Success.Answer(session_description=sd))
 
 
 def _candidate_msg() -> Any:  # noqa: ANN401
@@ -108,34 +110,16 @@ def _server(react: Callable[[Any], list[Any]]) -> tuple[Any, list[FakeCall]]:  #
     return Stub, calls
 
 
-def _streams_msg(*, granted: bool = True) -> Any:  # noqa: ANN401
-    asked = Resp.Success.AskStreamsResponse
-    if granted:
-        return _success(
-            ask_streams_response=asked(
-                success=asked.AskStreamsSuccess(streams=[stream_pb2.Stream(id="0-lm")])
-            )
-        )
-    return _success(
-        ask_streams_response=asked(
-            failure=asked.AskStreamsFailure(permission_denied=common_response_pb2.Error())
-        )
-    )
-
-
-def _edge_offer_msg() -> Any:  # noqa: ANN401
-    sd = session_description_pb2.SessionDescription(type="offer", sdp=CAMERA_ANSWER)
+def _offer_msg() -> Any:  # noqa: ANN401
+    sd = session_description_pb2.SessionDescription(type="offer", sdp=CAMERA_OFFER)
     return _success(offer=Resp.Success.Offer(session_description=sd))
 
 
 def _happy(request: Any) -> list[Any]:  # noqa: ANN401
+    """The app's flow: init with the stream, camera offers, client answers."""
     kind = request.WhichOneof("signaling_message")
     if kind == "init":
-        return [_init_msg()]
-    if kind == "offer":
-        return [_answer_msg(), _candidate_msg()]
-    if kind == "ask_streams":
-        return [_streams_msg()]
+        return [_init_msg(), _offer_msg(), _candidate_msg()]
     return []
 
 
@@ -147,7 +131,7 @@ def _session(**callbacks: Any) -> CloudVideoSession:  # noqa: ANN401
         space_id="space-1",
         video_edge_id="ve-1",
         channel_id="chan-1",
-        on_answer=callbacks.get("on_answer", lambda _sdp: None),
+        on_offer=callbacks.get("on_offer", lambda _sdp: None),
         on_candidate=callbacks.get("on_candidate", lambda _c: None),
         on_error=callbacks.get("on_error", lambda _c, _m: None),
     )
@@ -156,6 +140,9 @@ def _session(**callbacks: Any) -> CloudVideoSession:  # noqa: ANN401
 async def _settle() -> None:
     for _ in range(20):
         await asyncio.sleep(0)
+
+
+STUB = "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub"
 
 
 def test_sdp_shape_lists_each_media_section_only() -> None:
@@ -176,149 +163,106 @@ def test_sdp_shape_lists_each_media_section_only() -> None:
 
 
 def test_sdp_codecs_lists_distinct_names_only() -> None:
-    assert sdp_codecs(BROWSER_OFFER) == ["VP8", "H264"]
+    assert sdp_codecs(CAMERA_OFFER) == ["G722", "H264"]
     assert sdp_codecs("v=0\r\n") == []
 
 
 @pytest.mark.asyncio
-async def test_forwards_browser_offer_after_init_and_relays_answer() -> None:
-    answers: list[str] = []
+async def test_asks_for_the_stream_in_init_and_answers_the_camera_offer() -> None:
+    offers: list[str] = []
     candidates: list[RemoteCandidate] = []
     stub, calls = _server(_happy)
-    session = _session(on_answer=answers.append, on_candidate=candidates.append)
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
-        # A browser candidate that arrives before the offer is sent is held back.
+    session = _session(on_offer=offers.append, on_candidate=candidates.append)
+    with patch(STUB, stub):
+        session.start()
+        await _settle()
+        assert offers == [CAMERA_OFFER]
+        session.send_answer(LOCAL_ANSWER)
         session.add_local_candidate("candidate:9 1 udp 1 5.6.7.8 9 typ host", "0", 0)
         await _settle()
 
     sent = calls[0].sent
     assert [r.WhichOneof("signaling_message") for r in sent] == [
         "init",
-        "offer",
+        "answer",
         "new_ice_candidate",
-        "ask_streams",
     ]
     init = sent[0].init
     assert init.video_edge_id == "ve-1"
     assert init.space_locator.space_id == "space-1"
-    # Streams in init make the camera offer first (#322 field test), so
-    # they are only asked for once the camera has answered.
-    assert list(init.initial_streams) == []
-    stream = sent[3].ask_streams.streams[0]
+    stream = init.initial_streams[0]
     assert (stream.id, stream.channel_guid, stream.type) == ("0-lm", "chan-1", types_pb2.ST_MAIN)
     assert [f.frame_type for f in stream.filter] == [types_pb2.FT_VIDEO]
-    assert sent[1].offer.session_description.sdp == BROWSER_OFFER
-    assert answers == [CAMERA_ANSWER]
+    assert sent[1].answer.session_description.sdp == LOCAL_ANSWER
+    assert sent[1].answer.session_description.type == "answer"
     assert candidates[0].candidate.endswith("typ relay")
     assert candidates[0].sdp_mid == "0"
-    assert session.outcome.stage == "streaming"
-    assert session.outcome.granted_streams == 1
-    assert session.outcome.answer_codecs == ["H264"]
-    assert session.outcome.ice_servers == 1
+    outcome = session.outcome
+    assert outcome.stage == "answered"
+    assert outcome.error is None
+    assert outcome.offer_shape == sdp_shape(CAMERA_OFFER)
+    assert outcome.answer_shape == sdp_shape(LOCAL_ANSWER)
+    assert (outcome.ice_servers, outcome.remote_candidates, outcome.local_candidates) == (1, 1, 1)
     session.close()
 
 
 @pytest.mark.asyncio
-async def test_camera_offering_itself_is_reported_not_forwarded() -> None:
+async def test_answered_session_outlives_the_answer_timeout() -> None:
     errors: list[str] = []
-
-    def react(request: Any) -> list[Any]:  # noqa: ANN401
-        if request.WhichOneof("signaling_message") == "init":
-            return [_init_msg(), _edge_offer_msg()]
-        return []
-
-    stub, _calls = _server(react)
+    stub, _calls = _server(_happy)
     session = _session(on_error=lambda code, _m: errors.append(code))
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
+    with patch(STUB, stub), patch.object(webrtc, "ANSWER_TIMEOUT", 0.05):
+        session.start()
         await _settle()
-    assert errors == ["edge_sent_offer"]
-    assert session.outcome.edge_sent_offer is True
-    assert session.outcome.edge_offer_stage == "offer_sent"
-    assert session.outcome.edge_offer_codecs == ["H264"]
-    # The browser's own offer stays recorded apart from the camera's.
-    assert session.outcome.offer_codecs == ["VP8", "H264"]
+        session.send_answer(LOCAL_ANSWER)
+        await asyncio.sleep(0.2)
+    assert errors == []
+    session.close()
 
 
 @pytest.mark.asyncio
-async def test_camera_renegotiating_after_ask_streams_is_reported() -> None:
+async def test_unanswered_offer_times_out() -> None:
     errors: list[str] = []
-
-    def react(request: Any) -> list[Any]:  # noqa: ANN401
-        replies = _happy(request)
-        if request.WhichOneof("signaling_message") == "ask_streams":
-            return [*replies, _edge_offer_msg()]
-        return replies
-
-    stub, _calls = _server(react)
+    stub, _calls = _server(_happy)
     session = _session(on_error=lambda code, _m: errors.append(code))
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
-        await _settle()
-    assert errors == ["edge_sent_offer"]
-    assert session.outcome.edge_offer_stage == "streaming"
-    # What changed between the camera's answer and its own offer is the point.
-    assert session.outcome.offer_shape == sdp_shape(BROWSER_OFFER)
-    assert session.outcome.answer_shape == sdp_shape(CAMERA_ANSWER)
-    assert session.outcome.edge_offer_shape
+    with patch(STUB, stub), patch.object(webrtc, "ANSWER_TIMEOUT", 0.05):
+        session.start()
+        await asyncio.sleep(0.2)
+    assert errors == ["timeout"]
+    assert session.outcome.stage == "offered"
 
 
 @pytest.mark.asyncio
-async def test_refused_live_stream_reaches_the_browser() -> None:
+async def test_renegotiation_after_the_answer_is_reported() -> None:
     errors: list[str] = []
 
     def react(request: Any) -> list[Any]:  # noqa: ANN401
-        if request.WhichOneof("signaling_message") == "ask_streams":
-            return [_streams_msg(granted=False)]
+        if request.WhichOneof("signaling_message") == "answer":
+            return [_offer_msg()]
         return _happy(request)
 
     stub, _calls = _server(react)
     session = _session(on_error=lambda code, _m: errors.append(code))
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
+    with patch(STUB, stub):
+        session.start()
         await _settle()
-    assert errors == ["permission_denied"]
+        session.send_answer(LOCAL_ANSWER)
+        await _settle()
+    assert errors == ["renegotiation"]
 
 
 @pytest.mark.asyncio
-async def test_server_failure_reaches_the_browser() -> None:
+async def test_server_failure_is_reported() -> None:
     errors: list[str] = []
     failure = Resp(failure=Resp.Failure(permission_denied=common_response_pb2.Error()))
     stub, _calls = _server(
         lambda r: [failure] if r.WhichOneof("signaling_message") == "init" else []
     )
     session = _session(on_error=lambda code, _m: errors.append(code))
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
+    with patch(STUB, stub):
+        session.start()
         await _settle()
     assert errors == ["permission_denied"]
-
-
-@pytest.mark.asyncio
-async def test_no_answer_times_out() -> None:
-    errors: list[str] = []
-    stub, _calls = _server(lambda _r: [])
-    session = _session(on_error=lambda code, _m: errors.append(code))
-    with (
-        patch(
-            "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-        ),
-        patch.object(webrtc, "ANSWER_TIMEOUT", 0.05),
-    ):
-        session.start(BROWSER_OFFER)
-        await asyncio.sleep(0.2)
-    assert errors == ["timeout"]
 
 
 @pytest.mark.asyncio
@@ -326,21 +270,20 @@ async def test_close_ends_the_stream_without_an_error() -> None:
     errors: list[str] = []
     stub, _calls = _server(_happy)
     session = _session(on_error=lambda code, _m: errors.append(code))
-    with patch(
-        "v3.mobilegwsvc.service.stream_webrtc.endpoint_pb2_grpc.StreamWebrtcServiceStub", stub
-    ):
-        session.start(BROWSER_OFFER)
+    with patch(STUB, stub):
+        session.start()
         await _settle()
         session.close()
         await _settle()
     assert errors == []
+    assert session.closed
     assert session._task is not None and session._task.done()
 
 
 def test_outcome_never_carries_sdp_or_credentials() -> None:
     session = _session()
-    session.outcome.offer_codecs = sdp_codecs(BROWSER_OFFER)
-    session.outcome.offer_shape = sdp_shape(BROWSER_OFFER)
+    session.outcome.offer_codecs = sdp_codecs(CAMERA_OFFER)
+    session.outcome.offer_shape = sdp_shape(CAMERA_OFFER)
     dumped = repr(session.outcome.as_dict())
     for secret in ("v=0", "candidate:", "turn:", "rtpmap"):
         assert secret not in dumped

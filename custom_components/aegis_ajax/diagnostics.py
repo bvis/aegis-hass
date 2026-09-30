@@ -198,6 +198,8 @@ async def async_get_config_entry_diagnostics(
         "video_edge_onvif_rtsp": video_edge_probe,
         # Experimental cloud live view (#322): how far the latest session per
         # camera got (stage, codecs, candidate counts). No SDP or credentials.
+        # The live view needs Home Assistant's go2rtc to answer the camera.
+        "cloud_video_go2rtc": "go2rtc" in hass.config.components,
         "cloud_video": {
             device_id: outcome.as_dict()
             for device_id, outcome in coordinator.cloud_video_outcomes.items()
