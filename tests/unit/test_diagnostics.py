@@ -186,6 +186,20 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert result["bypass_switches"] == "never"
 
     @pytest.mark.asyncio
+    async def test_member_push_preferences_lookup_says_when_it_never_ran(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        """Only `auto` bypass mode runs the lookup; an empty block must not
+        read as a failed one (#519)."""
+        coordinator.spaces_api.member_push_preferences = {}
+        coordinator.spaces_api.member_push_preferences_lookup = {}
+        entry.options = {"bypass_switches": "always"}
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["member_push_preferences_lookup"] == {"space-1": "not_run"}
+
+    @pytest.mark.asyncio
     async def test_push_block_carries_no_fcm_credentials(
         self, coordinator: MagicMock, entry: MagicMock
     ) -> None:
