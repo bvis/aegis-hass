@@ -216,15 +216,17 @@ class TestAjaxLockCommands:
         )
 
     @pytest.mark.asyncio
-    async def test_lock_command_swallows_device_command_error(self) -> None:
-        # Surface the failure through logs rather than raising — the entity
-        # must not crash HA's service pipeline. Next poll corrects state.
+    async def test_lock_command_raises_on_device_command_error(self) -> None:
+        # A refused unlock must fail the action, not look like it worked.
+        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+
         device = _make_device("smart_lock", "locked")
         coordinator = _make_coordinator(device)
         coordinator.devices_api.send_command.side_effect = DeviceCommandError("smart_lock_offline")
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)
 
-        await lock.async_unlock()  # must not raise
+        with pytest.raises(HomeAssistantError):
+            await lock.async_unlock()
 
         coordinator.async_request_refresh.assert_not_called()
 

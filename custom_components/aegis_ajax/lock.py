@@ -10,13 +10,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.devices import (
     SMART_LOCK_ACTION_UNLATCH,
-    DeviceCommandError,
     SmartLockError,
 )
 from custom_components.aegis_ajax.api.models import DeviceCommand
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
-from custom_components.aegis_ajax.entity import build_device_info
+from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -138,17 +137,8 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
             device_type="smart_lock",
             channels=[1],
         )
-        try:
-            await self.coordinator.devices_api.send_command(command)
-        except DeviceCommandError as exc:
-            _LOGGER.error(
-                "SmartLock %s %s failed: %s",
-                self._device_id,
-                "lock" if lock else "unlock",
-                exc,
-            )
-            return
-        await self.coordinator.async_request_refresh()
+        # Raises a translated error, so a refused lock doesn't look like it worked.
+        await async_send_device_command(self.coordinator, command)
 
     async def _send_action(self, action: int) -> None:
         """Unlatch (OPEN) via SwitchSmartLockService — the only unlatch path.
