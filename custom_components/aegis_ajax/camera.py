@@ -3,29 +3,31 @@
 from __future__ import annotations
 
 import logging
+import secrets
+import time
 from typing import TYPE_CHECKING
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.components.camera.webrtc import WebRTCAnswer, WebRTCCandidate, WebRTCError
-from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from webrtc_models import RTCIceCandidateInit
 
 from custom_components.aegis_ajax.api.media import is_valid_photo_url
-from custom_components.aegis_ajax.api.webrtc import CloudVideoSession, RemoteCandidate
+from custom_components.aegis_ajax.api.webrtc import CloudVideoSession
 from custom_components.aegis_ajax.const import CONF_CLOUD_VIDEO, DEFAULT_CLOUD_VIDEO
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import build_device_info
+from custom_components.aegis_ajax.video_bridge import DATA_KEY, async_get_bridge
 
 if TYPE_CHECKING:
-    from homeassistant.components.camera.webrtc import WebRTCSendMessage
+    from collections.abc import Callable
+
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
     from custom_components.aegis_ajax.api.models import Device
+    from custom_components.aegis_ajax.api.webrtc import RemoteCandidate
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -164,16 +166,19 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
 class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
     """Live view of an Ajax video channel through the Ajax cloud (#322, experimental).
 
-    Home Assistant only relays signalling: the browser's WebRTC offer goes to
-    the camera over the Ajax cloud, and the answer and ICE candidates come
-    back. The video itself flows browser <-> Ajax and never through Home
-    Assistant, which is why this also works when Home Assistant is not on the
-    camera's network.
+    Home Assistant's go2rtc is the WebRTC peer: it answers the camera's offer
+    the way the app does and serves the browser itself, so this also works
+    when Home Assistant is not on the camera's network. The stream source is
+    a loopback URL of `video_bridge`, which relays the signalling to Ajax.
     """
 
     _attr_has_entity_name = True
     _attr_translation_key = "cloud_video"
     _attr_supported_features = CameraEntityFeature.STREAM
+
+    # A new session within this many seconds of the last one is refused, so a
+    # player that keeps retrying can't open a stream of Ajax video sessions.
+    MIN_SESSION_INTERVAL = 10.0
 
     def __init__(
         self,
@@ -186,7 +191,9 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         self._device_id = device_id
         self._video_edge_id, self._channel_id = source
         self._attr_unique_id = f"aegis_ajax_{device_id}_cloud_video"
-        self._sessions: dict[str, CloudVideoSession] = {}
+        self._token = secrets.token_urlsafe(24)
+        self._last_session_at = 0.0
+        self._sessions: set[CloudVideoSession] = set()
         device = coordinator.devices.get(device_id)
         if device:
             self._attr_device_info = build_device_info(
@@ -206,62 +213,58 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         # No still image: a snapshot would need a video session of its own.
         return None
 
+    @property
+    def use_stream_for_stills(self) -> bool:
+        # Explicit, not HA's default: with go2rtc as the provider, stills from
+        # the stream would open an Ajax video session for every thumbnail.
+        return False
+
     def _space_id(self) -> str:
         # ponytail: video channels carry no space id, so a multi-space account
         # uses its first space; record the owning space per device if a
         # multi-space install ever reports `video_edge_not_found`.
         return next(iter(self.coordinator.spaces), "")
 
-    async def async_handle_async_webrtc_offer(
-        self, offer_sdp: str, session_id: str, send_message: WebRTCSendMessage
-    ) -> None:
-        def on_answer(sdp: str) -> None:
-            send_message(WebRTCAnswer(answer=sdp))
+    async def stream_source(self) -> str | None:
+        # Building the URL costs nothing: Ajax is only called once go2rtc
+        # connects to it, which happens when someone opens the live view.
+        bridge = await async_get_bridge(self.hass)
+        bridge.register(self._token, self)
+        return bridge.url(self._token)
 
-        def on_candidate(cand: RemoteCandidate) -> None:
-            send_message(
-                WebRTCCandidate(
-                    RTCIceCandidateInit(
-                        cand.candidate,
-                        sdp_mid=cand.sdp_mid,
-                        sdp_m_line_index=cand.sdp_mline_index,
-                    )
-                )
-            )
-
-        def on_error(code: str, message: str) -> None:
-            send_message(WebRTCError(code=code, message=message))
-
+    def open_session(
+        self,
+        *,
+        on_offer: Callable[[str], None],
+        on_candidate: Callable[[RemoteCandidate], None],
+        on_error: Callable[[str, str], None],
+    ) -> CloudVideoSession | None:
+        now = time.monotonic()
+        if now - self._last_session_at < self.MIN_SESSION_INTERVAL:
+            _LOGGER.debug("Cloud video: session for %s refused, too soon", self.entity_id)
+            return None
+        self._last_session_at = now
         session = CloudVideoSession(
             self.coordinator.grpc_client,
             space_id=self._space_id(),
             video_edge_id=self._video_edge_id,
             channel_id=self._channel_id,
-            on_answer=on_answer,
+            on_offer=on_offer,
             on_candidate=on_candidate,
             on_error=on_error,
         )
-        self._sessions[session_id] = session
         # Shared object: the dump shows how far the latest session got, even
         # while it is still running.
         self.coordinator.cloud_video_outcomes[self._device_id] = session.outcome
-        session.start(offer_sdp)
-
-    async def async_on_webrtc_candidate(
-        self, session_id: str, candidate: RTCIceCandidateInit
-    ) -> None:
-        if session := self._sessions.get(session_id):
-            session.add_local_candidate(
-                candidate.candidate, candidate.sdp_mid, candidate.sdp_m_line_index
-            )
-
-    @callback
-    def close_webrtc_session(self, session_id: str) -> None:
-        if session := self._sessions.pop(session_id, None):
-            session.close()
+        self._sessions = {s for s in self._sessions if not s.closed}
+        self._sessions.add(session)
+        session.start()
+        return session
 
     async def async_will_remove_from_hass(self) -> None:
-        for session in self._sessions.values():
+        if bridge := self.hass.data.get(DATA_KEY):
+            bridge.unregister(self._token)
+        for session in self._sessions:
             session.close()
         self._sessions.clear()
         await super().async_will_remove_from_hass()
