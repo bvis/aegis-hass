@@ -464,3 +464,17 @@ class TestEventSetup:
             "aegis_ajax_motion-doorbell_doorbell_event",
             "aegis_ajax_button_button_press_event",
         }
+
+
+def test_event_entities_stay_available_when_a_poll_fails() -> None:
+    # Coming back from unavailable would replay the last event to state triggers.
+    coordinator = MagicMock()
+    coordinator.last_update_success = False
+    coordinator.spaces = {"space-1": MagicMock(hub_id="hub-1", name="Home")}
+    coordinator.devices = {}
+    entities = [
+        AjaxSecurityEvent(coordinator=coordinator, space_id="space-1"),
+        AjaxDoorbellEvent(coordinator=coordinator, device_id="doorbell-1"),
+        AjaxButtonPressEvent(coordinator=coordinator, device_id="button-1"),
+    ]
+    assert all(entity.available for entity in entities)

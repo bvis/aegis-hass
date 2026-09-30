@@ -29,6 +29,19 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+class _AlwaysAvailable:
+    """Event entities mark moments, so they stay available through a failed poll.
+
+    Coming back from `unavailable` restores the last event's timestamp, and a
+    state trigger without an `unavailable` guard reads that as a new event: a
+    doorbell ring or button press nobody made.
+    """
+
+    @property
+    def available(self) -> bool:
+        return True
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -56,7 +69,7 @@ async def async_setup_entry(
         coordinator.register_button_event_entity(button._device_id, button)
 
 
-class AjaxSecurityEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):
+class AjaxSecurityEvent(_AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "security_event"
 
@@ -111,7 +124,7 @@ class AjaxSecurityEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         self.coordinator.notify_persistent_event(event_type, {**data, "space_id": self._space_id})
 
 
-class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):
+class AjaxDoorbellEvent(_AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):
     """Per-device doorbell event entity living on the doorbell device card (#173).
 
     The hub-level `AjaxSecurityEvent` already fires `doorbell_pressed`, but it
@@ -166,7 +179,9 @@ class AjaxDoorbellEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
         self.async_write_ha_state()
 
 
-class AjaxButtonPressEvent(CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity):
+class AjaxButtonPressEvent(
+    _AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordinator], EventEntity
+):
     """Per-device press event for an Ajax Button in control mode (#348).
 
     A Button in *panic* mode already surfaces through the hub-level
