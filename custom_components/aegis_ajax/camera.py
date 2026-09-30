@@ -232,6 +232,12 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         bridge.register(self._token, self)
         return bridge.url(self._token)
 
+    async def async_create_stream(self) -> None:
+        # No HLS stream: Home Assistant offers HLS for every go2rtc camera, and
+        # ffmpeg can't open the webrtc: source, so it would retry for ever.
+        # go2rtc reads stream_source() itself, so the live view is unaffected.
+        return None
+
     def open_session(
         self,
         *,

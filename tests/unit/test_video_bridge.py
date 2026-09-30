@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
@@ -140,3 +140,14 @@ async def test_camera_still_image_never_opens_a_session() -> None:
     camera = AjaxCloudVideoCamera(coordinator, "dev-1", ("ve-1", "chan-1"))
     assert await camera.async_camera_image() is None
     assert camera.use_stream_for_stills is False
+
+
+@pytest.mark.asyncio
+async def test_camera_declines_an_hls_stream() -> None:
+    coordinator = MagicMock()
+    coordinator.devices = {}
+    camera = AjaxCloudVideoCamera(coordinator, "dev-1", ("ve-1", "chan-1"))
+    camera.hass = MagicMock()
+    camera.stream_source = AsyncMock(return_value="webrtc:ws://127.0.0.1:1/t#format=openipc")  # type: ignore[method-assign]
+    assert await camera.async_create_stream() is None
+    camera.stream_source.assert_not_awaited()
