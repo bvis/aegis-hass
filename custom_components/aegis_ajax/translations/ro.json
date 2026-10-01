@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entitate",
-                    "description": "Panoul de alarmă de armat forțat. Dacă este omis, armează toate panourile."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entitate",
-                    "description": "Panoul de alarmă de armat forțat. Dacă este omis, armează toate panourile."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entitate",
-                    "description": "Entitatea panoului de alarmă pentru spațiul care va fi dezarmat din modul de noapte. Dacă este omis, se aplică tuturor panourilor."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Entitate",
-                    "description": "Entitatea panoului de alarmă a spațiului pentru care se apasă butonul de panică. Dacă este omisă, panica este trimisă către toate spațiile configurate."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Latitudine",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Entitate",
-                    "description": "Entitatea panoului de alarmă a spațiului al cărui mod al hub-ului se actualizează. Dacă este omisă, se aplică tuturor spațiilor configurate."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

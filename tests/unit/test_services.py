@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
+
+
+def _target_call(hass: MagicMock, entry: MagicMock, data: dict | None = None) -> SimpleNamespace:
+    """Prepare explicit targets belonging to one entry and an internal HA context."""
+    from homeassistant.core import Context
+
+    entry.entry_id = "entry1"
+    entry.options = {}
+    entities = {
+        f"alarm_control_panel.{sid}": SimpleNamespace(
+            platform="aegis_ajax",
+            config_entry_id="entry1",
+            disabled_by=None,
+            unique_id=f"aegis_ajax_alarm_entry1_{sid}",
+        )
+        for sid in entry.runtime_data._space_ids
+    }
+    registry = MagicMock()
+    registry.async_get.side_effect = entities.get
+    hass.data = {"entity_registry": registry}
+    return SimpleNamespace(data={"entity_id": list(entities), **(data or {})}, context=Context())
 
 
 class TestForceArmService:
@@ -28,7 +50,7 @@ class TestForceArmService:
         hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
-        call.data = {}  # No entity_id → all spaces
+        call = _target_call(hass, mock_entry)
 
         await _async_handle_force_arm(hass, call)
 
@@ -57,7 +79,7 @@ class TestForceArmService:
         hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
-        call.data = {}  # No entity_id → all spaces
+        call = _target_call(hass, mock_entry)
 
         await _async_handle_force_arm_night(hass, call)
 
@@ -88,7 +110,7 @@ class TestDisarmNightModeService:
         hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
-        call.data = {}  # No entity_id → all spaces
+        call = _target_call(hass, mock_entry)
 
         await _async_handle_disarm_night_mode(hass, call)
 
@@ -114,7 +136,7 @@ class TestRefreshAlarmImagesService:
         entry = MagicMock(runtime_data=coordinator)
         hass = MagicMock()
         hass.config_entries.async_entries = MagicMock(return_value=[entry])
-        service_call = MagicMock(data={})
+        service_call = _target_call(hass, entry)
 
         result = await _async_handle_refresh_alarm_images(hass, service_call)
 
@@ -155,6 +177,7 @@ class TestClientSessionServices:
         hass.config_entries.async_entries = MagicMock(return_value=[entry])
         call = MagicMock()
         call.data = {}
+        call.context.user_id = None
 
         with pytest.raises(ServiceValidationError, match="Could not list Ajax account sessions"):
             await _async_handle_list_client_sessions(hass, call)
@@ -386,7 +409,9 @@ class TestClientSessionServices:
         from custom_components.aegis_ajax import _async_handle_terminate_client_session
 
         with pytest.raises(ServiceValidationError, match="confirm: true"):
-            await _async_handle_terminate_client_session(MagicMock(), MagicMock(data={}))
+            await _async_handle_terminate_client_session(
+                MagicMock(), MagicMock(data={}, context=MagicMock(user_id=None))
+            )
 
 
 class TestServiceRegistration:

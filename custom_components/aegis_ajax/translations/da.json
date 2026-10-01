@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Enhed",
-                    "description": "Alarmpanel-enhed der skal tvangsaktiveres. Hvis udeladt, aktiveres alle paneler."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Enhed",
-                    "description": "Alarmpanel-enhed der skal tvangsaktiveres i natfunktion. Hvis udeladt, aktiveres alle paneler."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Enhed",
-                    "description": "Alarmpanel-enhed for det space, der skal deaktiveres fra natfunktion. Hvis udeladt, gælder det alle paneler."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Enhed",
-                    "description": "Alarmpanel-enhed for det space, hvis panikknap der skal trykkes. Hvis udeladt, sendes panikken til alle konfigurerede spaces."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Breddegrad",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Enhed",
-                    "description": "Alarmpanel-enhed for det space, hvis hub-tilstand der skal opdateres. Hvis udeladt, gælder det alle konfigurerede spaces."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

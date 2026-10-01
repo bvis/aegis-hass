@@ -117,11 +117,25 @@ class _NotificationLogServiceStub(Protocol):
 
 def is_valid_photo_url(url: str) -> bool:
     """Return whether a signed Ajax photo URL points at a known host."""
-    hostname = urlparse(url).hostname or ""
-    # Anchor the S3 branch to the real bucket host so a substring match can't
-    # accept e.g. `hubs-uploaded-resources.attacker.com` (SSRF).
-    is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(".amazonaws.com")
-    return hostname.endswith(".ajax.systems") or is_s3
+    try:
+        parsed = urlparse(url)
+        if (
+            parsed.scheme != "https"
+            or parsed.port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or any(ord(char) <= 32 or ord(char) == 127 for char in url)
+        ):
+            return False
+        hostname = parsed.hostname or ""
+    except (ValueError, TypeError):
+        return False
+    # The bucket name must match exactly, including on regional S3 endpoints.
+    s3_host = re.fullmatch(
+        r"hubs-uploaded-resources\.s3(?:[.-][a-z]{2}(?:-gov)?-[a-z]+-\d)?\.amazonaws\.com",
+        hostname,
+    )
+    return hostname.endswith(".ajax.systems") or s3_host is not None
 
 
 def _photo_urls_from_media(media: _NotificationMedia) -> tuple[str, ...]:
@@ -371,14 +385,7 @@ class MediaApi:
                         url: str = raw_url.decode("utf-8", errors="ignore")
                         parsed = urlparse(url)
                         hostname = parsed.hostname or ""
-                        is_ajax = hostname.endswith(".ajax.systems")
-                        # Anchor the S3 branch to the real bucket host — a bare
-                        # `in` substring would also accept e.g.
-                        # `hubs-uploaded-resources.attacker.com` (SSRF).
-                        is_s3 = "hubs-uploaded-resources" in hostname and hostname.endswith(
-                            ".amazonaws.com"
-                        )
-                        if is_ajax or is_s3:
+                        if is_valid_photo_url(url):
                             # Host + path only — the query string holds the S3 signature.
                             _LOGGER.debug(
                                 "Photo URL from media stream: %s%s", hostname, parsed.path

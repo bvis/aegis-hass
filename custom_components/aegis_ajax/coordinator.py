@@ -9,7 +9,6 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-import aiohttp
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -38,7 +37,7 @@ from custom_components.aegis_ajax.api.hub_object import (
     HubObjectApi,
     SimCardInfo,
 )
-from custom_components.aegis_ajax.api.media import AlarmMedia, MediaApi, is_valid_photo_url
+from custom_components.aegis_ajax.api.media import AlarmMedia, MediaApi
 from custom_components.aegis_ajax.api.models import (
     BatteryInfo,
     device_deactivation_kinds,
@@ -872,22 +871,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         filename: str | None = None,
     ) -> Path | None:
         """Download one trusted historical image and save it for its camera."""
-        if not is_valid_photo_url(url):
-            _LOGGER.warning("Rejected alarm image URL with unexpected domain")
-            return None
+        from custom_components.aegis_ajax.photo_download import (
+            async_download_photo,  # noqa: PLC0415
+        )
 
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as response:
-                if response.status != 200:
-                    _LOGGER.debug("Ajax alarm image download returned HTTP %s", response.status)
-                    return None
-                image = await response.read()
-        except Exception:
-            _LOGGER.debug("Could not download Ajax alarm image", exc_info=True)
-            return None
-
-        if not image:
+        image = await async_download_photo(async_get_clientsession(self.hass), url)
+        if image is None:
             return None
         saved_path = await save_photo(
             self.hass,

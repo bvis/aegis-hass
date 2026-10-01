@@ -111,6 +111,7 @@ class TestAlarmControlPanel:
         self, use_pin_code: bool = False, pin_code: str | None = None
     ) -> MagicMock:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         options: dict = {"use_pin_code": use_pin_code}
         if pin_code is not None:
             options["pin_code_hash"] = hashlib.sha256(pin_code.encode()).hexdigest()
@@ -119,23 +120,27 @@ class TestAlarmControlPanel:
 
     def test_unique_id(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
-        assert panel.unique_id == "aegis_ajax_alarm_s1"
+        assert panel.unique_id == "aegis_ajax_alarm_entry1_s1"
 
     def test_available_when_online(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(online=True)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.available is True
 
     def test_unavailable_when_offline(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(online=False)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.available is False
 
     def test_unavailable_when_space_missing(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.available is False
@@ -143,12 +148,14 @@ class TestAlarmControlPanel:
     def test_name_is_none(self) -> None:
         """Primary entity adopts device name — _attr_name must be None."""
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space()}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel._attr_name is None
 
     def test_device_info_with_space(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space()}
         coordinator.devices = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -160,6 +167,7 @@ class TestAlarmControlPanel:
 
     def test_device_info_without_space(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {}
         coordinator.devices = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -171,6 +179,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.alarm_state == AlarmControlPanelState.ARMED_AWAY
@@ -181,12 +190,14 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.alarm_state == AlarmControlPanelState.DISARMED
 
     def test_alarm_state_none_when_no_space(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.alarm_state is None
@@ -199,6 +210,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.alarmed_space_ids = {"s1"}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -210,6 +222,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.NIGHT_MODE)}
         coordinator.alarmed_space_ids = {"s1"}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -222,6 +235,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
         coordinator.alarmed_space_ids = {"s1"}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -247,6 +261,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.delay_overlays = {"s1": self._overlay("arming")}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -258,6 +273,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.NIGHT_MODE)}
         coordinator.delay_overlays = {"s1": self._overlay("pending")}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -269,6 +285,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.alarmed_space_ids = {"s1"}
         coordinator.delay_overlays = {"s1": self._overlay("pending")}
@@ -281,6 +298,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
         coordinator.delay_overlays = {"s1": self._overlay("arming")}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -288,6 +306,7 @@ class TestAlarmControlPanel:
 
     def test_delay_attributes_present_when_option_enabled(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.delay_panel_states = True
         coordinator.delay_overlays = {"s1": self._overlay("arming")}
@@ -300,6 +319,7 @@ class TestAlarmControlPanel:
 
     def test_delay_attributes_null_end_when_no_delay_runs(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.delay_panel_states = True
         coordinator.delay_overlays = {}
@@ -309,6 +329,7 @@ class TestAlarmControlPanel:
 
     def test_delay_attributes_absent_when_option_disabled(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         coordinator.delay_panel_states = False
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -318,6 +339,7 @@ class TestAlarmControlPanel:
 
     def test_optimistic_write_resyncs_the_delay_overlays(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         panel.hass = None
@@ -339,6 +361,7 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {
             "s1": replace(
                 self._make_space(SecurityState.PARTIALLY_ARMED),
@@ -354,12 +377,14 @@ class TestAlarmControlPanel:
         )
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space(SecurityState.PARTIALLY_ARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.alarm_state == AlarmControlPanelState.ARMED_CUSTOM_BYPASS
 
     def test_extra_state_attributes(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {"s1": self._make_space()}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         attrs = panel.extra_state_attributes
@@ -369,6 +394,7 @@ class TestAlarmControlPanel:
 
     def test_extra_state_attributes_empty_when_no_space(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.extra_state_attributes == {}
@@ -386,6 +412,7 @@ class TestAlarmControlPanel:
     @pytest.mark.asyncio
     async def test_alarm_arm_away(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.arm = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -396,6 +423,7 @@ class TestAlarmControlPanel:
     @pytest.mark.asyncio
     async def test_alarm_arm_night(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.arm_night_mode = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -409,6 +437,7 @@ class TestAlarmControlPanel:
         # debounced lite re-read (PARTIALLY_ARMED in group mode) maps back to
         # armed_night instead of armed_custom_bypass (#284).
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.arm_night_mode = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -423,6 +452,7 @@ class TestAlarmControlPanel:
         from dataclasses import replace
 
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.disarm = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -440,6 +470,7 @@ class TestAlarmControlPanel:
     @pytest.mark.asyncio
     async def test_alarm_disarm(self) -> None:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.disarm = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -451,6 +482,7 @@ class TestAlarmControlPanel:
     async def test_alarm_disarm_from_night_mode_uses_regular_disarm(self) -> None:
         """Regular disarm() works from night mode — server handles it correctly."""
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.security_api.disarm = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         coordinator.config_entry.options = {"use_pin_code": False}
@@ -578,13 +610,14 @@ class TestGroupAlarmControlPanel:
 
     def _make_coordinator(self) -> MagicMock:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.config_entry.options = {}
         return coordinator
 
     def test_unique_id_per_group(self) -> None:
         coordinator = self._make_coordinator()
         panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
-        assert panel.unique_id == "aegis_ajax_alarm_s1_group_g1"
+        assert panel.unique_id == "aegis_ajax_alarm_entry1_s1_group_g1"
 
     def test_group_supported_features_excludes_arm_home_when_option_disabled(self) -> None:
         from homeassistant.components.alarm_control_panel import (
@@ -710,6 +743,7 @@ class TestAsyncSetupEntry:
 
     def _coordinator_with_space(self, *, group_mode: bool, groups: tuple) -> MagicMock:  # type: ignore[type-arg]
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.spaces = {
             "s1": Space(
                 id="s1",
@@ -818,6 +852,7 @@ class TestGroupMembershipAttributes:
         self, devices: dict[str, Device], group_id: str = "g1"
     ) -> AjaxGroupAlarmControlPanel:
         coordinator = MagicMock()
+        coordinator.config_entry.entry_id = "entry1"
         coordinator.config_entry.options = {}
         coordinator.spaces = {"s1": self._space()}
         coordinator.devices = devices

@@ -675,6 +675,7 @@ class TestPressPanicButtonHandler:
     def _make_call(self, data: dict) -> MagicMock:
         call = MagicMock()
         call.data = data
+        call.context.user_id = None
         return call
 
     @pytest.mark.asyncio
@@ -986,6 +987,7 @@ class TestSetPhotoOnDemandModeHandler:
     def _make_call(self, data: dict) -> MagicMock:
         call = MagicMock()
         call.data = data
+        call.context.user_id = None
         return call
 
     @pytest.mark.asyncio
