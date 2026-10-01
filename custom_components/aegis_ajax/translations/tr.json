@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Varlık",
-                    "description": "Zorla kurulacak alarm paneli. Belirtilmezse tüm paneller kurulur."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Varlık",
-                    "description": "Zorla kurulacak alarm paneli. Belirtilmezse tüm paneller kurulur."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Varlık",
-                    "description": "Gece modundan çıkarılacak alanın alarm paneli varlığı. Belirtilmezse tüm panellere uygulanır."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Varlık",
-                    "description": "Panik butonu basılacak alanın alarm paneli varlığı. Atlanırsa panik tüm yapılandırılmış alanlara gönderilir."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Enlem",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Varlık",
-                    "description": "Hub modu güncellenecek alanın alarm paneli varlığı. Belirtilmezse yapılandırılmış tüm alanlara uygulanır."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

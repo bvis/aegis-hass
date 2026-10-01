@@ -165,7 +165,11 @@ async def test_camera_read_during_composition_does_not_cache_stale_preview(tmp_p
     assert await camera.async_camera_image() == old_bytes
 
     response = AsyncMock(status=200)
-    response.read = AsyncMock(return_value=_make_jpeg(color=(255, 0, 0)))
+    response.content_length = None
+    response.content = MagicMock()
+    response.content.iter_chunked.return_value.__aiter__.return_value = [
+        _make_jpeg(color=(255, 0, 0))
+    ]
     response.__aenter__ = AsyncMock(return_value=response)
     session = MagicMock()
     session.get.return_value = response

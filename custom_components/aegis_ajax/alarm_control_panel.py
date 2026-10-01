@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -225,7 +223,26 @@ def map_security_state(state: SecurityState) -> AlarmControlPanelState:
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
+    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.domain != "alarm_control_panel" or entity.platform != DOMAIN:
+            continue
+        legacy_ids = {
+            f"aegis_ajax_alarm_{sid}": f"aegis_ajax_alarm_{entry.entry_id}_{sid}"
+            for sid in coordinator.spaces
+        }
+        for sid, space in coordinator.spaces.items():
+            for group in space.groups:
+                legacy_ids[f"aegis_ajax_alarm_{sid}_group_{group.id}"] = (
+                    f"aegis_ajax_alarm_{entry.entry_id}_{sid}_group_{group.id}"
+                )
+        if entity.unique_id in legacy_ids:
+            registry.async_update_entity(
+                entity.entity_id, new_unique_id=legacy_ids[entity.unique_id]
+            )
     entities: list[AlarmControlPanelEntity] = []
     for space_id, space in coordinator.spaces.items():
         # Always create the space-level panel. It carries night-mode support
@@ -263,6 +280,9 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str) -> None:
         super().__init__(coordinator)
         self._space_id = space_id
+        if coordinator.config_entry is None:
+            raise ValueError("Alarm panels require an owning config entry")
+        self._account_entry_id = coordinator.config_entry.entry_id
         space = coordinator.spaces.get(space_id)
         hub_id = space.hub_id if space else space_id
         hub_device = coordinator.devices.get(hub_id)
@@ -323,12 +343,12 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
     def _validate_code(self, code: str | None) -> None:
         """Raise HomeAssistantError if the provided code does not match the stored hash."""
-        if not self.code_arm_required:
-            return
-        stored_hash = self._get_options().get("pin_code_hash", "")
-        computed = hashlib.sha256(code.encode()).hexdigest() if code else ""
-        if not code or not hmac.compare_digest(computed, stored_hash):
-            raise HomeAssistantError(self._translate_error("invalid_alarm_code"))
+        from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
+
+        try:
+            validate_pin(self._get_options(), code)
+        except HomeAssistantError as err:
+            raise HomeAssistantError(self._translate_error("invalid_alarm_code")) from err
 
     def _issue_label(self, key: str) -> str:
         """Return a translated issue label for the current HA language."""
@@ -385,7 +405,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str) -> None:
         super().__init__(coordinator, space_id)
-        self._attr_unique_id = f"aegis_ajax_alarm_{space_id}"
+        self._attr_unique_id = f"aegis_ajax_alarm_{self._account_entry_id}_{space_id}"
 
     @property
     def available(self) -> bool:
@@ -556,7 +576,9 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str, group_id: str) -> None:
         super().__init__(coordinator, space_id)
         self._group_id = group_id
-        self._attr_unique_id = f"aegis_ajax_alarm_{space_id}_group_{group_id}"
+        self._attr_unique_id = (
+            f"aegis_ajax_alarm_{self._account_entry_id}_{space_id}_group_{group_id}"
+        )
         space = coordinator.spaces.get(space_id)
         group = space.get_group(group_id) if space else None
         self._attr_name = group.name if group else f"Group {group_id}"

@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entidade",
-                    "description": "Painel de alarme para armar forçado. Se omitido, arma todos os painéis."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entidade",
-                    "description": "Painel de alarme para armar forçado. Se omitido, arma todos os painéis."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entidade",
-                    "description": "Entidade do painel de alarme do espaço a desarmar do modo noturno. Se omitido, aplica-se a todos os painéis."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Entidade",
-                    "description": "Entidade do painel de alarme do espaço cujo botão de pânico vai ser premido. Se for omitida, o pânico é enviado a todos os espaços configurados."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Latitude",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Entidade",
-                    "description": "Painel de alarme do espaço cujo modo do hub deve ser atualizado. Se omitido, aplica-se a todos os espaços configurados."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

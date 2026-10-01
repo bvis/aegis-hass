@@ -11,7 +11,6 @@ from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.aegis_ajax.api.media import is_valid_photo_url
 from custom_components.aegis_ajax.api.webrtc import CloudVideoSession
 from custom_components.aegis_ajax.const import CONF_CLOUD_VIDEO, DEFAULT_CLOUD_VIDEO
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -142,24 +141,14 @@ class AjaxCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
 
     async def _download_image(self, url: str) -> bytes | None:
         """Download image from URL and cache it."""
-        import aiohttp  # noqa: PLC0415
+        from custom_components.aegis_ajax.photo_download import (
+            async_download_photo,  # noqa: PLC0415
+        )
 
-        if not is_valid_photo_url(url):
-            # Log host only — never the query string (carries the S3 signature).
-            from urllib.parse import urlparse  # noqa: PLC0415
-
-            _LOGGER.warning(
-                "Rejected photo URL with unexpected domain: %s", urlparse(url).hostname or "?"
-            )
-            return self._last_image
-        self._last_image_url = url
-        session = async_get_clientsession(self.hass)
-        try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status == 200:
-                    self._last_image = await resp.read()
-        except Exception:
-            _LOGGER.exception("Failed to download photo")
+        image = await async_download_photo(async_get_clientsession(self.hass), url)
+        if image is not None:
+            self._last_image_url = url
+            self._last_image = image
         return self._last_image
 
 

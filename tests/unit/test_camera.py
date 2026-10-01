@@ -27,6 +27,25 @@ def _device(device_id: str, device_type: str) -> Device:
     )
 
 
+def _jpeg_bytes() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def _image_response() -> AsyncMock:
+    response = AsyncMock(status=200)
+    response.content_length = None
+    response.content = MagicMock()
+    response.content.iter_chunked.return_value.__aiter__.return_value = [_jpeg_bytes()]
+    response.__aenter__.return_value = response
+    return response
+
+
 class TestCameraSetup:
     @pytest.mark.asyncio
     async def test_setup_adds_only_camera_capability(self) -> None:
@@ -134,9 +153,8 @@ class TestAjaxCamera:
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam_phod"
         )
 
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.read = AsyncMock(return_value=b"fake_image_data")
+        mock_resp = _image_response()
+        mock_resp.read = AsyncMock(return_value=_jpeg_bytes())
         mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
         mock_resp.__aexit__ = AsyncMock(return_value=None)
 
@@ -149,7 +167,7 @@ class TestAjaxCamera:
         ):
             result = await cam.async_camera_image()
 
-        assert result == b"fake_image_data"
+        assert result == _jpeg_bytes()
         assert "d1" not in coordinator.last_photo_urls
 
     @pytest.mark.asyncio
@@ -165,9 +183,8 @@ class TestAjaxCamera:
             coordinator=coordinator, device_id="d1", hub_id="h1", device_type="motion_cam_phod"
         )
 
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.read = AsyncMock(return_value=b"cached_url_data")
+        mock_resp = _image_response()
+        mock_resp.read = AsyncMock(return_value=_jpeg_bytes())
         mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
         mock_resp.__aexit__ = AsyncMock(return_value=None)
 
@@ -180,7 +197,7 @@ class TestAjaxCamera:
         ):
             result = await cam.async_camera_image()
 
-        assert result == b"cached_url_data"
+        assert result == _jpeg_bytes()
         # URL should be consumed (popped)
         assert "d1" not in coordinator.last_photo_urls
 
@@ -317,7 +334,7 @@ class TestAjaxCamera:
         cam._last_image = b"cached"
 
         mock_session = MagicMock()
-        mock_session.get = MagicMock(side_effect=Exception("network error"))
+        mock_session.get = MagicMock(side_effect=OSError("network error"))
 
         with patch(
             "custom_components.aegis_ajax.camera.async_get_clientsession",

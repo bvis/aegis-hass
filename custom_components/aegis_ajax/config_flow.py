@@ -573,7 +573,7 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                 ).hexdigest()
             else:
                 user_input.pop("pin_code", None)
-            # FCM credentials live in `entry.data` (encrypted storage).
+            # FCM credentials live in `entry.data`; at-rest protection is managed by HA.
             # Two routes can update them:
             #   1. The dedicated "Delete FCM credentials" toggle wipes all
             #      four keys unconditionally — the unambiguous deletion

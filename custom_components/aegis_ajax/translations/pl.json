@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Jednostka",
-                    "description": "Panel alarmowy do wymuszonego uzbrojenia. Jeśli pominięto, uzbraja wszystkie panele."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Jednostka",
-                    "description": "Panel alarmowy do wymuszonego uzbrojenia. Jeśli pominięto, uzbraja wszystkie panele."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Jednostka",
-                    "description": "Jednostka panelu alarmowego przestrzeni do rozbrojenia z trybu nocnego. W przypadku pominięcia dotyczy wszystkich paneli."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Jednostka",
-                    "description": "Encja panelu alarmowego przestrzeni, w której ma zostać naciśnięty przycisk paniki. Jeśli zostanie pominięta, alarm zostanie wysłany do wszystkich skonfigurowanych przestrzeni."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Szerokość geograficzna",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Jednostka",
-                    "description": "Jednostka panelu alarmowego przestrzeni, której tryb huba ma zostać zaktualizowany. Jeśli zostanie pominięta, dotyczy wszystkich skonfigurowanych przestrzeni."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

@@ -125,7 +125,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entita",
-                    "description": "Alarmový panel k nucenému zastřežení. Pokud je vynecháno, zastřeží všechny panely."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -135,7 +139,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entita",
-                    "description": "Alarmový panel k nucenému zastřežení. Pokud je vynecháno, zastřeží všechny panely."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -145,7 +153,11 @@
             "fields": {
                 "entity_id": {
                     "name": "Entita",
-                    "description": "Entita poplachového panelu prostoru, který se má odjistit z nočního režimu. Pokud je vynecháno, platí pro všechny panely."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "Required when PIN protection is enabled for the selected account."
                 }
             }
         },
@@ -159,7 +171,7 @@
                 },
                 "entity_id": {
                     "name": "Entita",
-                    "description": "Entita alarmového panelu prostoru, jehož panikové tlačítko se má stisknout. Pokud je vynecháno, panika se odešle do všech nakonfigurovaných prostorů."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 },
                 "latitude": {
                     "name": "Zeměpisná šířka",
@@ -185,7 +197,7 @@
                 },
                 "entity_id": {
                     "name": "Entita",
-                    "description": "Entita alarmového panelu prostoru, jehož režim hubu se má změnit. Pokud je vynecháno, platí pro všechny nakonfigurované prostory."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },
@@ -195,7 +207,7 @@
             "fields": {
                 "entity_id": {
                     "name": "Entity",
-                    "description": "Alarm panel entity for the space to import. If omitted, imports from every configured space."
+                    "description": "Explicit space alarm panel to target. Group panels and implicit all-space targets are not supported."
                 }
             }
         },

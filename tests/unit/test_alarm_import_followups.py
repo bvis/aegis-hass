@@ -89,11 +89,13 @@ class TestTheIdMemoriesAreBounded:
 
 class TestOneCoolingSpaceDoesNotHideTheOthers:
     @staticmethod
-    def _hass_with(coordinator: MagicMock) -> MagicMock:
+    def _hass_with(coordinator: MagicMock) -> tuple[MagicMock, object]:
         entry = MagicMock(runtime_data=coordinator)
         hass = MagicMock()
         hass.config_entries.async_entries = MagicMock(return_value=[entry])
-        return hass
+        from tests.unit.test_services import _target_call
+
+        return hass, _target_call(hass, entry)
 
     @pytest.mark.asyncio
     async def test_results_of_the_spaces_that_ran_survive_a_cooling_sibling(self) -> None:
@@ -108,9 +110,7 @@ class TestOneCoolingSpaceDoesNotHideTheOthers:
             ]
         )
 
-        result = await _async_handle_refresh_alarm_images(
-            self._hass_with(coordinator), MagicMock(data={})
-        )
+        result = await _async_handle_refresh_alarm_images(*self._hass_with(coordinator))
 
         assert result == {
             "spaces": 2,
@@ -132,9 +132,7 @@ class TestOneCoolingSpaceDoesNotHideTheOthers:
             ]
         )
 
-        result = await _async_handle_refresh_alarm_images(
-            self._hass_with(coordinator), MagicMock(data={})
-        )
+        result = await _async_handle_refresh_alarm_images(*self._hass_with(coordinator))
 
         assert result == {"spaces": 2, "notifications": 2, "images": 5, "skipped": 1}
 
@@ -150,9 +148,7 @@ class TestOneCoolingSpaceDoesNotHideTheOthers:
         )
 
         with pytest.raises(HomeAssistantError) as error:
-            await _async_handle_refresh_alarm_images(
-                self._hass_with(coordinator), MagicMock(data={})
-            )
+            await _async_handle_refresh_alarm_images(*self._hass_with(coordinator))
 
         assert error.value.translation_key == "alarm_backfill_rate_limited"
 
@@ -165,9 +161,7 @@ class TestOneCoolingSpaceDoesNotHideTheOthers:
         coordinator.async_import_alarm_images = AsyncMock(side_effect=RuntimeError("boom"))
 
         with pytest.raises(RuntimeError):
-            await _async_handle_refresh_alarm_images(
-                self._hass_with(coordinator), MagicMock(data={})
-            )
+            await _async_handle_refresh_alarm_images(*self._hass_with(coordinator))
 
 
 class TestTheMediaStreamIsNotAwaitedUnderTheLock:

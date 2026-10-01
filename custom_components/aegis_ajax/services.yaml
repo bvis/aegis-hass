@@ -6,10 +6,17 @@ force_arm:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: Required when PIN protection is enabled for the selected account.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
-      description: Alarm panel entity to force arm. If omitted, arms all panels.
-      required: false
+      description: Alarm panel entity to force arm. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
@@ -23,10 +30,17 @@ force_arm_night:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: Required when PIN protection is enabled for the selected account.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
-      description: Alarm panel entity to force arm night. If omitted, arms all panels.
-      required: false
+      description: Alarm panel entity to force arm night. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
@@ -43,10 +57,17 @@ disarm_night_mode:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: Required when PIN protection is enabled for the selected account.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
-      description: Alarm panel entity for the space to disarm from night mode. If omitted, applies to all panels.
-      required: false
+      description: Alarm panel entity for the space to disarm from night mode. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
@@ -79,10 +100,8 @@ press_panic_button:
     entity_id:
       name: Entity
       description: >-
-        Alarm panel entity for the space whose panic button to press. If
-        omitted, the panic is sent to every space configured in the
-        integration.
-      required: false
+        Alarm panel entity for the space whose panic button to press. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
@@ -145,9 +164,8 @@ set_photo_on_demand_mode:
     entity_id:
       name: Entity
       description: >-
-        Alarm panel entity for the space whose hub mode to update. If
-        omitted, applies to every configured space.
-      required: false
+        Alarm panel entity for the space whose hub mode to update. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
@@ -171,9 +189,8 @@ refresh_alarm_images:
     entity_id:
       name: Entity
       description: >-
-        Alarm panel entity for the space to import. If omitted, imports from
-        every configured space.
-      required: false
+        Alarm panel entity for the space to import. An explicit space panel is required.
+      required: true
       selector:
         entity:
           domain: alarm_control_panel
