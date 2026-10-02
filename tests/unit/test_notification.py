@@ -918,6 +918,66 @@ class TestFcmRejectedCredsShortCircuit:
         listener._rejected_store.async_save.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_retryable_registration_failure_is_retried_by_the_supervisor(self) -> None:
+        """#553 — a failed registration used to leave push down until a reload:
+        no client, no restart armed. It now arms the regular backoff, and the
+        restart registers again instead of starting a client with nothing."""
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            side_effect=RuntimeError(
+                "Unable to establish subscription with Google Cloud Messaging."
+            )
+        )
+        listener = self._listener(hass)
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+            patch(
+                "homeassistant.helpers.event.async_track_time_interval",
+                MagicMock(return_value=MagicMock()),
+            ),
+        ):
+            await listener.async_start()
+            retry_at = listener._fcm_restart_at
+            assert retry_at is not None
+            listener._async_start_push_client = AsyncMock(return_value=True)
+            await listener._async_supervise_push_client(now=retry_at)
+
+        assert register_cls.call_count == 2
+        listener._async_start_push_client.assert_not_awaited()
+        # Failed again: re-armed, one backoff step further.
+        assert listener._fcm_restart_at is not None
+        assert listener._fcm_restart_at > retry_at
+
+    @pytest.mark.asyncio
+    async def test_terminal_registration_failure_is_not_retried(self) -> None:
+        # #227: a credential verdict stays latched, never retried on a timer.
+        hass = MagicMock()
+        hass.async_add_executor_job = AsyncMock(
+            side_effect=RuntimeError("Unable to register with fcm")
+        )
+        listener = self._listener(hass)
+        register_cls = MagicMock(return_value=MagicMock(register=MagicMock()))
+
+        reg_inv, clr_inv, reg_miss, clr_miss = self._repair_patches()
+        with (
+            reg_inv,
+            clr_inv,
+            reg_miss,
+            clr_miss,
+            patch("firebase_messaging.fcmregister.FcmRegister", register_cls),
+        ):
+            await listener.async_start()
+
+        assert listener._fcm_restart_at is None
+
+    @pytest.mark.asyncio
     async def test_transient_failure_does_not_persist(self) -> None:
         hass = MagicMock()
         hass.async_add_executor_job = AsyncMock(
@@ -3682,6 +3742,49 @@ class TestFcmStuckPushRepair:
         reg.assert_called_once()
         assert reg.call_args.kwargs["entry_id"] == "entry-x"
         assert reg.call_args.kwargs["terminations"] == 3
+
+    async def _start_client(self, listener: AjaxNotificationListener) -> None:
+        client = MagicMock()
+        client.start = AsyncMock()
+        with (
+            patch("firebase_messaging.FcmPushClient", MagicMock(return_value=client)),
+            patch("custom_components.aegis_ajax.notification.attach_fcm_log_guard"),
+            patch("custom_components.aegis_ajax.notification.install_fcm_decrypt_guard"),
+        ):
+            assert await listener._async_start_push_client(register_repair_on_failure=False)
+
+    @pytest.mark.asyncio
+    async def test_outage_deaths_after_an_earlier_push_do_not_accumulate(self) -> None:
+        """#553: a push before an hour-long outage left its id behind, so every
+        connection-error death read as the same replayed message and the
+        working registration was discarded. A death only counts when that
+        client run was handed a frame."""
+        listener = self._make_listener()
+        listener._last_persistent_id = "0:before-the-outage"
+        listener._async_replace_poisoned_registration = AsyncMock()
+        with patch(
+            "custom_components.aegis_ajax.notification.async_register_fcm_push_stuck"
+        ) as reg:
+            for index in range(4):
+                await self._start_client(listener)
+                await self._die(listener, 1000.0 * (index + 1))
+        reg.assert_not_called()
+        listener._async_replace_poisoned_registration.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_frame_replayed_in_every_run_still_accumulates(self) -> None:
+        # #373's shape: each restarted client is handed the same id, then dies.
+        listener = self._make_listener()
+        listener._async_replace_poisoned_registration = AsyncMock()
+        with patch(
+            "custom_components.aegis_ajax.notification.async_register_fcm_push_stuck"
+        ) as reg:
+            for index in range(3):
+                await self._start_client(listener)
+                listener._on_notification({}, "0:poison")
+                await self._die(listener, 1000.0 * (index + 1))
+        reg.assert_called_once()
+        listener._async_replace_poisoned_registration.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_deaths_on_different_messages_do_not_accumulate(self) -> None:

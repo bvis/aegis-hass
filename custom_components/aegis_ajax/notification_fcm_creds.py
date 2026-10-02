@@ -288,8 +288,9 @@ def _classify_fcm_failure(exc: BaseException) -> str:
             "Google's GCM registration step failed before the FCM credentials "
             "were used — that request carries none of the four values, so this "
             "is not a verdict on them and is usually transient. It is retried "
-            "on the next restart or reload of the integration; submitting the "
-            "Repair card under Settings → Repairs retries it immediately."
+            "automatically every 5 to 15 minutes, and on the next restart or "
+            "reload of the integration; submitting the Repair card under "
+            "Settings → Repairs retries it immediately."
         )
     if "unable to register with fcm" in lower:
         return (
