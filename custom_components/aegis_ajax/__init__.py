@@ -126,46 +126,74 @@ _CUSTOM_SERVICE_NAMES = (
 )
 
 
-def _resolve_target_space_ids(
-    hass: HomeAssistant, call: ServiceCall
+async def _resolve_target_space_ids(
+    hass: HomeAssistant, call: ServiceCall, *, require_pin: bool = False
 ) -> list[tuple[AjaxCobrandedCoordinator, str]]:
-    """Resolve target entity_ids to (coordinator, space_id) pairs.
+    """Authorize all explicit space panels before performing any operation.
 
-    If no target is specified, returns all spaces from all entries.
+    Never infer an account from a Space ID: multiple accounts may share it.
+    Group panels are rejected because these services act on the entire space.
     """
+    from homeassistant.auth.permissions.const import POLICY_CONTROL  # noqa: PLC0415
+    from homeassistant.exceptions import ServiceValidationError, Unauthorized  # noqa: PLC0415
     from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
 
-    entity_ids: list[str] = call.data.get("entity_id", [])
+    from custom_components.aegis_ajax.service_security import (  # noqa: PLC0415
+        async_call_user,
+        validate_pin,
+    )
+
+    entity_ids = call.data.get("entity_id")
     if isinstance(entity_ids, str):
         entity_ids = [entity_ids]
-
-    entries = hass.config_entries.async_entries(DOMAIN)
-    if not entity_ids:
-        # No target: operate on all spaces (backwards-compatible)
-        results: list[tuple[AjaxCobrandedCoordinator, str]] = []
-        for entry in entries:
-            coordinator: AjaxCobrandedCoordinator = entry.runtime_data
-            for space_id in coordinator._space_ids:
-                results.append((coordinator, space_id))
-        return results
-
-    # Map entity_id → space_id via unique_id pattern "aegis_ajax_alarm_{space_id}"
+    if (
+        not isinstance(entity_ids, list)
+        or not entity_ids
+        or any(not isinstance(eid, str) for eid in entity_ids)
+        or any(key in call.data for key in ("device_id", "area_id", "floor_id", "label_id"))
+    ):
+        raise ServiceValidationError("Select explicit Aegis space alarm panel entity IDs.")
+    user = await async_call_user(hass, call)
+    entries = {entry.entry_id: entry for entry in hass.config_entries.async_entries(DOMAIN)}
     entity_reg = er.async_get(hass)
-    results = []
+    results: list[tuple[AjaxCobrandedCoordinator, str]] = []
+    seen: set[tuple[str, str]] = set()
     for eid in entity_ids:
-        entity_entry = entity_reg.async_get(eid)
-        if entity_entry is None or entity_entry.platform != DOMAIN:
-            continue
-        uid = entity_entry.unique_id or ""
-        # unique_id format: "aegis_ajax_alarm_{space_id}"
-        if not uid.startswith("aegis_ajax_alarm_"):
-            continue
-        space_id = uid.removeprefix("aegis_ajax_alarm_")
-        for entry in entries:
-            coordinator = entry.runtime_data
-            if space_id in coordinator._space_ids:
-                results.append((coordinator, space_id))
-                break
+        entity = entity_reg.async_get(eid)
+        if (
+            entity is None
+            or entity.platform != DOMAIN
+            or not eid.startswith("alarm_control_panel.")
+            or entity.disabled_by is not None
+            or entity.config_entry_id not in entries
+        ):
+            raise ServiceValidationError("Target must be a loaded Aegis space alarm panel.")
+        if user is not None and not user.permissions.check_entity(eid, POLICY_CONTROL):
+            raise Unauthorized(context=call.context, entity_id=eid, permission=POLICY_CONTROL)
+        entry = entries[entity.config_entry_id]
+        coordinator = getattr(entry, "runtime_data", None)
+        if coordinator is None:
+            raise ServiceValidationError("The selected Aegis account is not loaded.")
+        space_id = next(
+            (
+                sid
+                for sid in coordinator._space_ids
+                if entity.unique_id
+                in (
+                    f"aegis_ajax_alarm_{sid}",
+                    f"aegis_ajax_alarm_{entry.entry_id}_{sid}",
+                )
+            ),
+            None,
+        )
+        if space_id is None:
+            raise ServiceValidationError("Select a space panel, not a group panel.")
+        if require_pin:
+            validate_pin(entry.options, call.data.get("code"))
+        key = (entry.entry_id, space_id)
+        if key not in seen:
+            seen.add(key)
+            results.append((coordinator, space_id))
     return results
 
 
@@ -195,6 +223,10 @@ async def _async_handle_list_client_sessions(
     """Return sessions for one configured Ajax account."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
+    from custom_components.aegis_ajax.service_security import async_require_admin  # noqa: PLC0415
+
+    await async_require_admin(hass, call)
+
     try:
         sessions = await _resolve_session_coordinator(hass, call).async_list_client_sessions()
     except (RuntimeError, HtsConnectionError) as exc:
@@ -206,7 +238,11 @@ async def _async_handle_terminate_client_session(hass: HomeAssistant, call: Serv
     """Terminate one selected non-current Ajax account session."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    if not call.data.get("confirm"):
+    from custom_components.aegis_ajax.service_security import async_require_admin  # noqa: PLC0415
+
+    await async_require_admin(hass, call)
+
+    if call.data.get("confirm") is not True:
         raise ServiceValidationError(
             "terminate_client_session requires `confirm: true` to terminate a session."
         )
@@ -225,7 +261,11 @@ async def _async_handle_terminate_other_client_sessions(
     """Terminate all sessions except the current Aegis account session."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    if not call.data.get("confirm"):
+    from custom_components.aegis_ajax.service_security import async_require_admin  # noqa: PLC0415
+
+    await async_require_admin(hass, call)
+
+    if call.data.get("confirm") is not True:
         raise ServiceValidationError(
             "terminate_other_client_sessions requires `confirm: true` to terminate all "
             "other sessions."
@@ -241,7 +281,7 @@ async def _async_handle_terminate_other_client_sessions(
 
 async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm service call (arm ignoring open sensors)."""
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call, require_pin=True)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm(space_id, ignore_alarms=True)
@@ -253,7 +293,7 @@ async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> Non
 
 async def _async_handle_force_arm_night(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm_night service call (night mode ignoring open sensors)."""
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call, require_pin=True)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm_night_mode(space_id, ignore_alarms=True)
@@ -271,7 +311,7 @@ async def _async_handle_disarm_night_mode(hass: HomeAssistant, call: ServiceCall
     night-mode groups and leaves any independently armed (away) groups armed,
     which `alarm_disarm` on the space panel cannot express (#233).
     """
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call, require_pin=True)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.disarm_from_night_mode(space_id)
@@ -295,7 +335,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     """
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    if not call.data.get("confirm"):
+    if call.data.get("confirm") is not True:
         raise ServiceValidationError(
             "press_panic_button requires `confirm: true` to acknowledge that this "
             "forwards a panic alarm to the Ajax monitoring station (CRA), which on "
@@ -305,7 +345,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     latitude = call.data.get("latitude")
     longitude = call.data.get("longitude")
 
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
             "press_panic_button: no Aegis alarm panel found for the given target."
@@ -330,14 +370,23 @@ async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: Serv
     """
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
+    from custom_components.aegis_ajax.service_security import async_require_admin  # noqa: PLC0415
+
+    await async_require_admin(hass, call)
+
     user_enabled = call.data.get("user")
     scenario_enabled = call.data.get("scenario")
+    if any(
+        value is not None and not isinstance(value, bool)
+        for value in (user_enabled, scenario_enabled)
+    ):
+        raise ServiceValidationError("Photo on Demand values must be booleans.")
     if user_enabled is None and scenario_enabled is None:
         raise ServiceValidationError(
             "set_photo_on_demand_mode requires at least one of `user` or `scenario`."
         )
 
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
             "set_photo_on_demand_mode: no Aegis alarm panel found for the given target."
@@ -368,7 +417,7 @@ async def _async_handle_refresh_alarm_images(
     imported_notifications = 0
     imported_images = 0
     skipped = 0
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     cooldown: HomeAssistantError | None = None
     for coordinator, space_id in targets:
         try:

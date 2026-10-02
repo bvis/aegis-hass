@@ -294,15 +294,19 @@ If you would rather not depend on the camera's own classifier, [Frigate](https:/
 |---|---|
 | `aegis_ajax.force_arm` | Arm the system ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
 | `aegis_ajax.force_arm_night` | Arm night mode ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
-| `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Supports entity target; if omitted, applies to all panels. |
+| `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Requires an explicit space alarm panel target. |
 | `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
-| `aegis_ajax.refresh_alarm_images` | Import recent alarm-photo albums without triggering a capture. Target an alarm panel with `entity_id`, or omit it for all spaces. One history query + at most 10 media streams per space, once per five minutes; completed albums are skipped. |
+| `aegis_ajax.refresh_alarm_images` | Import recent alarm-photo albums without triggering a capture. Target a space alarm panel with an explicit `entity_id`. One history query + at most 10 media streams per space, once per five minutes; completed albums are skipped. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
 | `aegis_ajax.list_client_sessions` | Return the sessions Ajax holds for the account (device model, OS, client version, app label, created / expires), with the integration's own session marked `is_current`. On-demand only — the endpoint rate-limits repeated calls. |
 | `aegis_ajax.terminate_client_session` | Log one selected device out of the Ajax account. Requires an explicit confirmation flag and refuses to touch the integration's own session. |
 | `aegis_ajax.terminate_other_client_sessions` | Log every other device out of the Ajax account, keeping this integration's session. Same confirmation flag; reports how many sessions it terminated if the endpoint stops it part way. |
 
-Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.
+All space-level custom actions require explicit `entity_id` targets. Missing targets, group panels, and device/area selectors are rejected. `force_arm`, `force_arm_night`, and `disarm_night_mode` also require `code` when the selected account has PIN protection enabled. Existing automations must supply these fields.
+
+Custom actions check the caller's entity-control permissions before executing any target. Account-session services and Photo on Demand configuration additionally require an HA administrator. Internal HA automations without a user context remain trusted, but still need explicit targets and any configured PIN.
+
+Alarm panels are scoped to their owning Aegis config entry, allowing separate Ajax accounts on the same Space to have separate alarm panels. Existing panel entity IDs are preserved by a registry migration. Custom commands use the targeted panel's account, never another account sharing the Space. Sensor duplication is not added. Configure HA permissions to restrict who can control each account's panels; dashboard visibility is not an authorization mechanism. Ajax-side actor attribution still requires live verification.
 
 ### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
 
@@ -358,7 +362,7 @@ Whether sirens sound is decided **entirely by the hub** — the panic request ca
 | Field | Required | Description |
 |---|---|---|
 | `confirm` | **Yes** (must be `true`) | Safety lock. The service refuses to run unless explicitly set to `true` to prevent accidental triggers from automations. |
-| `entity_id` | No | Alarm panel entity for the space whose panic button to press. If omitted, the panic is sent to **every** configured space. |
+| `entity_id` | Yes | Explicit space alarm panel whose panic button to press. |
 | `latitude` | No | Optional caller latitude forwarded to Ajax. Use together with `longitude`. |
 | `longitude` | No | Optional caller longitude forwarded to Ajax. Use together with `latitude`. |
 
