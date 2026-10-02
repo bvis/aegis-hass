@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Odśwież hub"
+            },
+            "siren_sound_test": {
+                "name": "Test dźwięku"
             }
         },
         "event": {

@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Opdater hub"
+            },
+            "siren_sound_test": {
+                "name": "Test lyd"
             }
         },
         "event": {

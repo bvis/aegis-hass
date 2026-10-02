@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Aktualizovat hub"
+            },
+            "siren_sound_test": {
+                "name": "Test zvuku"
             }
         },
         "event": {

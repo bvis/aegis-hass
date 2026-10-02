@@ -332,3 +332,77 @@ class TestCapturePhotoButtonFailures:
         with pytest.raises(HomeAssistantError) as exc:
             await button.async_press()
         assert exc.value.translation_key == "photo_capture_failed"
+
+
+def _make_siren(device_type: str = "home_siren") -> Device:
+    return Device(
+        id="siren-1",
+        hub_id="hub-1",
+        name="Siren",
+        device_type=device_type,
+        room_id=None,
+        group_id=None,
+        state=DeviceState.ONLINE,
+        malfunctions=0,
+        bypassed=False,
+        statuses={},
+        battery=None,
+    )
+
+
+class TestSirenSoundTestButton:
+    """`button.<siren>_test_sound` plays the siren's test sound (#549)."""
+
+    @pytest.mark.asyncio
+    async def test_setup_adds_one_per_addressable_siren(self) -> None:
+        from custom_components.aegis_ajax.button import AjaxSirenSoundTestButton, async_setup_entry
+
+        coordinator = _make_coordinator()
+        coordinator.devices = {  # type: ignore[attr-defined]
+            "siren-1": _make_siren("street_siren"),
+            # No ObjectType case, so the command can't address it.
+            "siren-2": _make_siren("street_siren_plus"),
+        }
+        coordinator.spaces = {}  # type: ignore[attr-defined]
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        added: list = []
+        await async_setup_entry(MagicMock(), entry, added.extend)
+        sirens = [e for e in added if isinstance(e, AjaxSirenSoundTestButton)]
+        assert [e.unique_id for e in sirens] == ["aegis_ajax_siren-1_siren_sound_test"]
+
+    @pytest.mark.asyncio
+    async def test_press_sends_once_and_drops_a_press_too_soon(self) -> None:
+        from custom_components.aegis_ajax.button import AjaxSirenSoundTestButton
+
+        coordinator = MagicMock()
+        coordinator.devices = {"siren-1": _make_siren()}
+        coordinator.devices_api.start_sound_test = AsyncMock()  # type: ignore[attr-defined]
+        button = AjaxSirenSoundTestButton(coordinator, "siren-1")  # type: ignore[arg-type]
+
+        await button.async_press()
+        await button.async_press()
+
+        coordinator.devices_api.start_sound_test.assert_awaited_once_with(  # type: ignore[attr-defined]
+            "hub-1", "siren-1", "home_siren"
+        )
+
+    @pytest.mark.asyncio
+    async def test_refusal_raises_translated_error(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+        from custom_components.aegis_ajax.button import AjaxSirenSoundTestButton
+
+        coordinator = MagicMock()
+        coordinator.devices = {"siren-1": _make_siren()}
+        coordinator.devices_api.start_sound_test = AsyncMock(  # type: ignore[attr-defined]
+            side_effect=DeviceCommandError(
+                "sound_test: permission_denied", reason="permission_denied"
+            )
+        )
+        button = AjaxSirenSoundTestButton(coordinator, "siren-1")  # type: ignore[arg-type]
+
+        with pytest.raises(HomeAssistantError) as exc:
+            await button.async_press()
+        assert exc.value.translation_key == "command_permission_denied"

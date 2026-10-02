@@ -4508,3 +4508,72 @@ class TestSetChimesMode:
             await api.set_chimes_mode("hub-1", enable=True)
 
         assert exc_info.value.reason == "permission_denied"
+
+
+class TestStartSoundTest:
+    """`device_command_stest_start` — a siren's test sound (#549)."""
+
+    def _make_api(self) -> DevicesApi:
+        client = MagicMock()
+        client._get_channel.return_value = MagicMock()
+        client._session.get_call_metadata.return_value = []
+        return DevicesApi(client)
+
+    @pytest.mark.asyncio
+    async def test_sends_hub_device_and_object_type(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_stest_start import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        api = self._make_api()
+        captured: list = []
+        ok = response_pb2.DeviceCommandSoundTestStartResponse(success=common_response_pb2.Success())
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                async def _execute(req: object, **_: object) -> object:
+                    captured.append(req)
+                    return ok
+
+                self.execute = AsyncMock(side_effect=_execute)
+
+        with patch.object(
+            endpoint_pb2_grpc, "DeviceCommandSoundTestStartServiceStub", _StubFactory
+        ):
+            await api.start_sound_test("hub-1", "siren-1", "street_siren")
+
+        assert len(captured) == 1
+        req = captured[0]
+        assert (req.hub_id, req.device_id) == ("hub-1", "siren-1")
+        assert req.object_type.WhichOneof("type") == "street_siren"
+
+    @pytest.mark.asyncio
+    async def test_failure_raises_with_reason(self) -> None:
+        from v3.mobilegwsvc.commonmodels.response import response_pb2 as common_response_pb2
+        from v3.mobilegwsvc.service.device_command_stest_start import (
+            endpoint_pb2_grpc,
+            response_pb2,
+        )
+
+        from custom_components.aegis_ajax.api.devices import DeviceCommandError
+
+        api = self._make_api()
+        failure = response_pb2.DeviceCommandSoundTestStartResponse(
+            failure=response_pb2.DeviceCommandSoundTestStartResponse.Failure(
+                hub_busy=common_response_pb2.HubBusyError(),
+            )
+        )
+
+        class _StubFactory:
+            def __init__(self, channel: object) -> None:
+                self.execute = AsyncMock(return_value=failure)
+
+        with (
+            patch.object(endpoint_pb2_grpc, "DeviceCommandSoundTestStartServiceStub", _StubFactory),
+            pytest.raises(DeviceCommandError) as exc_info,
+        ):
+            await api.start_sound_test("hub-1", "siren-1", "home_siren")
+
+        assert exc_info.value.reason == "hub_busy"
