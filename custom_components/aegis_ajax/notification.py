@@ -189,6 +189,9 @@ class AjaxNotificationListener:
         self._fcm_config: Any = None
         self._fcm_supervisor_unsub: Callable[[], None] | None = None
         self._fcm_restart_at: float | None = None
+        # Set when the last registration failed retryably: the next restart
+        # registers again instead of starting a client (#553).
+        self._registration_failed = False
         self._fcm_restart_backoff: float = FCM_RESTART_BACKOFF_INITIAL_SECONDS
         self._fcm_client_started_at: float | None = None
         # #373: last persistent_id handed to us, plus which id the client was
@@ -511,6 +514,7 @@ class AjaxNotificationListener:
                 if rejected:
                     # These values worked — drop any stale rejection marker.
                     await self._rejected_store.async_remove()
+                self._registration_failed = False
                 _LOGGER.info("FCM registration successful")
             except Exception as exc:
                 # Remember a terminal credential rejection so we don't re-hit
@@ -522,6 +526,12 @@ class AjaxNotificationListener:
                 await self._async_log_fcm_refusal_reason(exc, android_package)
                 if self._entry_id:
                     async_register_fcm_credentials_invalid(self._hass, entry_id=self._entry_id)
+                if not _is_terminal_fcm_failure(exc):
+                    # Retried with the regular backoff, or push stays down until
+                    # a reload once the stuck-push recovery fails offline (#553).
+                    self._registration_failed = True
+                    self._start_push_client_supervisor()
+                    self._schedule_fcm_restart(time.monotonic())
                 return
             finally:
                 if fcm_session is not None:
@@ -654,6 +664,9 @@ class AjaxNotificationListener:
         attach_fcm_log_guard()
         # Contain undecodable push frames before any can arrive (#373).
         install_fcm_decrypt_guard(FcmPushClient)
+        # Only a frame this client was handed can be the one it died on: an
+        # outage death after an earlier push must not count as a replay (#553).
+        self._last_persistent_id = None
         try:
             self._push_client = FcmPushClient(
                 callback=self._on_notification,
@@ -702,9 +715,10 @@ class AjaxNotificationListener:
         means the server is replaying something we cannot get past — the loop
         cannot break on its own, because the frame is never acked.
 
-        Deaths with no push seen at all (an ordinary network outage) carry no
-        id and must not accumulate, or a long connectivity problem would raise
-        a Repair about a poisoned message that does not exist.
+        Deaths with no push seen during that client's run (an ordinary network
+        outage, even after earlier pushes) carry no id and must not accumulate,
+        or a long connectivity problem would discard a working registration
+        over a poisoned message that does not exist (#553).
         """
         persistent_id = self._last_persistent_id
         if persistent_id is None:
@@ -854,6 +868,11 @@ class AjaxNotificationListener:
         if self._fcm_restart_at is None or now < self._fcm_restart_at:
             return
         self._fcm_restart_at = None
+        if self._registration_failed:
+            # No registration to start a client with: register again. A failure
+            # re-arms the backoff inside `async_start` (#553).
+            await self.async_start()
+            return
         if await self._async_start_push_client(register_repair_on_failure=False):
             _LOGGER.info("FCM push client restarted — push notifications active again")
         else:
