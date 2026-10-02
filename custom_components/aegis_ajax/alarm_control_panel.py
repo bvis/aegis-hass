@@ -287,8 +287,9 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         entry_data = getattr(coordinator.config_entry, "data", {})
         raw_label = entry_data.get("account_label") or entry_data.get("email", "account")
         self._account_label = slugify(str(raw_label)) or "account"
-        self._attr_suggested_object_id = f"ajax_{self._account_label}_{slugify(space_id)}"
         space = coordinator.spaces.get(space_id)
+        space_name = space.name if space and isinstance(space.name, str) else space_id
+        self._attr_suggested_object_id = f"ajax_{self._account_label}_{slugify(str(space_name))}"
         hub_id = space.hub_id if space else space_id
         hub_device = coordinator.devices.get(hub_id)
         if hub_device:
@@ -603,6 +604,9 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         space = coordinator.spaces.get(space_id)
         group = space.get_group(group_id) if space else None
         self._attr_name = group.name if group else f"Group {group_id}"
+        self._attr_suggested_object_id = (
+            f"ajax_{self._account_label}_{slugify(str(group.name if group else group_id))}"
+        )
 
     @property
     def _group(self) -> Group | None:
