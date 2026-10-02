@@ -14,6 +14,7 @@ from homeassistant.components.alarm_control_panel import (  # type: ignore[attr-
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from custom_components.aegis_ajax.const import (
     CONF_EXPOSE_ARM_HOME,
@@ -283,6 +284,10 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         if coordinator.config_entry is None:
             raise ValueError("Alarm panels require an owning config entry")
         self._account_entry_id = coordinator.config_entry.entry_id
+        entry_data = getattr(coordinator.config_entry, "data", {})
+        raw_label = entry_data.get("account_label") or entry_data.get("email", "account")
+        self._account_label = slugify(str(raw_label)) or "account"
+        self._attr_suggested_object_id = f"ajax_{self._account_label}_{slugify(space_id)}"
         space = coordinator.spaces.get(space_id)
         hub_id = space.hub_id if space else space_id
         hub_device = coordinator.devices.get(hub_id)
@@ -554,6 +559,22 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         self.coordinator._optimistic_space_states[self._space_id] = (expiry, new_state)
         if self.hass is not None:
             self.async_write_ha_state()
+            # Other Aegis entries may authenticate the same Ajax Space. Their
+            # panels must reflect this confirmed command immediately too.
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                other = getattr(entry, "runtime_data", None)
+                if other is None or other is self.coordinator:
+                    continue
+                other_space = other.spaces.get(self._space_id)
+                if other_space is None:
+                    continue
+                other.spaces[self._space_id] = replace(
+                    other_space,
+                    security_state=new_state,
+                    night_mode_enabled=night_mode_enabled,
+                )
+                other._optimistic_space_states[self._space_id] = (expiry, new_state)
+                other.async_set_updated_data({"spaces": other.spaces, "devices": other.devices})
 
 
 class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
@@ -674,3 +695,19 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
             return  # not a real dataclass (e.g. during tests)
         if self.hass is not None:
             self.async_write_ha_state()
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                other = getattr(entry, "runtime_data", None)
+                if other is None or other is self.coordinator:
+                    continue
+                other_space = other.spaces.get(self._space_id)
+                if other_space is None:
+                    continue
+                other_group = other_space.get_group(self._group_id)
+                if other_group is None:
+                    continue
+                other_groups = tuple(
+                    replace(g, security_state=new_state) if g.id == self._group_id else g
+                    for g in other_space.groups
+                )
+                other.spaces[self._space_id] = replace(other_space, groups=other_groups)
+                other.async_set_updated_data({"spaces": other.spaces, "devices": other.devices})
