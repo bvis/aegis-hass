@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Hub'ı yenile"
+            },
+            "siren_sound_test": {
+                "name": "Ses testi"
             }
         },
         "event": {

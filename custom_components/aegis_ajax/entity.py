@@ -166,6 +166,16 @@ async def async_set_chimes_mode(
     await coordinator.async_request_refresh()
 
 
+async def async_start_sound_test(coordinator: AjaxCobrandedCoordinator, device: Device) -> None:
+    """Play a siren's test sound, mapping hub rejections to a clear error (#549)."""
+    from custom_components.aegis_ajax.api.devices import DeviceCommandError  # noqa: PLC0415
+
+    try:
+        await coordinator.devices_api.start_sound_test(device.hub_id, device.id, device.device_type)
+    except DeviceCommandError as err:
+        _raise_translated_command_error(err)
+
+
 def _raise_translated_command_error(err: Any) -> None:  # noqa: ANN401
     """Re-raise a `DeviceCommandError` as a translated `HomeAssistantError`.
 

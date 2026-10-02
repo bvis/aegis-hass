@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Reîmprospătează hub-ul"
+            },
+            "siren_sound_test": {
+                "name": "Test sunet"
             }
         },
         "event": {

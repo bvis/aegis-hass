@@ -331,6 +331,9 @@
             },
             "refresh_hub": {
                 "name": "Оновити хаб"
+            },
+            "siren_sound_test": {
+                "name": "Перевірка звуку"
             }
         },
         "event": {
