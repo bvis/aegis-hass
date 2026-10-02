@@ -251,6 +251,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 "password_hash": self._password_hash,
                 "app_label": self._app_label,
                 "spaces": user_input["spaces"],
+                "account_label": user_input.get(
+                    "account_label", self._email.split("@", 1)[0]
+                ).strip(),
                 "device_id": self._client.session.device_id,
             }
             # Persist session token to avoid re-login (and 2FA) on restart
@@ -294,6 +297,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                         # disables Submit while empty for `Required`, so
                         # this is the belt-and-braces server-side guard.
                         vol.Length(min=1),
+                    ),
+                    vol.Required("account_label", default=self._email.split("@", 1)[0]): vol.All(
+                        str, vol.Length(min=1, max=32)
                     ),
                 }
             ),
