@@ -3,6 +3,7 @@
     "name": "Aegis for Ajax",
     "codeowners": ["@bvis"],
     "config_flow": true,
+    "after_dependencies": ["web_rtc"],
     "dependencies": ["media_source"],
     "dhcp": [
         {"macaddress": "9C756E*"}
