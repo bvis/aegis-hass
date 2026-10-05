@@ -203,6 +203,8 @@ async def test_asks_for_the_stream_in_init_and_answers_the_camera_offer() -> Non
     assert outcome.offer_shape == sdp_shape(CAMERA_OFFER)
     assert outcome.answer_shape == sdp_shape(LOCAL_ANSWER)
     assert (outcome.ice_servers, outcome.remote_candidates, outcome.local_candidates) == (1, 1, 1)
+    assert outcome.remote_candidate_types == {"relay": 1}
+    assert outcome.local_candidate_types == {"host": 1}
     session.close()
 
 
@@ -218,6 +220,20 @@ async def test_answered_session_outlives_the_answer_timeout() -> None:
         await asyncio.sleep(0.2)
     assert errors == []
     session.close()
+
+
+@pytest.mark.asyncio
+async def test_answered_session_ends_quietly_at_its_lifetime_cap() -> None:
+    errors: list[str] = []
+    stub, _calls = _server(_happy)
+    session = _session(on_error=lambda code, _m: errors.append(code))
+    with patch(STUB, stub), patch.object(webrtc, "MAX_SESSION_SECONDS", 0.05):
+        session.start()
+        await _settle()
+        session.send_answer(LOCAL_ANSWER)
+        await asyncio.sleep(0.2)
+    assert errors == []
+    assert session.closed
 
 
 @pytest.mark.asyncio

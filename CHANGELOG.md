@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The experimental cloud live view (#322) can now reach a camera on another network.** Home Assistant starts its go2rtc with no STUN or TURN servers, so go2rtc could only offer its LAN addresses, and a camera behind another router had no way to reach it. The setup finished on both sides but no video arrived. go2rtc now gets the same ICE servers Home Assistant gives the browser: its own STUN servers by default, plus any you configured or Home Assistant Cloud's. The session also stays open once go2rtc has answered. go2rtc hangs up the signalling as soon as it's connected, and the integration used to read that as "nobody's watching" and close the camera's session at that very moment. An answered session now runs until Ajax ends it, the next live view replaces it, or 10 minutes pass. The `cloud_video` diagnostics now count which kinds of connection path each side offered (`host`, `srflx`, `relay`), never the addresses. **Requests to Ajax:** none added. Still one video session per live view, and never more than one per camera.
+
 ## [1.23.0] - 2026-10-03
 
 Two push fixes confirmed in the field, a test button for sirens, and an experimental cloud live view for video cameras. After an internet outage, push now comes back on its own: an outage no longer throws away a working push registration, and a failed registration is retried every few minutes instead of waiting for a reload. Sirens get a *Test sound* button. The diagnostics show whether the Home Assistant account has video detection pushes turned on. Event entities no longer replay their last event after a failed update, and a refused lock or unlock now fails the action instead of looking successful.

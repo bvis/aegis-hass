@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -12,6 +13,8 @@ import pytest
 from custom_components.aegis_ajax.api.webrtc import RemoteCandidate
 from custom_components.aegis_ajax.camera import AjaxCloudVideoCamera
 from custom_components.aegis_ajax.video_bridge import VideoBridge
+
+CAMERA = "custom_components.aegis_ajax.camera"
 
 
 class FakeSession:
@@ -87,8 +90,89 @@ async def test_bridge_speaks_go2rtc_openipc() -> None:
         await bridge.async_stop()
     assert camera.session.answers == ["v=0 answer"]
     assert camera.session.candidates == [("candidate:2 1 udp 1 5.6.7.8 9 typ host", "0", 0)]
-    # go2rtc closing the socket (last viewer gone) closes the Ajax session.
+    # go2rtc closes the socket as soon as it is connected, so an answered
+    # session must keep running: the camera is streaming on it.
+    assert not camera.session.closed
+
+
+@pytest.mark.asyncio
+async def test_bridge_closes_an_unanswered_session_with_the_socket() -> None:
+    bridge = VideoBridge()
+    await bridge.async_start()
+    camera = FakeCamera()
+    bridge.register("tok", camera)
+    try:
+        async with (
+            aiohttp.ClientSession() as http,
+            http.ws_connect(f"http://127.0.0.1:{bridge.port}/tok") as ws,
+        ):
+            await ws.receive_json()
+        for _ in range(50):
+            if camera.session.closed:
+                break
+            await asyncio.sleep(0.01)
+    finally:
+        await bridge.async_stop()
     assert camera.session.closed
+
+
+def test_bridge_url_carries_the_ice_servers_for_go2rtc() -> None:
+    bridge = VideoBridge()
+    bridge.port = 1234
+    ice = '[{"urls":["stun:stun.example:3478"]}]'
+    assert (
+        bridge.url("tok", ice) == f"webrtc:ws://127.0.0.1:1234/tok#format=openipc#ice_servers={ice}"
+    )
+    assert bridge.url("tok") == "webrtc:ws://127.0.0.1:1234/tok#format=openipc"
+
+
+@pytest.mark.asyncio
+async def test_camera_hands_home_assistants_ice_servers_to_go2rtc() -> None:
+    from webrtc_models import RTCIceServer
+
+    coordinator = MagicMock()
+    coordinator.devices = {}
+    camera = AjaxCloudVideoCamera(coordinator, "dev-1", ("ve-1", "chan-1"))
+    camera.hass = MagicMock()
+    bridge = VideoBridge()
+    bridge.port = 1234
+    servers = [
+        RTCIceServer(urls=["stun:stun.example:3478"]),
+        RTCIceServer(urls="turn:turn.example:3478", username="u", credential="c"),
+        # go2rtc splits its parameters on "#", so this one can't be passed.
+        RTCIceServer(urls="turn:turn.example:3478", username="u", credential="a#b"),
+    ]
+    with (
+        patch(f"{CAMERA}.async_get_bridge", AsyncMock(return_value=bridge)),
+        patch(f"{CAMERA}.async_get_ice_servers", return_value=servers),
+    ):
+        url = await camera.stream_source()
+    assert url is not None
+    _, _, ice = url.partition("#ice_servers=")
+    assert json.loads(ice) == [
+        {"urls": ["stun:stun.example:3478"]},
+        {"urls": "turn:turn.example:3478", "username": "u", "credential": "c"},
+    ]
+
+
+def test_a_new_session_closes_the_previous_one() -> None:
+    coordinator = MagicMock()
+    coordinator.devices = {}
+    coordinator.spaces = {"space-1": object()}
+    coordinator.cloud_video_outcomes = {}
+    camera = AjaxCloudVideoCamera(coordinator, "dev-1", ("ve-1", "chan-1"))
+    noop = {
+        "on_offer": lambda _s: None,
+        "on_candidate": lambda _c: None,
+        "on_error": lambda *_: None,
+    }
+    with patch(f"{CAMERA}.CloudVideoSession.start", lambda self: None):
+        first = camera.open_session(**noop)
+        camera._last_session_at = 0.0
+        second = camera.open_session(**noop)
+    assert first is not None and second is not None
+    assert first.closed
+    assert not second.closed
 
 
 @pytest.mark.asyncio
