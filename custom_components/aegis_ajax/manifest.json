@@ -1,6 +1,7 @@
 {
     "domain": "aegis_ajax",
     "name": "Aegis for Ajax",
+    "after_dependencies": ["web_rtc"],
     "codeowners": ["@bvis"],
     "config_flow": true,
     "dependencies": ["media_source"],

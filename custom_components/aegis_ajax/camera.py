@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 import time
 from typing import TYPE_CHECKING
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
+from homeassistant.components.web_rtc import async_get_ice_servers
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -230,7 +232,10 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         # connects to it, which happens when someone opens the live view.
         bridge = await async_get_bridge(self.hass)
         bridge.register(self._token, self)
-        return bridge.url(self._token)
+        servers = [server.to_dict() for server in async_get_ice_servers(self.hass)]
+        # go2rtc splits its URL parameters on "#", so a server containing one is left out.
+        ice = json.dumps([s for s in servers if "#" not in json.dumps(s)], separators=(",", ":"))
+        return bridge.url(self._token, ice)
 
     async def async_create_stream(self) -> None:
         # No HLS stream: Home Assistant offers HLS for every go2rtc camera, and
@@ -262,8 +267,11 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         # Shared object: the dump shows how far the latest session got, even
         # while it is still running.
         self.coordinator.cloud_video_outcomes[self._device_id] = session.outcome
-        self._sessions = {s for s in self._sessions if not s.closed}
-        self._sessions.add(session)
+        # go2rtc only asks again once its previous producer is gone, so an
+        # older session still open is idle: close it, one per camera.
+        for old in self._sessions:
+            old.close()
+        self._sessions = {session}
         session.start()
         return session
 

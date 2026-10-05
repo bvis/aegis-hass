@@ -17,8 +17,11 @@ The outcome of every session is recorded (stage reached, codecs, the layout
 of the camera's offer and of the answer) for diagnostics. No SDP, candidate
 or ICE credential is ever logged or stored.
 
-API delta: one stream per live view, opened when go2rtc asks for it and
-closed when the last viewer leaves. Nothing runs while nobody watches.
+API delta: one stream per live view, opened when go2rtc asks for it. go2rtc
+hangs up its signalling socket as soon as it is connected, so an answered
+stream runs until Ajax ends it, the next live view replaces it, or
+``MAX_SESSION_SECONDS`` passes, whichever comes first; never more than one
+per camera.
 """
 
 from __future__ import annotations
@@ -43,9 +46,15 @@ _LOGGER = logging.getLogger(__name__)
 # the player spinning.
 ANSWER_TIMEOUT = 20.0
 
+# ponytail: fixed cap on an answered session; we can't see when go2rtc's last
+# viewer leaves. Raise it, or end the session on go2rtc's stream list, if
+# live views longer than this get cut.
+MAX_SESSION_SECONDS = 600.0
+
 # Id of the first live main stream (`<n>-l` + `m`); tracks come back as `<id>-v` / `<id>-a`.
 LIVE_MAIN_STREAM_ID = "0-lm"
 
+_CANDIDATE_TYPE_RE = re.compile(r" typ (\w+)")
 _RTPMAP_RE = re.compile(r"^a=rtpmap:\d+ ([A-Za-z0-9_-]+)/", re.MULTILINE)
 
 
@@ -102,6 +111,12 @@ def sdp_shape(sdp: str) -> list[str]:
     return out
 
 
+def _count_candidate_type(counts: dict[str, int], candidate: str) -> None:
+    match = _CANDIDATE_TYPE_RE.search(candidate)
+    kind = match.group(1) if match else "unknown"
+    counts[kind] = counts.get(kind, 0) + 1
+
+
 @dataclass
 class SessionOutcome:
     """PII-free record of how one cloud-video session went, for diagnostics."""
@@ -117,6 +132,9 @@ class SessionOutcome:
     ice_servers: int | None = None
     remote_candidates: int = 0
     local_candidates: int = 0
+    # host / srflx / relay counts: which paths each side offered, no addresses.
+    remote_candidate_types: dict[str, int] = field(default_factory=dict)
+    local_candidate_types: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +149,8 @@ class SessionOutcome:
             "ice_servers": self.ice_servers,
             "remote_candidates": self.remote_candidates,
             "local_candidates": self.local_candidates,
+            "remote_candidate_types": self.remote_candidate_types,
+            "local_candidate_types": self.local_candidate_types,
         }
 
 
@@ -254,7 +274,7 @@ class CloudVideoSession:
         self._task = asyncio.get_running_loop().create_task(self._run())
 
     def send_answer(self, sdp: str) -> None:
-        """Answer the camera's offer; from here the session runs until closed."""
+        """Answer the camera's offer; the session then runs until closed or capped."""
         if self._closed:
             return
         self.outcome.answer_codecs = sdp_codecs(sdp)
@@ -262,7 +282,8 @@ class CloudVideoSession:
         self.outcome.stage = "answered"
         self._outbox.put_nowait(self._answer_request(sdp))
         if self._deadline is not None:
-            self._deadline.reschedule(None)
+            loop = asyncio.get_running_loop()
+            self._deadline.reschedule(loop.time() + MAX_SESSION_SECONDS)
 
     def add_local_candidate(
         self, candidate: str, sdp_mid: str | None, sdp_mline_index: int | None
@@ -271,6 +292,7 @@ class CloudVideoSession:
         if self._closed or not candidate:
             return
         self.outcome.local_candidates += 1
+        _count_candidate_type(self.outcome.local_candidate_types, candidate)
         self._outbox.put_nowait(self._candidate_request(candidate, sdp_mid, sdp_mline_index))
 
     def close(self) -> None:
@@ -330,6 +352,7 @@ class CloudVideoSession:
         elif kind == "new_ice_candidate":
             cand = success.new_ice_candidate.candidate
             self.outcome.remote_candidates += 1
+            _count_candidate_type(self.outcome.remote_candidate_types, cand.sdp)
             self._on_candidate(
                 RemoteCandidate(
                     candidate=cand.sdp,
@@ -366,7 +389,10 @@ class CloudVideoSession:
             if not self._closed:
                 self._fail("stream_ended", "Ajax closed the video session")
         except TimeoutError:
-            self._fail("timeout", f"no answer to the camera's offer (stage {self.outcome.stage})")
+            if self.outcome.stage != "answered":
+                self._fail(
+                    "timeout", f"no answer to the camera's offer (stage {self.outcome.stage})"
+                )
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001

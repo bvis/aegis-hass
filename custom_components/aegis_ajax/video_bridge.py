@@ -12,6 +12,13 @@ openipc messages to the Ajax signalling stream:
     go2rtc -> us  {"req": "answer", "data": "<sdp>"}
     go2rtc -> us  {"req": "candidate", "data": "<candidate>"}
 
+go2rtc hangs up as soon as its peer connection is up, so once go2rtc has
+answered, a closed socket no longer ends the Ajax session: the camera is
+streaming on it. The URL also carries Home Assistant's ICE servers
+(``#ice_servers=``): Home Assistant starts go2rtc with none, so without them
+it could only offer its LAN addresses, which a camera behind another NAT
+can't reach.
+
 Each camera has a random token in its URL, and the socket only listens on
 the loopback interface.
 """
@@ -65,8 +72,9 @@ class VideoBridge:
     def unregister(self, token: str) -> None:
         self._cameras.pop(token, None)
 
-    def url(self, token: str) -> str:
-        return f"webrtc:ws://127.0.0.1:{self.port}/{token}#format=openipc"
+    def url(self, token: str, ice_servers: str | None = None) -> str:
+        url = f"webrtc:ws://127.0.0.1:{self.port}/{token}#format=openipc"
+        return f"{url}#ice_servers={ice_servers}" if ice_servers else url
 
     async def async_start(self) -> None:
         app = web.Application()
@@ -120,6 +128,7 @@ class VideoBridge:
             await ws.close()
 
         writer = asyncio.get_running_loop().create_task(write())
+        answered = False
         try:
             async for msg in ws:
                 if msg.type is not WSMsgType.TEXT:
@@ -128,12 +137,14 @@ class VideoBridge:
                     data = json.loads(msg.data)
                     if data.get("req") == "answer":
                         session.send_answer(data.get("data") or "")
+                        answered = True
                     elif data.get("req") == "candidate":
                         # go2rtc sends the bare candidate line; with BUNDLE
                         # every candidate belongs to the first section.
                         session.add_local_candidate(data.get("data") or "", "0", 0)
         finally:
-            session.close()
+            if not answered:
+                session.close()
             writer.cancel()
         return ws
 
