@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Push decryption is no longer shared with other integrations.** The integration used to patch the push library's decrypt for the whole Home Assistant process, so another integration doing the same (Fermax Blue does) wrapped ours, and its push errors were logged as `aegis_ajax` warnings. Aegis now decrypts its own pushes on its own push client and leaves the library untouched. It also reads signed push headers (`dh=<key>; p256ecdsa=<key>`), which broke every Fermax push in October 2026, in case Ajax ever starts signing too. **Requests to Ajax:** none added.
+
 ### Fixed
 - **The experimental cloud live view (#322) can now reach a camera on another network.** Home Assistant starts its go2rtc with no STUN or TURN servers, so go2rtc could only offer its LAN addresses, and a camera behind another router had no way to reach it. The setup finished on both sides but no video arrived. go2rtc now gets the same ICE servers Home Assistant gives the browser: its own STUN servers by default, plus any you configured or Home Assistant Cloud's. The session also stays open once go2rtc has answered. go2rtc hangs up the signalling as soon as it's connected, and the integration used to read that as "nobody's watching" and close the camera's session at that very moment. An answered session now runs until Ajax ends it, the next live view replaces it, or 10 minutes pass. The `cloud_video` diagnostics now count which kinds of connection path each side offered (`host`, `srflx`, `relay`), never the addresses. **Requests to Ajax:** none added. Still one video session per live view, and never more than one per camera.
 
