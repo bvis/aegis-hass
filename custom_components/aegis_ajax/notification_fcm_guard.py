@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
+from base64 import urlsafe_b64decode
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
@@ -36,14 +37,6 @@ GUARD_LOGGER_NAME = __name__
 
 # The module logger firebase-messaging's `_listen` loop emits on.
 FCM_PUSH_LOGGER_NAME = "firebase_messaging.fcmpushclient"
-
-# Marker attribute so `install_fcm_decrypt_guard` is idempotent across
-# reloads and supervised restarts.
-_DECRYPT_GUARD_FLAG = "_aegis_decrypt_guard_installed"
-
-# Where the shipped `_decrypt_raw_data` is kept once patched, so the patch is
-# reversible.
-_PRISTINE_DECRYPT_ATTR = "_aegis_pristine_decrypt"
 
 # More than this many exception logs inside the window is a storm, not
 # operations: healthy reconnects log at most one exception per reset cycle
@@ -107,12 +100,29 @@ def _pad_urlsafe_b64(value: str) -> str:
     return value + "========"
 
 
-def install_fcm_decrypt_guard(client_cls: Any) -> None:  # noqa: ANN401
-    """Make `_decrypt_raw_data` padding-tolerant and non-fatal (#373).
+def _header_param(value: str, name: str) -> str:
+    """Return parameter `name` from an upstream-sliced `;`-separated header value.
+
+    The library slices the leading `dh=` / `salt=` off by length and keeps the
+    rest, so a VAPID-signed push (`dh=<key>; p256ecdsa=<key>`) arrives here as
+    `<key>; p256ecdsa=<key>` and decodes to a key that is not a P-256 point
+    (`Invalid EC key`). Fermax started signing its pushes this way in
+    2026-10; this keeps Ajax pushes working if it ever does too.
+    """
+    segments = [segment.strip() for segment in value.split(";")]
+    for segment in segments:
+        if segment.startswith(f"{name}="):
+            return segment[len(name) + 1 :]
+    return segments[0]
+
+
+def install_fcm_decrypt_guard(client: Any) -> None:  # noqa: ANN401
+    """Give our push client a padding-tolerant, non-fatal decrypt (#373).
 
     Two failures are being contained here, and the second is the severe one:
 
-    1. **Unpadded base64.** The root cause; `_pad_urlsafe_b64` fixes it.
+    1. **Malformed header values.** Unpadded base64 (`_pad_urlsafe_b64`) and
+       signed headers carrying a second parameter (`_header_param`).
     2. **A raise tearing down the whole client.** `binascii.Error` is a
        `ValueError`, so the listen loop's `except (OSError, EOFError)` misses
        it and it reaches the outer `except Exception`, which shuts the client
@@ -129,27 +139,40 @@ def install_fcm_decrypt_guard(client_cls: Any) -> None:  # noqa: ANN401
     crucially — reaches the acknowledgement. One event is lost instead of all
     future ones.
 
-    Upstream fixes this properly in sdb9696/firebase-messaging#37, open and
-    mergeable since June with no release carrying it. Drop this patch once a
-    release ships it, tracked in #373.
+    The decrypt is our own and lands on this client instance only (the library
+    calls `self._decrypt_raw_data`). Patching the shared `FcmPushClient` class
+    used to chain us with any other integration doing the same — Fermax Blue
+    did — so each logged the other's push errors as its own.
+
+    Upstream fixes the padding in sdb9696/firebase-messaging#37, open and
+    mergeable since June with no release carrying it. Drop this once a
+    release ships it and the signed headers, tracked in #373.
     """
-    original = getattr(client_cls, "_decrypt_raw_data", None)
-    if original is None or getattr(client_cls, _DECRYPT_GUARD_FLAG, False):
-        return
+    import http_ece  # noqa: PLC0415
+    from cryptography.hazmat.primitives.serialization import (  # noqa: PLC0415
+        load_der_private_key,
+    )
+
     state = {"warned": False}
 
-    def _guarded(
+    def _decrypt(
         credentials: dict[str, Any],
         crypto_key_str: str,
         salt_str: str,
         raw_data: bytes,
     ) -> bytes:
         try:
-            decrypted: bytes = original(
-                credentials,
-                _pad_urlsafe_b64(crypto_key_str),
-                _pad_urlsafe_b64(salt_str),
+            keys = credentials["keys"]
+            private_key = load_der_private_key(
+                urlsafe_b64decode(_pad_urlsafe_b64(keys["private"])), password=None
+            )
+            decrypted: bytes = http_ece.decrypt(
                 raw_data,
+                salt=urlsafe_b64decode(_pad_urlsafe_b64(_header_param(salt_str, "salt"))),
+                private_key=private_key,
+                dh=urlsafe_b64decode(_pad_urlsafe_b64(_header_param(crypto_key_str, "dh"))),
+                version="aesgcm",
+                auth_secret=urlsafe_b64decode(_pad_urlsafe_b64(keys["secret"])),
             )
             return decrypted
         except Exception as exc:  # noqa: BLE001
@@ -170,11 +193,7 @@ def install_fcm_decrypt_guard(client_cls: Any) -> None:  # noqa: ANN401
                 )
             return b""
 
-    # Keep the shipped function reachable: it is what we delegate to, and it
-    # lets the patch be undone (tests do exactly that to prove the premise).
-    setattr(client_cls, _PRISTINE_DECRYPT_ATTR, staticmethod(original))
-    client_cls._decrypt_raw_data = staticmethod(_guarded)  # noqa: SLF001
-    setattr(client_cls, _DECRYPT_GUARD_FLAG, True)
+    client._decrypt_raw_data = _decrypt  # noqa: SLF001
 
 
 def attach_fcm_log_guard() -> None:

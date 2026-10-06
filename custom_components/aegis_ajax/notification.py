@@ -662,8 +662,6 @@ class AjaxNotificationListener:
 
         # Defuse the traceback CPU bomb before the listen loop exists (#285).
         attach_fcm_log_guard()
-        # Contain undecodable push frames before any can arrive (#373).
-        install_fcm_decrypt_guard(FcmPushClient)
         # Only a frame this client was handed can be the one it died on: an
         # outage death after an earlier push must not count as a replay (#553).
         self._last_persistent_id = None
@@ -677,6 +675,8 @@ class AjaxNotificationListener:
                 # supervisor then owns the restart cadence (#285).
                 config=FcmPushClientConfig(abort_on_sequential_error_count=3),
             )
+            # Contain undecodable push frames before any can arrive (#373).
+            install_fcm_decrypt_guard(self._push_client)
             if asyncio.iscoroutinefunction(self._push_client.start):
                 await self._push_client.start()
             else:
