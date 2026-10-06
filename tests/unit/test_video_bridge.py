@@ -137,7 +137,7 @@ async def test_camera_hands_home_assistants_ice_servers_to_go2rtc() -> None:
     bridge = VideoBridge()
     bridge.port = 1234
     servers = [
-        RTCIceServer(urls=["stun:stun.example:3478"]),
+        RTCIceServer(urls=["stun:stun.example:3478", "stun:stun.example:80"]),
         RTCIceServer(urls="turn:turn.example:3478", username="u", credential="c"),
         # go2rtc splits its parameters on "#", so this one can't be passed.
         RTCIceServer(urls="turn:turn.example:3478", username="u", credential="a#b"),
@@ -149,8 +149,10 @@ async def test_camera_hands_home_assistants_ice_servers_to_go2rtc() -> None:
         url = await camera.stream_source()
     assert url is not None
     _, _, ice = url.partition("#ice_servers=")
+    # go2rtc 1.9.x drops a list of URLs without a word, so each URL goes alone as a string.
     assert json.loads(ice) == [
-        {"urls": ["stun:stun.example:3478"]},
+        {"urls": "stun:stun.example:3478"},
+        {"urls": "stun:stun.example:80"},
         {"urls": "turn:turn.example:3478", "username": "u", "credential": "c"},
     ]
 

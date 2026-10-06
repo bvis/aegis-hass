@@ -232,7 +232,15 @@ class AjaxCloudVideoCamera(CoordinatorEntity[AjaxCobrandedCoordinator], Camera):
         # connects to it, which happens when someone opens the live view.
         bridge = await async_get_bridge(self.hass)
         bridge.register(self._token, self)
-        servers = [server.to_dict() for server in async_get_ice_servers(self.hass)]
+        servers = []
+        for server in async_get_ice_servers(self.hass):
+            entry = server.to_dict()
+            urls = entry.pop("urls")
+            # go2rtc 1.9.x only reads "urls" as a string and silently drops a
+            # list, which left it without STUN: one server per URL.
+            servers += [
+                {**entry, "urls": url} for url in ([urls] if isinstance(urls, str) else urls)
+            ]
         # go2rtc splits its URL parameters on "#", so a server containing one is left out.
         ice = json.dumps([s for s in servers if "#" not in json.dumps(s)], separators=(",", ":"))
         return bridge.url(self._token, ice)
