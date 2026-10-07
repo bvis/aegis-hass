@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 async def test_migration_preserves_entity_id_and_other_account(tmp_path: Path) -> None:
     hass = HomeAssistant(str(tmp_path))
     hass.config_entries = MagicMock()
-    with patch("homeassistant.helpers.device_registry.async_get", return_value=MagicMock()):
+    with patch("homeassistant.helpers.device_registry.async_get", return_value=MagicMock(async_wait_loaded=AsyncMock())):
         registry = er.async_get(hass)
         await registry.async_load()
     with patch.object(registry, "async_schedule_save"):
