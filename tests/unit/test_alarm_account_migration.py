@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 async def test_migration_preserves_entity_id_and_other_account(tmp_path: Path) -> None:
     hass = HomeAssistant(str(tmp_path))
     hass.config_entries = MagicMock()
-    dr.async_get(hass)
-    registry = er.async_get(hass)
-    await registry.async_load()
+    with patch("homeassistant.helpers.device_registry.async_get", return_value=MagicMock()):
+        registry = er.async_get(hass)
+        await registry.async_load()
     with patch.object(registry, "async_schedule_save"):
         alice = SimpleNamespace(entry_id="alice", pref_disable_new_entities=False, disabled_by=None)
         bob = SimpleNamespace(entry_id="bob", pref_disable_new_entities=False, disabled_by=None)
