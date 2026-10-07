@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.1] - 2026-10-07
+
+### Fixed
+- **Login works again after Ajax blocked the app version we report (#559).** Since 7 October 2026 Ajax rejects the app version the integration has always sent (3.30) with `PERMISSION_DENIED: Request is blacklisted`, so setup and reconfiguring failed for everyone. The integration now reports 3.57, a current Android app version, to both Ajax connections. With the newer version Ajax leaves the CRA company out of the space data, so the *CRA company* diagnostic sensor stays empty for now. **Requests to Ajax:** none added.
+
 ## [1.23.0] - 2026-10-03
 
 Two push fixes confirmed in the field, a test button for sirens, and an experimental cloud live view for video cameras. After an internet outage, push now comes back on its own: an outage no longer throws away a working push registration, and a failed registration is retried every few minutes instead of waiting for a reload. Sirens get a *Test sound* button. The diagnostics show whether the Home Assistant account has video detection pushes turned on. Event entities no longer replay their last event after a failed update, and a refused lock or unlock now fails the action instead of looking successful.
