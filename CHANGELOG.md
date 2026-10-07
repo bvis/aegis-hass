@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.23.2] - unreleased
+## [1.23.2] - 2026-10-08
 
 ### Added
 - **A clear message when Ajax stops accepting the integration's version.** When Ajax blacklisted the app version we reported (#559), setup, reauth and reconfigure only said "An unexpected error occurred", and a running install just went unavailable with nothing in the UI (#563). Those forms now say Ajax is rejecting this version and to update the integration, and a running install raises a Repair with the same advice that clears itself once Ajax accepts it again. A missing account permission still reads as before. **Requests to Ajax:** none added.
