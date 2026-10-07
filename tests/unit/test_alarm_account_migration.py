@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.aegis_ajax.alarm_control_panel import async_setup_entry
@@ -21,7 +20,10 @@ if TYPE_CHECKING:
 async def test_migration_preserves_entity_id_and_other_account(tmp_path: Path) -> None:
     hass = HomeAssistant(str(tmp_path))
     hass.config_entries = MagicMock()
-    with patch("homeassistant.helpers.device_registry.async_get", return_value=MagicMock(async_wait_loaded=AsyncMock())):
+    with patch(
+        "homeassistant.helpers.device_registry.async_get",
+        return_value=MagicMock(async_wait_loaded=AsyncMock()),
+    ):
         registry = er.async_get(hass)
         await registry.async_load()
     with patch.object(registry, "async_schedule_save"):
