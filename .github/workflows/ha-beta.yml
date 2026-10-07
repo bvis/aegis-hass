@@ -1,0 +1,59 @@
+name: Newest HA core
+
+# The CI workflow tests against the newest *stable* core, which is what users
+# run today. This one tests against the newest release on PyPI, beta included,
+# installed under that core's own package_constraints.txt exactly as Home
+# Assistant would install us. A beta lands about a week before each stable and
+# can move pins under us (2026.10 took protobuf from 6 to 7 and swapped
+# voluptuous for probatio), so the daily run turns that into a red build while
+# there is still time to react, instead of a user report on release day.
+#
+# Not a required check: a broken beta must not block merges.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "37 7 * * *"
+  workflow_dispatch:
+    inputs:
+      ha_version:
+        description: "Core version to test (default: newest on PyPI, beta included)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run unit tests against the newest core
+        env:
+          HA_VERSION: ${{ inputs.ha_version }}
+        run: |
+          docker run --rm -e HA_VERSION -v "$(pwd)":/app -w /app python:3.14-slim bash -c '
+            set -euo pipefail
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc libc-dev >/dev/null
+            pip install --quiet --no-cache-dir --root-user-action=ignore packaging
+            if [ -z "$HA_VERSION" ]; then
+              HA_VERSION=$(python3 -c "
+          import json, urllib.request
+          from packaging.version import Version
+          data = json.load(urllib.request.urlopen(\"https://pypi.org/pypi/homeassistant/json\"))
+          print(max((v for v, files in data[\"releases\"].items() if files and not all(f[\"yanked\"] for f in files)), key=Version))
+          ")
+            fi
+            echo "Testing against homeassistant==$HA_VERSION"
+            python3 -c "import urllib.request; urllib.request.urlretrieve(\"https://raw.githubusercontent.com/home-assistant/core/$HA_VERSION/homeassistant/package_constraints.txt\", \"/tmp/constraints.txt\")"
+            # Runtime requirements only: the dev extra pins grpcio-tools, whose
+            # protobuf cap is a codegen concern and may conflict with the core pin.
+            pip install --quiet --no-cache-dir --root-user-action=ignore -c /tmp/constraints.txt \
+              "homeassistant==$HA_VERSION" \
+              $(python3 -c "import json; print(\" \".join(json.load(open(\"custom_components/aegis_ajax/manifest.json\"))[\"requirements\"]))") \
+              pytest pytest-asyncio
+            pip list 2>/dev/null | grep -iE "^(homeassistant|protobuf|grpcio|firebase-messaging) "
+            python3 scripts/check_proto_imports.py
+            pytest tests/unit/ -q -p no:cacheprovider
+          '
