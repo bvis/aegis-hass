@@ -5,17 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.23.2] - unreleased
 
 ### Changed
 - **Push decryption is no longer shared with other integrations.** The integration used to patch the push library's decrypt for the whole Home Assistant process, so another integration doing the same (Fermax Blue does) wrapped ours, and its push errors were logged as `aegis_ajax` warnings. Aegis now decrypts its own pushes on its own push client and leaves the library untouched. It also reads signed push headers (`dh=<key>; p256ecdsa=<key>`), which broke every Fermax push in October 2026, in case Ajax ever starts signing too. **Requests to Ajax:** none added.
 
 ### Fixed
-- **Login works again after Ajax blocked the app version we report (#559).** Since 7 October 2026 Ajax rejects the app version the integration has always sent (3.30) with `PERMISSION_DENIED: Request is blacklisted`, so setup and reconfiguring failed for everyone. The integration now reports 3.57, a current Android app version, to both Ajax connections. Newer versions made Ajax leave the CRA company out of the space data in the past, so the *CRA company* diagnostic sensor may show unknown. **Requests to Ajax:** none added.
-
 - **The experimental cloud live view (#322) can now reach a camera on another network.** Home Assistant starts its go2rtc with no STUN or TURN servers, so go2rtc could only offer its LAN addresses, and a camera behind another router had no way to reach it. The setup finished on both sides but no video arrived. go2rtc now gets the same ICE servers Home Assistant gives the browser: its own STUN servers by default, plus any you configured or Home Assistant Cloud's. The session also stays open once go2rtc has answered. go2rtc hangs up the signalling as soon as it's connected, and the integration used to read that as "nobody's watching" and close the camera's session at that very moment. An answered session now runs until Ajax ends it, the next live view replaces it, or 10 minutes pass. The `cloud_video` diagnostics now count which kinds of connection path each side offered (`host`, `srflx`, `relay`), never the addresses. **Requests to Ajax:** none added. Still one video session per live view, and never more than one per camera.
 
 - **The cloud live view (#322) actually passes the STUN servers to go2rtc now.** go2rtc 1.9, the version Home Assistant ships, only reads a server's `urls` as a single string and silently ignores a list, which is how Home Assistant hands them over. So the fix above never reached go2rtc: it still offered only LAN addresses, and video played only when the router happened to let it through. Each URL is now passed as a server of its own, which go2rtc does read. **Requests to Ajax:** none added.
+
+## [1.23.1] - 2026-10-07
+
+### Fixed
+- **Login works again after Ajax blocked the app version we report (#559).** Since 7 October 2026 Ajax rejects the app version the integration has always sent (3.30) with `PERMISSION_DENIED: Request is blacklisted`, so setup and reconfiguring failed for everyone. The integration now reports 3.57, a current Android app version, to both Ajax connections. With the newer version Ajax leaves the CRA company out of the space data, so the *CRA company* diagnostic sensor stays empty for now. **Requests to Ajax:** none added.
 
 ## [1.23.0] - 2026-10-03
 
