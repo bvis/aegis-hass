@@ -34,6 +34,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import grpc
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
@@ -124,6 +126,9 @@ class SessionOutcome:
     started_at: float = field(default_factory=time.time)
     stage: str = "starting"
     error: str | None = None
+    # gRPC status name when the session call itself failed (`rpc_error`), so
+    # a dump tells a refused client (#559) from a network drop.
+    rpc_status: str | None = None
     offer_codecs: list[str] = field(default_factory=list)
     answer_codecs: list[str] = field(default_factory=list)
     offer_shape: list[str] = field(default_factory=list)
@@ -141,6 +146,7 @@ class SessionOutcome:
             "started_at": round(self.started_at),
             "stage": self.stage,
             "error": self.error,
+            "rpc_status": self.rpc_status,
             "offer_codecs": self.offer_codecs,
             "answer_codecs": self.answer_codecs,
             "offer_shape": self.offer_shape,
@@ -396,7 +402,9 @@ class CloudVideoSession:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
-            self._fail("rpc_error", type(exc).__name__)
+            if isinstance(exc, grpc.aio.AioRpcError):
+                self.outcome.rpc_status = exc.code().name
+            self._fail("rpc_error", self.outcome.rpc_status or type(exc).__name__)
             _LOGGER.debug("Cloud video stream failed", exc_info=True)
         finally:
             self._closed = True
