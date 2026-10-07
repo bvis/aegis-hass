@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -323,12 +321,12 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
     def _validate_code(self, code: str | None) -> None:
         """Raise HomeAssistantError if the provided code does not match the stored hash."""
-        if not self.code_arm_required:
-            return
-        stored_hash = self._get_options().get("pin_code_hash", "")
-        computed = hashlib.sha256(code.encode()).hexdigest() if code else ""
-        if not code or not hmac.compare_digest(computed, stored_hash):
-            raise HomeAssistantError(self._translate_error("invalid_alarm_code"))
+        from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
+
+        try:
+            validate_pin(self._get_options(), code)
+        except HomeAssistantError as err:
+            raise HomeAssistantError(self._translate_error("invalid_alarm_code")) from err
 
     def _issue_label(self, key: str) -> str:
         """Return a translated issue label for the current HA language."""

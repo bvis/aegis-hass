@@ -176,33 +176,23 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
             )
 
         _LOGGER.debug("Photo URL retrieved for %s: %s", self._device_id, url[:80])
-        import aiohttp  # noqa: PLC0415
         from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
             async_get_clientsession,
         )
 
+        from custom_components.aegis_ajax.photo_download import (  # noqa: PLC0415
+            async_download_photo,
+        )
         from custom_components.aegis_ajax.photo_storage import (  # noqa: PLC0415
             save_photo,
         )
 
-        session = async_get_clientsession(self.hass)
-        try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status != 200:
-                    _LOGGER.warning(
-                        "Photo download for %s returned HTTP %s", self._device_id, resp.status
-                    )
-                    raise HomeAssistantError(
-                        translation_domain=DOMAIN, translation_key="photo_capture_failed"
-                    )
-                image_bytes = await resp.read()
-        except HomeAssistantError:
-            raise
-        except Exception as err:
-            _LOGGER.exception("Failed to download photo for %s", self._device_id)
+        image_bytes = await async_download_photo(async_get_clientsession(self.hass), url)
+        if image_bytes is None:
+            _LOGGER.warning("Photo download for %s failed", self._device_id)
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="photo_capture_failed"
-            ) from err
+            )
 
         device = self.coordinator.devices.get(self._device_id)
         device_name = device.name if device else self._device_id

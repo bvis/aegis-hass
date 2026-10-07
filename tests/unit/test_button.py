@@ -256,7 +256,9 @@ class TestCapturePhotoButtonFailures:
         coordinator._devices_api = MagicMock()
         coordinator._devices_api.capture_photo = AsyncMock(return_value=True)
         coordinator._media_api = MagicMock()
-        coordinator._media_api.get_photo_url = AsyncMock(return_value="http://x/p.jpg")
+        coordinator._media_api.get_photo_url = AsyncMock(
+            return_value="https://x.ajax.systems/p.jpg"
+        )
         listener = MagicMock()
         listener.has_fcm_credentials = True
         listener.wait_for_notification_id = AsyncMock(return_value="notif-1")
@@ -332,6 +334,39 @@ class TestCapturePhotoButtonFailures:
         with pytest.raises(HomeAssistantError) as exc:
             await button.async_press()
         assert exc.value.translation_key == "photo_capture_failed"
+
+    @pytest.mark.asyncio
+    async def test_rejected_download_raises(self) -> None:
+        """The button downloads through the bounded, non-redirecting helper."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        button, _ = self._make_button()
+        with (
+            patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+            patch(
+                "custom_components.aegis_ajax.photo_download.async_download_photo",
+                AsyncMock(return_value=None),
+            ) as download,
+            pytest.raises(HomeAssistantError) as exc,
+        ):
+            await button.async_press()
+        assert exc.value.translation_key == "photo_capture_failed"
+        assert download.await_args.args[1] == "https://x.ajax.systems/p.jpg"
+
+    @pytest.mark.asyncio
+    async def test_downloaded_photo_is_saved(self) -> None:
+        button, coordinator = self._make_button()
+        with (
+            patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+            patch(
+                "custom_components.aegis_ajax.photo_download.async_download_photo",
+                AsyncMock(return_value=b"jpeg"),
+            ),
+            patch("custom_components.aegis_ajax.photo_storage.save_photo", AsyncMock()) as save,
+        ):
+            await button.async_press()
+        assert save.await_args.args[1] == b"jpeg"
+        assert coordinator.last_photo_urls["cam-1"] == "https://x.ajax.systems/p.jpg"
 
 
 def _make_siren(device_type: str = "home_siren") -> Device:

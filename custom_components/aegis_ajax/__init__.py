@@ -126,7 +126,7 @@ _CUSTOM_SERVICE_NAMES = (
 )
 
 
-def _resolve_target_space_ids(
+async def _resolve_target_space_ids(
     hass: HomeAssistant, call: ServiceCall
 ) -> list[tuple[AjaxCobrandedCoordinator, str]]:
     """Resolve target entity_ids to (coordinator, space_id) pairs.
@@ -148,6 +148,20 @@ def _resolve_target_space_ids(
             for space_id in coordinator._space_ids:
                 results.append((coordinator, space_id))
         return results
+
+    # Authorize every explicit target before any service action is performed.
+    from homeassistant.auth.permissions.const import POLICY_CONTROL  # noqa: PLC0415
+    from homeassistant.exceptions import Unauthorized, UnknownUser  # noqa: PLC0415
+
+    if call.context.user_id is not None:
+        user = await hass.auth.async_get_user(call.context.user_id)
+        if user is None or not user.is_active:
+            raise UnknownUser(context=call.context)
+        for entity_id in entity_ids:
+            if not user.permissions.check_entity(entity_id, POLICY_CONTROL):
+                raise Unauthorized(
+                    context=call.context, entity_id=entity_id, permission=POLICY_CONTROL
+                )
 
     # Map entity_id → space_id via unique_id pattern "aegis_ajax_alarm_{space_id}"
     entity_reg = er.async_get(hass)
@@ -241,7 +255,7 @@ async def _async_handle_terminate_other_client_sessions(
 
 async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm service call (arm ignoring open sensors)."""
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm(space_id, ignore_alarms=True)
@@ -253,7 +267,7 @@ async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> Non
 
 async def _async_handle_force_arm_night(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm_night service call (night mode ignoring open sensors)."""
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm_night_mode(space_id, ignore_alarms=True)
@@ -271,7 +285,7 @@ async def _async_handle_disarm_night_mode(hass: HomeAssistant, call: ServiceCall
     night-mode groups and leaves any independently armed (away) groups armed,
     which `alarm_disarm` on the space panel cannot express (#233).
     """
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.disarm_from_night_mode(space_id)
@@ -305,7 +319,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     latitude = call.data.get("latitude")
     longitude = call.data.get("longitude")
 
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
             "press_panic_button: no Aegis alarm panel found for the given target."
@@ -337,7 +351,7 @@ async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: Serv
             "set_photo_on_demand_mode requires at least one of `user` or `scenario`."
         )
 
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
             "set_photo_on_demand_mode: no Aegis alarm panel found for the given target."
@@ -368,7 +382,7 @@ async def _async_handle_refresh_alarm_images(
     imported_notifications = 0
     imported_images = 0
     skipped = 0
-    targets = _resolve_target_space_ids(hass, call)
+    targets = await _resolve_target_space_ids(hass, call)
     cooldown: HomeAssistantError | None = None
     for coordinator, space_id in targets:
         try:
