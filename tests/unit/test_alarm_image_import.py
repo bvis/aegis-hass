@@ -31,6 +31,25 @@ def _camera(device_id: str = "camera") -> Device:
     )
 
 
+def _jpeg_bytes() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def _image_response() -> AsyncMock:
+    response = AsyncMock(status=200)
+    response.content_length = None
+    response.content = MagicMock()
+    response.content.iter_chunked.return_value.__aiter__.return_value = [_jpeg_bytes()]
+    response.__aenter__.return_value = response
+    return response
+
+
 class TestAlarmImageImport:
     @pytest.mark.asyncio
     async def test_pushed_alarm_uses_direct_media_stream(self) -> None:
@@ -133,8 +152,8 @@ class TestAlarmImageImport:
         coordinator.photo_revisions = {}
         device = _camera()
 
-        response = AsyncMock(status=200)
-        response.read = AsyncMock(return_value=b"image")
+        response = _image_response()
+        response.read = AsyncMock(return_value=_jpeg_bytes())
         response.__aenter__ = AsyncMock(return_value=response)
         response.__aexit__ = AsyncMock(return_value=None)
         session = MagicMock()
@@ -157,7 +176,7 @@ class TestAlarmImageImport:
         assert saved_path is not None
         save_photo.assert_awaited_once_with(
             coordinator.hass,
-            b"image",
+            _jpeg_bytes(),
             "camera",
             "Hall camera",
             captured_at=None,
