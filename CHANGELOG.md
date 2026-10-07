@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The cloud live view (#322) actually passes the STUN servers to go2rtc now.** go2rtc 1.9, the version Home Assistant ships, only reads a server's `urls` as a single string and silently ignores a list, which is how Home Assistant hands them over. So the fix above never reached go2rtc: it still offered only LAN addresses, and video played only when the router happened to let it through. Each URL is now passed as a server of its own, which go2rtc does read. **Requests to Ajax:** none added.
 
+### Security
+- **Safer photo downloads and permission checks on targeted service calls (#562, thanks @kamonishe).** Camera, *Capture photo* and historical alarm photos now download only over HTTPS from Ajax hosts, refuse redirects, stop at 10 MB and are checked to be a real JPEG, PNG or WebP image before they're shown or saved. When a person calls an Aegis service on specific alarm panels, Home Assistant now checks that their user may control those panels before anything is sent. Calls from automations, and calls without a target, work as before. **Requests to Ajax:** none added.
+
 ## [1.23.1] - 2026-10-07
 
 ### Fixed

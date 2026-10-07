@@ -46,12 +46,15 @@ async def async_download_photo(session: ClientSession, url: str) -> bytes | None
             url, timeout=aiohttp.ClientTimeout(total=15), allow_redirects=False
         ) as response:
             if response.status != 200:
+                _LOGGER.debug("Ajax photo download returned HTTP %s", response.status)
                 return None
             if response.content_length is not None and response.content_length > MAX_PHOTO_BYTES:
+                _LOGGER.debug("Ajax photo too large: %s bytes", response.content_length)
                 return None
             data = bytearray()
             async for chunk in response.content.iter_chunked(64 * 1024):
                 if len(data) + len(chunk) > MAX_PHOTO_BYTES:
+                    _LOGGER.debug("Ajax photo exceeded %s bytes", MAX_PHOTO_BYTES)
                     return None
                 data.extend(chunk)
         image = bytes(data)
@@ -59,6 +62,7 @@ async def async_download_photo(session: ClientSession, url: str) -> bytes | None
             valid = await asyncio.to_thread(_valid_image, image)
             if valid:
                 return image
+        _LOGGER.debug("Ajax photo is empty or not a valid image (%s bytes)", len(image))
     except (aiohttp.ClientError, TimeoutError, OSError):
         # Exception strings can contain signed URLs; do not log them.
         _LOGGER.warning("Could not download Ajax photo")
