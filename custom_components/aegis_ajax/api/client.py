@@ -52,7 +52,7 @@ _TRANSIENT_CODES = {
 }
 
 
-def is_client_rejected(exc: BaseException | None) -> bool:
+def is_client_rejected(exc: BaseException | None, *, api_retired: bool = False) -> bool:
     """True when Ajax refused this integration build, not the account (#559).
 
     Ajax answers every call with PERMISSION_DENIED "Request is blacklisted"
@@ -60,14 +60,21 @@ def is_client_rejected(exc: BaseException | None) -> bool:
     A bare PERMISSION_DENIED means the account lacks a permission, so the
     details text is what tells the two apart. Walks `__cause__` because
     callers wrap the gRPC error.
+
+    `api_retired=True` also counts UNIMPLEMENTED, which the Ajax app treats
+    as "this API is deprecated, update the app". Only pass it for core calls
+    (login, space list): on a feature call UNIMPLEMENTED can just mean that
+    one method isn't there.
     """
     while exc is not None:
-        if (
-            isinstance(exc, grpc.aio.AioRpcError)
-            and exc.code() == grpc.StatusCode.PERMISSION_DENIED
-            and "blacklist" in (exc.details() or "").lower()
-        ):
-            return True
+        if isinstance(exc, grpc.aio.AioRpcError):
+            code = exc.code()
+            if code == grpc.StatusCode.PERMISSION_DENIED and (
+                "blacklist" in (exc.details() or "").lower()
+            ):
+                return True
+            if api_retired and code == grpc.StatusCode.UNIMPLEMENTED:
+                return True
         exc = exc.__cause__
     return False
 

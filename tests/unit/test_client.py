@@ -428,3 +428,8 @@ class TestIsClientRejected:
         err = _rpc_error(grpc.StatusCode.PERMISSION_DENIED, "Permission denied")
         assert not is_client_rejected(err)
         assert not is_client_rejected(RuntimeError("Request is blacklisted"))
+
+    def test_unimplemented_only_counts_for_core_calls(self) -> None:
+        err = _rpc_error(grpc.StatusCode.UNIMPLEMENTED, "Method not found")
+        assert not is_client_rejected(err)
+        assert is_client_rejected(err, api_retired=True)

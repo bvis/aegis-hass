@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax, Aegis for Ajax'ın bu sürümünü reddediyor",
-            "description": "Ajax sunucuları entegrasyonun bu sürümünden gelen istekleri kabul etmeyi bıraktı (\"Request is blacklisted\"), bu yüzden oturum açamıyor, durumları güncelleyemiyor ve komut gönderemiyor. Hesabınız ve kimlik bilgileriniz sorunsuz. Aegis for Ajax'ı HACS'ten en son sürüme güncelleyin ve Home Assistant'ı yeniden başlatın. Bu onarım, Ajax entegrasyonu yeniden kabul ettiğinde kendiliğinden kaybolur."
+            "description": "Ajax sunucuları entegrasyonun bu sürümünden gelen istekleri kabul etmeyi bıraktı, bu yüzden oturum açamıyor, durumları güncelleyemiyor ve komut gönderemiyor. Hesabınız ve kimlik bilgileriniz sorunsuz. Aegis for Ajax'ı HACS'ten en son sürüme güncelleyin ve Home Assistant'ı yeniden başlatın. Bu onarım, Ajax entegrasyonu yeniden kabul ettiğinde kendiliğinden kaybolur."
         },
         "fcm_credentials_invalid": {
             "title": "Push bildirimleri devre disi - FCM kimlik bilgileri reddedildi",

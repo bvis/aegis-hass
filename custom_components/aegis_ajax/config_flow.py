@@ -87,6 +87,15 @@ TOTP_SCHEMA = vol.Schema(
 )
 
 
+def _unexpected_error_key(err: Exception) -> str:
+    """Form error for an exception no other branch handled.
+
+    The flows only make core calls (login, space list), so UNIMPLEMENTED
+    counts as Ajax retiring the API here.
+    """
+    return "client_rejected" if is_client_rejected(err, api_retired=True) else "unknown"
+
+
 class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security."""
 
@@ -212,7 +221,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                     e,
                     exc_info=True,
                 )
-                errors["base"] = "client_rejected" if is_client_rejected(e) else "unknown"
+                errors["base"] = _unexpected_error_key(e)
                 await self._async_close_client()
         return self.async_show_form(step_id="user", data_schema=USER_SCHEMA, errors=errors)
 
@@ -237,7 +246,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except Exception as err:
                 _LOGGER.exception("Unexpected error during 2FA")
-                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
+                errors["base"] = _unexpected_error_key(err)
         return self.async_show_form(step_id="2fa", data_schema=TOTP_SCHEMA, errors=errors)
 
     async def async_step_select_spaces(
@@ -335,7 +344,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except Exception as err:
                 _LOGGER.exception("Unexpected error during reconfigure")
-                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
+                errors["base"] = _unexpected_error_key(err)
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -384,7 +393,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except Exception as err:
                 _LOGGER.exception("Unexpected error during reconfigure 2FA")
-                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
+                errors["base"] = _unexpected_error_key(err)
         return self.async_show_form(
             step_id="reconfigure_2fa", data_schema=TOTP_SCHEMA, errors=errors
         )
@@ -433,7 +442,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except Exception as err:
                 _LOGGER.exception("Unexpected error during reauth")
-                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
+                errors["base"] = _unexpected_error_key(err)
 
         return self.async_show_form(
             step_id="reauth_confirm",
@@ -474,7 +483,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except Exception as err:
                 _LOGGER.exception("Unexpected error during reauth 2FA")
-                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
+                errors["base"] = _unexpected_error_key(err)
         return self.async_show_form(step_id="reauth_2fa", data_schema=TOTP_SCHEMA, errors=errors)
 
     async def _async_finish_reauth(self) -> ConfigFlowResult:

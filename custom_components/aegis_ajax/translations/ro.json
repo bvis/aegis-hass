@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax respinge această versiune de Aegis for Ajax",
-            "description": "Serverele Ajax nu mai acceptă cereri de la această versiune a integrării („Request is blacklisted”), așa că nu se poate autentifica, nu poate actualiza stările și nu poate trimite comenzi. Contul și datele tale de autentificare sunt în regulă. Actualizează Aegis for Ajax în HACS la cea mai nouă versiune și repornește Home Assistant. Această reparație dispare singură când Ajax acceptă din nou integrarea."
+            "description": "Serverele Ajax nu mai acceptă cereri de la această versiune a integrării, așa că nu se poate autentifica, nu poate actualiza stările și nu poate trimite comenzi. Contul și datele tale de autentificare sunt în regulă. Actualizează Aegis for Ajax în HACS la cea mai nouă versiune și repornește Home Assistant. Această reparație dispare singură când Ajax acceptă din nou integrarea."
         },
         "fcm_credentials_invalid": {
             "title": "Notificarile push dezactivate - credentiale FCM respinse",

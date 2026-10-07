@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax weigert deze versie van Aegis for Ajax",
-            "description": "De Ajax-servers accepteren geen verzoeken meer van deze versie van de integratie (\"Request is blacklisted\"), dus kan die niet inloggen, statussen bijwerken of commando's versturen. Je account en inloggegevens zijn in orde. Werk Aegis for Ajax in HACS bij naar de nieuwste versie en herstart Home Assistant. Deze reparatie verdwijnt vanzelf zodra Ajax de integratie weer accepteert."
+            "description": "De Ajax-servers accepteren geen verzoeken meer van deze versie van de integratie, dus kan die niet inloggen, statussen bijwerken of commando's versturen. Je account en inloggegevens zijn in orde. Werk Aegis for Ajax in HACS bij naar de nieuwste versie en herstart Home Assistant. Deze reparatie verdwijnt vanzelf zodra Ajax de integratie weer accepteert."
         },
         "fcm_credentials_invalid": {
             "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",

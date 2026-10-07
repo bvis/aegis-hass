@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax lehnt diese Version von Aegis for Ajax ab",
-            "description": "Die Ajax-Server akzeptieren keine Anfragen mehr von dieser Version der Integration („Request is blacklisted“). Sie kann sich daher weder anmelden noch Zustände aktualisieren oder Befehle senden. Dein Konto und deine Zugangsdaten sind in Ordnung. Aktualisiere Aegis for Ajax in HACS auf die neueste Version und starte Home Assistant neu. Diese Reparatur verschwindet von selbst, sobald Ajax die Integration wieder akzeptiert."
+            "description": "Die Ajax-Server akzeptieren keine Anfragen mehr von dieser Version der Integration. Sie kann sich daher weder anmelden noch Zustände aktualisieren oder Befehle senden. Dein Konto und deine Zugangsdaten sind in Ordnung. Aktualisiere Aegis for Ajax in HACS auf die neueste Version und starte Home Assistant neu. Diese Reparatur verschwindet von selbst, sobald Ajax die Integration wieder akzeptiert."
         },
         "fcm_credentials_invalid": {
             "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",
