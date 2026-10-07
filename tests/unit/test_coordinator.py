@@ -169,38 +169,100 @@ class TestRoomsRefresh:
         await coordinator._async_update_data()
         assert coordinator.rooms == {}
 
+
+_CENTRAL_ONE = MonitoringCompany(
+    name="Central One", status=MonitoringCompanyStatus.APPROVED, hex_id="0000016A"
+)
+
+
+class TestLoadMonitoringCompanies:
+    """#561: CRA companies come from disk, fetched only when none are stored."""
+
+    @staticmethod
+    def _setup(stored: dict) -> AjaxCobrandedCoordinator:  # noqa: F821
+        coordinator = _make_coordinator(space_ids=["s1", "s2"])
+        coordinator.spaces = {"s1": _make_space("s1"), "s2": _make_space("s2")}
+        coordinator.hass.config.country = "ES"
+        coordinator._monitoring_companies_store = MagicMock()
+        coordinator._monitoring_companies_store.async_load = AsyncMock(return_value=stored)
+        coordinator._monitoring_companies_store.async_save = AsyncMock()
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.find_space_monitoring_companies = AsyncMock(
+            return_value=[_CENTRAL_ONE]
+        )
+        return coordinator
+
     @pytest.mark.asyncio
-    async def test_monitoring_companies_populated_from_space_snapshot(self) -> None:
+    async def test_stored_companies_are_used_without_asking_ajax(self) -> None:
+        coordinator = self._setup({"s1": (_CENTRAL_ONE,), "s2": ()})
+
+        await coordinator._load_monitoring_companies()
+
+        coordinator._spaces_api.find_space_monitoring_companies.assert_not_awaited()
+        coordinator._monitoring_companies_store.async_save.assert_not_awaited()
+        assert coordinator.spaces["s1"].approved_monitoring_companies == (_CENTRAL_ONE,)
+        assert coordinator.spaces["s1"].monitoring_companies_loaded is True
+        # A space with no CRA is stored as an empty list, not refetched.
+        assert coordinator.spaces["s2"].monitoring_companies == ()
+        assert coordinator.spaces["s2"].monitoring_companies_loaded is True
+
+    @pytest.mark.asyncio
+    async def test_only_spaces_missing_from_disk_are_fetched_and_saved(self) -> None:
+        coordinator = self._setup({"s1": (_CENTRAL_ONE,)})
+
+        await coordinator._load_monitoring_companies()
+
+        coordinator._spaces_api.find_space_monitoring_companies.assert_awaited_once_with("s2", "ES")
+        coordinator._monitoring_companies_store.async_save.assert_awaited_once_with(
+            {"s1": (_CENTRAL_ONE,), "s2": (_CENTRAL_ONE,)}
+        )
+        assert coordinator.spaces["s2"].approved_monitoring_companies == (_CENTRAL_ONE,)
+
+    @pytest.mark.asyncio
+    async def test_country_falls_back_when_home_assistant_has_none(self) -> None:
+        coordinator = self._setup({"s1": ()})
+        coordinator.hass.config.country = None
+
+        await coordinator._load_monitoring_companies()
+
+        coordinator._spaces_api.find_space_monitoring_companies.assert_awaited_once_with("s2", "AQ")
+
+    @pytest.mark.asyncio
+    async def test_failed_fetch_leaves_the_space_unloaded_and_unsaved(self) -> None:
+        coordinator = self._setup({"s1": (_CENTRAL_ONE,)})
+        coordinator._spaces_api.find_space_monitoring_companies = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+
+        await coordinator._load_monitoring_companies()
+
+        coordinator._monitoring_companies_store.async_save.assert_awaited_once_with(
+            {"s1": (_CENTRAL_ONE,)}
+        )
+        assert coordinator.spaces["s1"].monitoring_companies_loaded is True
+        assert coordinator.spaces["s2"].monitoring_companies_loaded is False
+
+    @pytest.mark.asyncio
+    async def test_hourly_snapshot_does_not_wipe_the_companies(self) -> None:
+        """The snapshot no longer carries companies; it must leave them alone."""
         coordinator = _make_coordinator()
         coordinator._client.session.is_authenticated = True
         coordinator._streams_started = True
-
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            monitoring_companies=(_CENTRAL_ONE,),
+            monitoring_companies_loaded=True,
+        )
         coordinator._spaces_api = MagicMock()
         coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
-        coordinator._spaces_api.get_space_snapshot = AsyncMock(
-            return_value=SpaceSnapshot(
-                monitoring_companies=(
-                    MonitoringCompany(
-                        name="Central One",
-                        status=MonitoringCompanyStatus.APPROVED,
-                    ),
-                ),
-                monitoring_companies_loaded=True,
-            )
-        )
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(return_value=SpaceSnapshot())
         coordinator._devices_api = MagicMock()
         coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
 
         await coordinator._async_update_data()
 
-        assert coordinator.spaces["s1"].has_monitoring is True
-        assert coordinator.spaces["s1"].approved_monitoring_companies == (
-            MonitoringCompany(
-                name="Central One",
-                status=MonitoringCompanyStatus.APPROVED,
-            ),
-        )
-        assert coordinator.spaces["s1"].monitoring_companies_loaded is True
+        coordinator._spaces_api.get_space_snapshot.assert_awaited()
+        assert coordinator.spaces["s1"].approved_monitoring_companies == (_CENTRAL_ONE,)
 
 
 class TestAsyncUpdateData:

@@ -82,6 +82,7 @@ from custom_components.aegis_ajax.delay_states import (
 from custom_components.aegis_ajax.device_cache import BatteryDeltaShapes, DevicesCache
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_get_registered_device
+from custom_components.aegis_ajax.monitoring_companies import MonitoringCompaniesStore
 from custom_components.aegis_ajax.photo_storage import (
     alarm_album_exists,
     alarm_album_name,
@@ -707,6 +708,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # same no-entry_id mode as the cache above.
         self._battery_shapes: BatteryDeltaShapes | None = (
             BatteryDeltaShapes(hass, entry_id) if entry_id else None
+        )
+        self._monitoring_companies_store: MonitoringCompaniesStore | None = (
+            MonitoringCompaniesStore(hass, entry_id) if entry_id else None
         )
 
     @property
@@ -1428,10 +1432,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("Hub %s reported no SIM section; no IMEI sensor will be created", hub_id)
 
     async def _maybe_refresh_rooms(self, now: float) -> None:
-        """Cached once-per-hour room + monitoring_companies + groups refresh
-        via the heavier `get_space_snapshot`. Drives `suggested_area` on
-        device entries (HA auto-area assignment) and refreshes the group
-        + CRA-company snapshot that `list_spaces` doesn't return.
+        """Cached once-per-hour room + groups refresh via the heavier
+        `get_space_snapshot`. Drives `suggested_area` on device entries (HA
+        auto-area assignment) and refreshes the group snapshot that
+        `list_spaces` doesn't return.
         """
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
@@ -1461,8 +1465,6 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if current_space is not None:
                 self.spaces[space_id] = dc_replace(
                     current_space,
-                    monitoring_companies=snapshot.monitoring_companies,
-                    monitoring_companies_loaded=snapshot.monitoring_companies_loaded,
                     groups=snapshot.groups,
                     group_mode_enabled=snapshot.group_mode_enabled,
                     night_mode_enabled=snapshot.night_mode_enabled,
@@ -1793,6 +1795,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await self._devices_cache.async_save(self.devices)
                 except Exception:  # noqa: BLE001
                     _LOGGER.debug("Failed to persist devices cache", exc_info=True)
+        await self._load_monitoring_companies()
         await self._probe_smart_locks_once()
         await self._start_device_streams()
         await self._start_hts()
@@ -1810,6 +1813,45 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             len(self.spaces),
             "scheduled" if self._hts_task is not None else "skipped",
         )
+
+    async def _load_monitoring_companies(self) -> None:
+        """Attach each space's CRA companies, from disk or fetched once (#561).
+
+        Only a space with nothing stored is fetched: a new entry, an install
+        upgraded from a version that read them off the snapshot, or one whose
+        store the reconfigure flow dropped. A failed fetch leaves the space
+        without companies until the next setup; `_refresh_spaces` carries
+        whatever is attached here across polls.
+        """
+        from dataclasses import replace as dc_replace  # noqa: PLC0415
+
+        if self._monitoring_companies_store is None:
+            return
+        stored = await self._monitoring_companies_store.async_load()
+        missing = [space_id for space_id in self.spaces if space_id not in stored]
+        if missing:
+            country = self.hass.config.country or "AQ"
+            for space_id in missing:
+                try:
+                    fetched = await self._spaces_api.find_space_monitoring_companies(
+                        space_id, country
+                    )
+                except Exception:  # noqa: BLE001
+                    _LOGGER.debug(
+                        "Could not fetch CRA companies for space %s", space_id, exc_info=True
+                    )
+                    continue
+                stored[space_id] = tuple(fetched)
+            try:
+                await self._monitoring_companies_store.async_save(stored)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Failed to persist CRA companies", exc_info=True)
+        for space_id, companies in stored.items():
+            space = self.spaces.get(space_id)
+            if space is not None:
+                self.spaces[space_id] = dc_replace(
+                    space, monitoring_companies=companies, monitoring_companies_loaded=True
+                )
 
     async def _probe_smart_locks_once(self) -> None:
         """#206 Bug B: one-shot read-only probe of `SmartLockService` to

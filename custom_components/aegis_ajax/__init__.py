@@ -867,6 +867,11 @@ async def async_remove_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntr
     Ajax account would keep accumulating "Aegis" devices in its active
     sessions list every time someone uninstalls and reinstalls.
     """
+    from custom_components.aegis_ajax.monitoring_companies import (  # noqa: PLC0415
+        async_remove_monitoring_companies,
+    )
+
+    await async_remove_monitoring_companies(hass, entry.entry_id)
     if "session_token" not in entry.data or "user_hex_id" not in entry.data:
         return
 

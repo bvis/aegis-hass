@@ -31,10 +31,7 @@ class MonitoringCompany:
 
     `hex_id` is the stable per-company opaque identifier the Ajax cloud uses
     to address this company on every endpoint that returns or accepts a
-    `SpaceMonitoringCompany`. Kept alongside `name` so the integration can
-    resolve a missing name through `SpaceMonitoringCompanyService.getMonitoringCompany`
-    when the space-stream snapshot only ships `(hex_id, status)` without a
-    name attached.
+    `SpaceMonitoringCompany`.
     """
 
     name: str
@@ -131,8 +128,6 @@ class SpaceSnapshot:
     """Subset of full space snapshot data used by the integration."""
 
     rooms: tuple[Room, ...] = field(default_factory=tuple)
-    monitoring_companies: tuple[MonitoringCompany, ...] = field(default_factory=tuple)
-    monitoring_companies_loaded: bool = False
     groups: tuple[Group, ...] = field(default_factory=tuple)
     group_mode_enabled: bool = False
     # Night mode currently active, read off `mode.group_mode` (#284).

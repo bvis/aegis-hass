@@ -956,8 +956,17 @@ class TestAsyncRemoveEntry:
         mock_client.close = AsyncMock()
         mock_client.session = MagicMock()
 
-        with patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client):
+        with (
+            patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client),
+            patch(
+                "custom_components.aegis_ajax.monitoring_companies."
+                "async_remove_monitoring_companies",
+                AsyncMock(),
+            ) as remove_companies,
+        ):
             await async_remove_entry(hass, entry)
+
+        remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
         mock_client.connect.assert_awaited_once()
         mock_client.logout.assert_awaited_once()
@@ -974,8 +983,17 @@ class TestAsyncRemoveEntry:
         mock_client = MagicMock()
         mock_client.logout = AsyncMock()
 
-        with patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client):
+        with (
+            patch("custom_components.aegis_ajax.AjaxGrpcClient", return_value=mock_client),
+            patch(
+                "custom_components.aegis_ajax.monitoring_companies."
+                "async_remove_monitoring_companies",
+                AsyncMock(),
+            ) as remove_companies,
+        ):
             await async_remove_entry(hass, entry)
+
+        remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
         mock_client.logout.assert_not_called()
 

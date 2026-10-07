@@ -760,6 +760,31 @@ class TestAsyncFinishReconfigure:
     """Reconfiguring to a different account must refresh the entry's visible
     title and unique_id, not just its data (#241)."""
 
+    @pytest.fixture(autouse=True)
+    def _no_store(self) -> object:
+        with patch(
+            "custom_components.aegis_ajax.monitoring_companies.async_remove_monitoring_companies",
+            AsyncMock(),
+        ) as remove:
+            yield remove
+
+    @pytest.mark.asyncio
+    async def test_finish_reconfigure_drops_the_stored_cra_companies(
+        self, _no_store: AsyncMock
+    ) -> None:
+        """The reload after a reconfigure fetches the CRA companies again (#561)."""
+        flow, entry = self._make_flow()
+        entry.entry_id = "entry-1"
+        flow._email = "old@example.com"
+        flow._app_label = "Ajax"
+        flow._password_hash = hashlib.sha256(b"pw").hexdigest()
+        flow._session_snapshot = None
+        flow.hass = MagicMock()
+
+        await flow._async_finish_reconfigure()
+
+        _no_store.assert_awaited_once_with(flow.hass, "entry-1")
+
     @staticmethod
     def _make_flow() -> tuple[AjaxCobrandedConfigFlow, MagicMock]:
         flow = AjaxCobrandedConfigFlow()
