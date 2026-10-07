@@ -282,6 +282,45 @@ async def test_server_failure_is_reported() -> None:
 
 
 @pytest.mark.asyncio
+async def test_rpc_failure_records_the_grpc_status() -> None:
+    """A refused session call must say why in the dump, not just `rpc_error` (#322)."""
+    import grpc
+
+    class FailingCall:
+        def __aiter__(self) -> FailingCall:
+            return self
+
+        async def __anext__(self) -> Any:  # noqa: ANN401
+            raise grpc.aio.AioRpcError(  # type: ignore[call-arg]
+                code=grpc.StatusCode.PERMISSION_DENIED,
+                initial_metadata=grpc.aio.Metadata(),
+                trailing_metadata=grpc.aio.Metadata(),
+                details="Request is blacklisted",
+            )
+
+        def cancel(self) -> None:
+            pass
+
+    class Stub:
+        def __init__(self, channel: Any) -> None:  # noqa: ANN401
+            pass
+
+        def execute(self, requests: Any, metadata: Any = None) -> FailingCall:  # noqa: ANN401
+            return FailingCall()
+
+    errors: list[tuple[str, str]] = []
+    session = _session(on_error=lambda code, msg: errors.append((code, msg)))
+    with patch(STUB, Stub):
+        session.start()
+        await _settle()
+    assert errors == [("rpc_error", "PERMISSION_DENIED")]
+    dumped = session.outcome.as_dict()
+    assert dumped["error"] == "rpc_error"
+    assert dumped["rpc_status"] == "PERMISSION_DENIED"
+    assert "blacklisted" not in repr(dumped)
+
+
+@pytest.mark.asyncio
 async def test_close_ends_the_stream_without_an_error() -> None:
     errors: list[str] = []
     stub, _calls = _server(_happy)

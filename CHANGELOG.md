@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.3] - unreleased
+
+### Changed
+- **Cloud live view diagnostics (#322) say why Ajax refused a session.** When the request to open the video session fails, the `cloud_video` block only said `rpc_error`. It now also records the gRPC status (`rpc_status`, for example `PERMISSION_DENIED` or `UNAVAILABLE`), and the warning in the log names it too, so a refused client can be told apart from a network drop. **Requests to Ajax:** none added.
+
 ## [1.23.2] - 2026-10-08
 
 ### Added
