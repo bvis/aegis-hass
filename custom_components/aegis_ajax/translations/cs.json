@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax odmítá tuto verzi Aegis for Ajax",
-            "description": "Servery Ajax přestaly přijímat požadavky z této verze integrace („Request is blacklisted“), takže se nemůže přihlásit, aktualizovat stavy ani odesílat příkazy. Váš účet a přihlašovací údaje jsou v pořádku. Aktualizujte Aegis for Ajax v HACS na nejnovější verzi a restartujte Home Assistant. Tato oprava zmizí sama, jakmile Ajax integraci opět přijme."
+            "description": "Servery Ajax přestaly přijímat požadavky z této verze integrace, takže se nemůže přihlásit, aktualizovat stavy ani odesílat příkazy. Váš účet a přihlašovací údaje jsou v pořádku. Aktualizujte Aegis for Ajax v HACS na nejnovější verzi a restartujte Home Assistant. Tato oprava zmizí sama, jakmile Ajax integraci opět přijme."
         },
         "fcm_credentials_invalid": {
             "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",

@@ -1,0 +1,53 @@
+name: Client version watch
+
+# The Ajax app publishes the versions it considers outdated. If the version
+# we report (CLIENT_VERSION) falls at or below one of those thresholds, Ajax
+# may stop accepting it, as it did with 3.30 in #559. The daily run opens an
+# issue while there is still time to bump it. One GET per day from GitHub;
+# user installs never fetch this file.
+#
+# Not a required check: the file is outside our control.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - custom_components/aegis_ajax/const.py
+      - scripts/check_client_version.py
+      - .github/workflows/client-version-watch.yml
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Compare CLIENT_VERSION with the app's deprecation thresholds
+        id: check
+        run: |
+          set +e
+          python3 scripts/check_client_version.py | tee result.txt
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 1 = deprecated (reported below as an issue), 2 = file unreadable.
+          [ "$code" -eq 2 ] && exit 1
+          exit 0
+      - name: Open or update the warning issue
+        if: steps.check.outputs.code == '1' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Ajax lists our CLIENT_VERSION as outdated"
+          body="$(printf 'The daily client version watch found:\n\n```\n%s\n```\n\nBump `CLIENT_VERSION` in `const.py` to a current app version before Ajax starts rejecting it (see #559).' "$(cat result.txt)")"
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

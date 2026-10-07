@@ -262,7 +262,7 @@
         },
         "client_rejected": {
             "title": "Ajax rejette cette version d'Aegis for Ajax",
-            "description": "Les serveurs Ajax n'acceptent plus les requêtes de cette version de l'intégration (« Request is blacklisted »), elle ne peut donc ni se connecter, ni mettre à jour les états, ni envoyer de commandes. Votre compte et vos identifiants ne sont pas en cause. Mettez à jour Aegis for Ajax dans HACS vers la dernière version et redémarrez Home Assistant. Cette réparation disparaît d'elle-même dès qu'Ajax accepte à nouveau l'intégration."
+            "description": "Les serveurs Ajax n'acceptent plus les requêtes de cette version de l'intégration, elle ne peut donc ni se connecter, ni mettre à jour les états, ni envoyer de commandes. Votre compte et vos identifiants ne sont pas en cause. Mettez à jour Aegis for Ajax dans HACS vers la dernière version et redémarrez Home Assistant. Cette réparation disparaît d'elle-même dès qu'Ajax accepte à nouveau l'intégration."
         },
         "fcm_credentials_invalid": {
             "title": "Notifications push desactivees - identifiants FCM rejetes",

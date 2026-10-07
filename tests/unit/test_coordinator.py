@@ -692,6 +692,57 @@ class TestAsyncUpdateData:
         clr.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_unimplemented_core_call_raises_repair(self) -> None:
+        """UNIMPLEMENTED on the space list = Ajax retired the API: ask for an update."""
+        import grpc
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(
+            side_effect=grpc.aio.AioRpcError(  # type: ignore[call-arg]
+                code=grpc.StatusCode.UNIMPLEMENTED,
+                initial_metadata=grpc.aio.Metadata(),
+                trailing_metadata=grpc.aio.Metadata(),
+                details="Method not found",
+            )
+        )
+
+        with (
+            patch("custom_components.aegis_ajax.coordinator.async_register_client_rejected") as reg,
+            pytest.raises(UpdateFailed, match="rejected this version"),
+        ):
+            await coordinator._async_update_data()
+        reg.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unimplemented_feature_call_does_not_raise_repair(self) -> None:
+        """UNIMPLEMENTED after the core calls succeeded is one missing method, not a retired API."""
+        import grpc
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._maybe_refresh_sim_and_firmware = AsyncMock(  # type: ignore[method-assign]
+            side_effect=grpc.aio.AioRpcError(  # type: ignore[call-arg]
+                code=grpc.StatusCode.UNIMPLEMENTED,
+                initial_metadata=grpc.aio.Metadata(),
+                trailing_metadata=grpc.aio.Metadata(),
+                details="Method not found",
+            )
+        )
+
+        with (
+            patch("custom_components.aegis_ajax.coordinator.async_register_client_rejected") as reg,
+            pytest.raises(UpdateFailed, match="Error fetching Ajax data"),
+        ):
+            await coordinator._async_update_data()
+        reg.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_hub_offline_24h_triggers_repair_and_clears_when_back_online(
         self,
     ) -> None:

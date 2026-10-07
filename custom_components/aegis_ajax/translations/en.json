@@ -322,7 +322,7 @@
         },
         "client_rejected": {
             "title": "Ajax is rejecting this version of Aegis for Ajax",
-            "description": "The Ajax servers stopped accepting requests from this version of the integration (\"Request is blacklisted\"), so it can't log in, update states or send commands. Your account and credentials are fine. Update Aegis for Ajax in HACS to the latest release and restart Home Assistant. This Repair clears itself once Ajax accepts the integration again."
+            "description": "The Ajax servers stopped accepting requests from this version of the integration, so it can't log in, update states or send commands. Your account and credentials are fine. Update Aegis for Ajax in HACS to the latest release and restart Home Assistant. This Repair clears itself once Ajax accepts the integration again."
         },
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",

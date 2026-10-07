@@ -322,7 +322,7 @@
         },
         "client_rejected": {
             "title": "Ajax afviser denne version af Aegis for Ajax",
-            "description": "Ajax-serverne er holdt op med at acceptere forespørgsler fra denne version af integrationen (\"Request is blacklisted\"), så den kan ikke logge ind, opdatere tilstande eller sende kommandoer. Din konto og dine loginoplysninger er i orden. Opdater Aegis for Ajax i HACS til den nyeste version, og genstart Home Assistant. Denne reparation forsvinder af sig selv, når Ajax accepterer integrationen igen."
+            "description": "Ajax-serverne er holdt op med at acceptere forespørgsler fra denne version af integrationen, så den kan ikke logge ind, opdatere tilstande eller sende kommandoer. Din konto og dine loginoplysninger er i orden. Opdater Aegis for Ajax i HACS til den nyeste version, og genstart Home Assistant. Denne reparation forsvinder af sig selv, når Ajax accepterer integrationen igen."
         },
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",

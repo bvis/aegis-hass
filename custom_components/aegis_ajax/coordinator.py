@@ -1181,9 +1181,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return False
 
     async def _async_update_data(self) -> dict[str, Any]:
+        # UNIMPLEMENTED means "API retired" only on the core calls; later
+        # feature calls may lack one method without the API being gone.
+        core_done = False
         try:
             await self._ensure_authenticated()
             self.spaces = await self._refresh_spaces()
+            core_done = True
             async_clear_client_rejected(self.hass)
             self._drop_cleared_alarms()
             self.sync_delay_overlays()
@@ -1224,7 +1228,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise
             raise UpdateFailed("Ajax gRPC call was cancelled mid-flight") from None
         except Exception as err:
-            if is_client_rejected(err):
+            if is_client_rejected(err, api_retired=not core_done):
                 async_register_client_rejected(self.hass)
                 raise UpdateFailed(
                     "Ajax rejected this version of the integration; update it and restart"
