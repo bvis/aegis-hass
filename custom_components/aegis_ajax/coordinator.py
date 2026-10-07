@@ -20,6 +20,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from custom_components.aegis_ajax.api import devices_parser
+from custom_components.aegis_ajax.api.client import is_client_rejected
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import (
     HtsClient,
@@ -88,8 +89,10 @@ from custom_components.aegis_ajax.photo_storage import (
     save_photo,
 )
 from custom_components.aegis_ajax.repairs import (
+    async_clear_client_rejected,
     async_clear_hts_chronic_failure,
     async_clear_hub_offline,
+    async_register_client_rejected,
     async_register_hts_chronic_failure,
     async_register_hub_offline,
 )
@@ -1177,6 +1180,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             await self._ensure_authenticated()
             self.spaces = await self._refresh_spaces()
+            async_clear_client_rejected(self.hass)
             self._drop_cleared_alarms()
             self.sync_delay_overlays()
             self._prune_manual_refresh()
@@ -1216,6 +1220,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise
             raise UpdateFailed("Ajax gRPC call was cancelled mid-flight") from None
         except Exception as err:
+            if is_client_rejected(err):
+                async_register_client_rejected(self.hass)
+                raise UpdateFailed(
+                    "Ajax rejected this version of the integration; update it and restart"
+                ) from err
             raise UpdateFailed("Error fetching Ajax data") from err
 
     # ------------------------------------------------------------------

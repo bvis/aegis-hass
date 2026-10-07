@@ -26,7 +26,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from custom_components.aegis_ajax.api.client import AjaxGrpcClient
+from custom_components.aegis_ajax.api.client import AjaxGrpcClient, is_client_rejected
 from custom_components.aegis_ajax.api.session import (
     AjaxSession,
     AuthenticationError,
@@ -212,7 +212,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                     e,
                     exc_info=True,
                 )
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(e) else "unknown"
                 await self._async_close_client()
         return self.async_show_form(step_id="user", data_schema=USER_SCHEMA, errors=errors)
 
@@ -235,9 +235,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_totp"
             except TimeoutError:
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as err:
                 _LOGGER.exception("Unexpected error during 2FA")
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
         return self.async_show_form(step_id="2fa", data_schema=TOTP_SCHEMA, errors=errors)
 
     async def async_step_select_spaces(
@@ -333,9 +333,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except (ConnectionError, OSError, TimeoutError):
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as err:
                 _LOGGER.exception("Unexpected error during reconfigure")
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -382,9 +382,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_totp"
             except TimeoutError:
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as err:
                 _LOGGER.exception("Unexpected error during reconfigure 2FA")
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
         return self.async_show_form(
             step_id="reconfigure_2fa", data_schema=TOTP_SCHEMA, errors=errors
         )
@@ -431,9 +431,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except (ConnectionError, OSError, TimeoutError):
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as err:
                 _LOGGER.exception("Unexpected error during reauth")
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
 
         return self.async_show_form(
             step_id="reauth_confirm",
@@ -472,9 +472,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_totp"
             except TimeoutError:
                 errors["base"] = "cannot_connect"
-            except Exception:
+            except Exception as err:
                 _LOGGER.exception("Unexpected error during reauth 2FA")
-                errors["base"] = "unknown"
+                errors["base"] = "client_rejected" if is_client_rejected(err) else "unknown"
         return self.async_show_form(step_id="reauth_2fa", data_schema=TOTP_SCHEMA, errors=errors)
 
     async def _async_finish_reauth(self) -> ConfigFlowResult:

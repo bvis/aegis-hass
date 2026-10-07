@@ -162,6 +162,35 @@ class TestAsyncStepUser:
         assert flow.async_show_form.call_args[1]["errors"]["base"] == "unknown"
 
     @pytest.mark.asyncio
+    async def test_step_user_blacklisted_client_says_update(self) -> None:
+        """Ajax refusing our client version must not read as "unexpected error" (#563)."""
+        import grpc
+
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_show_form = MagicMock(return_value={"type": "form"})
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        mock_client.close = AsyncMock()
+        mock_client.login = AsyncMock(
+            side_effect=grpc.aio.AioRpcError(  # type: ignore[call-arg]
+                code=grpc.StatusCode.PERMISSION_DENIED,
+                initial_metadata=grpc.aio.Metadata(),
+                trailing_metadata=grpc.aio.Metadata(),
+                details="Request is blacklisted",
+            )
+        )
+
+        with patch(
+            "custom_components.aegis_ajax.config_flow.AjaxGrpcClient", return_value=mock_client
+        ):
+            await flow.async_step_user({"email": "a@b.com", "password": "pass"})
+
+        assert flow.async_show_form.call_args[1]["errors"]["base"] == "client_rejected"
+
+    @pytest.mark.asyncio
     async def test_step_user_closes_client_on_login_failure(self) -> None:
         """A failed login must close the channel; each retry creates a new client."""
         flow = AjaxCobrandedConfigFlow()

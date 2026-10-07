@@ -59,6 +59,7 @@
             "invalid_auth": "Ungültige E-Mail-Adresse oder falsches Passwort.",
             "invalid_totp": "Ungültiger TOTP-Code. Bitte versuchen Sie es erneut.",
             "cannot_connect": "Verbindung zu Ajax-Servern nicht möglich.",
+            "client_rejected": "Ajax lehnt diese Version von Aegis for Ajax ab. Aktualisiere die Integration in HACS, starte Home Assistant neu und versuche es erneut.",
             "unknown": "Ein unerwarteter Fehler ist aufgetreten."
         },
         "abort": {
@@ -258,6 +259,10 @@
         "grpcio_version_mismatch": {
             "title": "Aegis benoetigt grpcio {required} oder neuer (gefunden {current})",
             "description": "Aegis benoetigt `grpcio` fuer den gRPC-Kanal, der mit der Ajax-Cloud spricht; Ihre Home-Assistant-Installation liefert `grpcio` {current}. Unterhalb von {required} kann der Login mit kryptischen HTTP/2-Fehlern fehlschlagen. Auf Home Assistant Core oder Container fixiert das Manifest der Integration die Version bei der Installation, aber auf Home Assistant OS wird das system-weite grpcio verwendet und das Manifest hat keinen Einfluss darauf — typischerweise muessen Sie Home Assistant OS auf einen Build aktualisieren, der ein neueres grpcio enthaelt. Die Reparatur wird beim naechsten Reload automatisch geschlossen, sobald die Version {required} ueberschreitet."
+        },
+        "client_rejected": {
+            "title": "Ajax lehnt diese Version von Aegis for Ajax ab",
+            "description": "Die Ajax-Server akzeptieren keine Anfragen mehr von dieser Version der Integration („Request is blacklisted“). Sie kann sich daher weder anmelden noch Zustände aktualisieren oder Befehle senden. Dein Konto und deine Zugangsdaten sind in Ordnung. Aktualisiere Aegis for Ajax in HACS auf die neueste Version und starte Home Assistant neu. Diese Reparatur verschwindet von selbst, sobald Ajax die Integration wieder akzeptiert."
         },
         "fcm_credentials_invalid": {
             "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",

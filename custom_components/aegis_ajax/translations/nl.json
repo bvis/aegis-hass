@@ -59,6 +59,7 @@
             "invalid_auth": "Ongeldig e-mailadres of wachtwoord.",
             "invalid_totp": "Ongeldige TOTP-code. Probeer het opnieuw.",
             "cannot_connect": "Kan geen verbinding maken met de Ajax-servers.",
+            "client_rejected": "Ajax weigert deze versie van Aegis for Ajax. Werk de integratie bij in HACS, herstart Home Assistant en probeer het opnieuw.",
             "unknown": "Er is een onverwachte fout opgetreden."
         },
         "abort": {
@@ -258,6 +259,10 @@
         "grpcio_version_mismatch": {
             "title": "Aegis vereist grpcio {required} of nieuwer (gevonden {current})",
             "description": "Aegis is afhankelijk van `grpcio` voor het gRPC-kanaal naar de Ajax-cloud, en jouw Home Assistant-installatie bevat `grpcio` {current}. Onder {required} kan de aanmelding mislukken met cryptische HTTP/2-fouten. Op Home Assistant Core of Container fixeert het integratiemanifest de versie bij installatie, maar op Home Assistant OS gebruikt de runtime een systeembrede grpcio die dit manifest niet kan beinvloeden — meestal moet je Home Assistant OS bijwerken naar een build met een nieuwere grpcio. De melding sluit automatisch bij de volgende herlaadronde zodra de versie boven {required} komt."
+        },
+        "client_rejected": {
+            "title": "Ajax weigert deze versie van Aegis for Ajax",
+            "description": "De Ajax-servers accepteren geen verzoeken meer van deze versie van de integratie (\"Request is blacklisted\"), dus kan die niet inloggen, statussen bijwerken of commando's versturen. Je account en inloggegevens zijn in orde. Werk Aegis for Ajax in HACS bij naar de nieuwste versie en herstart Home Assistant. Deze reparatie verdwijnt vanzelf zodra Ajax de integratie weer accepteert."
         },
         "fcm_credentials_invalid": {
             "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",

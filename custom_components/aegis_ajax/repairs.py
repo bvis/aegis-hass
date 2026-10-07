@@ -45,6 +45,7 @@ ISSUE_FCM_NOT_CONFIGURED = "fcm_not_configured"
 ISSUE_FCM_PUSH_STUCK = "fcm_push_stuck"
 ISSUE_FCM_NEVER_DELIVERED = "fcm_never_delivered"
 ISSUE_GRPCIO_VERSION_MISMATCH = "grpcio_version_mismatch"
+ISSUE_CLIENT_REJECTED = "client_rejected"
 
 # Floor below which the integration's gRPC calls have historically failed
 # in ways that surface as cryptic stack traces (HTTP/2 framing errors,
@@ -260,6 +261,27 @@ def async_register_fcm_never_delivered(
 
 def async_clear_fcm_never_delivered(hass: HomeAssistant, *, entry_id: str) -> None:
     ir.async_delete_issue(hass, DOMAIN, _issue_id(ISSUE_FCM_NEVER_DELIVERED, entry_id))
+
+
+def async_register_client_rejected(hass: HomeAssistant) -> None:
+    """Ajax refuses this integration build (#559); only an update fixes it.
+
+    One issue for the whole domain: every entry sends the same client
+    version, so they are rejected together and recover together.
+    """
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        ISSUE_CLIENT_REJECTED,
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key=ISSUE_CLIENT_REJECTED,
+        learn_more_url="https://github.com/bvis/aegis-hass/releases",
+    )
+
+
+def async_clear_client_rejected(hass: HomeAssistant) -> None:
+    ir.async_delete_issue(hass, DOMAIN, ISSUE_CLIENT_REJECTED)
 
 
 def _parse_version(value: str) -> tuple[int, ...]:
