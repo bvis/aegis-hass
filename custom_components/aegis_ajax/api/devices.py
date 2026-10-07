@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 # #206: client-version reported on the bumped findAllBySpace retry. The Ajax
 # server silently drops feature fields keyed on the reported version (see the
 # monitoring_companies incident in const.CLIENT_VERSION's history); the Yale /
-# Assa Abloy SmartLock service postdates our default 3.30, so the locks may
+# Assa Abloy SmartLock service postdates the old default 3.30, so the locks may
 # only enumerate when we claim a newer client.
 _PROBE_CLIENT_VERSION = "3.60"
 
