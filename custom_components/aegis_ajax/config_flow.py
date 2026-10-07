@@ -533,6 +533,13 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 "the entry keeps its previous (rejected) token",
                 entry.entry_id,
             )
+        # The reload fetches the CRA companies again (#561): reconfiguring is
+        # how a user picks up a change of CRA.
+        from custom_components.aegis_ajax.monitoring_companies import (  # noqa: PLC0415
+            async_remove_monitoring_companies,
+        )
+
+        await async_remove_monitoring_companies(self.hass, entry.entry_id)
         # Refresh the visible title and unique_id too, not just the data —
         # otherwise switching accounts leaves the old email on the entry's
         # front page until a second reconfigure (#241).
