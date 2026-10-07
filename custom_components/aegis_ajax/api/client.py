@@ -51,6 +51,27 @@ _TRANSIENT_CODES = {
     grpc.StatusCode.INTERNAL,
 }
 
+
+def is_client_rejected(exc: BaseException | None) -> bool:
+    """True when Ajax refused this integration build, not the account (#559).
+
+    Ajax answers every call with PERMISSION_DENIED "Request is blacklisted"
+    once it stops accepting our `CLIENT_VERSION`; only an update fixes it.
+    A bare PERMISSION_DENIED means the account lacks a permission, so the
+    details text is what tells the two apart. Walks `__cause__` because
+    callers wrap the gRPC error.
+    """
+    while exc is not None:
+        if (
+            isinstance(exc, grpc.aio.AioRpcError)
+            and exc.code() == grpc.StatusCode.PERMISSION_DENIED
+            and "blacklist" in (exc.details() or "").lower()
+        ):
+            return True
+        exc = exc.__cause__
+    return False
+
+
 # HTTP/2 keepalive for the channel. The device stream is a long-lived
 # server-streaming RPC; without keepalive a half-open connection (a NAT /
 # router silently dropping an idle link with no RST) leaves its `async for`

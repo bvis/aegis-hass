@@ -59,6 +59,7 @@
             "invalid_auth": "Forkert e-mail eller adgangskode.",
             "invalid_totp": "Forkert TOTP-kode. Prøv igen.",
             "cannot_connect": "Kan ikke oprette forbindelse til Ajax-serverne.",
+            "client_rejected": "Ajax afviser denne version af Aegis for Ajax. Opdater integrationen i HACS, genstart Home Assistant og prøv igen.",
             "unknown": "Der opstod en uventet fejl."
         },
         "abort": {
@@ -318,6 +319,10 @@
         "grpcio_version_mismatch": {
             "title": "Aegis kræver grpcio {required} eller nyere (fandt {current})",
             "description": "Aegis er afhængig af `grpcio` til gRPC-kanalen, der kommunikerer med Ajax-skyen, og din Home Assistant-installation medbringer `grpcio` {current}. Login kan mislykkes med kryptiske HTTP/2-fejl under {required}. På Home Assistant Core eller Container fastlåser integrationens manifest versionen ved installation, men på Home Assistant OS medbringer runtime'en en systemdækkende grpcio, som dette manifest ikke kan påvirke — du skal typisk opgradere Home Assistant OS til en build, der indeholder en nyere grpcio. Reparationen fjernes automatisk ved næste genindlæsning, når versionen overstiger {required}."
+        },
+        "client_rejected": {
+            "title": "Ajax afviser denne version af Aegis for Ajax",
+            "description": "Ajax-serverne er holdt op med at acceptere forespørgsler fra denne version af integrationen (\"Request is blacklisted\"), så den kan ikke logge ind, opdatere tilstande eller sende kommandoer. Din konto og dine loginoplysninger er i orden. Opdater Aegis for Ajax i HACS til den nyeste version, og genstart Home Assistant. Denne reparation forsvinder af sig selv, når Ajax accepterer integrationen igen."
         },
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",

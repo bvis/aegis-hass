@@ -598,6 +598,38 @@ class TestAsyncUpdateData:
             await coordinator._async_update_data()
 
     @pytest.mark.asyncio
+    async def test_blacklisted_client_raises_repair_and_clears_on_success(self) -> None:
+        """Ajax refusing our client version must say "update", not "error" (#559)."""
+        import grpc
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(
+            side_effect=grpc.aio.AioRpcError(  # type: ignore[call-arg]
+                code=grpc.StatusCode.PERMISSION_DENIED,
+                initial_metadata=grpc.aio.Metadata(),
+                trailing_metadata=grpc.aio.Metadata(),
+                details="Request is blacklisted",
+            )
+        )
+
+        with (
+            patch("custom_components.aegis_ajax.coordinator.async_register_client_rejected") as reg,
+            pytest.raises(UpdateFailed, match="rejected this version"),
+        ):
+            await coordinator._async_update_data()
+        reg.assert_called_once()
+
+        coordinator._spaces_api.list_spaces = AsyncMock(return_value=[_make_space("s1")])
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+        with patch("custom_components.aegis_ajax.coordinator.async_clear_client_rejected") as clr:
+            await coordinator._async_update_data()
+        clr.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_hub_offline_24h_triggers_repair_and_clears_when_back_online(
         self,
     ) -> None:

@@ -12,6 +12,7 @@ import pytest
 from custom_components.aegis_ajax.api.client import (
     _KEEPALIVE_START_MS,
     AjaxGrpcClient,
+    is_client_rejected,
 )
 from custom_components.aegis_ajax.api.session import AjaxSession
 from custom_components.aegis_ajax.const import GRPC_HOST, GRPC_PORT
@@ -402,3 +403,28 @@ class TestCallUnary:
 
         result = await client.call_server_stream("/some/method", mock_request, mock_response_type)
         assert result is mock_stream
+
+
+def _rpc_error(code: grpc.StatusCode, details: str) -> grpc.aio.AioRpcError:
+    return grpc.aio.AioRpcError(  # type: ignore[call-arg]
+        code=code,
+        initial_metadata=grpc.aio.Metadata(),
+        trailing_metadata=grpc.aio.Metadata(),
+        details=details,
+    )
+
+
+class TestIsClientRejected:
+    def test_blacklisted_is_rejected(self) -> None:
+        err = _rpc_error(grpc.StatusCode.PERMISSION_DENIED, "Request is blacklisted")
+        assert is_client_rejected(err)
+
+    def test_wrapped_blacklisted_is_rejected(self) -> None:
+        err = RuntimeError("wrapper")
+        err.__cause__ = _rpc_error(grpc.StatusCode.PERMISSION_DENIED, "Request is blacklisted")
+        assert is_client_rejected(err)
+
+    def test_missing_account_permission_is_not(self) -> None:
+        err = _rpc_error(grpc.StatusCode.PERMISSION_DENIED, "Permission denied")
+        assert not is_client_rejected(err)
+        assert not is_client_rejected(RuntimeError("Request is blacklisted"))

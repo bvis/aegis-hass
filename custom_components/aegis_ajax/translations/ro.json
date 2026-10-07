@@ -59,6 +59,7 @@
             "invalid_auth": "E-mail sau parolă invalide.",
             "invalid_totp": "Cod TOTP invalid. Vă rugăm să încercați din nou.",
             "cannot_connect": "Nu se poate conecta la serverele Ajax.",
+            "client_rejected": "Ajax respinge această versiune de Aegis for Ajax. Actualizează integrarea în HACS, repornește Home Assistant și încearcă din nou.",
             "unknown": "A apărut o eroare neașteptată."
         },
         "abort": {
@@ -258,6 +259,10 @@
         "grpcio_version_mismatch": {
             "title": "Aegis are nevoie de grpcio {required} sau mai nou (gasit {current})",
             "description": "Aegis depinde de `grpcio` pentru canalul gRPC care comunica cu cloud-ul Ajax, iar instalarea ta Home Assistant aduce `grpcio` {current}. Sub {required} autentificarea poate esua cu erori HTTP/2 criptice. Pe Home Assistant Core sau Container manifest-ul integrarii fixeaza versiunea la instalare, dar pe Home Assistant OS runtime-ul foloseste un grpcio la nivel de sistem pe care manifest-ul nu il poate influenta — de obicei trebuie sa actualizezi Home Assistant OS la o build care include un grpcio mai nou. Reparatia se inchide automat la urmatoarea reincarcare cand versiunea depaseste {required}."
+        },
+        "client_rejected": {
+            "title": "Ajax respinge această versiune de Aegis for Ajax",
+            "description": "Serverele Ajax nu mai acceptă cereri de la această versiune a integrării („Request is blacklisted”), așa că nu se poate autentifica, nu poate actualiza stările și nu poate trimite comenzi. Contul și datele tale de autentificare sunt în regulă. Actualizează Aegis for Ajax în HACS la cea mai nouă versiune și repornește Home Assistant. Această reparație dispare singură când Ajax acceptă din nou integrarea."
         },
         "fcm_credentials_invalid": {
             "title": "Notificarile push dezactivate - credentiale FCM respinse",
