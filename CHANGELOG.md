@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Cloud live view diagnostics (#322) say why Ajax refused a session.** When the request to open the video session fails, the `cloud_video` block only said `rpc_error`. It now also records the gRPC status (`rpc_status`, for example `PERMISSION_DENIED` or `UNAVAILABLE`), and the warning in the log names it too, so a refused client can be told apart from a network drop. **Requests to Ajax:** none added.
 
+### Fixed
+- **Home Assistant no longer logs a stuck push task on shutdown (#570).** Stopping the push client left its reader waiting for Google to close the connection, which could take over 20 seconds, so every restart ended with `Task could not be canceled and was still running after shutdown`. The connection is now dropped first and the stop waits up to 5 seconds for the client to finish. **Requests to Ajax:** none added.
+
 ## [1.23.2] - 2026-10-08
 
 ### Added

@@ -694,6 +694,32 @@ class TestFcmPushClientSupervision:
         assert listener._fcm_supervisor_unsub is None
         assert listener._fcm_restart_at is None
 
+    @pytest.mark.asyncio
+    async def test_async_stop_ends_the_reader_before_returning(self) -> None:
+        """#570: the library's stop() cancels the reader without waiting, and
+        the reader's cleanup then waits for a TLS close only an abort ends."""
+        listener = self._make_listener()
+        closed = asyncio.Event()
+
+        async def reader() -> None:
+            try:
+                await asyncio.sleep(3600)
+            finally:
+                await closed.wait()  # writer.wait_closed()
+
+        task = asyncio.create_task(reader())
+        await asyncio.sleep(0)
+        client = MagicMock()
+        client.writer.transport.abort.side_effect = closed.set
+        client.tasks = [task]
+        client.stop = AsyncMock(side_effect=lambda: task.cancel())
+        listener._push_client = client
+
+        await asyncio.wait_for(listener.async_stop(), timeout=1)
+
+        assert task.done()
+        assert listener._push_client is None
+
 
 class TestAsyncStartFcmRepairs:
     """The FCM listener raises a Repair when registration / push start fails."""
