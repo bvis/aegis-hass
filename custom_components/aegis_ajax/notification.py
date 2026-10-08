@@ -79,6 +79,8 @@ FCM_RESTART_BACKOFF_MAX_SECONDS = 900.0
 # A client that has stayed alive this long earns the backoff reset, so the
 # next incident starts again at the 5-minute delay.
 FCM_HEALTHY_RUN_RESET_SECONDS = 1800.0
+# #570: how long a stop waits for the client's reader and monitor to finish.
+FCM_STOP_TIMEOUT_SECONDS = 5.0
 
 # Issue #174: when the underlying TCP socket against `mtalk.google.com:5228`
 # (FCM's MCS endpoint) gets reset, Google replays any push that wasn't acked
@@ -1639,10 +1641,21 @@ class AjaxNotificationListener:
             self._fcm_supervisor_unsub = None
         self._fcm_restart_at = None
         if self._push_client:
+            client = self._push_client
             try:
-                stop_result = self._push_client.stop()
+                # #570: the library cancels its tasks without waiting, and the
+                # reader's cleanup then waits for a TLS close Google can take
+                # tens of seconds to send, outliving HA's shutdown. Drop the
+                # connection first so that cleanup ends at once, then wait.
+                writer = getattr(client, "writer", None)
+                if writer is not None:
+                    writer.transport.abort()
+                tasks = [t for t in getattr(client, "tasks", None) or [] if not t.done()]
+                stop_result = client.stop()
                 if hasattr(stop_result, "__await__"):
                     await stop_result
+                if tasks:
+                    await asyncio.wait(tasks, timeout=FCM_STOP_TIMEOUT_SECONDS)
                 _LOGGER.debug("FCM push client stopped")
             except Exception:
                 _LOGGER.exception("Error stopping FCM push client")
