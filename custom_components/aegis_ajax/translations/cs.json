@@ -337,6 +337,9 @@
             "refresh_hub": {
                 "name": "Aktualizovat hub"
             },
+            "restore_after_alarm": {
+                "name": "Obnovit po poplachu"
+            },
             "siren_sound_test": {
                 "name": "Test zvuku"
             }

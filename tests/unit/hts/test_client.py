@@ -200,6 +200,54 @@ class TestClientSessions:
         assert not isinstance(exc_info.value, HtsTerminationOutcomeUnknownError)
 
 
+class TestRestoreAfterAlarm:
+    """#572: the app's Restore is one hub command frame plus one answer."""
+
+    @pytest.mark.asyncio
+    async def test_sends_restore_frame_and_returns_the_answer(self) -> None:
+        client = _make_client()
+        client._connected = True
+        client._send_message = AsyncMock(return_value=0x000102)  # type: ignore[method-assign]
+
+        task = asyncio.create_task(client.restore_after_alarm("0001A2B3"))
+        await asyncio.sleep(0)
+        msg_type, payload = client._send_message.await_args.args
+        assert msg_type == 0x06
+        assert client._send_message.await_args.kwargs == {"receiver": 0x0001A2B3}
+        assert tlv_decode(payload) == [b"\x00", b"\x21", b"\x00\x01\xa2\xb3", b"\x16"]
+
+        # The transport receipt and an answer to another frame are not the result.
+        client._handle_answer(_msg(MsgType.ACK, tlv_encode([b"\x00", b"\x00\x01\x02"])))
+        client._handle_answer(_msg(MsgType.ACK, tlv_encode([b"\x05", b"\x00\x00\x09"])))
+        assert not task.done()
+        client._handle_answer(_msg(MsgType.ACK, tlv_encode([b"\x01", b"\x00\x01\x02"])))
+
+        assert await task == 0x01
+        assert client._pending_hub_command is None
+
+    @pytest.mark.asyncio
+    async def test_no_answer_raises_connection_error(self) -> None:
+        client = _make_client()
+        client._connected = True
+        client._send_message = AsyncMock(return_value=7)  # type: ignore[method-assign]
+
+        with (
+            patch("custom_components.aegis_ajax.api.hts.client.HUB_COMMAND_TIMEOUT", 0.01),
+            pytest.raises(HtsConnectionError, match="answer"),
+        ):
+            await client.restore_after_alarm("0001A2B3")
+        assert client._pending_hub_command is None
+
+    @pytest.mark.asyncio
+    async def test_not_connected_sends_nothing(self) -> None:
+        client = _make_client()
+        client._send_message = AsyncMock()  # type: ignore[method-assign]
+
+        with pytest.raises(HtsConnectionError):
+            await client.restore_after_alarm("0001A2B3")
+        client._send_message.assert_not_awaited()
+
+
 # ---------------------------------------------------------------------------
 # __init__ state
 # ---------------------------------------------------------------------------

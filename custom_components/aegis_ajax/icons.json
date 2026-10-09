@@ -44,6 +44,7 @@
         },
         "button": {
             "capture_photo": { "default": "mdi:camera" },
+            "restore_after_alarm": { "default": "mdi:restore-alert" },
             "siren_sound_test": { "default": "mdi:bullhorn" }
         }
     }

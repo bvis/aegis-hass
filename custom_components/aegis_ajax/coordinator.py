@@ -23,6 +23,7 @@ from custom_components.aegis_ajax.api import devices_parser
 from custom_components.aegis_ajax.api.client import is_client_rejected
 from custom_components.aegis_ajax.api.devices import DevicesApi
 from custom_components.aegis_ajax.api.hts.client import (
+    COMMAND_ANSWERS,
     HtsClient,
     HtsConnectionError,
     HtsTerminationOutcomeUnknownError,
@@ -2862,6 +2863,44 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cached value until the next delta refreshes it.
         """
         return self._hts_client is not None
+
+    async def async_restore_after_alarm(self, hub_id: str) -> None:
+        """Restore the system after an alarm or malfunction, like the app's Restore (#572).
+
+        One HTS frame per call, the same one the app sends.
+        """
+        hts_client = self._hts_client
+        if hts_client is None or not hts_client.is_connected:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": "hub connection (HTS) not active"},
+            )
+        try:
+            answer = await hts_client.restore_after_alarm(hub_id)
+        except HtsConnectionError as exc:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": str(exc)},
+            ) from exc
+        name = COMMAND_ANSWERS.get(answer, f"0x{answer:02X}")
+        _LOGGER.info("Restore after alarm on hub %s: %s", hub_id, name)
+        if answer in (0x01, 0x02, 0x09):
+            return
+        key = {
+            0x03: "command_not_performed",
+            0x05: "command_permission_denied",
+            0x06: "command_unknown",
+            0x07: "command_hub_offline",
+            0x0F: "command_hub_wrong_state",
+            0x11: "command_hub_wrong_state",
+        }.get(answer, "command_failed")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=key,
+            translation_placeholders={"reason": name} if key == "command_failed" else None,
+        )
 
     async def async_request_manual_refresh(self, hub_id: str) -> None:
         """Trigger a one-shot STATUS_BODY refresh for `hub_id`, rate-limited.

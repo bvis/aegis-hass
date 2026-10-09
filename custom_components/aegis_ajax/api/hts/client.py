@@ -105,6 +105,32 @@ PING_INTERVAL = 30
 STATUS_REFRESH_INTERVAL = 60
 READ_TIMEOUT = 40
 SESSION_REQUEST_TIMEOUT = 15
+# Hub commands (#572) go out as a type-0x06 frame addressed to the hub:
+# [key 0x00, object type, object id, command]. The result comes back as an
+# ACK-type (0x16) frame whose key is the answer code below; key 0x00 is only
+# the transport receipt.
+HUB_COMMAND_MSG_TYPE = 0x06
+HUB_COMMAND_KEY = 0x00
+OBJECT_TYPE_HUB = 0x21
+HUB_COMMAND_RESTORE_AFTER_ALARM = 0x16
+HUB_COMMAND_TIMEOUT = 15
+COMMAND_ANSWERS = {
+    0x01: "DELIVERED",
+    0x02: "DELIVERED_COMMAND_PERFORMED",
+    0x03: "DELIVERED_COMMAND_NOT_PERFORMED",
+    0x05: "FAILED_INSUFFICIENT_ACCESS",
+    0x06: "FAILED_UNKNOWN_COMMAND",
+    0x07: "UNDELIVERED_RECEIVER_OFFLINE",
+    0x08: "UNDELIVERED_WRONG_RECEIVER",
+    0x09: "DELIVERED_WAS_ALREADY_PERFORMED",
+    0x0A: "FAILED_WRONG_PARAMETERS",
+    0x0B: "FAILED_WRONG_MESSAGE_TYPE",
+    0x0E: "SERVER_ERROR",
+    0x0F: "BUSY",
+    0x10: "HUB_ERROR",
+    0x11: "WRONG_STATE",
+    0x16: "HUB_BLOCKED_BY_SERVICE_PROVIDER",
+}
 # Bound the full 4-step auth handshake. Without this, a server that keeps the
 # TCP connection alive but feeds bytes slowly can keep `_receive_message()`'s
 # per-chunk reads under READ_TIMEOUT forever, so the coroutine never resolves.
@@ -322,6 +348,8 @@ class HtsClient:
         self._pending_user_registration_response: tuple[int, asyncio.Future[list[bytes]]] | None = (
             None
         )
+        self._hub_command_lock = asyncio.Lock()
+        self._pending_hub_command: tuple[int | None, asyncio.Future[int]] | None = None
 
     # ------------------------------------------------------------------
     # Properties
@@ -527,11 +555,13 @@ class HtsClient:
     # Send / receive
     # ------------------------------------------------------------------
 
-    async def _send_message(self, msg_type: MsgType, payload: bytes) -> None:
-        """Build, encrypt and send an HTS message."""
+    async def _send_message(
+        self, msg_type: MsgType | int, payload: bytes, *, receiver: int | None = None
+    ) -> int:
+        """Build, encrypt and send an HTS message; return its sequence number."""
         msg = HtsMessage(
             sender=self._sender_id,
-            receiver=self._receiver_id,
+            receiver=self._receiver_id if receiver is None else receiver,
             seq_num=self._next_seq(),
             link=0,
             flags=0,
@@ -555,6 +585,7 @@ class HtsClient:
             raise HtsConnectionError("Not connected")
         self._writer.write(frame)
         await self._writer.drain()
+        return msg.seq_num
 
     async def _send_response(
         self,
@@ -735,6 +766,63 @@ class HtsClient:
                 del params
                 succeeded.append(session_id)
         return succeeded
+
+    async def restore_after_alarm(self, hub_id: str) -> int:
+        """Send the app's "Restore" command to a hub (#572); return the answer code."""
+        hub = int(hub_id, 16)
+        return await self._send_hub_command(
+            hub,
+            [
+                bytes([HUB_COMMAND_KEY]),
+                bytes([OBJECT_TYPE_HUB]),
+                hub.to_bytes(4, "big"),
+                bytes([HUB_COMMAND_RESTORE_AFTER_ALARM]),
+            ],
+        )
+
+    async def _send_hub_command(self, hub: int, params: list[bytes]) -> int:
+        """Send one hub command and wait for its answer code."""
+        if not self._connected:
+            raise HtsConnectionError("HTS is not connected")
+        async with self._hub_command_lock:
+            future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+            self._pending_hub_command = (None, future)
+            try:
+                seq = await self._send_message(
+                    HUB_COMMAND_MSG_TYPE, tlv_encode(params), receiver=hub
+                )
+                self._pending_hub_command = (seq, future)
+                return await asyncio.wait_for(future, timeout=HUB_COMMAND_TIMEOUT)
+            except TimeoutError as exc:
+                raise HtsConnectionError("Timed out waiting for the hub's answer") from exc
+            finally:
+                self._pending_hub_command = None
+                if not future.done():
+                    future.cancel()
+
+    def _handle_answer(self, msg: HtsMessage) -> None:
+        """Hand a hub command's answer to the waiting request."""
+        pending = self._pending_hub_command
+        if pending is None:
+            return
+        try:
+            params = tlv_decode(msg.payload)
+        except ValueError:
+            return
+        if not params or len(params[0]) != 1 or params[0][0] == ACK_KEY_RECEIVED:
+            return
+        # The answer echoes the command's sequence number; skip answers to
+        # anything else.
+        seq = pending[0]
+        if (
+            seq is not None
+            and len(params) > 1
+            and len(params[1]) == 3
+            and int.from_bytes(params[1]) != seq
+        ):
+            return
+        if not pending[1].done():
+            pending[1].set_result(params[0][0])
 
     @staticmethod
     def _parse_client_sessions(params: list[bytes]) -> list[ClientSession]:
@@ -960,7 +1048,7 @@ class HtsClient:
                 elif msg.msg_type == MsgType.USER_REGISTRATION:
                     self._handle_user_registration_response(msg)
                 elif msg.msg_type == MsgType.ACK:
-                    pass  # expected
+                    self._handle_answer(msg)
                 elif int(msg.msg_type) == _MSG_TYPE_EVENT:
                     self._handle_event_message(msg)
                 else:

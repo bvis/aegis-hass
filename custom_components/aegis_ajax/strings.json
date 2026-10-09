@@ -378,6 +378,9 @@
             "refresh_hub": {
                 "name": "Refresh hub"
             },
+            "restore_after_alarm": {
+                "name": "Restore after alarm"
+            },
             "siren_sound_test": {
                 "name": "Test sound"
             }
