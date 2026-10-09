@@ -337,6 +337,9 @@
             "refresh_hub": {
                 "name": "Оновити хаб"
             },
+            "restore_after_alarm": {
+                "name": "Відновити після тривоги"
+            },
             "siren_sound_test": {
                 "name": "Перевірка звуку"
             }

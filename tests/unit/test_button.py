@@ -441,3 +441,33 @@ class TestSirenSoundTestButton:
         with pytest.raises(HomeAssistantError) as exc:
             await button.async_press()
         assert exc.value.translation_key == "command_permission_denied"
+
+
+class TestRestoreAfterAlarmButton:
+    """#572: one hub command per press, repeat presses dropped."""
+
+    def _make_button(self) -> tuple[object, object]:
+        from custom_components.aegis_ajax.button import AjaxRestoreAfterAlarmButton
+
+        coordinator = _make_coordinator()
+        coordinator.devices = {"hub-1": _make_hub_device("hub-1")}
+        coordinator.async_restore_after_alarm = AsyncMock()
+        button = AjaxRestoreAfterAlarmButton(coordinator=coordinator, hub_id="hub-1")
+        return button, coordinator
+
+    @pytest.mark.asyncio
+    async def test_press_restores_once_and_drops_quick_repeats(self) -> None:
+        button, coordinator = self._make_button()
+
+        await button.async_press()
+        await button.async_press()
+
+        coordinator.async_restore_after_alarm.assert_awaited_once_with("hub-1")
+
+    def test_follows_hts_availability(self) -> None:
+        button, coordinator = self._make_button()
+        coordinator._hts_client = None
+        assert button.available is False
+        coordinator._hts_client = MagicMock()
+        assert button.available is True
+        assert button.unique_id == "aegis_ajax_hub-1_restore_after_alarm"

@@ -337,6 +337,9 @@
             "refresh_hub": {
                 "name": "Actualitza el hub"
             },
+            "restore_after_alarm": {
+                "name": "Restaurar després de l'alarma"
+            },
             "siren_sound_test": {
                 "name": "Prova de so"
             }

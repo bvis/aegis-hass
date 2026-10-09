@@ -59,6 +59,7 @@ async def async_setup_entry(
             continue
         seen_hubs.add(hub_id)
         entities.append(AjaxRefreshHubButton(coordinator=coordinator, hub_id=hub_id))
+        entities.append(AjaxRestoreAfterAlarmButton(coordinator=coordinator, hub_id=hub_id))
     async_add_entities(entities)
 
 
@@ -94,6 +95,40 @@ class AjaxRefreshHubButton(CoordinatorEntity[AjaxCobrandedCoordinator], ButtonEn
 
     async def async_press(self) -> None:
         await self.coordinator.async_request_manual_refresh(self._hub_id)
+
+
+class AjaxRestoreAfterAlarmButton(CoordinatorEntity[AjaxCobrandedCoordinator], ButtonEntity):
+    """The app's *Restore* after an alarm or malfunction (#572).
+
+    One command per press; presses closer together than `MIN_PRESS_INTERVAL`
+    are dropped so a looping automation can't flood the hub.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "restore_after_alarm"
+
+    MIN_PRESS_INTERVAL = 10.0
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
+        super().__init__(coordinator)
+        self._hub_id = hub_id
+        self._attr_unique_id = f"aegis_ajax_{hub_id}_restore_after_alarm"
+        self._last_press_at = -self.MIN_PRESS_INTERVAL
+        hub_device = coordinator.devices.get(hub_id)
+        if hub_device is not None:
+            self._attr_device_info = build_device_info(hub_device, coordinator.rooms)
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.is_hts_alive
+
+    async def async_press(self) -> None:
+        now = time.monotonic()
+        if now - self._last_press_at < self.MIN_PRESS_INTERVAL:
+            _LOGGER.debug("Restore on %s dropped, pressed too soon", self._hub_id)
+            return
+        self._last_press_at = now
+        await self.coordinator.async_restore_after_alarm(self._hub_id)
 
 
 class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], ButtonEntity):

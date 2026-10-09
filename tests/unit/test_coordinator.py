@@ -3814,6 +3814,54 @@ class TestOnHtsDeviceKv:
         assert coordinator.is_hts_alive is False
 
 
+class TestRestoreAfterAlarm:
+    """#572: map the hub's answer to success or a translated error."""
+
+    @staticmethod
+    def _coordinator(answer: int) -> AjaxCobrandedCoordinator:  # noqa: F821
+        coordinator = _make_coordinator()
+        hts = MagicMock()
+        hts.is_connected = True
+        hts.restore_after_alarm = AsyncMock(return_value=answer)
+        coordinator._hts_client = hts
+        return coordinator
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("answer", [0x01, 0x02, 0x09])
+    async def test_delivered_or_already_done_succeeds(self, answer: int) -> None:
+        coordinator = self._coordinator(answer)
+        await coordinator.async_restore_after_alarm("hub-1")
+        coordinator._hts_client.restore_after_alarm.assert_awaited_once_with("hub-1")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("answer", "key"),
+        [
+            (0x05, "command_permission_denied"),
+            (0x07, "command_hub_offline"),
+            (0x11, "command_hub_wrong_state"),
+            (0x10, "command_failed"),
+            (0x7E, "command_failed"),
+        ],
+    )
+    async def test_refusals_raise_translated_errors(self, answer: int, key: str) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = self._coordinator(answer)
+        with pytest.raises(HomeAssistantError) as exc:
+            await coordinator.async_restore_after_alarm("hub-1")
+        assert exc.value.translation_key == key
+
+    @pytest.mark.asyncio
+    async def test_no_hts_raises(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _make_coordinator()
+        with pytest.raises(HomeAssistantError) as exc:
+            await coordinator.async_restore_after_alarm("hub-1")
+        assert exc.value.translation_key == "command_failed"
+
+
 class TestManualHubRefresh:
     """Coordinator-level guard for the per-hub manual refresh button (#179)."""
 

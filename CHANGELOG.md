@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.23.3] - unreleased
+## [1.24.0] - unreleased
+
+### Added
+- **Restore after alarm button for hubs (#572).** Each hub gets a *Restore after alarm* button that sends the same *Restore* as the Ajax app, for systems set to stay blocked after an alarm or malfunction until someone restores them. The account needs the restore permission for that space, and a refusal from the hub shows up as an error. Pressing it when nothing needs restoring does nothing. **Requests to Ajax:** one per press, sent on the hub connection the integration already keeps open, and presses less than 10 seconds apart are ignored. Nothing is sent while nobody presses it.
 
 ### Changed
 - **Cloud live view diagnostics (#322) say why Ajax refused a session.** When the request to open the video session fails, the `cloud_video` block only said `rpc_error`. It now also records the gRPC status (`rpc_status`, for example `PERMISSION_DENIED` or `UNAVAILABLE`), and the warning in the log names it too, so a refused client can be told apart from a network drop. **Requests to Ajax:** none added.
