@@ -93,6 +93,10 @@ jobs:
         run: |
           docker run --rm -v "$(pwd)":/app -w /app python:3.13-slim \
             python3 scripts/check_ha_requirement_floors.py
+      - name: Check Home Assistant imports exist in the minimum core
+        run: |
+          docker run --rm -v "$(pwd)":/app -w /app python:3.13-slim \
+            python3 scripts/check_ha_import_floor.py
 
   lint:
     runs-on: ubuntu-latest
