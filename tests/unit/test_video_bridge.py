@@ -157,6 +157,26 @@ async def test_camera_hands_home_assistants_ice_servers_to_go2rtc() -> None:
     ]
 
 
+def test_camera_loads_on_home_assistant_without_web_rtc() -> None:
+    """Home Assistant < 2026.1 has no web_rtc component; camera.py must still import (#574)."""
+    import importlib
+    import sys
+
+    from webrtc_models import RTCIceServer
+
+    from custom_components.aegis_ajax import camera as camera_module
+
+    stun = RTCIceServer(urls="stun:stun.example:3478")
+    hass = MagicMock()
+    hass.data = {"camera_webrtc_ice_servers": [lambda: [stun]]}
+    try:
+        with patch.dict(sys.modules, {"homeassistant.components.web_rtc": None}):
+            legacy = importlib.reload(camera_module)
+        assert legacy.async_get_ice_servers(hass) == [stun]
+    finally:
+        importlib.reload(camera_module)
+
+
 def test_a_new_session_closes_the_previous_one() -> None:
     coordinator = MagicMock()
     coordinator.devices = {}

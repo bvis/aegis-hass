@@ -9,7 +9,6 @@ import time
 from typing import TYPE_CHECKING
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.components.web_rtc import async_get_ice_servers
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -20,12 +19,22 @@ from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import build_device_info
 from custom_components.aegis_ajax.video_bridge import DATA_KEY, async_get_bridge
 
+try:
+    from homeassistant.components.web_rtc import async_get_ice_servers
+except ImportError:  # Home Assistant < 2026.1 has no web_rtc component (#574)
+
+    def async_get_ice_servers(hass: HomeAssistant) -> list[RTCIceServer]:
+        # The camera component keeps the ICE server getters here, its STUN default included.
+        return [s for get in hass.data.get("camera_webrtc_ice_servers", []) for s in get()]
+
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from webrtc_models import RTCIceServer
 
     from custom_components.aegis_ajax.api.models import Device
     from custom_components.aegis_ajax.api.webrtc import RemoteCandidate
