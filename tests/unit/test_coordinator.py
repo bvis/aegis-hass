@@ -1000,6 +1000,39 @@ class TestAsyncUpdateData:
         coordinator._client.close.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_home_assistant_stop_stops_the_push_client(self) -> None:
+        """HA doesn't unload entries on stop, so the stop event must end FCM (#570)."""
+        from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+
+        coordinator = _make_coordinator()
+        listener = MagicMock(async_start=AsyncMock(), async_stop=AsyncMock())
+        with patch(
+            "custom_components.aegis_ajax.notification.AjaxNotificationListener",
+            return_value=listener,
+        ):
+            await coordinator.async_start_push_notifications()
+
+        event, on_stop = coordinator.hass.bus.async_listen_once.call_args.args
+        assert event == EVENT_HOMEASSISTANT_STOP
+        await on_stop(MagicMock())
+        listener.async_stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_removes_the_push_stop_listener(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._client.close = AsyncMock()
+        listener = MagicMock(async_start=AsyncMock(), async_stop=AsyncMock())
+        with patch(
+            "custom_components.aegis_ajax.notification.AjaxNotificationListener",
+            return_value=listener,
+        ):
+            await coordinator.async_start_push_notifications()
+        unsub = coordinator.hass.bus.async_listen_once.return_value
+
+        await coordinator.async_shutdown()
+        unsub.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_update_restarts_hts_when_previous_task_finished(self) -> None:
         net_state = HubNetworkState(ethernet_connected=True)
         coordinator = _make_coordinator()

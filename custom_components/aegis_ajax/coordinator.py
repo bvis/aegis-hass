@@ -9,7 +9,8 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import CALLBACK_TYPE, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import CALLBACK_TYPE, Event, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -506,6 +507,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # triggers the install RPC.
         self.device_firmware_updates: dict[str, DeviceFirmwareUpdateInfo] = {}
         self._notification_listener: AjaxNotificationListener | None = None
+        self._unsub_push_stop: CALLBACK_TYPE | None = None
         # Optional persistent-notification manager (2.2). Attached by
         # async_setup_entry from the config-entry options; None means the
         # feature is off (the default) and event dispatch skips it.
@@ -3859,7 +3861,20 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             app_label=app_label,
             disable_push_warning=disable_push_warning,
         )
-        await self._notification_listener.async_start()
+        listener = self._notification_listener
+
+        # #570: Home Assistant does not unload config entries when it stops, so
+        # async_shutdown() never runs on a restart. Stop the push client here.
+        async def _stop_push(_event: Event) -> None:
+            self._unsub_push_stop = None
+            await listener.async_stop()
+
+        if self._unsub_push_stop is not None:
+            self._unsub_push_stop()
+        self._unsub_push_stop = self.hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STOP, _stop_push
+        )
+        await listener.async_start()
 
     async def async_shutdown(self) -> None:
         # Stop the siren-temperature refresh timer (#220)
@@ -3899,6 +3914,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._hts_client:
             await self._hts_client.close()
 
+        if self._unsub_push_stop is not None:
+            self._unsub_push_stop()
+            self._unsub_push_stop = None
         if self._notification_listener:
             await self._notification_listener.async_stop()
         await self._client.close()
