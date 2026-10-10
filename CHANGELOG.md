@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **The integration loads again on Home Assistant 2025.11 and 2025.12 (#574).** Since 1.23.1 the camera platform imported the `web_rtc` component, which only exists from Home Assistant 2026.1, so setup failed with `No module named 'homeassistant.components.web_rtc'` on older versions. Older versions now read the same ICE servers from the camera component. **Requests to Ajax:** none added.
-- **Home Assistant no longer logs a stuck push task on shutdown (#570).** Stopping the push client left its reader waiting for Google to close the connection, which could take over 20 seconds, so every restart ended with `Task could not be canceled and was still running after shutdown`. The connection is now dropped first and the stop waits up to 5 seconds for the client to finish. **Requests to Ajax:** none added.
+- **Home Assistant no longer logs a stuck push task on shutdown (#570).** Stopping the push client left its reader waiting for Google to close the connection, which could take over 20 seconds, so every restart ended with `Task could not be canceled and was still running after shutdown`. The connection is now dropped first and the stop waits up to 5 seconds for the client to finish, both when the integration is reloaded and when Home Assistant stops or restarts (1.23.3-beta.2 only covered reloads, since Home Assistant doesn't unload integrations on shutdown). **Requests to Ajax:** none added.
 
 ## [1.23.2] - 2026-10-08
 
