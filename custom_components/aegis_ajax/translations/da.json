@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "Hub'en er i øjeblikket ikke i en tilstand, der tillader denne handling."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Tilkobl i nattilstand kan ikke ændres, mens detektoren er tilkoblet. Frakobl først, og prøv igen."
+        },
         "command_alarm_reset_needed": {
             "message": "En aktiv alarm skal nulstilles, før denne handling kan udføres."
         },

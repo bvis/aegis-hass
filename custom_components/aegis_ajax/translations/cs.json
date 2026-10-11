@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "Hub momentálně není ve stavu, který tuto akci umožňuje."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Nastavení „Zabezpečit v nočním režimu“ nelze změnit, když je detektor zabezpečený. Nejprve zrušte zabezpečení a zkuste to znovu."
+        },
         "command_alarm_reset_needed": {
             "message": "Aktivní alarm musí být resetován, než bude možné tuto akci provést."
         },

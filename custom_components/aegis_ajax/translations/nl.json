@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "De hub is momenteel niet in een staat die deze actie toestaat."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Inschakelen in nachtmodus kan niet worden gewijzigd terwijl de detector is ingeschakeld. Schakel eerst uit en probeer het opnieuw."
+        },
         "command_alarm_reset_needed": {
             "message": "Een actief alarm moet worden gereset voordat deze actie kan worden uitgevoerd."
         },

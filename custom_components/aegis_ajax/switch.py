@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -21,6 +22,7 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_NEVER,
     CONF_BYPASS_SWITCHES,
     DEFAULT_BYPASS_SWITCHES,
+    DOMAIN,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
@@ -438,7 +440,16 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
             device_type=self._device_type,
             enable=enable,
         )
-        await async_send_device_command(self.coordinator, cmd)
+        try:
+            await async_send_device_command(self.coordinator, cmd)
+        except HomeAssistantError as err:
+            # The hub refuses settings changes on an armed detector. Say so
+            # plainly, and as a user error so HA doesn't log a traceback.
+            if err.translation_key == "command_hub_wrong_state":
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN, translation_key="night_mode_arm_while_armed"
+                ) from err
+            raise
 
 
 class AjaxChimeSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):

@@ -182,3 +182,40 @@ class TestSetup:
             await async_setup_entry(MagicMock(), entry, lambda e, *a, **k: added.extend(e))
         ids = {e.unique_id for e in added if isinstance(e, AjaxNightModeArmSwitch)}
         assert ids == {"aegis_ajax_30EA219B_night_mode_arm"}
+
+
+class TestArmedRefusal:
+    """An armed detector's refusal reads as a plain user error, not a traceback (#579)."""
+
+    def _switch(self, error: Exception) -> AjaxNightModeArmSwitch:
+        coordinator = MagicMock()
+        coordinator.rooms = {}
+        coordinator.devices = {}
+        coordinator.devices_api.send_command = AsyncMock(side_effect=error)
+        coordinator.async_request_refresh = AsyncMock()
+        return AjaxNightModeArmSwitch(
+            coordinator=coordinator, device_id="X", hub_id="h", device_type="door_protect"
+        )
+
+    @pytest.mark.asyncio
+    async def test_wrong_state_says_disarm_first(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        sw = self._switch(
+            DeviceCommandError("night_mode_arm: hub_wrong_state", reason="hub_wrong_state")
+        )
+        with pytest.raises(ServiceValidationError) as err:
+            await sw.async_turn_off()
+        assert err.value.translation_key == "night_mode_arm_while_armed"
+
+    @pytest.mark.asyncio
+    async def test_other_refusals_keep_their_message(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+
+        sw = self._switch(
+            DeviceCommandError("night_mode_arm: permission_denied", reason="permission_denied")
+        )
+        with pytest.raises(HomeAssistantError) as err:
+            await sw.async_turn_on()
+        assert not isinstance(err.value, ServiceValidationError)
+        assert err.value.translation_key == "command_permission_denied"

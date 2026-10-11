@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "O hub não está em um estado que permita esta ação no momento."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Não é possível alterar \"Armar no modo noturno\" enquanto o detector está armado. Desarme primeiro e tente novamente."
+        },
         "command_alarm_reset_needed": {
             "message": "Um alarme ativo precisa ser resetado antes de realizar esta ação."
         },

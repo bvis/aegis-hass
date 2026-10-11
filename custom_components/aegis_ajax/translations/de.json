@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "Der Hub ist derzeit nicht in einem Zustand, der diese Aktion zulässt."
         },
+        "night_mode_arm_while_armed": {
+            "message": "„Im Nachtmodus scharf schalten“ kann nicht geändert werden, solange der Melder scharf ist. Zuerst unscharf schalten und erneut versuchen."
+        },
         "command_alarm_reset_needed": {
             "message": "Ein aktiver Alarm muss zurückgesetzt werden, bevor diese Aktion ausgeführt werden kann."
         },

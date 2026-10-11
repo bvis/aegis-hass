@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "Hub şu anda bu işleme izin veren bir durumda değil."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Dedektör kuruluyken \"Gece modunda kur\" değiştirilemez. Önce devre dışı bırakın, sonra tekrar deneyin."
+        },
         "command_alarm_reset_needed": {
             "message": "Bu işlem yapılmadan önce etkin bir alarmın sıfırlanması gerekiyor."
         },

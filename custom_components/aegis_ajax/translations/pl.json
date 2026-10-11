@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "Hub nie jest obecnie w stanie umożliwiającym tę czynność."
         },
+        "night_mode_arm_while_armed": {
+            "message": "Nie można zmienić opcji „Uzbrajaj w trybie nocnym”, gdy czujnik jest uzbrojony. Najpierw rozbrój i spróbuj ponownie."
+        },
         "command_alarm_reset_needed": {
             "message": "Aktywny alarm musi zostać zresetowany przed wykonaniem tej czynności."
         },

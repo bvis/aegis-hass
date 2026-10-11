@@ -612,6 +612,9 @@
         "command_hub_wrong_state": {
             "message": "L'hub non è in uno stato che consente questa azione al momento."
         },
+        "night_mode_arm_while_armed": {
+            "message": "«Inserire in modalità notte» non può essere modificato mentre il rilevatore è inserito. Disinserisci prima e riprova."
+        },
         "command_alarm_reset_needed": {
             "message": "Un allarme attivo deve essere ripristinato prima di poter eseguire questa azione."
         },
