@@ -16,7 +16,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -124,6 +124,10 @@ _LOGGER = logging.getLogger(__name__)
 # expected to take action (check hub power, firewall, etc).
 _HUB_OFFLINE_THRESHOLD_HOURS = 24
 _HTS_CHRONIC_FAILURE_SECONDS = 30 * 60
+# First retry after an HTS drop (#578); doubles per failed or short-lived
+# connection up to the poll interval, so a hub that keeps closing the socket
+# is retried no faster than the poll cycle did before.
+_HTS_RECONNECT_FIRST_DELAY = 30
 
 # Minimum seconds between two user-triggered STATUS_BODY refresh requests
 # on the same hub. The periodic refresh loop already runs every 60 s
@@ -694,6 +698,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # `hts_chronic_failure` Repair surfaced after 30 min of
         # sustained reconnect failures.
         self._hts_first_failure_at: float | None = None
+        self._hts_connected_at: float | None = None
+        self._hts_reconnect_delay = _HTS_RECONNECT_FIRST_DELAY
+        self._unsub_hts_reconnect: CALLBACK_TYPE | None = None
         # Wall-clock timestamp of the last successful `_async_update_data`
         # return, exposed as `last_update_success_time` for the System
         # Health card. HA's `DataUpdateCoordinator` only tracks the
@@ -1986,6 +1993,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._hts_client.seed_hub_states(self.hub_network)
             result = await self._hts_client.connect()
             _LOGGER.info("HTS connected, %d hub(s)", len(result.hubs))
+            self._hts_connected_at = time.monotonic()
             self._clear_hts_chronic_failure()
             await self._hts_client.listen(
                 on_state_update=self._on_hts_update,
@@ -2001,7 +2009,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # traceback still lands when DEBUG is enabled.
             _LOGGER.warning(
                 "HTS connection failed (%s) — hub network sensors will be unavailable. "
-                "The integration will retry on the next poll cycle.",
+                "The integration will retry automatically.",
                 exc.__class__.__name__,
                 exc_info=True,
             )
@@ -2971,9 +2979,25 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         space_id=space_id,
                         minutes_failing=int(elapsed // 60),
                     )
-        if reconnect:
-            # Schedule reconnect on next poll cycle rather than immediate retry
-            _LOGGER.debug("HTS disconnected; will reconnect on next poll cycle")
+        # A connection that lasted a full poll interval was healthy: start the
+        # backoff over. A failed connect or a quick drop keeps doubling it.
+        connected_at, self._hts_connected_at = self._hts_connected_at, None
+        if connected_at is not None and time.monotonic() - connected_at >= self._poll_interval:
+            self._hts_reconnect_delay = _HTS_RECONNECT_FIRST_DELAY
+        if reconnect and self._unsub_hts_reconnect is None:
+            # #578: waiting for the next poll left the panel stale for up to
+            # its interval, missing any arm/disarm the hub sent meanwhile.
+            delay = self._hts_reconnect_delay
+            self._hts_reconnect_delay = min(delay * 2, self._poll_interval)
+            _LOGGER.debug("HTS disconnected; reconnecting in %d s", delay)
+            self._unsub_hts_reconnect = async_call_later(
+                self.hass, delay, self._async_hts_reconnect_due
+            )
+
+    @callback
+    def _async_hts_reconnect_due(self, _now: datetime) -> None:
+        self._unsub_hts_reconnect = None
+        self.hass.async_create_background_task(self._start_hts(), "aegis_ajax HTS reconnect")
 
     def _clear_hts_chronic_failure(self) -> None:
         """Called when HTS reconnects successfully — drop any active Repair."""
@@ -3907,6 +3931,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._stream_tasks.clear()
 
         # Stop HTS
+        if self._unsub_hts_reconnect is not None:
+            self._unsub_hts_reconnect()
+            self._unsub_hts_reconnect = None
         if self._hts_task and not self._hts_task.done():
             self._hts_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):

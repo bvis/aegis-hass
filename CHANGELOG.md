@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.1] - unreleased
+
+### Fixed
+- **The hub connection comes back within seconds after Ajax drops it (#578).** When the live hub connection closed, the integration only reconnected on the next poll, up to 5 minutes later with the default interval, and any arm or disarm the hub sent in that window was lost, so a group panel could stay on the old state. It now retries after 30 seconds, doubling the wait after each failed or short-lived connection up to the poll interval. **Requests to Ajax:** none added in normal operation, since the reconnect only happens sooner. While the connection keeps failing there are up to four extra attempts (at 30, 60, 120 and 240 seconds) before it settles at the poll interval.
+
 ## [1.24.0] - 2026-10-10
 
 ### Added

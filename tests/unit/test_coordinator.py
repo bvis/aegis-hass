@@ -5977,3 +5977,70 @@ class TestSpaceSecurityArmFlagWidth:
         armed = {**self._ONE_BYTE, 0x06: b"\x01"}
         coordinator._on_hts_device_kv("00338977", "00000001", armed, from_body=True)
         coordinator.request_security_snapshot_refresh.assert_called_once()
+
+
+class TestHtsReconnect:
+    """An HTS drop reconnects on its own backoff, not on the next poll (#578)."""
+
+    CALL_LATER = "custom_components.aegis_ajax.coordinator.async_call_later"
+
+    def _coordinator(self) -> object:
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator._poll_interval = 300
+        return coordinator
+
+    def _delays(self, coordinator: object, drops: int) -> list[int]:
+        delays = []
+        with patch(self.CALL_LATER) as call_later:
+            for _ in range(drops):
+                coordinator._handle_hts_disconnect()
+                delays.append(call_later.call_args.args[1])
+                coordinator._unsub_hts_reconnect = None  # the timer fired
+        return delays
+
+    def test_failed_reconnects_back_off_up_to_the_poll_interval(self) -> None:
+        coordinator = self._coordinator()
+        assert self._delays(coordinator, 6) == [30, 60, 120, 240, 300, 300]
+
+    def test_a_connection_that_lasted_a_poll_interval_starts_over(self) -> None:
+        coordinator = self._coordinator()
+        self._delays(coordinator, 3)
+        coordinator._hts_connected_at = time.monotonic() - 301
+        assert self._delays(coordinator, 1) == [30]
+
+    def test_a_quick_drop_after_connecting_keeps_backing_off(self) -> None:
+        coordinator = self._coordinator()
+        self._delays(coordinator, 2)
+        coordinator._hts_connected_at = time.monotonic() - 5
+        assert self._delays(coordinator, 1) == [120]
+
+    def test_only_one_reconnect_is_pending(self) -> None:
+        coordinator = self._coordinator()
+        with patch(self.CALL_LATER) as call_later:
+            coordinator._handle_hts_disconnect()
+            coordinator._handle_hts_disconnect()
+        call_later.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_the_timer_starts_hts(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._start_hts = AsyncMock()
+        coordinator._unsub_hts_reconnect = MagicMock()
+        coordinator.hass.async_create_background_task = MagicMock(
+            side_effect=lambda coro, _name: asyncio.ensure_future(coro)
+        )
+        coordinator._async_hts_reconnect_due(MagicMock())
+        await asyncio.sleep(0)
+        coordinator._start_hts.assert_awaited_once()
+        assert coordinator._unsub_hts_reconnect is None
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_a_pending_reconnect(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator._client.close = AsyncMock()
+        cancel = MagicMock()
+        coordinator._unsub_hts_reconnect = cancel
+        await coordinator.async_shutdown()
+        cancel.assert_called_once()
+        assert coordinator._unsub_hts_reconnect is None
