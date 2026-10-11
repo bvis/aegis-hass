@@ -978,6 +978,8 @@ class DevicesApi:
             await self._device_bypass(command)
         elif command.action == "siren_settings":
             await self._update_siren_settings(command)
+        elif command.action == "night_mode_arm":
+            await self._update_night_mode_arm(command)
         else:
             raise DeviceCommandError(f"Unknown device command action: {command.action}")
 
@@ -1030,6 +1032,50 @@ class DevicesApi:
             command.alarm_duration,
             command.siren_volume_level,
         )
+
+    async def _update_night_mode_arm(self, command: DeviceCommand) -> None:
+        """Change a detector's "Arm in Night Mode" setting via UpdateHubDevice (#579).
+
+        Same request as the Ajax app's toggle: one `Update` carrying only
+        `CommonArmingPartSettings.night_mode_arm`. The field is `optional`, so
+        the detector's other arming settings (delays, arming mode) are left
+        alone. Needs device-edit permission, like the siren settings.
+        """
+        from systems.ajax.api.ecosystem.v2.commonmodels.device.common import (  # noqa: PLC0415
+            common_arming_part_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import (  # noqa: PLC0415
+            update_pb2,
+        )
+        from v3.mobilegwsvc.service.update_hub_device import (  # noqa: PLC0415
+            endpoint_pb2_grpc,
+            request_pb2,
+        )
+
+        if command.night_mode_arm is None:
+            raise DeviceCommandError("night_mode_arm command requires a value")
+        part = common_arming_part_pb2.CommonArmingPart
+        settings = part.CommonArmingPartSettings(
+            night_mode_arm=(
+                part.NIGHT_MODE_ARM_ENABLED
+                if command.night_mode_arm
+                else part.NIGHT_MODE_ARM_DISABLED
+            )
+        )
+        channel = self._client._get_channel()
+        metadata = self._client._session.get_call_metadata()
+        stub = endpoint_pb2_grpc.UpdateHubDeviceServiceStub(channel)
+        request = request_pb2.UpdateHubDeviceRequest(
+            hub_id=command.hub_id,
+            device_id=command.device_id,
+            object_type=_build_object_type(command.device_type),
+            update=[update_pb2.Update(common_arming_part_settings=settings)],
+        )
+        response = await stub.execute(request, metadata=metadata, timeout=15)
+        if response.HasField("failure"):
+            error = response.failure.WhichOneof("error") or "unknown"
+            raise DeviceCommandError(f"night_mode_arm: {error}", reason=error)
+        _LOGGER.debug("Device %s night_mode_arm=%s OK", command.device_id, command.night_mode_arm)
 
     async def _device_bypass(self, command: DeviceCommand) -> None:
         """Deactivate / reactivate a device via DeviceCommandDeviceBypass (#338).

@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Atlama"
             },
+            "night_mode_arm": {
+                "name": "Gece modunda kur"
+            },
             "chime": {
                 "name": "Zil sesi"
             }

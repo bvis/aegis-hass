@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Bypass"
             },
+            "night_mode_arm": {
+                "name": "Armar en modo noche"
+            },
             "chime": {
                 "name": "Timbre"
             }

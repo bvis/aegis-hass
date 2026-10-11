@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Pominięcie"
             },
+            "night_mode_arm": {
+                "name": "Uzbrajaj w trybie nocnym"
+            },
             "chime": {
                 "name": "Gong"
             }

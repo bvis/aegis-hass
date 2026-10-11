@@ -46,6 +46,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Doorbell events**: video-edge doorbells get a per-device `event` entity emitting HA's canonical `ring` event, and a doorbell motion push turns the doorbell's motion sensor on (30 s auto-off)
 - **Button presses**: an Ajax Button in control mode gets a per-device `event` entity that fires `pressed` — no push (FCM) needed, and it works while the system is armed or disarmed
 - **Per-device bypass switches**: each non-hub device can get a `bypass` switch to deactivate / reactivate it; gated by the `bypass_switches` option (`auto` / `always` / `never`). The switch reads `on` for a device deactivated **anywhere** — from Home Assistant, the Ajax app, or by an installer — and its `deactivation_kinds` attribute names the mode in force. Mind Ajax's own wording: `temporary_deactivation_*` is the **permanent** deactivation (until you re-enable it), `one_time_deactivation_*` lasts a single arming cycle, and a `*_tamper` variant means only the device's tamper protection is off. Both directions work from Home Assistant: switch **on** applies the same permanent deactivation the Ajax app does, switch **off** puts the device back under protection — and the integration re-reads the device after every write, so the switch never shows a state the hardware isn't in ([#338](https://github.com/bvis/aegis-hass/issues/338))
+- **Arm in night mode, per detector**: each intrusion detector gets an *Arm in night mode* switch (disabled by default) that edits the same setting as the Ajax app, so automations can change what Night Mode protects. See [Night Mode per detector](#night-mode-per-detector) ([#579](https://github.com/bvis/aegis-hass/issues/579))
 - **Device removal follows the panel**: deleting a device in the Ajax app removes it from Home Assistant within seconds — entities, device card and cache. Deletions that happen while Home Assistant is offline are picked up on the next reconnect: the device stops claiming state and its leftover card can be removed from its device page (**Delete device** — offered for any device the hub no longer reports; live devices are refused and a mistaken deletion re-creates itself from the next snapshot) ([#422](https://github.com/bvis/aegis-hass/issues/422))
 - **Logbook**: Human-readable security event descriptions with icons
 - **Real-time updates**: Persistent gRPC stream for instant sensor state changes (< 1 second latency)
@@ -371,6 +372,60 @@ target:
 data:
   confirm: true
 ```
+
+## Night Mode per detector
+
+Ajax has three security states: **disarmed**, **armed** and **Night Mode**. Night Mode is a partial arm for when people are home, usually at night. Every intrusion detector has its own *Arm in night mode* setting that decides what it does when Night Mode is on:
+
+- **On**: the detector arms with Night Mode and raises an alarm if triggered. This is the usual choice for exterior doors and ground-floor windows.
+- **Off**: the detector ignores Night Mode and only protects when the system is fully armed. This is the usual choice for indoor motion detectors, so walking to the kitchen at night doesn't set off the alarm.
+
+The integration exposes that setting as a switch on each detector (door, motion, glass, combined detectors, MotionCam and wired inputs). It reads the same value the Ajax app shows (the moon icon in its device list) and changes it the same way the app does, so automations can adjust what Night Mode protects.
+
+The switch is **disabled by default**: enable it under the device page, *Configuration* section, for the detectors you want to control.
+
+### How it differs from the bypass switch
+
+| | Bypass | Arm in night mode |
+|---|---|---|
+| Affects | Every mode: the device stops protecting entirely | Night Mode only: the detector still protects when fully armed |
+| Meant for | Temporary exclusions (a faulty sensor, a window that won't close) | Choosing what Night Mode protects in a given situation |
+| If it's left wrong | The device never protects | The device doesn't protect at night, but still does when everyone is out |
+
+### When it's useful
+
+- **A room that's sometimes in use**: a garden room, office or garage that is armed at night while empty. Take its detectors out of Night Mode while someone is using it and put them back afterwards.
+- **Sleeping with a window open**: a contact on a window you open on warm nights blocks or warns on Night Mode arming. An automation can take it out of Night Mode while the window is open and restore it once it's closed.
+- **Guests or pets**: someone sleeping near a detector that normally arms at night, or a pet that roams one area.
+- **Seasonal changes**: a terrace door that's in use all summer.
+
+For example, to keep a garden room out of Night Mode while its lights are on (entity ids are illustrative):
+
+```yaml
+automation:
+  - alias: "Garden room follows occupancy"
+    triggers:
+      - trigger: state
+        entity_id: light.garden_room
+    conditions:
+      - condition: state
+        entity_id: alarm_control_panel.aegis_home
+        state: disarmed
+    actions:
+      - action: "switch.turn_{{ 'off' if trigger.to_state.state == 'on' else 'on' }}"
+        target:
+          entity_id:
+            - switch.garden_room_door_arm_in_night_mode
+            - switch.garden_room_motion_arm_in_night_mode
+```
+
+### Things to know
+
+- **It's a stored setting, not a temporary state.** Unlike a one-time bypass, it stays as set until someone changes it. If an automation turns it off, make sure something turns it back on.
+- **It lowers protection.** Anyone or anything that can flip the switch can leave a door unprotected at night. That's why it's off by default; enable it only for the detectors you mean to automate.
+- **Change it before arming.** As in the Ajax app, a detector's settings can't be changed while it is armed; if the hub refuses, Home Assistant shows the error. Automations should adjust detectors before switching to Night Mode.
+- **Permissions**: the Ajax account needs the device-edit permission (the same one the bypass switch uses). Without it, Ajax refuses the change and Home Assistant shows an error.
+- **Requests to Ajax**: reading the setting costs nothing, it arrives with the device data the integration already receives. Each change is one request, the same one the app sends.
 
 ## Example Dashboard
 

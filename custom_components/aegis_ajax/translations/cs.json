@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Vyřazení"
             },
+            "night_mode_arm": {
+                "name": "Zabezpečit v nočním režimu"
+            },
             "chime": {
                 "name": "Gong"
             }

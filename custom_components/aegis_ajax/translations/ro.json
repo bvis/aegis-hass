@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Excludere"
             },
+            "night_mode_arm": {
+                "name": "Armare în modul de noapte"
+            },
             "chime": {
                 "name": "Sonerie"
             }

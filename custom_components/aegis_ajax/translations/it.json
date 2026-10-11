@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Esclusione"
             },
+            "night_mode_arm": {
+                "name": "Inserire in modalità notte"
+            },
             "chime": {
                 "name": "Campanello"
             }

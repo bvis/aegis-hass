@@ -213,6 +213,9 @@ class DeviceCommand:
     # `CommonSirenPart.SirenVolumeLevel` enum value.
     alarm_duration: int | None = None
     siren_volume_level: int | None = None
+    # The detector's "Arm in Night Mode" setting (#579). Only set for
+    # action="night_mode_arm".
+    night_mode_arm: bool | None = None
 
     @classmethod
     def on(
@@ -265,6 +268,19 @@ class DeviceCommand:
             device_id=device_id,
             device_type=device_type,
             bypass_enable=enable,
+        )
+
+    @classmethod
+    def set_night_mode_arm(
+        cls, hub_id: str, device_id: str, device_type: str, *, enable: bool
+    ) -> DeviceCommand:
+        """Turn a detector's "Arm in Night Mode" setting on or off (#579)."""
+        return cls(
+            action="night_mode_arm",
+            hub_id=hub_id,
+            device_id=device_id,
+            device_type=device_type,
+            night_mode_arm=enable,
         )
 
     @classmethod

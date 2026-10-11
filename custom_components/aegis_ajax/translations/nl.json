@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Overbruggen"
             },
+            "night_mode_arm": {
+                "name": "Inschakelen in nachtmodus"
+            },
             "chime": {
                 "name": "Deurbel"
             }

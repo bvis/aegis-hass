@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Contournement"
             },
+            "night_mode_arm": {
+                "name": "Armer en mode nuit"
+            },
             "chime": {
                 "name": "Carillon"
             }

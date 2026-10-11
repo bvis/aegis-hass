@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Ignorar"
             },
+            "night_mode_arm": {
+                "name": "Armar no modo noturno"
+            },
             "chime": {
                 "name": "Campainha"
             }

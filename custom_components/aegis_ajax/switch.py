@@ -23,6 +23,7 @@ from custom_components.aegis_ajax.const import (
     DEFAULT_BYPASS_SWITCHES,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import (
     async_send_device_command,
     async_set_chimes_mode,
@@ -119,6 +120,15 @@ async def async_setup_entry(
         if device_id not in hub_ids and (bypass_hubs is None or device.hub_id in bypass_hubs):
             entities.append(
                 AjaxBypassSwitch(
+                    coordinator=coordinator,
+                    device_id=device_id,
+                    hub_id=device.hub_id,
+                    device_type=device.device_type,
+                )
+            )
+        if capabilities_for(device).has_night_mode_arm:
+            entities.append(
+                AjaxNightModeArmSwitch(
                     coordinator=coordinator,
                     device_id=device_id,
                     hub_id=device.hub_id,
@@ -364,6 +374,71 @@ class AjaxBypassSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity
         # entity must be corrected by an independent read rather than trusting
         # the success response. Only reached when the write did not raise.
         self.coordinator.schedule_bypass_confirm(self._device_id, expected=enable)
+
+
+class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
+    """A detector's "Arm in Night Mode" setting (#579).
+
+    `on` = the detector arms when the space or its group goes into Night
+    Mode; `off` = it only protects in full arm. This is the hub's stored
+    setting, the same one the Ajax app edits, not a temporary state: it stays
+    as set until someone changes it again. Disabled by default because it
+    lets Home Assistant weaken what Night Mode protects.
+
+    The state comes from the device stream's `armed_in_night_mode` status, so
+    reading it costs no requests. Writing needs device-edit permission; a
+    refusal from the hub (e.g. while armed) is surfaced as a translated error.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "night_mode_arm"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: AjaxCobrandedCoordinator,
+        device_id: str,
+        hub_id: str,
+        device_type: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._hub_id = hub_id
+        self._device_type = device_type
+        self._attr_unique_id = f"aegis_ajax_{device_id}_night_mode_arm"
+        device = coordinator.devices.get(device_id)
+        if device:
+            self._attr_device_info = build_device_info(
+                device, coordinator.rooms, via_device_id=coordinator.hub_registry_id(device.hub_id)
+            )
+
+    @property
+    def available(self) -> bool:
+        device = self.coordinator.devices.get(self._device_id)
+        return device is not None and device.is_online
+
+    @property
+    def is_on(self) -> bool | None:
+        device = self.coordinator.devices.get(self._device_id)
+        if device is None:
+            return None
+        return bool(device.statuses.get("armed_in_night_mode"))
+
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await self._set(enable=True)
+
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await self._set(enable=False)
+
+    async def _set(self, *, enable: bool) -> None:
+        cmd = DeviceCommand.set_night_mode_arm(
+            hub_id=self._hub_id,
+            device_id=self._device_id,
+            device_type=self._device_type,
+            enable=enable,
+        )
+        await async_send_device_command(self.coordinator, cmd)
 
 
 class AjaxChimeSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):

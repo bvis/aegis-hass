@@ -32,6 +32,7 @@ class DeviceCapabilities:
     has_electrical_readings: bool = False
     has_direct_power: bool = False
     has_hts_temperature: bool = False
+    has_night_mode_arm: bool = False
 
 
 class DeviceHandler(Protocol):
@@ -461,6 +462,21 @@ def get_device_handler(device_type: str) -> DeviceHandler:
 # and its sensor entities follow, with nothing to keep in step by hand.
 
 
+# Intrusion detectors with an "Arm in Night Mode" setting (#579) that don't
+# expose `delay_when_leaving`, which marks the rest of them.
+_NIGHT_MODE_ARM_EXTRA_TYPES = frozenset(
+    {
+        "glass_protect",
+        "glass_protect_fibra",
+        "glass_protect_s",
+        "transmitter",
+        "wire_input",
+        "wire_input_rs",
+        "wire_input_mt",
+    }
+)
+
+
 def capabilities_for(device: Device) -> DeviceCapabilities:
     """Return device capabilities for the given device."""
     capabilities = get_device_handler(device.device_type).capabilities(device)
@@ -475,4 +491,9 @@ def capabilities_for(device: Device) -> DeviceCapabilities:
         )
     if device_type in HTS_TEMPERATURE_DEVICE_TYPES:
         capabilities = dataclasses.replace(capabilities, has_hts_temperature=True)
+    if (
+        "delay_when_leaving" in capabilities.binary_sensor_keys
+        or device_type in _NIGHT_MODE_ARM_EXTRA_TYPES
+    ):
+        capabilities = dataclasses.replace(capabilities, has_night_mode_arm=True)
     return capabilities

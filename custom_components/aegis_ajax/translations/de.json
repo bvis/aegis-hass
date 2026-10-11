@@ -547,6 +547,9 @@
             "bypass": {
                 "name": "Überbrückung"
             },
+            "night_mode_arm": {
+                "name": "Im Nachtmodus scharf schalten"
+            },
             "chime": {
                 "name": "Gong"
             }
