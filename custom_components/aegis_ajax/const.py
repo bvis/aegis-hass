@@ -578,6 +578,8 @@ VIDEO_EVENT_TAG_MAP: dict[str, str] = {
     "ring_button_pressed": "doorbell_pressed",
     "motion_detected": "motion",
     "human_detected": "motion",
+    "car_detected": "motion",
+    "pet_detected": "motion",
 }
 
 # Map SmartLockEventTag oneof field names to simplified HA event types. Ajax
@@ -628,6 +630,8 @@ TAG_PRIORITY: dict[str, int] = {
     # Tier 80 — sensor / device activity
     "motion_detected": 80,
     "human_detected": 80,
+    "car_detected": 80,
+    "pet_detected": 80,
     "door_opened": 80,
     "ring_button_pressed": 80,
     "doorbell_pressed": 80,

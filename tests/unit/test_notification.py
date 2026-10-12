@@ -2813,6 +2813,36 @@ class TestExtractEventCompiledProtos:
         event_type, _ = result
         assert event_type == "motion"
 
+    @pytest.mark.parametrize("tag", ["human_detected", "car_detected", "pet_detected"])
+    def test_video_qualifier_detection_tags_map_to_motion(self, tag: str) -> None:
+        # Camera detections (#519): all fire `motion`; `raw_tag` tells them apart.
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event import (  # noqa: E501
+            transition_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (  # noqa: E501
+            qualifier_pb2 as video_qualifier_pb2,
+        )
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.commonmodels.event.video import (
+            tag_pb2 as video_tag_pb2,
+        )
+
+        video_tag = video_tag_pb2.VideoEventTag()
+        getattr(video_tag, tag).SetInParent()
+        qualifier = video_qualifier_pb2.VideoEventQualifier(
+            tag=video_tag,
+            transition=transition_pb2.EventTransition(
+                triggered=transition_pb2.EventTransition.Triggered()
+            ),
+        )
+        wrapped = self._wrap(qualifier.SerializeToString())
+
+        result = self._make_listener()._extract_event_with_compiled_protos(wrapped)
+
+        assert result is not None
+        event_type, data = result
+        assert event_type == "motion"
+        assert data["raw_tag"] == tag
+
 
 class TestParseAndFireEventLogging:
     """Push events now log `event_type / raw_tag / group_id` at DEBUG (#148).
