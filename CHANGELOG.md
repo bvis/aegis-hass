@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Vehicle and pet detections from cameras fire events (#519).** Cameras report car and pet detections alongside person detections, but only person detections were handled, so the others were dropped. They now fire a `motion` event on `aegis_ajax_event` like person detections, and `raw_tag` (`car_detected`, `pet_detected`, `human_detected`) tells them apart. Detection alerts only reach Home Assistant when the account would get them in the Ajax app, and a user account also needs permission on the camera stream. **Requests to Ajax:** none, they come with the push already received.
+
 ## [1.25.0] - 2026-10-12
 
 ### Added
