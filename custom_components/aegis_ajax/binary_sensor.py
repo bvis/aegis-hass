@@ -337,7 +337,8 @@ class AjaxProblemSensor(CoordinatorEntity[AjaxCobrandedCoordinator], BinarySenso
 
     @property
     def available(self) -> bool:
-        return self.coordinator.devices.get(self._device_id) is not None
+        device = self.coordinator.devices.get(self._device_id)
+        return device is not None and device.is_online
 
     @property
     def is_on(self) -> bool:

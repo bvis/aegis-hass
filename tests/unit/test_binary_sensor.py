@@ -1070,7 +1070,9 @@ class TestAjaxConnectivitySensor:
 
 
 class TestAjaxProblemSensor:
-    def _make_device(self, malfunctions: int = 0) -> Device:
+    def _make_device(
+        self, malfunctions: int = 0, state: DeviceState = DeviceState.ONLINE
+    ) -> Device:
         return Device(
             id="dev-1",
             hub_id="hub-1",
@@ -1078,7 +1080,7 @@ class TestAjaxProblemSensor:
             device_type="door_protect",
             room_id=None,
             group_id=None,
-            state=DeviceState.ONLINE,
+            state=state,
             malfunctions=malfunctions,
             bypassed=False,
             statuses={},
@@ -1104,6 +1106,19 @@ class TestAjaxProblemSensor:
         coordinator.devices = {}
         sensor = AjaxProblemSensor(coordinator=coordinator, device_id="dev-1")
         assert sensor.is_on is False
+
+    def test_available_when_online(self) -> None:
+        coordinator = MagicMock()
+        coordinator.devices = {"dev-1": self._make_device()}
+        sensor = AjaxProblemSensor(coordinator=coordinator, device_id="dev-1")
+        assert sensor.available is True
+
+    def test_unavailable_when_offline(self) -> None:
+        # #585: an offline device kept reporting a stale "OK".
+        coordinator = MagicMock()
+        coordinator.devices = {"dev-1": self._make_device(state=DeviceState.OFFLINE)}
+        sensor = AjaxProblemSensor(coordinator=coordinator, device_id="dev-1")
+        assert sensor.available is False
 
     def test_unique_id(self) -> None:
         device = self._make_device()
