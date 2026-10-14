@@ -155,6 +155,11 @@ class AjaxCapturePhotoButton(CoordinatorEntity[AjaxCobrandedCoordinator], Button
                 device, coordinator.rooms, via_device_id=coordinator.hub_registry_id(device.hub_id)
             )
 
+    @property
+    def available(self) -> bool:
+        device = self.coordinator.devices.get(self._device_id)
+        return super().available and device is not None and device.is_online
+
     async def async_press(self) -> None:
         """Trigger photo capture, retrieve the URL, download and save it.
 

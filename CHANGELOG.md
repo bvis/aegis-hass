@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Problem goes unavailable while the device is offline (#585).** Every other entity of an offline device goes unavailable, but *Problem* kept showing its last value, so a device that was turned off still read *OK*. It now goes unavailable too; *Connectivity* still reports the device as disconnected. **Requests to Ajax:** none.
+- **Capture photo goes unavailable while the camera is offline.** Like the other entities of an offline device, the button now shows as unavailable instead of accepting a press that could only time out after 15 seconds. A new test checks every entity of every device type for this, and `docs/invariants.md` lists the exceptions and why. **Requests to Ajax:** none, and a press on an offline camera no longer sends one.
 
 ## [1.25.0] - 2026-10-12
 
