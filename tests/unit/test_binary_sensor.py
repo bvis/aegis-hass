@@ -159,10 +159,12 @@ class TestBinarySensorTypes:
             assert "delay_when_leaving" not in _sensor_keys_for(dtype), dtype
 
     def test_wire_input_mt_gets_the_contact_sensor(self) -> None:
-        # Only the capture-validated family (#413); plain wire_input and
+        # Only the capture-validated families (#413); plain wire_input and
         # transmitter key the same concept on different sub-keys.
         assert "external_contact_open" in _DEVICE_TYPE_SENSORS["wire_input_mt"]
+        assert "external_contact_open" in _DEVICE_TYPE_SENSORS["wire_input_rs"]
         assert "external_contact_open" not in _DEVICE_TYPE_SENSORS["wire_input"]
+        assert "external_contact_open" not in _DEVICE_TYPE_SENSORS["transmitter"]
 
     def test_dual_curtain_outdoor_gets_a_motion_sensor(self) -> None:
         # #434: the family was missing from the map, so it fell through to the

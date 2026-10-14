@@ -260,6 +260,11 @@ _HTS_TAMPER_ROUTED_DEVICE_TYPES: frozenset[str] = frozenset(
 # things elsewhere (HTS sub-keys are legacy proto field numbers, per family).
 _HTS_CONTACT_STATE_KEY = 0x33
 
+# Families whose `0x33` has been captured as the contact position: the
+# MultiTransmitter's wire inputs (#413) and the Hub Hybrid's own wired
+# inputs, which send the same byte with the same meaning.
+_HTS_CONTACT_STATE_DEVICE_TYPES: frozenset[str] = frozenset({"wire_input_mt", "wire_input_rs"})
+
 # The statuses key the routed value lands on, read by the `opening`
 # binary sensor.
 _EXTERNAL_CONTACT_OPEN_KEY = "external_contact_open"
@@ -2546,7 +2551,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
     def _maybe_apply_hts_contact_state(self, device_id_hex: str, kv: dict[int, bytes]) -> None:
-        """Route HTS `0x33` onto `external_contact_open` for MT wire inputs (#413).
+        """Route HTS `0x33` onto `external_contact_open` for wired inputs (#413).
 
         `0x33=00` is "left its rest position" — the app's "Alerte" — and maps
         to open; `0x33=01` is at rest ("OK") and maps to closed. The proto
@@ -2578,7 +2583,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         `opening` sensor should say. Guarded by
         `test_the_no_nc_mode_key_is_not_consumed`.
 
-        Family-gated hard to `wire_input_mt`: the same byte means
+        Family-gated hard to `_HTS_CONTACT_STATE_DEVICE_TYPES`: the same byte means
         `external_sensor_power_broken` on the MultiTransmitter itself and
         other things on other families (#406's lesson). Re-reads the device
         from `self.devices` because an earlier applier in the kv chain may
@@ -2588,7 +2593,7 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         from dataclasses import replace as dc_replace  # noqa: PLC0415
 
         device = self.devices.get(device_id_hex)
-        if device is None or device.device_type != "wire_input_mt":
+        if device is None or device.device_type not in _HTS_CONTACT_STATE_DEVICE_TYPES:
             return
         raw = kv.get(_HTS_CONTACT_STATE_KEY)
         if raw == b"\x00":

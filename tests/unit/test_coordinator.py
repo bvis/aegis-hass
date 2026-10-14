@@ -3448,10 +3448,12 @@ class TestHtsContactState:
             battery=None,
         )
 
-    def test_00_reads_open(self) -> None:
+    @pytest.mark.parametrize("device_type", ["wire_input_mt", "wire_input_rs"])
+    def test_00_reads_open(self, device_type: str) -> None:
         # Capture, NC mode, 13:58: circuit open, app shows Alerte -> 0x33=00.
+        # Hub Hybrid wired inputs: door opened, 0x33 went 01 -> 00.
         coordinator = _make_coordinator()
-        coordinator.devices["082639CE"] = self._make_device()
+        coordinator.devices["082639CE"] = self._make_device(device_type=device_type)
         coordinator.async_set_updated_data = MagicMock()
 
         coordinator._on_hts_device_kv("0029B936", "082639CE", {0x33: b"\x00"})
@@ -3459,11 +3461,13 @@ class TestHtsContactState:
         assert coordinator.devices["082639CE"].statuses["external_contact_open"] is True
         coordinator.async_set_updated_data.assert_called_once()
 
-    def test_01_reads_closed(self) -> None:
+    @pytest.mark.parametrize("device_type", ["wire_input_mt", "wire_input_rs"])
+    def test_01_reads_closed(self, device_type: str) -> None:
         # Capture, NC mode, 13:59: circuit closed, app shows OK -> 0x33=01.
+        # Hub Hybrid wired inputs: door closed again, 0x33 went 00 -> 01.
         coordinator = _make_coordinator()
         coordinator.devices["082639CE"] = self._make_device(
-            statuses={"external_contact_open": True}
+            device_type=device_type, statuses={"external_contact_open": True}
         )
         coordinator.async_set_updated_data = MagicMock()
 

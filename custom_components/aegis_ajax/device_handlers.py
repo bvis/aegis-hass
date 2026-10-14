@@ -360,7 +360,7 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
     ),
     # Wired inputs
     StaticDeviceHandler(
-        ("transmitter", "wire_input", "wire_input_rs"),
+        ("transmitter", "wire_input"),
         ("tamper", "wire_input_alert"),
     ),
     StaticDeviceHandler(
@@ -368,7 +368,7 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
         ("tamper",),
     ),
     StaticDeviceHandler(
-        ("wire_input_mt",),
+        ("wire_input_mt", "wire_input_rs"),
         ("tamper", "wire_input_alert", "external_contact_open"),
     ),
     # LightSwitch dimmer — previously unmapped, so it fell through to the

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Vehicle and pet detections from cameras fire events (#519).** Cameras report car and pet detections alongside person detections, but only person detections were handled, so the others were dropped. They now fire a `motion` event on `aegis_ajax_event` like person detections, and `raw_tag` (`car_detected`, `pet_detected`, `human_detected`) tells them apart. Detection alerts only reach Home Assistant when the account would get them in the Ajax app, and a user account also needs permission on the camera stream. **Requests to Ajax:** none, they come with the push already received.
+- **Contact sensor for Hub Hybrid wired inputs (#588).** Wired contacts on the hub's own inputs (`wire_input_rs`) get the same *Contact* (open / closed) entity as MultiTransmitter inputs, so a door's position shows in Home Assistant while the system is disarmed, as it does in the Ajax app. The hub reports these inputs with the same byte and meaning as the MultiTransmitter. **Requests to Ajax:** none, the value comes with the hub status already received.
 
 ### Fixed
 - **Problem goes unavailable while the device is offline (#585).** Every other entity of an offline device goes unavailable, but *Problem* kept showing its last value, so a device that was turned off still read *OK*. It now goes unavailable too; *Connectivity* still reports the device as disconnected. **Requests to Ajax:** none.

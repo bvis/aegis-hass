@@ -3293,6 +3293,12 @@
       "enabled_by_default": true
     },
     {
+      "unique_id": "aegis_ajax_test_device_external_contact_open",
+      "device_class": "opening",
+      "entity_category": null,
+      "enabled_by_default": true
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
