@@ -158,7 +158,7 @@ class TestBinarySensorTypes:
         ):
             assert "delay_when_leaving" not in _sensor_keys_for(dtype), dtype
 
-    def test_wire_input_mt_gets_the_contact_sensor(self) -> None:
+    def test_wired_inputs_get_the_contact_sensor(self) -> None:
         # Only the capture-validated families (#413); plain wire_input and
         # transmitter key the same concept on different sub-keys.
         assert "external_contact_open" in _DEVICE_TYPE_SENSORS["wire_input_mt"]
