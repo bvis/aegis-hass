@@ -15,6 +15,7 @@ from custom_components.aegis_ajax.api.models import (
     Space,
 )
 from custom_components.aegis_ajax.binary_sensor import (
+    _WIRE_INPUT_DEVICE_TYPES,
     BINARY_SENSOR_TYPES,
     AjaxBinarySensor,
     AjaxConnectivitySensor,
@@ -931,17 +932,26 @@ class TestWireInputAlertSensor:
         )
         assert sensor.is_on is False
 
-    def test_transmitter_wire_input_alert_or_reduces_external_contact(self) -> None:
+    def test_every_wire_input_alert_family_is_or_reduced(self) -> None:
+        # wire_input_rs got the alert entity after the OR-reduce list was
+        # written and was left out of it; keep the two in step.
+        with_alert = {
+            dtype for dtype in _DEVICE_HANDLERS if "wire_input_alert" in _sensor_keys_for(dtype)
+        }
+        assert with_alert == _WIRE_INPUT_DEVICE_TYPES
+
+    @pytest.mark.parametrize("device_type", sorted(_WIRE_INPUT_DEVICE_TYPES))
+    def test_wire_input_alert_or_reduces_external_contact(self, device_type: str) -> None:
         # Issue #65: the Transmitter Jeweller may surface the intrusion line
         # via any of wire_input_status / external_contact_broken /
         # external_contact_alert depending on hub firmware. The unified
-        # entity must reflect any of them.
+        # entity must reflect any of them, on every wired-input family.
         for source in ("wire_input_alert", "external_contact_broken", "external_contact_alert"):
             device = Device(
                 id="tr-1",
                 hub_id="hub-1",
                 name="Transmitter",
-                device_type="transmitter",
+                device_type=device_type,
                 room_id=None,
                 group_id=None,
                 state=DeviceState.ONLINE,
@@ -955,7 +965,7 @@ class TestWireInputAlertSensor:
             sensor = AjaxBinarySensor(
                 coordinator=coordinator, device_id="tr-1", status_key="wire_input_alert"
             )
-            assert sensor.is_on is True, f"OR-reduce missed {source} on transmitter"
+            assert sensor.is_on is True, f"OR-reduce missed {source} on {device_type}"
 
     def test_door_protect_external_contact_broken_not_routed_as_alert(self) -> None:
         # Sanity check: the composite OR must apply ONLY to wire_input devices,

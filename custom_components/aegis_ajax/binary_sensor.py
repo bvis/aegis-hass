@@ -94,7 +94,10 @@ BINARY_SENSOR_TYPES: dict[str, BinarySensorTypeInfo] = {
 # Devices whose single "alert" entity should OR-reduce several hub status
 # oneofs into one state, because Ajax hub firmwares disagree on which oneof
 # carries the open/closed transition for wired inputs.
-_WIRE_INPUT_DEVICE_TYPES: frozenset[str] = frozenset({"wire_input", "wire_input_mt", "transmitter"})
+# Every family with a `wire_input_alert` entity belongs here; a test guards it.
+_WIRE_INPUT_DEVICE_TYPES: frozenset[str] = frozenset(
+    {"wire_input", "wire_input_mt", "wire_input_rs", "transmitter"}
+)
 _WIRE_INPUT_ALERT_SOURCES: tuple[str, ...] = (
     "wire_input_alert",
     "external_contact_broken",
