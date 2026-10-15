@@ -40,9 +40,10 @@ if TYPE_CHECKING:
 # invariant rather than a version: `TestNoDeviceIsEverItsOwnParent` asserts,
 # for every device family and both branches, that no via link ever points at
 # the device's own identity — and it fails if the #489 fix below is removed.
-_VIA_DEVICE_ID_SUPPORTED = "via_device_id" in (
-    DeviceInfo.__required_keys__ | DeviceInfo.__optional_keys__
-)
+# `__annotations__` lists the keys on both the old `TypedDict` and the
+# dataclass `DeviceInfo` became in 2026.11 (#593), which keeps
+# `__required_keys__`/`__optional_keys__` only as a compatibility layer.
+_VIA_DEVICE_ID_SUPPORTED = "via_device_id" in DeviceInfo.__annotations__
 
 
 def is_hub_device(device: Device) -> bool:
