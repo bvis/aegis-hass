@@ -787,6 +787,8 @@ _CONFIRMED_HTS_TEMPERATURE_SAMPLES: dict[str, tuple[bytes, float]] = {
     "home_siren": (b"\x17", 23.0),
     # #375: 0x1f = 31 °C in August for street siren double deck.
     "street_siren_double_deck": (b"\x1f", 31.0),
+    # #591: 0x10 = 16 °C outdoors at night.
+    "street_siren_fibra": (b"\x10", 16.0),
     # #412: two units captured on the same hub, 0x1d = 29 °C (308CE402) and
     # 0x1e = 30 °C (308CB897), both matching the app. One entry per family —
     # this dict records that the family reports 0x02, and the byte-to-degrees
@@ -889,6 +891,7 @@ class TestParseDeviceTemperatureC:
             "street_siren_double_deck",
             "street_siren_s_double_deck",
             "street_siren_double_deck_fibra",
+            "street_siren_fibra",
             "home_siren",
             "home_siren_g3",
             "home_siren_s",
