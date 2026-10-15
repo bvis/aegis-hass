@@ -246,6 +246,12 @@ def _redact_if_text(value: bytes) -> str:
     return value.hex()
 
 
+def _active_channels_raw(kv: dict[int, bytes]) -> str:
+    """The raw active-channels value, for #594: a byte mask, no user text."""
+    raw = kv.get(KEY_ACTIVE_CHANNELS)
+    return raw.hex() if raw is not None else "absent"
+
+
 def _format_non_hub_kv_summary(
     non_hub: list[tuple[bytes, dict[int, bytes]]],
 ) -> str:
@@ -1150,11 +1156,12 @@ class HtsClient:
                 # and other text, and these logs get pasted into public
                 # issues (see `_redact_if_text` for the same concern).
                 _LOGGER.debug(
-                    "Hub %s: parsed %d keys from %s: %s",
+                    "Hub %s: parsed %d keys from %s: %s (active channels raw=%s)",
                     hub_id,
                     len(kv),
                     "SETTINGS_BODY" if sub_key == 5 else "STATUS_BODY",
                     ",".join(f"0x{k:02x}" for k in sorted(kv)),
+                    _active_channels_raw(kv),
                 )
                 existing = self._hub_states.get(hub_id)
                 new_state = parse_hub_params(kv, existing)
@@ -1236,10 +1243,11 @@ class HtsClient:
                     self._schedule_hub_refresh(hub_id, "untrusted power delta")
             if kv and self._is_network_state_delta(kv):
                 _LOGGER.debug(
-                    "Hub %s: parsed %d keys from delta sub-key %d",
+                    "Hub %s: parsed %d keys from delta sub-key %d (active channels raw=%s)",
                     hub_id,
                     len(kv),
                     sub_key,
+                    _active_channels_raw(kv),
                 )
                 existing = self._hub_states.get(hub_id)
                 new_state = parse_hub_params(kv, existing)

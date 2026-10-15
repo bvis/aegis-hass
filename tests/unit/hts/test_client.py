@@ -776,6 +776,39 @@ class TestHandleUpdate:
         assert "2.41.116" not in caplog.text
 
     @pytest.mark.asyncio
+    async def test_body_and_delta_log_the_raw_active_channels(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#594: Ethernet reads off from the body and on after a delta.
+
+        Which bytes each frame carries for key 72 decides between a parse
+        bug and a hub that reports it that way; log them on both paths.
+        """
+        client = _make_client()
+        client._hubs = [MagicMock(hub_id="12345678")]
+
+        def _msg(params: list[bytes]) -> HtsMessage:
+            return HtsMessage(
+                sender=0x12345678,
+                receiver=client._sender_id,
+                seq_num=1,
+                link=10,
+                flags=0,
+                msg_type=MsgType.UPDATES,
+                payload=tlv_encode(params),
+            )
+
+        with caplog.at_level(logging.DEBUG):
+            # STATUS_BODY: hub row; then a flat network delta.
+            await client._handle_update(
+                _msg([b"\x09", bytes.fromhex("12345678"), b"\x48", b"\x02\x01"])
+            )
+            await client._handle_update(_msg([b"\x0b", b"\x48", b"\x01"]))
+
+        assert "active channels raw=0201" in caplog.text
+        assert "active channels raw=01" in caplog.text
+
+    @pytest.mark.asyncio
     async def test_malformed_payload_drops_message_without_raising(self) -> None:
         # Regression for #108: @uddinr's hub firmware emitted a payload
         # containing 0x06 0x6A inside a TLV segment which our escape
