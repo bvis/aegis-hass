@@ -144,12 +144,12 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
             "motion_protect_s",
             "motion_protect_s_plus",
         ),
-        ("motion_detected", "tamper", "delay_when_leaving"),
+        ("motion_detected", "tamper", "delay_when_leaving", "always_active"),
     ),
     # MotionCam
     StaticDeviceHandler(
         ("motion_cam", "motion_cam_outdoor", "motion_cam_fibra"),
-        ("motion_detected", "tamper", "delay_when_leaving"),
+        ("motion_detected", "tamper", "delay_when_leaving", "always_active"),
         is_camera=True,
     ),
     # `motion_cam_outdoor_two_four_phod` joined this group on field evidence
@@ -217,7 +217,7 @@ _HANDLERS: tuple[DeviceHandler, ...] = (
     # CombiProtect
     StaticDeviceHandler(
         ("combi_protect", "combi_protect_s", "combi_protect_fibra"),
-        ("motion_detected", "glass_break", "tamper", "delay_when_leaving"),
+        ("motion_detected", "glass_break", "tamper", "delay_when_leaving", "always_active"),
     ),
     # GlassProtect
     StaticDeviceHandler(

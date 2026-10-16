@@ -419,6 +419,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -446,6 +452,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -483,6 +495,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -510,6 +528,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -547,6 +571,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -574,6 +604,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -611,6 +647,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -638,6 +680,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -675,6 +723,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -702,6 +756,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -739,6 +799,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -766,6 +832,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -803,6 +875,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -830,6 +908,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -867,6 +951,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -894,6 +984,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -931,6 +1027,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -958,6 +1060,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -995,6 +1103,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -1022,6 +1136,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
@@ -1637,6 +1757,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -1675,6 +1801,12 @@
       "enabled_by_default": false
     },
     {
+      "unique_id": "aegis_ajax_test_device_always_active",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
       "unique_id": "aegis_ajax_test_device_connectivity",
       "device_class": "connectivity",
       "entity_category": "diagnostic",
@@ -1708,6 +1840,12 @@
     },
     {
       "unique_id": "aegis_ajax_test_device_delay_when_leaving",
+      "device_class": null,
+      "entity_category": "diagnostic",
+      "enabled_by_default": false
+    },
+    {
+      "unique_id": "aegis_ajax_test_device_always_active",
       "device_class": null,
       "entity_category": "diagnostic",
       "enabled_by_default": false
