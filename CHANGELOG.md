@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.26.0] - unreleased
+## [1.26.0] - 2026-10-16
 
 ### Added
 - **Always active state for MotionProtect, MotionCam and CombiProtect (#597).** A read-only *Always active* entity shows whether the detector is set to stay active while the system is disarmed. It is a diagnostic entity, disabled by default like *Delay when leaving*; enable it on the device page if you want it. **Requests to Ajax:** none, the setting comes with the device data already received.
