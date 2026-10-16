@@ -7,7 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
+from custom_components.aegis_ajax.api.hts.hub_state import (
+    KEY_ACTIVE_CHANNELS,
+    HubNetworkState,
+    parse_hub_params,
+)
 from custom_components.aegis_ajax.api.models import (
     Device,
     MonitoringCompany,
@@ -1179,7 +1183,7 @@ class TestAjaxProblemSensor:
 
 
 class TestAjaxHubWifiSensor:
-    def _make_coordinator(self, wifi_connected: bool = True) -> MagicMock:
+    def _make_coordinator(self, wifi_connected: bool | None = True) -> MagicMock:
         hub_device = Device(
             id="hub-1",
             hub_id="hub-1",
@@ -1205,6 +1209,17 @@ class TestAjaxHubWifiSensor:
     def test_is_off_when_wifi_not_connected(self) -> None:
         sensor = AjaxHubWifiSensor(self._make_coordinator(False), "hub-1")
         assert sensor.is_on is False
+
+    def test_unknown_until_hub_reports_active_channels(self) -> None:
+        """#594 — a startup row without the key renders unknown, not off."""
+        coordinator = self._make_coordinator(None)
+        sensor = AjaxHubWifiSensor(coordinator, "hub-1")
+        assert sensor.available is True
+        assert sensor.is_on is None
+        coordinator.hub_network["hub-1"] = parse_hub_params(
+            {KEY_ACTIVE_CHANNELS: bytes([0b010])}, coordinator.hub_network["hub-1"]
+        )
+        assert sensor.is_on is True
 
     def test_available_when_hub_network_exists(self) -> None:
         sensor = AjaxHubWifiSensor(self._make_coordinator(True), "hub-1")
