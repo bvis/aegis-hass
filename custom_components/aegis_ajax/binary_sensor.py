@@ -568,11 +568,13 @@ class AjaxHubNetworkBinarySensor(_HubNetworkBinarySensor):
         return base
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         state = self.coordinator.hub_network.get(self._hub_id)
         if state is None:
             return False
-        return bool(getattr(state, self._spec.state_attr, False))
+        value = getattr(state, self._spec.state_attr, False)
+        # None = the hub hasn't reported it yet (#594): unknown, not off.
+        return None if value is None else bool(value)
 
 
 # Backwards-compatible aliases — async_setup_entry and tests instantiate

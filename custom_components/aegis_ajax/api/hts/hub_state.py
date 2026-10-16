@@ -81,10 +81,13 @@ _ACTIVE_CHANNELS_GSM_BIT = 2  # bit 2
 class HubNetworkState:
     """Immutable snapshot of hub network connectivity."""
 
-    # Active connection flags (derived from KEY_ACTIVE_CHANNELS bitmask)
-    ethernet_connected: bool = False
-    wifi_connected: bool = False
-    gsm_connected: bool = False
+    # Active connection flags (derived from KEY_ACTIVE_CHANNELS bitmask).
+    # None until the hub sends that key: some hubs leave it out of the
+    # startup row and only send it on change (#594), and "disconnected"
+    # would be a guess.
+    ethernet_connected: bool | None = None
+    wifi_connected: bool | None = None
+    gsm_connected: bool | None = None
 
     # Ethernet
     ethernet_enabled: bool = False
@@ -125,8 +128,10 @@ class HubNetworkState:
     siren_on_any_tamper_raw: int | None = None
 
     @property
-    def primary_connection(self) -> str:
-        """Return the highest-priority active connection type."""
+    def primary_connection(self) -> str | None:
+        """Return the highest-priority active connection type, None if unreported."""
+        if (self.ethernet_connected, self.wifi_connected, self.gsm_connected) == (None, None, None):
+            return None
         if self.ethernet_connected:
             return "ethernet"
         if self.wifi_connected:
