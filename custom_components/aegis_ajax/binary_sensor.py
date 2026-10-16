@@ -54,7 +54,6 @@ BINARY_SENSOR_TYPES: dict[str, BinarySensorTypeInfo] = {
     "malfunction": BinarySensorTypeInfo(BinarySensorDeviceClass.PROBLEM, "malfunction"),
     "interference": BinarySensorTypeInfo(BinarySensorDeviceClass.PROBLEM, "interference"),
     "relay_stuck": BinarySensorTypeInfo(BinarySensorDeviceClass.PROBLEM, "relay_stuck"),
-    "always_active": BinarySensorTypeInfo(BinarySensorDeviceClass.RUNNING, "always_active"),
     "glass_break": BinarySensorTypeInfo(BinarySensorDeviceClass.SAFETY, "glass_break"),
     "vibration": BinarySensorTypeInfo(BinarySensorDeviceClass.VIBRATION, "vibration"),
     # DoorProtect Plus accelerometer fires `tilt` for sustained off-axis
@@ -86,6 +85,14 @@ BINARY_SENSOR_TYPES: dict[str, BinarySensorTypeInfo] = {
     "delay_when_leaving": BinarySensorTypeInfo(
         None,
         "delay_when_leaving",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        enabled_default=False,
+    ),
+    # #597: read-only mirror of the detector's "Always active" setting, same
+    # presence-only status shape and same treatment as `delay_when_leaving`.
+    "always_active": BinarySensorTypeInfo(
+        None,
+        "always_active",
         entity_category=EntityCategory.DIAGNOSTIC,
         enabled_default=False,
     ),
