@@ -41,6 +41,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# One action at a time: never send Ajax more requests than the app would.
+PARALLEL_UPDATES = 1
+
 SWITCH_DEVICE_TYPES: dict[str, int] = {
     "relay": 1,
     "relay_fibra_base": 1,
