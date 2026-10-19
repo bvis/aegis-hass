@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Livevisning"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Gruppe {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "Kommandoen kunne ikke gennemføres. Hub'en returnerede: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Der blev ikke fundet nogen Aegis-konto for det angivne entry_id."
+        },
+        "session_entry_required": {
+            "message": "entry_id er påkrævet, når der er konfigureret mere end én Aegis-konto."
+        },
+        "confirm_required": {
+            "message": "{service} kræver `confirm: true` for at køre."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button kræver `confirm: true`: den sender en panikalarm til alarmcentralen, som i de fleste aftaler straks sender politiet."
+        },
+        "session_id_invalid": {
+            "message": "session_id skal være et positivt heltal."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: der blev ikke fundet noget Aegis-alarmpanel for det angivne mål."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode kræver mindst én af `user` eller `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Kunne ikke vise Ajax-kontoens sessioner: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Kunne ikke afslutte Ajax-kontoens session: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Kunne ikke afslutte Ajax-kontoens andre sessioner: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Kan ikke tilkobles: åbne sensorer eller fejl registreret{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Kan ikke tilkobles: hubben er offline"
+        },
+        "security_hub_busy": {
+            "message": "Hubben er optaget, prøv igen om et par sekunder"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "En anden til-/frakobling er i gang"
+        },
+        "security_disarm_rejected": {
+            "message": "Kan ikke frakobles: kommandoen blev afvist af hubben"
+        },
+        "invalid_alarm_code": {
+            "message": "Ugyldig alarmkode"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Panik",
                 "tamper": "Sabotage"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Fjernbetjeninger"
         }
     }
 }

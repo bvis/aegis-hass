@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Živý náhled"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Skupina {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "Příkaz se nepodařilo dokončit. Hub vrátil: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Pro zadané entry_id nebyl nalezen žádný účet Aegis."
+        },
+        "session_entry_required": {
+            "message": "Pokud je nastaveno více účtů Aegis, je entry_id povinné."
+        },
+        "confirm_required": {
+            "message": "{service} vyžaduje ke spuštění `confirm: true`."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button vyžaduje `confirm: true`: odešle tísňový poplach na pult centralizované ochrany, který u většiny smluv ihned volá policii."
+        },
+        "session_id_invalid": {
+            "message": "session_id musí být kladné celé číslo."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: pro zadaný cíl nebyl nalezen žádný panel alarmu Aegis."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode vyžaduje alespoň `user` nebo `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Nepodařilo se vypsat relace účtu Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Relaci účtu Ajax se nepodařilo ukončit: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Ostatní relace účtu Ajax se nepodařilo ukončit: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Nelze zastřežit: otevřené senzory nebo poruchy{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Nelze zastřežit: hub offline"
+        },
+        "security_hub_busy": {
+            "message": "Hub je zaneprázdněn, zkuste to za několik sekund"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Probíhá jiná operace zastřežení/odstřežení"
+        },
+        "security_disarm_rejected": {
+            "message": "Nelze odstřežit: příkaz odmítnut hubem"
+        },
+        "invalid_alarm_code": {
+            "message": "Neplatný kód alarmu"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Panika",
                 "tamper": "Sabotáž"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Klíčenky"
         }
     }
 }

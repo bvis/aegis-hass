@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +10,14 @@ import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+
+@contextlib.contextmanager
+def _raises_key(exc: type[Exception], key: str) -> Iterator[None]:
+    """pytest.raises on the translation key; the message needs a running hass (#607)."""
+    with pytest.raises(exc) as err:
+        yield
+    assert getattr(err.value, "translation_key", None) == key
 
 
 @pytest.fixture(autouse=True)
@@ -684,7 +693,7 @@ class TestPressPanicButtonHandler:
         from custom_components.aegis_ajax import _async_handle_press_panic_button
 
         hass = MagicMock()
-        with pytest.raises(ServiceValidationError, match="confirm"):
+        with _raises_key(ServiceValidationError, "panic_confirm_required"):
             await _async_handle_press_panic_button(hass, self._make_call({}))
 
     @pytest.mark.asyncio
@@ -694,7 +703,7 @@ class TestPressPanicButtonHandler:
         from custom_components.aegis_ajax import _async_handle_press_panic_button
 
         hass = MagicMock()
-        with pytest.raises(ServiceValidationError, match="confirm"):
+        with _raises_key(ServiceValidationError, "panic_confirm_required"):
             await _async_handle_press_panic_button(hass, self._make_call({"confirm": False}))
 
     @pytest.mark.asyncio
@@ -708,7 +717,7 @@ class TestPressPanicButtonHandler:
             return_value=[],
         ):
             hass = MagicMock()
-            with pytest.raises(ServiceValidationError, match="no Aegis alarm panel"):
+            with _raises_key(ServiceValidationError, "no_panel_for_target"):
                 await _async_handle_press_panic_button(hass, self._make_call({"confirm": True}))
 
     @pytest.mark.asyncio
@@ -1013,7 +1022,7 @@ class TestSetPhotoOnDemandModeHandler:
         from custom_components.aegis_ajax import _async_handle_set_photo_on_demand_mode
 
         hass = MagicMock()
-        with pytest.raises(ServiceValidationError, match="`user`.*`scenario`"):
+        with _raises_key(ServiceValidationError, "photo_mode_option_required"):
             await _async_handle_set_photo_on_demand_mode(hass, self._make_call({}))
 
     @pytest.mark.asyncio
@@ -1027,7 +1036,7 @@ class TestSetPhotoOnDemandModeHandler:
             return_value=[],
         ):
             hass = MagicMock()
-            with pytest.raises(ServiceValidationError, match="no Aegis alarm panel"):
+            with _raises_key(ServiceValidationError, "no_panel_for_target"):
                 await _async_handle_set_photo_on_demand_mode(hass, self._make_call({"user": True}))
 
     @pytest.mark.asyncio

@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Live weergave"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Groep {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "De opdracht kon niet worden voltooid. De hub gaf terug: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Geen Aegis-account gevonden voor de opgegeven entry_id."
+        },
+        "session_entry_required": {
+            "message": "entry_id is verplicht als er meer dan één Aegis-account is ingesteld."
+        },
+        "confirm_required": {
+            "message": "{service} heeft `confirm: true` nodig om te worden uitgevoerd."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button heeft `confirm: true` nodig: het stuurt een paniekalarm naar de meldkamer, die bij de meeste contracten direct de politie stuurt."
+        },
+        "session_id_invalid": {
+            "message": "session_id moet een positief geheel getal zijn."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: geen Aegis-alarmpaneel gevonden voor het opgegeven doel."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode heeft minstens `user` of `scenario` nodig."
+        },
+        "sessions_list_failed": {
+            "message": "Kan de sessies van het Ajax-account niet ophalen: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Kan de sessie van het Ajax-account niet beëindigen: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Kan de andere sessies van het Ajax-account niet beëindigen: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Kan niet inschakelen: open sensoren of storingen{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Kan niet inschakelen: hub offline"
+        },
+        "security_hub_busy": {
+            "message": "Hub bezet, probeer het over een paar seconden opnieuw"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Een andere in-/uitschakelbewerking is bezig"
+        },
+        "security_disarm_rejected": {
+            "message": "Kan niet uitschakelen: opdracht geweigerd door hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Ongeldige alarmcode"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Paniek",
                 "tamper": "Sabotage"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Afstandsbedieningen"
         }
     }
 }

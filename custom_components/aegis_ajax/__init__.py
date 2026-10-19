@@ -195,10 +195,12 @@ def _resolve_session_coordinator(
         for entry in entries:
             if entry.entry_id == entry_id:
                 return cast("AjaxCobrandedCoordinator", entry.runtime_data)
-        raise ServiceValidationError("No Aegis account was found for the supplied entry_id.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="session_entry_not_found"
+        )
     if len(entries) != 1:
         raise ServiceValidationError(
-            "entry_id is required when more than one Aegis account is configured."
+            translation_domain=DOMAIN, translation_key="session_entry_required"
         )
     return cast("AjaxCobrandedCoordinator", entries[0].runtime_data)
 
@@ -207,49 +209,72 @@ async def _async_handle_list_client_sessions(
     hass: HomeAssistant, call: ServiceCall
 ) -> ServiceResponse:
     """Return sessions for one configured Ajax account."""
-    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
     try:
         sessions = await _resolve_session_coordinator(hass, call).async_list_client_sessions()
     except (RuntimeError, HtsConnectionError) as exc:
-        raise ServiceValidationError(f"Could not list Ajax account sessions: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="sessions_list_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
     return {"sessions": sessions}
 
 
 async def _async_handle_terminate_client_session(hass: HomeAssistant, call: ServiceCall) -> None:
     """Terminate one selected non-current Ajax account session."""
-    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+    from homeassistant.exceptions import (  # noqa: PLC0415
+        HomeAssistantError,
+        ServiceValidationError,
+    )
 
     if not call.data.get("confirm"):
         raise ServiceValidationError(
-            "terminate_client_session requires `confirm: true` to terminate a session."
+            translation_domain=DOMAIN,
+            translation_key="confirm_required",
+            translation_placeholders={"service": "terminate_client_session"},
         )
     session_id = call.data.get("session_id")
     if isinstance(session_id, bool) or not isinstance(session_id, int) or session_id <= 0:
-        raise ServiceValidationError("session_id must be a positive integer.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="session_id_invalid"
+        )
     try:
         await _resolve_session_coordinator(hass, call).async_terminate_client_session(session_id)
     except (RuntimeError, ValueError, HtsConnectionError) as exc:
-        raise ServiceValidationError(f"Could not terminate Ajax account session: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="session_terminate_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
 
 async def _async_handle_terminate_other_client_sessions(
     hass: HomeAssistant, call: ServiceCall
 ) -> ServiceResponse:
     """Terminate all sessions except the current Aegis account session."""
-    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+    from homeassistant.exceptions import (  # noqa: PLC0415
+        HomeAssistantError,
+        ServiceValidationError,
+    )
 
     if not call.data.get("confirm"):
         raise ServiceValidationError(
-            "terminate_other_client_sessions requires `confirm: true` to terminate all "
-            "other sessions."
+            translation_domain=DOMAIN,
+            translation_key="confirm_required",
+            translation_placeholders={"service": "terminate_other_client_sessions"},
         )
     try:
         terminated = await _resolve_session_coordinator(
             hass, call
         ).async_terminate_other_client_sessions()
     except (RuntimeError, ValueError, HtsConnectionError) as exc:
-        raise ServiceValidationError(f"Could not terminate Ajax account sessions: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="sessions_terminate_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
     return {"terminated_sessions": terminated}
 
 
@@ -311,9 +336,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
 
     if not call.data.get("confirm"):
         raise ServiceValidationError(
-            "press_panic_button requires `confirm: true` to acknowledge that this "
-            "forwards a panic alarm to the Ajax monitoring station (CRA), which on "
-            "most contracts triggers police dispatch immediately."
+            translation_domain=DOMAIN, translation_key="panic_confirm_required"
         )
 
     latitude = call.data.get("latitude")
@@ -322,7 +345,9 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
-            "press_panic_button: no Aegis alarm panel found for the given target."
+            translation_domain=DOMAIN,
+            translation_key="no_panel_for_target",
+            translation_placeholders={"service": "press_panic_button"},
         )
 
     for coordinator, space_id in targets:
@@ -348,13 +373,15 @@ async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: Serv
     scenario_enabled = call.data.get("scenario")
     if user_enabled is None and scenario_enabled is None:
         raise ServiceValidationError(
-            "set_photo_on_demand_mode requires at least one of `user` or `scenario`."
+            translation_domain=DOMAIN, translation_key="photo_mode_option_required"
         )
 
     targets = await _resolve_target_space_ids(hass, call)
     if not targets:
         raise ServiceValidationError(
-            "set_photo_on_demand_mode: no Aegis alarm panel found for the given target."
+            translation_domain=DOMAIN,
+            translation_key="no_panel_for_target",
+            translation_placeholders={"service": "set_photo_on_demand_mode"},
         )
 
     for coordinator, space_id in targets:

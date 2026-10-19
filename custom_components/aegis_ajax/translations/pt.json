@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Visualização em direto"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Grupo {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "Não foi possível concluir o comando. O hub devolveu: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Não foi encontrada nenhuma conta Aegis para o entry_id indicado."
+        },
+        "session_entry_required": {
+            "message": "entry_id é obrigatório quando há mais de uma conta Aegis configurada."
+        },
+        "confirm_required": {
+            "message": "{service} precisa de `confirm: true` para ser executado."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button precisa de `confirm: true`: envia um alarme de pânico à central recetora, que na maioria dos contratos chama a polícia de imediato."
+        },
+        "session_id_invalid": {
+            "message": "session_id tem de ser um número inteiro positivo."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: não foi encontrado nenhum painel de alarme Aegis para o destino indicado."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode precisa de pelo menos `user` ou `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Não foi possível listar as sessões da conta Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Não foi possível terminar a sessão da conta Ajax: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Não foi possível terminar as outras sessões da conta Ajax: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Não é possível armar: sensores abertos ou avarias{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Não é possível armar: hub offline"
+        },
+        "security_hub_busy": {
+            "message": "Hub ocupado, tente novamente em alguns segundos"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Outra operação de armar/desarmar em curso"
+        },
+        "security_disarm_rejected": {
+            "message": "Não é possível desarmar: comando rejeitado pelo hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Código de alarme inválido"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Pânico",
                 "tamper": "Adulteração"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Comandos"
         }
     }
 }

@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Vizualizare live"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Grupul {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "Comanda nu a putut fi finalizată. Hub-ul a returnat: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Nu s-a găsit niciun cont Aegis pentru entry_id-ul indicat."
+        },
+        "session_entry_required": {
+            "message": "entry_id este obligatoriu când sunt configurate mai multe conturi Aegis."
+        },
+        "confirm_required": {
+            "message": "{service} are nevoie de `confirm: true` pentru a rula."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button are nevoie de `confirm: true`: trimite o alarmă de panică la dispecerat, care în majoritatea contractelor trimite imediat poliția."
+        },
+        "session_id_invalid": {
+            "message": "session_id trebuie să fie un număr întreg pozitiv."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: nu s-a găsit niciun panou de alarmă Aegis pentru ținta indicată."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode are nevoie de cel puțin `user` sau `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Nu s-au putut lista sesiunile contului Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Sesiunea contului Ajax nu a putut fi închisă: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Celelalte sesiuni ale contului Ajax nu au putut fi închise: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Nu se poate arma: senzori deschiși sau defecțiuni{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Nu se poate arma: hub deconectat"
+        },
+        "security_hub_busy": {
+            "message": "Hub ocupat, încercați din nou în câteva secunde"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "O altă operațiune de armare/dezarmare este în curs"
+        },
+        "security_disarm_rejected": {
+            "message": "Nu se poate dezarma: comandă respinsă de hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Cod de alarmă invalid"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Panica",
                 "tamper": "Sabotaj"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Telecomenzi"
         }
     }
 }

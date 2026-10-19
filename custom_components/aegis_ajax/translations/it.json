@@ -582,6 +582,11 @@
             "cloud_video": {
                 "name": "Visione dal vivo"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Gruppo {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -626,6 +631,54 @@
         },
         "command_failed": {
             "message": "Impossibile completare il comando. L'hub ha restituito: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Nessun account Aegis trovato per l'entry_id indicato."
+        },
+        "session_entry_required": {
+            "message": "entry_id è obbligatorio quando è configurato più di un account Aegis."
+        },
+        "confirm_required": {
+            "message": "{service} richiede `confirm: true` per essere eseguito."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button richiede `confirm: true`: invia un allarme di panico alla centrale operativa, che nella maggior parte dei contratti avvisa subito la polizia."
+        },
+        "session_id_invalid": {
+            "message": "session_id deve essere un numero intero positivo."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: nessun pannello di allarme Aegis trovato per la destinazione indicata."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode richiede almeno `user` o `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Impossibile elencare le sessioni dell'account Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Impossibile chiudere la sessione dell'account Ajax: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Impossibile chiudere le altre sessioni dell'account Ajax: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Impossibile inserire: sensori aperti o malfunzionamenti{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Impossibile inserire: hub offline"
+        },
+        "security_hub_busy": {
+            "message": "Hub occupato, riprova tra qualche secondo"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Un'altra operazione di inserimento/disinserimento è in corso"
+        },
+        "security_disarm_rejected": {
+            "message": "Impossibile disinserire: comando rifiutato dall'hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Codice allarme non valido"
         }
     },
     "device_automation": {
@@ -677,6 +730,11 @@
                 "panic": "Panico",
                 "tamper": "Manomissione"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Telecomandi"
         }
     }
 }
