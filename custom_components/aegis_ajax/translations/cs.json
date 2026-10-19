@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Příkaz se nepodařilo dokončit. Hub vrátil: {reason}."
+        },
+        "not_loaded": {
+            "message": "Není načten žádný účet Aegis for Ajax. Zkontrolujte integraci na stránce Zařízení a služby."
         }
     },
     "device_automation": {
