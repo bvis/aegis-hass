@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Awaitable, Callable, Iterator
 
 
 @pytest.fixture(autouse=True)
@@ -421,36 +421,15 @@ class TestProtoDescriptorCollisionGuard:
 
 
 class TestOptionsUpdateListener:
-    @pytest.mark.asyncio
-    async def test_options_change_triggers_reload(self) -> None:
-        from custom_components.aegis_ajax import _async_options_update_listener
-
-        hass = MagicMock()
-        hass.config_entries.async_reload = AsyncMock()
-
-        entry = MagicMock()
-        entry.entry_id = "entry-1"
-
-        await _async_options_update_listener(hass, entry)
-
-        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
-
-    @pytest.mark.asyncio
-    async def test_setup_registers_update_listener(self) -> None:
+    @staticmethod
+    async def _setup_and_get_listener(
+        hass: MagicMock, entry: MagicMock
+    ) -> Callable[..., Awaitable[None]]:
         from custom_components.aegis_ajax import async_setup_entry
 
-        hass = MagicMock()
         hass.data = {}
         hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
-
-        entry = MagicMock()
-        entry.entry_id = "entry-1"
-        entry.data = {
-            "email": "test@example.com",
-            "password_hash": "abc123hash",
-            "spaces": ["s1"],
-        }
-        entry.options = {}
+        hass.config_entries.async_reload = AsyncMock()
 
         mock_client = MagicMock()
         mock_client.connect = AsyncMock()
@@ -470,6 +449,53 @@ class TestOptionsUpdateListener:
             await async_setup_entry(hass, entry)
 
         entry.add_update_listener.assert_called_once()
+        return entry.add_update_listener.call_args.args[0]
+
+    @staticmethod
+    def _entry() -> MagicMock:
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.data = {
+            "email": "test@example.com",
+            "password_hash": "abc123hash",
+            "spaces": ["s1"],
+            "session_token": "tok-1",
+            "user_hex_id": "hex",
+            "device_id": "dev",
+        }
+        entry.options = {"poll_interval": 300}
+        return entry
+
+    @pytest.mark.asyncio
+    async def test_options_change_triggers_reload(self) -> None:
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.options = {"poll_interval": 120}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+
+    @pytest.mark.asyncio
+    async def test_credential_change_in_data_triggers_reload(self) -> None:
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.data = {**entry.data, "fcm_api_key": "new"}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+
+    @pytest.mark.asyncio
+    async def test_session_refresh_does_not_reload(self) -> None:
+        """A new session token written after a login doesn't restart everything (#609)."""
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.data = {**entry.data, "session_token": "tok-2", "device_id": "dev-2"}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_not_awaited()
 
 
 class TestAutoLabeling:
