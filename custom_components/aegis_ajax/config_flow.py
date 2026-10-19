@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -67,6 +66,7 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
 )
+from custom_components.aegis_ajax.service_security import hash_pin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -584,9 +584,9 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, user_input["poll_interval"])
                 )
             if user_input.get("pin_code"):
-                user_input["pin_code_hash"] = hashlib.sha256(
-                    user_input.pop("pin_code").encode()
-                ).hexdigest()
+                user_input["pin_code_hash"] = await self.hass.async_add_executor_job(
+                    hash_pin, user_input.pop("pin_code")
+                )
             else:
                 user_input.pop("pin_code", None)
             # FCM credentials live in `entry.data` (encrypted storage).

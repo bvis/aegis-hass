@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,6 +13,7 @@ from custom_components.aegis_ajax.alarm_control_panel import (
 )
 from custom_components.aegis_ajax.api.models import Device, Group, Space
 from custom_components.aegis_ajax.const import ConnectionStatus, DeviceState, SecurityState
+from custom_components.aegis_ajax.service_security import hash_pin
 
 
 class TestMapSecurityState:
@@ -94,6 +94,14 @@ class TestMapSecurityState:
         assert result == AlarmControlPanelState.DISARMED
 
 
+def _executor_hass() -> MagicMock:
+    """hass whose executor runs the job inline (the PIN check runs there)."""
+    hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock(side_effect=lambda fn, *args: fn(*args))
+    hass.config.language = "en"
+    return hass
+
+
 class TestAlarmControlPanel:
     def _make_space(
         self, security_state: SecurityState = SecurityState.DISARMED, online: bool = True
@@ -113,7 +121,7 @@ class TestAlarmControlPanel:
         coordinator = MagicMock()
         options: dict = {"use_pin_code": use_pin_code}
         if pin_code is not None:
-            options["pin_code_hash"] = hashlib.sha256(pin_code.encode()).hexdigest()
+            options["pin_code_hash"] = hash_pin(pin_code)
         coordinator.config_entry.options = options
         return coordinator
 
@@ -465,6 +473,8 @@ class TestAlarmControlPanel:
         coordinator.async_request_refresh = AsyncMock()
         coordinator.spaces = {"s1": self._make_space(SecurityState.ARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
+        panel.async_write_ha_state = MagicMock()
         await panel.async_alarm_disarm(code="1234")
         coordinator.security_api.disarm.assert_called_once_with("s1")
 
@@ -475,6 +485,7 @@ class TestAlarmControlPanel:
         coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
         coordinator.security_api.disarm = AsyncMock()
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
         with pytest.raises(HomeAssistantError):
             await panel.async_alarm_disarm(code="9999")
         coordinator.security_api.disarm.assert_not_called()
@@ -486,6 +497,7 @@ class TestAlarmControlPanel:
         coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
         coordinator.security_api.disarm = AsyncMock()
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
         with pytest.raises(HomeAssistantError):
             await panel.async_alarm_disarm(code=None)
         coordinator.security_api.disarm.assert_not_called()
@@ -496,6 +508,7 @@ class TestAlarmControlPanel:
         coordinator.security_api.arm = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
         await panel.async_alarm_arm_away(code="5678")
         coordinator.security_api.arm.assert_called_once_with("s1", ignore_alarms=False)
 
@@ -506,6 +519,7 @@ class TestAlarmControlPanel:
         coordinator = self._make_coordinator(use_pin_code=True, pin_code="5678")
         coordinator.security_api.arm = AsyncMock()
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
         with pytest.raises(HomeAssistantError):
             await panel.async_alarm_arm_away(code="0000")
         coordinator.security_api.arm.assert_not_called()
@@ -538,6 +552,7 @@ class TestAlarmControlPanel:
 
         coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
         assert panel.code_format == CodeFormat.NUMBER
 
     def test_code_format_none_without_pin(self) -> None:

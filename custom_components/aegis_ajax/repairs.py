@@ -32,6 +32,8 @@ from custom_components.aegis_ajax.const import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from homeassistant.core import HomeAssistant
     from homeassistant.data_entry_flow import FlowResult
 
@@ -46,6 +48,7 @@ ISSUE_FCM_PUSH_STUCK = "fcm_push_stuck"
 ISSUE_FCM_NEVER_DELIVERED = "fcm_never_delivered"
 ISSUE_GRPCIO_VERSION_MISMATCH = "grpcio_version_mismatch"
 ISSUE_CLIENT_REJECTED = "client_rejected"
+ISSUE_PIN_CODE_UPDATE = "pin_code_update"
 
 # Floor below which the integration's gRPC calls have historically failed
 # in ways that surface as cryptic stack traces (HTTP/2 framing errors,
@@ -303,6 +306,28 @@ def _parse_version(value: str) -> tuple[int, ...]:
             break
         parts.append(int(digits))
     return tuple(parts) if parts else (0,)
+
+
+def async_check_pin_code_format(
+    hass: HomeAssistant, *, entry_id: str, options: Mapping[str, Any]
+) -> None:
+    """Ask the user to set the alarm PIN again when it's stored in the old format."""
+    from custom_components.aegis_ajax.service_security import (  # noqa: PLC0415
+        is_legacy_pin_hash,
+    )
+
+    issue_id = _issue_id(ISSUE_PIN_CODE_UPDATE, entry_id)
+    if options.get("use_pin_code", False) and is_legacy_pin_hash(options.get("pin_code_hash")):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_PIN_CODE_UPDATE,
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
 def async_check_grpcio_version(hass: HomeAssistant) -> None:
