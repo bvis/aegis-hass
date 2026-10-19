@@ -872,6 +872,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntr
     )
 
     await async_remove_monitoring_companies(hass, entry.entry_id)
+
+    from custom_components.aegis_ajax.notification import (  # noqa: PLC0415
+        async_remove_fcm_stores,
+    )
+
+    await async_remove_fcm_stores(hass, entry.entry_id)
     if "session_token" not in entry.data or "user_hex_id" not in entry.data:
         return
 

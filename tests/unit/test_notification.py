@@ -4048,3 +4048,53 @@ class TestFcmStuckPushRecovery:
         with patch("custom_components.aegis_ajax.notification.async_clear_fcm_push_stuck"):
             await listener._async_supervise_push_client(now=5000.0 + 1800.0)
         assert listener._stuck_recovery_done is False
+
+
+class TestFcmStoresPerEntry:
+    """Each config entry keeps its own FCM state (#605)."""
+
+    def test_two_entries_use_different_store_keys(self) -> None:
+        from custom_components.aegis_ajax.notification import AjaxNotificationListener
+
+        def _listener(entry_id: str) -> AjaxNotificationListener:
+            return AjaxNotificationListener(
+                hass=MagicMock(),
+                coordinator=MagicMock(),
+                fcm_project_id="p",
+                fcm_app_id="1:2:android:3",
+                fcm_api_key="k",
+                fcm_sender_id="2",
+                entry_id=entry_id,
+            )
+
+        a, b = _listener("entry-a"), _listener("entry-b")
+        for attr in ("_store", "_rejected_store", "_delivery_store"):
+            assert getattr(a, attr).key != getattr(b, attr).key
+            assert getattr(a, attr).key.endswith("_entry-a")
+
+    @pytest.mark.asyncio
+    async def test_first_entry_adopts_the_shared_store_once(self) -> None:
+        from custom_components.aegis_ajax.notification import STORAGE_KEY, AjaxNotificationListener
+
+        listener = AjaxNotificationListener(
+            hass=MagicMock(),
+            coordinator=MagicMock(),
+            fcm_project_id="p",
+            fcm_app_id="1:2:android:3",
+            fcm_api_key="k",
+            fcm_sender_id="2",
+            entry_id="entry-a",
+        )
+        own = MagicMock(key=f"{STORAGE_KEY}_entry-a")
+        own.async_load = AsyncMock(return_value=None)
+        own.async_save = AsyncMock()
+        legacy = MagicMock()
+        legacy.async_load = AsyncMock(return_value={"fcm": "creds"})
+        legacy.async_remove = AsyncMock()
+
+        with patch("custom_components.aegis_ajax.notification.Store", return_value=legacy):
+            data = await listener._async_load_store(own, STORAGE_KEY)
+
+        assert data == {"fcm": "creds"}
+        own.async_save.assert_awaited_once_with({"fcm": "creds"})
+        legacy.async_remove.assert_awaited_once()

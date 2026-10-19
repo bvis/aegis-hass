@@ -29,6 +29,7 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     FCM_REJECTED_STORAGE_KEY,
     FCM_STORAGE_VERSION,
+    fcm_store_key,
 )
 
 if TYPE_CHECKING:
@@ -387,7 +388,11 @@ class FcmCredentialsRepairFlow(RepairsFlow):
             self.hass.config_entries.async_update_entry(entry, data={**entry.data, **user_input})
             # Drop the rejection marker BEFORE the reload runs the
             # registration, or an unchanged set short-circuits it (#464).
-            await Store(self.hass, FCM_STORAGE_VERSION, FCM_REJECTED_STORAGE_KEY).async_remove()
+            await Store(
+                self.hass,
+                FCM_STORAGE_VERSION,
+                fcm_store_key(FCM_REJECTED_STORAGE_KEY, self._entry_id),
+            ).async_remove()
             await self.hass.config_entries.async_reload(self._entry_id)
             return self.async_create_entry(data={})
 

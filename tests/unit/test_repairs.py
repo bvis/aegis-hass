@@ -321,7 +321,10 @@ class TestFcmCredentialsRepairFlow:
         with patch("custom_components.aegis_ajax.repairs.Store", return_value=store) as store_cls:
             await flow.async_step_init({"fcm_project_id": "same"})
 
-        store_cls.assert_called_once_with(flow.hass, FCM_STORAGE_VERSION, FCM_REJECTED_STORAGE_KEY)
+        # The marker is per entry since #605
+        store_cls.assert_called_once_with(
+            flow.hass, FCM_STORAGE_VERSION, f"{FCM_REJECTED_STORAGE_KEY}_entry-abc"
+        )
         store.async_remove.assert_awaited_once()
         assert order == ["remove", "reload"]
 
