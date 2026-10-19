@@ -540,6 +540,7 @@ You can also manually copy the blueprint files from `custom_components/aegis_aja
 | Door not updating | Check that the gRPC stream is connected (look for "Device stream started" in logs) |
 | Motion sensor never turns on | Motion needs push: configure FCM (see [Motion sensors need push](#motion-sensors-need-push)), and test while the system is **armed** |
 | Photo capture button missing | Only MotionCam PhOD models support on-demand capture |
+| A newly paired device has no entities | The integration reloads itself once when Ajax reports a device it didn't have at startup, which can take until the next device update. If it still doesn't show, reload the integration. |
 | Arm fails with "malfunctions detected" | Open sensors or low batteries prevent arming. Enable **Force arm** in Options, or use the `aegis_ajax.force_arm` service. The error message lists the blocking devices. |
 | Disarm not working | Check HA logs for specific error; ensure the system is armed before disarming |
 

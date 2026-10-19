@@ -6048,3 +6048,57 @@ class TestHtsReconnect:
         await coordinator.async_shutdown()
         cancel.assert_called_once()
         assert coordinator._unsub_hts_reconnect is None
+
+
+class TestReloadForNewDevices:
+    """A device paired after setup gets its entities through one reload (#608)."""
+
+    @staticmethod
+    def _coordinator(entry_id: str) -> AjaxCobrandedCoordinator:  # noqa: F821
+        from custom_components.aegis_ajax import coordinator as coordinator_module
+
+        coordinator_module._AUTO_RELOADED_FOR.pop(entry_id, None)
+        coordinator = _make_coordinator()
+        coordinator.entry_id = entry_id
+        coordinator.devices = {"d1": MagicMock()}
+        coordinator.mark_platforms_set_up()
+        return coordinator
+
+    def test_new_device_schedules_one_reload(self) -> None:
+        coordinator = self._coordinator("reload-1")
+        coordinator.devices["d2"] = MagicMock()
+
+        coordinator._reload_for_new_devices()
+        coordinator._reload_for_new_devices()
+
+        coordinator.hass.config_entries.async_schedule_reload.assert_called_once_with("reload-1")
+
+    def test_known_devices_do_not_reload(self) -> None:
+        coordinator = self._coordinator("reload-2")
+
+        coordinator._reload_for_new_devices()
+
+        coordinator.hass.config_entries.async_schedule_reload.assert_not_called()
+
+    def test_before_platform_setup_nothing_happens(self) -> None:
+        coordinator = _make_coordinator()
+        coordinator.devices = {"d1": MagicMock()}
+
+        coordinator._reload_for_new_devices()
+
+        coordinator.hass.config_entries.async_schedule_reload.assert_not_called()
+
+    def test_a_device_reloads_only_once_per_run(self) -> None:
+        """After the reload the new coordinator must not reload again for the same id."""
+        first = self._coordinator("reload-3")
+        first.devices["d2"] = MagicMock()
+        first._reload_for_new_devices()
+
+        second = _make_coordinator()
+        second.entry_id = "reload-3"
+        second.devices = {"d1": MagicMock()}
+        second.mark_platforms_set_up()
+        second.devices["d2"] = MagicMock()  # e.g. arrives after setup again
+        second._reload_for_new_devices()
+
+        second.hass.config_entries.async_schedule_reload.assert_not_called()
