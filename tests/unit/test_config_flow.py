@@ -377,12 +377,16 @@ class TestAsyncStepSelectSpaces:
 
         mock_client = MagicMock()
         mock_client.session.device_id = "dev-uuid"
+        mock_client.close = AsyncMock()
         flow._client = mock_client
 
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
 
         await flow.async_step_select_spaces({"spaces": ["space-1"]})
         flow.async_create_entry.assert_called_once()
+        # The entry builds its own client: the flow's channel is closed (#610)
+        mock_client.close.assert_awaited_once()
+        assert flow._client is None
         call_kwargs = flow.async_create_entry.call_args[1]
         assert call_kwargs["data"]["email"] == "test@example.com"
         assert call_kwargs["data"]["spaces"] == ["space-1"]
@@ -414,6 +418,40 @@ class TestAsyncStepSelectSpaces:
             await flow.async_step_select_spaces(None)
 
         flow.async_show_form.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_step_select_spaces_list_error_aborts_cannot_connect(self) -> None:
+        """A network error listing spaces aborts with cannot_connect, not "Unknown error" (#610)."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_abort = MagicMock(return_value={"type": "abort"})
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        flow._client = mock_client
+
+        mock_spaces_api = MagicMock()
+        mock_spaces_api.list_spaces = AsyncMock(side_effect=ConnectionError("down"))
+        with patch(
+            "custom_components.aegis_ajax.config_flow.SpacesApi", return_value=mock_spaces_api
+        ):
+            await flow.async_step_select_spaces(None)
+
+        flow.async_abort.assert_called_once_with(reason="cannot_connect")
+        mock_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_abandoned_flow_closes_the_client(self) -> None:
+        """Closing the dialog midway (e.g. at 2FA) closes the channel (#610)."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.hass = MagicMock()
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        flow._client = mock_client
+
+        flow.async_remove()
+
+        coro = flow.hass.async_create_task.call_args.args[0]
+        await coro
+        mock_client.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_step_select_spaces_schema_starts_empty_with_dropdown_search(self) -> None:

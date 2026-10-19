@@ -8,6 +8,11 @@
                     "email": "Correo electronico",
                     "password": "Contrasena",
                     "app_label": "Etiqueta de app (nombre de la app co-branded)"
+                },
+                "data_description": {
+                    "email": "El correo con el que entras en la app de Ajax.",
+                    "password": "La contraseña de tu cuenta de Ajax. Home Assistant solo guarda un hash.",
+                    "app_label": "La app a la que pertenece tu cuenta: Ajax o una app co-branded. Consulta el README si no estás seguro."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Introduce el codigo de 6 digitos de tu app de autenticacion.",
                 "data": {
                     "totp_code": "Codigo TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El código de 6 dígitos de tu app de autenticación."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Elige que espacios (hubs) anadir.",
                 "data": {
                     "spaces": "Espacios"
+                },
+                "data_description": {
+                    "spaces": "Los espacios (hubs) que añadir a Home Assistant. Elige al menos uno."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "Correo electrónico",
                     "password": "Contraseña",
                     "app_label": "Etiqueta de la aplicación"
+                },
+                "data_description": {
+                    "email": "El correo con el que entras en la app de Ajax.",
+                    "password": "La contraseña de tu cuenta de Ajax. Home Assistant solo guarda un hash.",
+                    "app_label": "La app a la que pertenece tu cuenta: Ajax o una app co-branded. Consulta el README si no estás seguro."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Introduce el codigo de 6 digitos de tu app de autenticacion.",
                 "data": {
                     "totp_code": "Codigo TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El código de 6 dígitos de tu app de autenticación."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "La sesion de Ajax para {email} ya no es valida. Introduce la contrasena actual de la cuenta para restaurar el acceso.",
                 "data": {
                     "password": "Contrasena"
+                },
+                "data_description": {
+                    "password": "La contraseña de tu cuenta de Ajax. Home Assistant solo guarda un hash."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Introduce el codigo de 6 digitos de tu app de autenticacion.",
                 "data": {
                     "totp_code": "Codigo TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El código de 6 dígitos de tu app de autenticación."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Cuenta bloqueada. Intentalo mas tarde.",
             "reauth_successful": "Reautenticacion exitosa.",
             "already_in_progress": "La configuración ya está en curso. Completa o cancela el flujo existente.",
-            "reconfigure_successful": "Credenciales actualizadas correctamente."
+            "reconfigure_successful": "Credenciales actualizadas correctamente.",
+            "cannot_connect": "No se puede conectar a los servidores de Ajax."
         }
     },
     "options": {
