@@ -100,6 +100,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security."""
 
     VERSION = 2
+    MINOR_VERSION = 2
     DOMAIN = DOMAIN
 
     def __init__(self) -> None:

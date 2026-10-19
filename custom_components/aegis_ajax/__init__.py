@@ -426,6 +426,19 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if migrated:
             _LOGGER.info("Migrated FCM credentials from options to data")
         hass.config_entries.async_update_entry(entry, data=new_data, options=new_options, version=2)
+    if entry.version == 2 and entry.minor_version < 2:
+        # 2.1 → 2.2: plaintext password → hash (#612; used to run on every setup)
+        new_data = dict(entry.data)
+        if "password" in new_data and "password_hash" not in new_data:
+            from custom_components.aegis_ajax.api.session import AjaxSession  # noqa: PLC0415
+
+            new_data["password_hash"] = AjaxSession.hash_password(new_data.pop("password"))
+            _LOGGER.warning(
+                "Migrated plaintext password to hash for entry %s. "
+                "Please reconfigure if issues arise.",
+                entry.entry_id,
+            )
+        hass.config_entries.async_update_entry(entry, data=new_data, minor_version=2)
     return True
 
 
@@ -434,18 +447,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     # need; mostly hits HA OS where the manifest's pip-level requirement
     # doesn't apply. Self-clears on the next setup if HA gets upgraded.
     async_check_grpcio_version(hass)
-
-    # Migrate plaintext password to hash (one-time migration)
-    if "password" in entry.data and "password_hash" not in entry.data:
-        from custom_components.aegis_ajax.api.session import AjaxSession  # noqa: PLC0415
-
-        new_data = dict(entry.data)
-        new_data["password_hash"] = AjaxSession.hash_password(new_data.pop("password"))
-        hass.config_entries.async_update_entry(entry, data=new_data)
-        _LOGGER.warning(
-            "Migrated plaintext password to hash for entry %s. Please reconfigure if issues arise.",
-            entry.entry_id,
-        )
 
     # Support legacy entries that stored plaintext password instead of hash
     if "password_hash" in entry.data:
@@ -705,6 +706,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
 _LABEL_RULES: dict[str, set[str]] = {
     "aegis_alarm": {"alarm_control_panel", "event"},
     "aegis_hub": {"update"},
+    "aegis_camera": {"camera", "button"},
 }
 
 _DEVICE_CLASS_LABELS: dict[str, str] = {
@@ -721,27 +723,28 @@ _DEVICE_CLASS_LABELS: dict[str, str] = {
     "power": "aegis_connectivity",
 }
 
-_ENTITY_ID_LABELS: dict[str, str] = {
-    "camera.": "aegis_camera",
-    "button.": "aegis_camera",
-    "_ethernet": "aegis_hub",
-    "_wifi": "aegis_hub",
-    "_wi_fi": "aegis_hub",
-    "_ssid": "aegis_hub",
-    "_celular": "aegis_hub",
-    "_cellular": "aegis_hub",
-    "_connection_type": "aegis_hub",
-    "_tipo_de_conexion": "aegis_hub",
-    "_tipo_de_red": "aegis_hub",
-    "_alimentacion": "aegis_hub",
-    "_mains_power": "aegis_hub",
-    "_dns_": "aegis_hub",
-    "_gateway": "aegis_hub",
-    "_puerta_de_enlace": "aegis_hub",
-    "_imei": "aegis_hub",
-    "_cra": "aegis_hub",
-    "_conexion_cra": "aegis_hub",
-}
+# Hub entities by translation_key: stable across renames and languages (#612).
+_HUB_TRANSLATION_KEYS = frozenset(
+    {
+        "ethernet",
+        "wifi",
+        "mains_power",
+        "mobile_network_type",
+        "wifi_signal_level",
+        "sim_status",
+        "sim_imei",
+        "connection_type",
+        "wifi_ssid",
+        "wifi_ip",
+        "ethernet_ip",
+        "ethernet_gateway",
+        "ethernet_dns",
+        "cellular_signal",
+        "cellular_network",
+        "monitoring",
+        "monitoring_company",
+    }
+)
 
 
 @callback
@@ -799,11 +802,9 @@ async def _async_apply_labels(hass: HomeAssistant, entry: ConfigEntry) -> None:
             if dc in _DEVICE_CLASS_LABELS:
                 labels_to_add.add(_DEVICE_CLASS_LABELS[dc])
 
-        # Rule 3: entity_id pattern matching
-        eid = entity_entry.entity_id
-        for pattern, label_id in _ENTITY_ID_LABELS.items():
-            if pattern in eid:
-                labels_to_add.add(label_id)
+        # Rule 3: hub entities by translation_key
+        if entity_entry.translation_key in _HUB_TRANSLATION_KEYS:
+            labels_to_add.add("aegis_hub")
 
         # Apply labels (union with existing to preserve user labels)
         if labels_to_add and not labels_to_add.issubset(entity_entry.labels):

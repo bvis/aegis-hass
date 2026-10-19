@@ -46,6 +46,7 @@ from custom_components.aegis_ajax.repairs import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import aiohttp
     from homeassistant.core import HomeAssistant
 
     from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
@@ -486,7 +487,9 @@ class AjaxNotificationListener:
             # every request we initiate (`fcm_install`, refresh, register)
             # carries the package id. Co-brands without a mapping fall back
             # to the pre-1.5.3-beta.10 behaviour (no header, no session).
-            import aiohttp  # noqa: PLC0415
+            from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
+                async_create_clientsession,
+            )
 
             from custom_components.aegis_ajax.const import (  # noqa: PLC0415
                 APP_LABEL_TO_ANDROID_PACKAGE,
@@ -495,7 +498,12 @@ class AjaxNotificationListener:
             android_package = APP_LABEL_TO_ANDROID_PACKAGE.get(self._app_label)
             fcm_session: aiohttp.ClientSession | None = None
             if android_package:
-                fcm_session = aiohttp.ClientSession(headers={"X-Android-Package": android_package})
+                # HA's shared connector; detached (not closed) once registration ends (#612)
+                fcm_session = async_create_clientsession(
+                    self._hass,
+                    auto_cleanup=False,
+                    headers={"X-Android-Package": android_package},
+                )
                 _LOGGER.debug(
                     "FCM registration will carry X-Android-Package: %s",
                     android_package,
@@ -537,7 +545,7 @@ class AjaxNotificationListener:
                 return
             finally:
                 if fcm_session is not None:
-                    await fcm_session.close()
+                    fcm_session.detach()
 
         # Extract FCM token and register with Ajax servers
         assert self._credentials is not None
@@ -584,17 +592,16 @@ class AjaxNotificationListener:
         """
         if "unable to register with fcm" not in str(exc).lower():
             return
-        import aiohttp  # noqa: PLC0415
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
 
         try:
-            async with aiohttp.ClientSession() as session:
-                reason, message = await async_probe_fcm_refusal_reason(
-                    session,
-                    fcm_project_id=self._fcm_project_id,
-                    fcm_app_id=self._fcm_app_id,
-                    fcm_api_key=self._fcm_api_key,
-                    android_package=android_package,
-                )
+            reason, message = await async_probe_fcm_refusal_reason(
+                async_get_clientsession(self._hass),
+                fcm_project_id=self._fcm_project_id,
+                fcm_app_id=self._fcm_app_id,
+                fcm_api_key=self._fcm_api_key,
+                android_package=android_package,
+            )
         except Exception:  # noqa: BLE001
             _LOGGER.debug("FCM refusal-reason probe failed", exc_info=True)
             return
