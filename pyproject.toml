@@ -76,6 +76,13 @@ warn_return_any = true
 warn_unused_configs = true
 exclude = ["custom_components/aegis_ajax/proto/"]
 
+# HA 2026.10 moved entity classes into submodules that older HA doesn't have,
+# re-exporting them from the component package without `as`. Importing from
+# the package keeps the 2025.11 floor working.
+[[tool.mypy.overrides]]
+module = "homeassistant.components.*"
+implicit_reexport = true
+
 [tool.coverage.run]
 omit = [
     "custom_components/aegis_ajax/proto/*",
