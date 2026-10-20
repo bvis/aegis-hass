@@ -324,17 +324,14 @@ class TestAlarmControlPanel:
         assert "hub_state" not in attrs
         assert "exit_delay_seconds" not in attrs
 
-    def test_optimistic_write_resyncs_the_delay_overlays(self) -> None:
+    async def test_optimistic_write_resyncs_the_delay_overlays(self) -> None:
         coordinator = MagicMock()
         coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         panel.hass = None
-        import asyncio
 
-        async def run() -> None:
-            panel._optimistic_state_update(SecurityState.ARMED)
+        panel._optimistic_state_update(SecurityState.ARMED)
 
-        asyncio.run(run())
         coordinator.sync_delay_overlays.assert_called_once()
 
     def test_alarm_state_partially_armed_with_night_mode_is_armed_night(self) -> None:

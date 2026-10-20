@@ -35,6 +35,9 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+      # Pinned per Python version in pyproject.toml, and each release pins one
+      # core exactly, sometimes a beta. Bumped by hand together with the core.
+      - dependency-name: "pytest-homeassistant-custom-component"
     groups:
       # Bundle all minor / patch bumps into one PR per week to reduce noise.
       python-minor-patch:

@@ -16,6 +16,9 @@ from custom_components.aegis_ajax.video_bridge import VideoBridge
 
 CAMERA = "custom_components.aegis_ajax.camera"
 
+# The bridge is a real loopback server; Home Assistant's test plugin blocks sockets.
+pytestmark = pytest.mark.usefixtures("socket_enabled")
+
 
 class FakeSession:
     def __init__(self) -> None:

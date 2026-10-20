@@ -36,6 +36,13 @@ dev = [
     # older cannot install this integration at all (#513). Mirror any change
     # in hacs.json — tests/unit/test_supported_versions.py enforces it.
     "homeassistant>=2025.11.0",
+    # Home Assistant's test harness (hass fixture, MockConfigEntry, the flow
+    # manager). Each release pins one core exactly, so this also picks the core
+    # the tests run on: the newest stable each interpreter can install (3.13
+    # stops at 2026.2.3). Pinned rather than floored because some releases pin
+    # a core beta; ha-beta.yml covers the newest core. Bump with the core.
+    "pytest-homeassistant-custom-component==0.13.316; python_version < '3.14'",
+    "pytest-homeassistant-custom-component==0.13.373; python_version >= '3.14'",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
