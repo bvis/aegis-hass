@@ -38,7 +38,7 @@ jobs:
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc libc-dev >/dev/null
             pip install --quiet --no-cache-dir --root-user-action=ignore packaging
-            # The tests need Home Assistant's test harness, and each release of it
+            # The tests need the Home Assistant test harness, and each release of it
             # pins one core. Take the newest release (it follows every core, beta
             # included, within about a day), or the one built for HA_VERSION.
             read -r PHCC CORE <<<"$(python3 -c "
