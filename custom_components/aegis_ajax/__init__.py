@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, cast
 
@@ -92,6 +93,8 @@ if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+_PHOTO_CLEANUP_LOCK = asyncio.Lock()
 
 _FCM_KEYS = {"fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"}
 
@@ -697,13 +700,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     max_photos = entry.options.get("photo_max_per_device", 100)
 
     async def _photo_cleanup(_now: object = None) -> None:
-        deleted = await cleanup_old_photos(hass, retention_days, max_photos)
+        # Every entry cleans the same photo folder: one cleanup at a time (#611).
+        async with _PHOTO_CLEANUP_LOCK:
+            deleted = await cleanup_old_photos(hass, retention_days, max_photos)
         if deleted:
             _LOGGER.debug("Cleaned up %d old photos", len(deleted))
 
     # Schedule cleanup every 24h (first run deferred to avoid blocking startup)
     unsub_cleanup = async_track_time_interval(hass, _photo_cleanup, timedelta(hours=24))
-    hass.async_create_task(_photo_cleanup())
+    entry.async_create_background_task(
+        hass, _photo_cleanup(), name=f"aegis_ajax_photo_cleanup_{entry.entry_id}"
+    )
     entry.async_on_unload(unsub_cleanup)
 
     _async_register_hub_devices(hass, entry, coordinator)

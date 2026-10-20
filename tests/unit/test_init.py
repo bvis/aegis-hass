@@ -63,9 +63,10 @@ class TestAsyncSetupEntry:
 
         # FCM startup should be scheduled, not awaited synchronously.
         mock_coordinator.async_start_push_notifications.assert_called_once()
-        entry.async_create_background_task.assert_called_once()
-        kwargs = entry.async_create_background_task.call_args.kwargs
-        assert kwargs.get("name", "").startswith("aegis_ajax_fcm_start_")
+        names = [
+            c.kwargs.get("name", "") for c in entry.async_create_background_task.call_args_list
+        ]
+        assert sum(n.startswith("aegis_ajax_fcm_start_") for n in names) == 1
 
     @pytest.mark.asyncio
     async def test_setup_defaults_app_label_to_the_ajax_application_label(self) -> None:

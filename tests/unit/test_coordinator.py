@@ -76,6 +76,7 @@ def _make_coordinator(
             hass=hass, client=client, space_ids=space_ids or ["s1"], poll_interval=30
         )
     coordinator.hass = hass
+    coordinator.config_entry = None
     _set_base_state(coordinator)
     return coordinator
 
@@ -1167,6 +1168,7 @@ def _coordinator_with_stream() -> AjaxCobrandedCoordinator:  # noqa: F821
             hass=hass, client=client, space_ids=["s1"], poll_interval=300
         )
     coordinator.hass = hass
+    coordinator.config_entry = None
     coordinator.entry_id = "entry-1"
     coordinator.async_set_updated_data = MagicMock()
     _set_base_state(coordinator)
@@ -2333,6 +2335,7 @@ class TestApplyPushSecurityState:
                 hass=hass, client=client, space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.spaces = {
             "s1": Space(
@@ -2477,6 +2480,7 @@ class TestApplyPushDeviceMotion:
                 hass=hass, client=client, space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.devices = {
             "doorbell-1": Device(
@@ -2584,6 +2588,7 @@ class TestApplyPushGroupSecurityState:
                 hass=hass, client=client, space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.spaces = {
             "s1": Space(
@@ -2677,6 +2682,7 @@ class TestCachedSnapshotStart:
                 entry_id="entry-1",
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         # Replace the real DevicesCache with an in-memory fake
         cache_mock = MagicMock()
         cache_mock.async_load = AsyncMock(return_value=cached)
@@ -4776,6 +4782,7 @@ class TestSetChimeOptimistic:
                 hass=hass, client=client, space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.spaces = {
             "s1": Space(
@@ -4832,6 +4839,7 @@ class TestHtsChimeEvent:
                 hass=hass, client=client, space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.spaces = {
             "s1": Space(
@@ -4912,6 +4920,7 @@ class TestHtsSecurityEvent:
                 hass=hass, client=MagicMock(), space_ids=["s1"], poll_interval=300
             )
         coordinator.hass = hass
+        coordinator.config_entry = None
         coordinator.async_set_updated_data = MagicMock()
         coordinator.hass.async_create_task = MagicMock()
         coordinator.spaces = {
@@ -6072,3 +6081,22 @@ class TestHtsReconnect:
         await coordinator.async_shutdown()
         cancel.assert_called_once()
         assert coordinator._unsub_hts_reconnect is None
+
+
+class TestSpawnTiesTasksToTheEntry:
+    def test_spawn_uses_the_entry_background_task(self) -> None:
+        """Follow-up tasks are created on the entry so unload cancels them (#611)."""
+        coordinator = _make_coordinator()
+        coordinator.config_entry = MagicMock()
+
+        async def _work() -> None:
+            return None
+
+        coro = _work()
+        coordinator._async_spawn(coro, "test")
+        coro.close()
+
+        coordinator.config_entry.async_create_background_task.assert_called_once_with(
+            coordinator.hass, coro, "aegis_ajax test"
+        )
+        coordinator.hass.async_create_task.assert_not_called()
