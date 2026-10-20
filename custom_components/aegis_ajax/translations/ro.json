@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Parolă",
                     "app_label": "Etichetă aplicație (numele aplicației co-branded)"
+                },
+                "data_description": {
+                    "email": "Adresa de e-mail cu care te conectezi în aplicația Ajax.",
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei.",
+                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Alegeți ce spații (hub-uri) să adăugați.",
                 "data": {
                     "spaces": "Spații"
+                },
+                "data_description": {
+                    "spaces": "Spațiile (hub-urile) de adăugat în Home Assistant. Alege cel puțin unul."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Parolă",
                     "app_label": "Etichetă aplicație"
+                },
+                "data_description": {
+                    "email": "Adresa de e-mail cu care te conectezi în aplicația Ajax.",
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei.",
+                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Sesiunea Ajax pentru {email} nu mai este validă. Introduceți parola curentă a contului pentru a restabili accesul.",
                 "data": {
                     "password": "Parolă"
+                },
+                "data_description": {
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Introduceți codul din 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Contul este blocat. Vă rugăm să încercați mai târziu.",
             "reauth_successful": "Reautentificare reușită.",
             "already_in_progress": "Configurarea este deja în curs. Finalizați sau anulați fluxul existent.",
-            "reconfigure_successful": "Datele de autentificare au fost actualizate cu succes."
+            "reconfigure_successful": "Datele de autentificare au fost actualizate cu succes.",
+            "cannot_connect": "Nu se poate conecta la serverele Ajax."
         }
     },
     "options": {

@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Heslo",
                     "app_label": "Označení aplikace (název co-branded aplikace)"
+                },
+                "data_description": {
+                    "email": "E-mail, kterým se přihlašujete do aplikace Ajax.",
+                    "password": "Heslo k účtu Ajax. Home Assistant ukládá jen jeho hash.",
+                    "app_label": "Aplikace, ke které účet patří: Ajax nebo co-branded aplikace. Pokud si nejste jisti, podívejte se do README."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
                 "data": {
                     "totp_code": "Kód TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Šestimístný kód z vaší ověřovací aplikace."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Zvolte, které prostory (huby) chcete přidat.",
                 "data": {
                     "spaces": "Prostory"
+                },
+                "data_description": {
+                    "spaces": "Prostory (huby), které se mají přidat do Home Assistant. Vyberte alespoň jeden."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Heslo",
                     "app_label": "Štítek aplikace"
+                },
+                "data_description": {
+                    "email": "E-mail, kterým se přihlašujete do aplikace Ajax.",
+                    "password": "Heslo k účtu Ajax. Home Assistant ukládá jen jeho hash.",
+                    "app_label": "Aplikace, ke které účet patří: Ajax nebo co-branded aplikace. Pokud si nejste jisti, podívejte se do README."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
                 "data": {
                     "totp_code": "Kód TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Šestimístný kód z vaší ověřovací aplikace."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Vaše Ajax relace pro {email} již není platná. Zadejte aktuální heslo k účtu pro obnovení přístupu.",
                 "data": {
                     "password": "Heslo"
+                },
+                "data_description": {
+                    "password": "Heslo k účtu Ajax. Home Assistant ukládá jen jeho hash."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Zadejte 6místný kód z vaší ověřovací aplikace.",
                 "data": {
                     "totp_code": "Kód TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Šestimístný kód z vaší ověřovací aplikace."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Účet je uzamčen. Zkuste to prosím později.",
             "reauth_successful": "Opětovné ověření proběhlo úspěšně.",
             "already_in_progress": "Konfigurace již probíhá. Dokončete nebo zrušte stávající postup.",
-            "reconfigure_successful": "Přihlašovací údaje úspěšně aktualizovány."
+            "reconfigure_successful": "Přihlašovací údaje úspěšně aktualizovány.",
+            "cannot_connect": "Nelze se připojit k serverům Ajax."
         }
     },
     "options": {

@@ -157,6 +157,12 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             "device_id": session.device_id,
         }
 
+    @callback
+    def async_remove(self) -> None:
+        """Close the client when the flow is abandoned midway (#610)."""
+        if self._client is not None:
+            self.hass.async_create_task(self._async_close_client())
+
     async def _async_close_client(self) -> None:
         """Close and drop the in-flight gRPC client after a failed login.
 
@@ -266,10 +272,17 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._client.session.session_token:
                 data["session_token"] = self._client.session.session_token
                 data["user_hex_id"] = self._client.session.user_hex_id
+            # The entry builds its own client; don't leave this channel open (#610).
+            await self._async_close_client()
             return self.async_create_entry(title=f"Ajax Security ({self._email})", data=data)
         if self._client:
             spaces_api = SpacesApi(self._client)
-            spaces = await spaces_api.list_spaces()
+            try:
+                spaces = await spaces_api.list_spaces()
+            except Exception:
+                _LOGGER.exception("Could not list Ajax spaces after login")
+                await self._async_close_client()
+                return self.async_abort(reason="cannot_connect")
             space_options = [SelectOptionDict(value=s.id, label=s.name) for s in spaces]
         else:
             space_options = []
