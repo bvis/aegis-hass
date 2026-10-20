@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.2] - unreleased
+
+### Fixed
+- **Missing icons (#631).** Three icons named in the integration don't exist in Home Assistant's icon set, so nothing was drawn: *Arm in night mode* when off, *GSM* when disconnected, and *Drilling*. They now use existing icons. **Requests to Ajax:** none.
+
 ## [1.27.1] - 2026-10-20
 
 ### Fixed
