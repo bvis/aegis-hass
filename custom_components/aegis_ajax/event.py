@@ -28,6 +28,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Entities only read coordinator data; nothing to throttle.
+PARALLEL_UPDATES = 0
+
 
 class _AlwaysAvailable:
     """Event entities mark moments, so they stay available through a failed poll.
