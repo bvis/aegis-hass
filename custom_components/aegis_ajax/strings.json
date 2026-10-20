@@ -371,6 +371,9 @@
         },
         "command_failed": {
             "message": "The command could not be completed. The hub returned: {reason}."
+        },
+        "not_loaded": {
+            "message": "No Aegis for Ajax account is loaded. Check the integration on the Devices & services page."
         }
     },
     "entity": {

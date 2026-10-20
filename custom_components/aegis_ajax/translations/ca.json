@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "No s'ha pogut completar l'ordre. El hub ha retornat: {reason}."
+        },
+        "not_loaded": {
+            "message": "No hi ha cap compte d'Aegis for Ajax carregat. Revisa la integració a la pàgina Dispositius i serveis."
         }
     },
     "device_automation": {

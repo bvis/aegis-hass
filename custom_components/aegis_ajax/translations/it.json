@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Impossibile completare il comando. L'hub ha restituito: {reason}."
+        },
+        "not_loaded": {
+            "message": "Nessun account Aegis for Ajax è caricato. Controlla l'integrazione nella pagina Dispositivi e servizi."
         }
     },
     "device_automation": {

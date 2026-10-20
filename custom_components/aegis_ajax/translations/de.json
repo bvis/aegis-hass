@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Der Befehl konnte nicht abgeschlossen werden. Der Hub meldete: {reason}."
+        },
+        "not_loaded": {
+            "message": "Kein Aegis for Ajax-Konto ist geladen. Prüfe die Integration auf der Seite Geräte & Dienste."
         }
     },
     "device_automation": {

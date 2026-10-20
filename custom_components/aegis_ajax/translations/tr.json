@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Komut tamamlanamadı. Hub şunu döndürdü: {reason}."
+        },
+        "not_loaded": {
+            "message": "Yüklü bir Aegis for Ajax hesabı yok. Cihazlar ve hizmetler sayfasından entegrasyonu kontrol edin."
         }
     },
     "device_automation": {

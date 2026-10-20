@@ -92,7 +92,7 @@ class TestOneCoolingSpaceDoesNotHideTheOthers:
     def _hass_with(coordinator: MagicMock) -> MagicMock:
         entry = MagicMock(runtime_data=coordinator)
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[entry])
         return hass
 
     @pytest.mark.asyncio

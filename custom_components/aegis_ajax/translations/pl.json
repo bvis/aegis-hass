@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Nie udało się ukończyć polecenia. Hub zwrócił: {reason}."
+        },
+        "not_loaded": {
+            "message": "Żadne konto Aegis for Ajax nie jest załadowane. Sprawdź integrację na stronie Urządzenia i usługi."
         }
     },
     "device_automation": {

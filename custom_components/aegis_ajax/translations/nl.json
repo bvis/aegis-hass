@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "De opdracht kon niet worden voltooid. De hub gaf terug: {reason}."
+        },
+        "not_loaded": {
+            "message": "Er is geen Aegis for Ajax-account geladen. Controleer de integratie op de pagina Apparaten en diensten."
         }
     },
     "device_automation": {
