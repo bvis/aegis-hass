@@ -720,6 +720,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
 
     _async_register_hub_devices(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    coordinator.mark_platforms_set_up()
 
     # Auto-label entities for easy grouping in automations.
     # Users can disable this from the OptionsFlow when they prefer to manage

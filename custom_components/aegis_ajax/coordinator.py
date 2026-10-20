@@ -467,6 +467,10 @@ _STATUS_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 
+# entry_id -> device ids that already caused an automatic reload this run (#608).
+_AUTO_RELOADED_FOR: dict[str, set[str]] = {}
+
+
 class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(
         self,
@@ -484,6 +488,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._poll_interval = poll_interval
         self.entry_id = entry_id
+        # Device ids the platforms saw at setup; None until they ran (#608).
+        self._devices_at_setup: set[str] | None = None
         self._client = client
         self._reauth_required = False
         self._on_session_persist = on_session_persist
@@ -3581,6 +3587,32 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Debounced — bursts of stream snapshots coalesce into one write.
         if self._devices_cache is not None:
             self._devices_cache.async_schedule_save(self.devices)
+        self._reload_for_new_devices()
+
+    def mark_platforms_set_up(self) -> None:
+        """Remember which devices the platforms created entities for (#608)."""
+        self._devices_at_setup = set(self.devices)
+
+    def _reload_for_new_devices(self) -> None:
+        """Reload once when a device paired after setup shows up (#608).
+
+        Platforms build entities at setup, so a newly paired device would
+        otherwise get none until the next restart. A reload re-runs setup with
+        the device in place. Each new device triggers at most one reload per
+        Home Assistant run, so a device that keeps coming and going can't loop.
+        """
+        if self._devices_at_setup is None:
+            return
+        reloaded = _AUTO_RELOADED_FOR.setdefault(self.entry_id, set())
+        new = set(self.devices) - self._devices_at_setup - reloaded
+        if not new:
+            return
+        reloaded.update(new)
+        _LOGGER.info(
+            "%d new Ajax device(s) found after setup; reloading to add their entities",
+            len(new),
+        )
+        self.hass.config_entries.async_schedule_reload(self.entry_id)
 
     def _dedupe_video_doorbells(self) -> None:
         """Re-apply the video-doorbell dedup across `self.devices` and evict
