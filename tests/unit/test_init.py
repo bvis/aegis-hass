@@ -964,8 +964,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
@@ -991,8 +996,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
