@@ -63,9 +63,10 @@ class TestAsyncSetupEntry:
 
         # FCM startup should be scheduled, not awaited synchronously.
         mock_coordinator.async_start_push_notifications.assert_called_once()
-        entry.async_create_background_task.assert_called_once()
-        kwargs = entry.async_create_background_task.call_args.kwargs
-        assert kwargs.get("name", "").startswith("aegis_ajax_fcm_start_")
+        names = [
+            c.kwargs.get("name", "") for c in entry.async_create_background_task.call_args_list
+        ]
+        assert sum(n.startswith("aegis_ajax_fcm_start_") for n in names) == 1
 
     @pytest.mark.asyncio
     async def test_setup_defaults_app_label_to_the_ajax_application_label(self) -> None:
@@ -989,8 +990,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
@@ -1016,8 +1022,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 

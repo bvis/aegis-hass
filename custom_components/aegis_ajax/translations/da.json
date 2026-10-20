@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Adgangskode",
                     "app_label": "App-navn (co-branded appnavn)"
+                },
+                "data_description": {
+                    "email": "Den e-mail, du bruger til at logge ind i Ajax-appen.",
+                    "password": "Adgangskoden til din Ajax-konto. Home Assistant gemmer kun en hash af den.",
+                    "app_label": "Den app, din konto hører til: Ajax eller en co-branded app. Se README, hvis du er i tvivl."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
                 "data": {
                     "totp_code": "TOTP-kode"
+                },
+                "data_description": {
+                    "totp_code": "Den 6-cifrede kode fra din godkendelsesapp."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Vælg hvilke spaces (hubs), der skal tilføjes.",
                 "data": {
                     "spaces": "Spaces"
+                },
+                "data_description": {
+                    "spaces": "De områder (hubs), der skal tilføjes til Home Assistant. Vælg mindst ét."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Adgangskode",
                     "app_label": "App-navn (co-branded appnavn)"
+                },
+                "data_description": {
+                    "email": "Den e-mail, du bruger til at logge ind i Ajax-appen.",
+                    "password": "Adgangskoden til din Ajax-konto. Home Assistant gemmer kun en hash af den.",
+                    "app_label": "Den app, din konto hører til: Ajax eller en co-branded app. Se README, hvis du er i tvivl."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
                 "data": {
                     "totp_code": "TOTP-kode"
+                },
+                "data_description": {
+                    "totp_code": "Den 6-cifrede kode fra din godkendelsesapp."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Din Ajax-session for {email} er ikke længere gyldig. Indtast den aktuelle kontoadgangskode for at genoprette adgangen.",
                 "data": {
                     "password": "Adgangskode"
+                },
+                "data_description": {
+                    "password": "Adgangskoden til din Ajax-konto. Home Assistant gemmer kun en hash af den."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Indtast den 6-cifrede kode fra din autentificeringsapp.",
                 "data": {
                     "totp_code": "TOTP-kode"
+                },
+                "data_description": {
+                    "totp_code": "Den 6-cifrede kode fra din godkendelsesapp."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "already_in_progress": "Konfiguration er allerede i gang. Fuldfør eller annuller det eksisterende forløb.",
             "account_locked": "Kontoen er låst. Prøv igen senere.",
             "reauth_successful": "Genautentificering gennemført.",
-            "reconfigure_successful": "Loginoplysningerne er opdateret."
+            "reconfigure_successful": "Loginoplysningerne er opdateret.",
+            "cannot_connect": "Kan ikke oprette forbindelse til Ajax-serverne."
         }
     },
     "options": {
@@ -626,6 +652,9 @@
         },
         "command_failed": {
             "message": "Kommandoen kunne ikke gennemføres. Hub'en returnerede: {reason}."
+        },
+        "not_loaded": {
+            "message": "Ingen Aegis for Ajax-konto er indlæst. Tjek integrationen på siden Enheder og tjenester."
         }
     },
     "device_automation": {

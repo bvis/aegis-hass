@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Palavra-passe",
                     "app_label": "Etiqueta da aplicação (nome da app co-branded)"
+                },
+                "data_description": {
+                    "email": "O e-mail com que inicia sessão na app Ajax.",
+                    "password": "A palavra-passe da sua conta Ajax. O Home Assistant guarda apenas um hash.",
+                    "app_label": "A app a que a sua conta pertence: Ajax ou uma app co-branded. Consulte o README em caso de dúvida."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Introduza o código de 6 dígitos da sua aplicação de autenticação.",
                 "data": {
                     "totp_code": "Código TOTP"
+                },
+                "data_description": {
+                    "totp_code": "O código de 6 dígitos da sua app de autenticação."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Escolha quais os espaços (hubs) a adicionar.",
                 "data": {
                     "spaces": "Espaços"
+                },
+                "data_description": {
+                    "spaces": "Os espaços (hubs) a adicionar ao Home Assistant. Escolha pelo menos um."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Palavra-passe",
                     "app_label": "Rótulo da aplicação"
+                },
+                "data_description": {
+                    "email": "O e-mail com que inicia sessão na app Ajax.",
+                    "password": "A palavra-passe da sua conta Ajax. O Home Assistant guarda apenas um hash.",
+                    "app_label": "A app a que a sua conta pertence: Ajax ou uma app co-branded. Consulte o README em caso de dúvida."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Introduza o código de 6 dígitos da sua aplicação de autenticação.",
                 "data": {
                     "totp_code": "Código TOTP"
+                },
+                "data_description": {
+                    "totp_code": "O código de 6 dígitos da sua app de autenticação."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "A sua sessão Ajax para {email} já não é válida. Introduza a palavra-passe atual da conta para restaurar o acesso.",
                 "data": {
                     "password": "Palavra-passe"
+                },
+                "data_description": {
+                    "password": "A palavra-passe da sua conta Ajax. O Home Assistant guarda apenas um hash."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Introduza o código de 6 dígitos da sua aplicação de autenticação.",
                 "data": {
                     "totp_code": "Código TOTP"
+                },
+                "data_description": {
+                    "totp_code": "O código de 6 dígitos da sua app de autenticação."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Conta bloqueada. Por favor, tente mais tarde.",
             "reauth_successful": "Reautenticação efetuada com sucesso.",
             "already_in_progress": "A configuração já está em andamento. Conclua ou cancele o fluxo existente.",
-            "reconfigure_successful": "Credenciais atualizadas com sucesso."
+            "reconfigure_successful": "Credenciais atualizadas com sucesso.",
+            "cannot_connect": "Não é possível ligar aos servidores Ajax."
         }
     },
     "options": {
@@ -626,6 +652,9 @@
         },
         "command_failed": {
             "message": "Não foi possível concluir o comando. O hub devolveu: {reason}."
+        },
+        "not_loaded": {
+            "message": "Nenhuma conta Aegis for Ajax está carregada. Verifique a integração na página Dispositivos e serviços."
         }
     },
     "device_automation": {

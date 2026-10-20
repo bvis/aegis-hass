@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# One action at a time: never send Ajax more requests than the app would.
+PARALLEL_UPDATES = 1
+
 _ARM_ERRORS: dict[str, dict[str, str]] = {
     "hub_detected_malfunctions": {
         "en": "Cannot arm: open sensors or malfunctions detected",

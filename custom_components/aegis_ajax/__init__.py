@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import ServiceResponse, SupportsResponse, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,6 +90,11 @@ from custom_components.aegis_ajax.repairs import async_check_grpcio_version  # n
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
     from homeassistant.helpers.device_registry import DeviceEntry
+    from homeassistant.helpers.typing import ConfigType
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+_PHOTO_CLEANUP_LOCK = asyncio.Lock()
 
 _FCM_KEYS = {"fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"}
 
@@ -109,10 +116,7 @@ PLATFORMS = [
 
 type AjaxCobrandedConfigEntry = ConfigEntry[AjaxCobrandedCoordinator]
 
-# Single source of truth for the domain-level custom services. Registration
-# (async_setup_entry) and teardown (async_unload_entry) both derive from this
-# tuple so the two lists cannot drift — adding a service in one place without
-# the other previously leaked a registered service on unload.
+# Domain-level custom services, registered once in async_setup (#603).
 _CUSTOM_SERVICE_NAMES = (
     "force_arm",
     "force_arm_night",
@@ -124,6 +128,18 @@ _CUSTOM_SERVICE_NAMES = (
     "terminate_client_session",
     "terminate_other_client_sessions",
 )
+
+
+def _loaded_entries(hass: HomeAssistant) -> list[AjaxCobrandedConfigEntry]:
+    """Loaded entries; services fail with a clear error when there are none."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    entries = cast(
+        "list[AjaxCobrandedConfigEntry]", hass.config_entries.async_loaded_entries(DOMAIN)
+    )
+    if not entries:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
+    return entries
 
 
 async def _resolve_target_space_ids(
@@ -139,7 +155,7 @@ async def _resolve_target_space_ids(
     if isinstance(entity_ids, str):
         entity_ids = [entity_ids]
 
-    entries = hass.config_entries.async_entries(DOMAIN)
+    entries = _loaded_entries(hass)
     if not entity_ids:
         # No target: operate on all spaces (backwards-compatible)
         results: list[tuple[AjaxCobrandedCoordinator, str]] = []
@@ -189,18 +205,18 @@ def _resolve_session_coordinator(
     """Resolve one account for a session-management service call."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    entries = hass.config_entries.async_entries(DOMAIN)
+    entries = _loaded_entries(hass)
     entry_id = call.data.get("entry_id")
     if entry_id is not None:
         for entry in entries:
             if entry.entry_id == entry_id:
-                return cast("AjaxCobrandedCoordinator", entry.runtime_data)
+                return entry.runtime_data
         raise ServiceValidationError("No Aegis account was found for the supplied entry_id.")
     if len(entries) != 1:
         raise ServiceValidationError(
             "entry_id is required when more than one Aegis account is configured."
         )
-    return cast("AjaxCobrandedCoordinator", entries[0].runtime_data)
+    return entries[0].runtime_data
 
 
 async def _async_handle_list_client_sessions(
@@ -410,6 +426,75 @@ async def _async_handle_refresh_alarm_images(
     }
 
 
+@callback
+def _async_register_services(hass: HomeAssistant) -> None:
+    """Register the domain services once, whatever entries are loaded (#603)."""
+
+    async def _force_arm_handler(call: ServiceCall) -> None:
+        await _async_handle_force_arm(hass, call)
+
+    async def _force_arm_night_handler(call: ServiceCall) -> None:
+        await _async_handle_force_arm_night(hass, call)
+
+    async def _disarm_night_mode_handler(call: ServiceCall) -> None:
+        await _async_handle_disarm_night_mode(hass, call)
+
+    async def _press_panic_button_handler(call: ServiceCall) -> None:
+        await _async_handle_press_panic_button(hass, call)
+
+    async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
+        await _async_handle_set_photo_on_demand_mode(hass, call)
+
+    async def _refresh_alarm_images_handler(call: ServiceCall) -> ServiceResponse:
+        return await _async_handle_refresh_alarm_images(hass, call)
+
+    async def _list_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
+        return await _async_handle_list_client_sessions(hass, call)
+
+    async def _terminate_client_session_handler(call: ServiceCall) -> None:
+        await _async_handle_terminate_client_session(hass, call)
+
+    async def _terminate_other_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
+        return await _async_handle_terminate_other_client_sessions(hass, call)
+
+    service_handlers = {
+        "force_arm": _force_arm_handler,
+        "force_arm_night": _force_arm_night_handler,
+        "disarm_night_mode": _disarm_night_mode_handler,
+        "press_panic_button": _press_panic_button_handler,
+        "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
+        "refresh_alarm_images": _refresh_alarm_images_handler,
+        "list_client_sessions": _list_client_sessions_handler,
+        "terminate_client_session": _terminate_client_session_handler,
+        "terminate_other_client_sessions": _terminate_other_client_sessions_handler,
+    }
+    # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
+    # handler — fail loudly at setup rather than silently skipping it.
+    for name in _CUSTOM_SERVICE_NAMES:
+        if name == "list_client_sessions":
+            hass.services.async_register(
+                DOMAIN,
+                name,
+                service_handlers[name],
+                supports_response=SupportsResponse.ONLY,
+            )
+        elif name in {"terminate_other_client_sessions", "refresh_alarm_images"}:
+            hass.services.async_register(
+                DOMAIN,
+                name,
+                service_handlers[name],
+                supports_response=SupportsResponse.OPTIONAL,
+            )
+        else:
+            hass.services.async_register(DOMAIN, name, service_handlers[name])
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the integration: services live here, not per entry (#603)."""
+    _async_register_services(hass)
+    return True
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate config entry to newer version."""
     if entry.version == 1:
@@ -615,13 +700,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     max_photos = entry.options.get("photo_max_per_device", 100)
 
     async def _photo_cleanup(_now: object = None) -> None:
-        deleted = await cleanup_old_photos(hass, retention_days, max_photos)
+        # Every entry cleans the same photo folder: one cleanup at a time (#611).
+        async with _PHOTO_CLEANUP_LOCK:
+            deleted = await cleanup_old_photos(hass, retention_days, max_photos)
         if deleted:
             _LOGGER.debug("Cleaned up %d old photos", len(deleted))
 
     # Schedule cleanup every 24h (first run deferred to avoid blocking startup)
     unsub_cleanup = async_track_time_interval(hass, _photo_cleanup, timedelta(hours=24))
-    hass.async_create_task(_photo_cleanup())
+    entry.async_create_background_task(
+        hass, _photo_cleanup(), name=f"aegis_ajax_photo_cleanup_{entry.entry_id}"
+    )
     entry.async_on_unload(unsub_cleanup)
 
     _async_register_hub_devices(hass, entry, coordinator)
@@ -637,65 +726,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         except Exception:
             _LOGGER.debug("Auto-labeling skipped (labels API not available)")
 
-    async def _force_arm_handler(call: ServiceCall) -> None:
-        await _async_handle_force_arm(hass, call)
-
-    async def _force_arm_night_handler(call: ServiceCall) -> None:
-        await _async_handle_force_arm_night(hass, call)
-
-    async def _disarm_night_mode_handler(call: ServiceCall) -> None:
-        await _async_handle_disarm_night_mode(hass, call)
-
-    async def _press_panic_button_handler(call: ServiceCall) -> None:
-        await _async_handle_press_panic_button(hass, call)
-
-    async def _set_photo_on_demand_mode_handler(call: ServiceCall) -> None:
-        await _async_handle_set_photo_on_demand_mode(hass, call)
-
-    async def _refresh_alarm_images_handler(call: ServiceCall) -> ServiceResponse:
-        return await _async_handle_refresh_alarm_images(hass, call)
-
-    async def _list_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
-        return await _async_handle_list_client_sessions(hass, call)
-
-    async def _terminate_client_session_handler(call: ServiceCall) -> None:
-        await _async_handle_terminate_client_session(hass, call)
-
-    async def _terminate_other_client_sessions_handler(call: ServiceCall) -> ServiceResponse:
-        return await _async_handle_terminate_other_client_sessions(hass, call)
-
-    service_handlers = {
-        "force_arm": _force_arm_handler,
-        "force_arm_night": _force_arm_night_handler,
-        "disarm_night_mode": _disarm_night_mode_handler,
-        "press_panic_button": _press_panic_button_handler,
-        "set_photo_on_demand_mode": _set_photo_on_demand_mode_handler,
-        "refresh_alarm_images": _refresh_alarm_images_handler,
-        "list_client_sessions": _list_client_sessions_handler,
-        "terminate_client_session": _terminate_client_session_handler,
-        "terminate_other_client_sessions": _terminate_other_client_sessions_handler,
-    }
-    # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
-    # handler — fail loudly at setup rather than silently skipping it.
-    for name in _CUSTOM_SERVICE_NAMES:
-        if hass.services.has_service(DOMAIN, name):
-            continue
-        if name == "list_client_sessions":
-            hass.services.async_register(
-                DOMAIN,
-                name,
-                service_handlers[name],
-                supports_response=SupportsResponse.ONLY,
-            )
-        elif name in {"terminate_other_client_sessions", "refresh_alarm_images"}:
-            hass.services.async_register(
-                DOMAIN,
-                name,
-                service_handlers[name],
-                supports_response=SupportsResponse.OPTIONAL,
-            )
-        else:
-            hass.services.async_register(DOMAIN, name, service_handlers[name])
     # Reload integration when options or credentials change (e.g. FCM credentials)
     reload_state = _reload_relevant_state(entry)
 
@@ -833,11 +863,6 @@ def _reload_relevant_state(entry: ConfigEntry) -> tuple[dict[str, Any], dict[str
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:
-    remaining = hass.config_entries.async_entries(DOMAIN)
-    if not any(e.entry_id != entry.entry_id for e in remaining):
-        for name in _CUSTOM_SERVICE_NAMES:
-            hass.services.async_remove(DOMAIN, name)
-
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         coordinator: AjaxCobrandedCoordinator = entry.runtime_data
@@ -884,6 +909,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntr
     )
 
     await async_remove_monitoring_companies(hass, entry.entry_id)
+
+    from custom_components.aegis_ajax.notification import (  # noqa: PLC0415
+        async_remove_fcm_stores,
+    )
+
+    await async_remove_fcm_stores(hass, entry.entry_id)
     if "session_token" not in entry.data or "user_hex_id" not in entry.data:
         return
 

@@ -12,6 +12,13 @@ DOMAIN = "aegis_ajax"
 # `repairs.py` clears it when the user re-submits the Repair card (#464).
 FCM_STORAGE_VERSION = 1
 FCM_REJECTED_STORAGE_KEY = f"{DOMAIN}_fcm_rejected"
+
+
+def fcm_store_key(base: str, entry_id: str) -> str:
+    """Storage key for one config entry: two accounts must not share FCM state (#605)."""
+    return f"{base}_{entry_id}" if entry_id else base
+
+
 MANUFACTURER = "Ajax Systems"
 
 # Labels for automatic entity categorization

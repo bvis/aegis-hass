@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Password",
                     "app_label": "Etichetta app (nome app co-branded)"
+                },
+                "data_description": {
+                    "email": "L'email con cui accedi all'app Ajax.",
+                    "password": "La password del tuo account Ajax. Home Assistant ne conserva solo un hash.",
+                    "app_label": "L'app a cui appartiene il tuo account: Ajax o un'app co-branded. In caso di dubbi consulta il README."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Inserisci il codice a 6 cifre dalla tua app di autenticazione.",
                 "data": {
                     "totp_code": "Codice TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Il codice a 6 cifre della tua app di autenticazione."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Scegli quali spazi (hub) aggiungere.",
                 "data": {
                     "spaces": "Spazi"
+                },
+                "data_description": {
+                    "spaces": "Gli spazi (hub) da aggiungere a Home Assistant. Scegline almeno uno."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Password",
                     "app_label": "Etichetta app"
+                },
+                "data_description": {
+                    "email": "L'email con cui accedi all'app Ajax.",
+                    "password": "La password del tuo account Ajax. Home Assistant ne conserva solo un hash.",
+                    "app_label": "L'app a cui appartiene il tuo account: Ajax o un'app co-branded. In caso di dubbi consulta il README."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Inserisci il codice a 6 cifre dalla tua app di autenticazione.",
                 "data": {
                     "totp_code": "Codice TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Il codice a 6 cifre della tua app di autenticazione."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "La sessione Ajax per {email} non è più valida. Inserisci la password attuale dell'account per ripristinare l'accesso.",
                 "data": {
                     "password": "Password"
+                },
+                "data_description": {
+                    "password": "La password del tuo account Ajax. Home Assistant ne conserva solo un hash."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Inserisci il codice a 6 cifre dell'app di autenticazione.",
                 "data": {
                     "totp_code": "Codice TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Il codice a 6 cifre della tua app di autenticazione."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Account bloccato. Riprova più tardi.",
             "reauth_successful": "Riautenticazione completata con successo.",
             "already_in_progress": "La configurazione è già in corso. Completa o annulla il flusso esistente.",
-            "reconfigure_successful": "Credenziali aggiornate con successo."
+            "reconfigure_successful": "Credenziali aggiornate con successo.",
+            "cannot_connect": "Impossibile connettersi ai server Ajax."
         }
     },
     "options": {
@@ -626,6 +652,9 @@
         },
         "command_failed": {
             "message": "Impossibile completare il comando. L'hub ha restituito: {reason}."
+        },
+        "not_loaded": {
+            "message": "Nessun account Aegis for Ajax è caricato. Controlla l'integrazione nella pagina Dispositivi e servizi."
         }
     },
     "device_automation": {

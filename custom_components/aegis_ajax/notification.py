@@ -24,6 +24,7 @@ from custom_components.aegis_ajax.const import (
     RAW_TAG_TO_GROUP_SECURITY_STATE,
     RAW_TAG_TO_SECURITY_STATE,
     SECURITY_STATE_EVENT_TYPES,
+    fcm_store_key,
 )
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.notification_fcm_guard import (
@@ -60,6 +61,16 @@ STORAGE_KEY = f"{DOMAIN}_fcm_credentials"
 REJECTED_STORAGE_KEY = FCM_REJECTED_STORAGE_KEY
 DELIVERY_STORAGE_KEY = f"{DOMAIN}_fcm_delivery"
 STORAGE_VERSION = FCM_STORAGE_VERSION
+_LEGACY_ADOPT_LOCK = asyncio.Lock()
+
+
+async def async_remove_fcm_stores(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete an entry's FCM stores when the entry is removed (#605)."""
+    for key in (STORAGE_KEY, REJECTED_STORAGE_KEY, DELIVERY_STORAGE_KEY):
+        await Store[dict[str, Any]](
+            hass, STORAGE_VERSION, fcm_store_key(key, entry_id)
+        ).async_remove()
+
 
 # Ajax dispatches two FCM messages per security transition (one user-facing
 # Notification + one silent DispatchEvent), separated by ~20-30 ms server-side.
@@ -202,9 +213,11 @@ class AjaxNotificationListener:
         self._death_persistent_id: str | None = None
         self._death_repeat_count: int = 0
         self._stuck_recovery_done: bool = False
-        self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, fcm_store_key(STORAGE_KEY, entry_id)
+        )
         self._rejected_store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, REJECTED_STORAGE_KEY
+            hass, STORAGE_VERSION, fcm_store_key(REJECTED_STORAGE_KEY, entry_id)
         )
         self._credentials: dict[str, Any] | None = None
         self._photo_callbacks: dict[str, asyncio.Future[str | None]] = {}
@@ -227,7 +240,7 @@ class AjaxNotificationListener:
         # restarts, and it is keyed to the credential fingerprint so that
         # re-entering the four values resets the evidence by construction.
         self._delivery_store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, DELIVERY_STORAGE_KEY
+            hass, STORAGE_VERSION, fcm_store_key(DELIVERY_STORAGE_KEY, entry_id)
         )
         self._creds_fingerprint: str = _fcm_creds_hash(
             fcm_project_id=fcm_project_id,
@@ -290,6 +303,30 @@ class AjaxNotificationListener:
     def first_delivery_at(self) -> str | None:
         """ISO timestamp of the first push this credential set ever delivered."""
         return self._first_delivery_at
+
+    async def _async_load_store(
+        self, store: Store[dict[str, Any]], legacy_key: str
+    ) -> dict[str, Any] | None:
+        """Load this entry's store, adopting the pre-#605 shared one once.
+
+        Before #605 every entry used one key. The first entry to start takes
+        that data over and removes it, so a second account starts clean.
+        """
+        data = await store.async_load()
+        if data is not None or store.key == legacy_key:
+            return data
+        async with _LEGACY_ADOPT_LOCK:
+            legacy: Store[dict[str, Any]] = Store(self._hass, STORAGE_VERSION, legacy_key)
+            try:
+                data = await legacy.async_load()
+                if data is None:
+                    return None
+                await store.async_save(data)
+                await legacy.async_remove()
+            except Exception:  # noqa: BLE001 - a storage problem must not stop push
+                _LOGGER.debug("Could not adopt the shared FCM store %s", legacy_key, exc_info=True)
+                return None
+            return data
 
     @property
     def has_fcm_credentials(self) -> bool:
@@ -388,7 +425,7 @@ class AjaxNotificationListener:
             return
 
         # Load or create FCM credentials
-        stored = await self._store.async_load()
+        stored = await self._async_load_store(self._store, STORAGE_KEY)
         self._credentials = dict(stored) if stored else None
         await self._async_load_delivery_record()
 
@@ -462,7 +499,7 @@ class AjaxNotificationListener:
             # failed requests against the Firebase project. We remember the
             # rejected set by hash (never the secret) and skip the network
             # attempt until the user changes the values.
-            rejected = await self._rejected_store.async_load()
+            rejected = await self._async_load_store(self._rejected_store, REJECTED_STORAGE_KEY)
             if rejected and rejected.get("hash") == creds_hash:
                 _LOGGER.warning(
                     "FCM credentials were already rejected by Google and haven't "
@@ -1048,7 +1085,7 @@ class AjaxNotificationListener:
         be able to stop push from starting.
         """
         try:
-            stored = await self._delivery_store.async_load()
+            stored = await self._async_load_store(self._delivery_store, DELIVERY_STORAGE_KEY)
         except Exception:
             _LOGGER.debug("Could not load the FCM delivery record", exc_info=True)
             return

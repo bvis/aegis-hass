@@ -8,6 +8,11 @@
                     "email": "Email",
                     "password": "Password",
                     "app_label": "App label (co-branded app name)"
+                },
+                "data_description": {
+                    "email": "The email you use to sign in to the Ajax app.",
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it.",
+                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Choose which spaces (hubs) to add.",
                 "data": {
                     "spaces": "Spaces"
+                },
+                "data_description": {
+                    "spaces": "The spaces (hubs) to add to Home Assistant. Pick at least one."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "Email",
                     "password": "Password",
                     "app_label": "App label (co-branded app name)"
+                },
+                "data_description": {
+                    "email": "The email you use to sign in to the Ajax app.",
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it.",
+                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Your Ajax session for {email} is no longer valid. Enter the current account password to restore access.",
                 "data": {
                     "password": "Password"
+                },
+                "data_description": {
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "already_in_progress": "Configuration is already in progress. Please complete or cancel the existing flow.",
             "account_locked": "Account is locked. Please try again later.",
             "reauth_successful": "Re-authentication successful.",
-            "reconfigure_successful": "Credentials updated successfully."
+            "reconfigure_successful": "Credentials updated successfully.",
+            "cannot_connect": "Cannot connect to Ajax servers."
         }
     },
     "options": {
@@ -626,6 +652,9 @@
         },
         "command_failed": {
             "message": "The command could not be completed. The hub returned: {reason}."
+        },
+        "not_loaded": {
+            "message": "No Aegis for Ajax account is loaded. Check the integration on the Devices & services page."
         }
     },
     "device_automation": {
