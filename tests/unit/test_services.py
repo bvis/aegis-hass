@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import contextlib
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+
+@contextlib.contextmanager
+def _raises_key(exc: type[Exception], key: str) -> Iterator[None]:
+    """pytest.raises on the translation key; the message needs a running hass (#607)."""
+    with pytest.raises(exc) as err:
+        yield
+    assert getattr(err.value, "translation_key", None) == key
 
 
 class TestForceArmService:
@@ -139,8 +152,9 @@ class TestClientSessionServices:
         )
 
     @pytest.mark.asyncio
-    async def test_list_sessions_surfaces_hts_errors_as_service_validation_errors(self) -> None:
-        from homeassistant.exceptions import ServiceValidationError
+    async def test_list_sessions_surfaces_hts_errors_as_ha_errors(self) -> None:
+        """An Ajax-side failure is a HomeAssistantError, not bad user input (#607)."""
+        from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
         from custom_components.aegis_ajax import _async_handle_list_client_sessions
         from custom_components.aegis_ajax.api.hts.client import HtsConnectionError
@@ -156,8 +170,11 @@ class TestClientSessionServices:
         call = MagicMock()
         call.data = {}
 
-        with pytest.raises(ServiceValidationError, match="Could not list Ajax account sessions"):
+        with pytest.raises(HomeAssistantError) as err:
             await _async_handle_list_client_sessions(hass, call)
+        assert not isinstance(err.value, ServiceValidationError)
+        assert err.value.translation_key == "sessions_list_failed"
+        assert err.value.translation_placeholders == {"error": "connection closed"}
 
     @pytest.mark.asyncio
     async def test_current_session_cannot_be_terminated(self) -> None:
@@ -385,7 +402,7 @@ class TestClientSessionServices:
 
         from custom_components.aegis_ajax import _async_handle_terminate_client_session
 
-        with pytest.raises(ServiceValidationError, match="confirm: true"):
+        with _raises_key(ServiceValidationError, "confirm_required"):
             await _async_handle_terminate_client_session(MagicMock(), MagicMock(data={}))
 
 

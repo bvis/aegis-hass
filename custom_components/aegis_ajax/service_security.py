@@ -7,7 +7,9 @@ import hmac
 import secrets
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
+
+from custom_components.aegis_ajax.const import DOMAIN
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -54,6 +56,10 @@ def validate_pin(options: Mapping[str, Any], code: object) -> None:
         return
     stored = options.get("pin_code_hash", "")
     if not isinstance(code, str) or not code or not isinstance(stored, str):
-        raise HomeAssistantError("Invalid alarm code")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="invalid_alarm_code"
+        )
     if not _pin_matches(code, stored):
-        raise HomeAssistantError("Invalid alarm code")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="invalid_alarm_code"
+        )

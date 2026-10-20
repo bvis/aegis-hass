@@ -612,6 +612,11 @@
             "cloud_video": {
                 "name": "Vue en direct"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Groupe {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -656,6 +661,54 @@
         },
         "command_failed": {
             "message": "La commande n'a pas pu être terminée. Le hub a renvoyé : {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Aucun compte Aegis trouvé pour l'entry_id indiqué."
+        },
+        "session_entry_required": {
+            "message": "entry_id est obligatoire lorsque plusieurs comptes Aegis sont configurés."
+        },
+        "confirm_required": {
+            "message": "{service} nécessite `confirm: true` pour s'exécuter."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button nécessite `confirm: true` : il envoie une alarme de panique au centre de télésurveillance, qui dans la plupart des contrats prévient la police immédiatement."
+        },
+        "session_id_invalid": {
+            "message": "session_id doit être un entier positif."
+        },
+        "no_panel_for_target": {
+            "message": "{service} : aucun panneau d'alarme Aegis trouvé pour la cible indiquée."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode nécessite au moins `user` ou `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Impossible de lister les sessions du compte Ajax : {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Impossible de fermer la session du compte Ajax : {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Impossible de fermer les autres sessions du compte Ajax : {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Impossible d'armer : capteurs ouverts ou dysfonctionnements{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Impossible d'armer : hub hors ligne"
+        },
+        "security_hub_busy": {
+            "message": "Hub occupé, réessayez dans quelques secondes"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Une autre opération d'armement/désarmement est en cours"
+        },
+        "security_disarm_rejected": {
+            "message": "Impossible de désarmer : commande rejetée par le hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Code d'alarme invalide"
         },
         "not_loaded": {
             "message": "Aucun compte Aegis for Ajax n'est chargé. Vérifiez l'intégration dans la page Appareils et services."
@@ -710,6 +763,11 @@
                 "panic": "Panique",
                 "tamper": "Sabotage"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Télécommandes"
         }
     }
 }

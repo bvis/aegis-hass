@@ -612,6 +612,11 @@
             "cloud_video": {
                 "name": "Visualització en directe"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Grup {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -656,6 +661,54 @@
         },
         "command_failed": {
             "message": "No s'ha pogut completar l'ordre. El hub ha retornat: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "No s'ha trobat cap compte d'Aegis per a l'entry_id indicat."
+        },
+        "session_entry_required": {
+            "message": "entry_id és obligatori quan hi ha més d'un compte d'Aegis configurat."
+        },
+        "confirm_required": {
+            "message": "{service} necessita `confirm: true` per executar-se."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button necessita `confirm: true`: envia una alarma de pànic a la central receptora, que en la majoria de contractes avisa la policia immediatament."
+        },
+        "session_id_invalid": {
+            "message": "session_id ha de ser un nombre enter positiu."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: no s'ha trobat cap panell d'alarma d'Aegis per al destí indicat."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode necessita almenys `user` o `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "No s'han pogut llistar les sessions del compte d'Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "No s'ha pogut tancar la sessió del compte d'Ajax: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "No s'han pogut tancar les altres sessions del compte d'Ajax: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "No es pot armar: sensors oberts o avaries detectades{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "No es pot armar: hub desconnectat"
+        },
+        "security_hub_busy": {
+            "message": "Hub ocupat, torna-ho a provar en uns segons"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Una altra operació d'armat/desarmat en curs"
+        },
+        "security_disarm_rejected": {
+            "message": "No es pot desarmar: comanda rebutjada pel hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Codi d'alarma incorrecte"
         },
         "not_loaded": {
             "message": "No hi ha cap compte d'Aegis for Ajax carregat. Revisa la integració a la pàgina Dispositius i serveis."
@@ -710,6 +763,11 @@
                 "panic": "Panic",
                 "tamper": "Manipulacio"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Comandaments"
         }
     }
 }

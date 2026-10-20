@@ -1509,7 +1509,7 @@ class TestKeyfobActiveSensor:
         # itself is named after the keyfob.
         assert sensor.name == "ALICE"
         assert sensor.device_info["identifiers"] == {("aegis_ajax", "002B1A51_keyfobs")}
-        assert sensor.device_info["name"] == "Keyfobs"
+        assert sensor.device_info["translation_key"] == "keyfobs"  # translated name (#607)
 
     def test_keyfob_device_links_to_hub_by_registry_id_on_new_ha(self) -> None:
         # #444: the virtual Keyfobs device builds its own DeviceInfo and must

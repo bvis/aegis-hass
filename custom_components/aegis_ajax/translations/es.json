@@ -612,6 +612,11 @@
             "cloud_video": {
                 "name": "Vista en directo"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Grupo {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -656,6 +661,54 @@
         },
         "command_failed": {
             "message": "No se pudo completar el comando. El hub devolvió: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "No se ha encontrado ninguna cuenta de Aegis para el entry_id indicado."
+        },
+        "session_entry_required": {
+            "message": "entry_id es obligatorio cuando hay más de una cuenta de Aegis configurada."
+        },
+        "confirm_required": {
+            "message": "{service} necesita `confirm: true` para ejecutarse."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button necesita `confirm: true`: envía una alarma de pánico a la central receptora, que en la mayoría de contratos avisa a la policía de inmediato."
+        },
+        "session_id_invalid": {
+            "message": "session_id debe ser un número entero positivo."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: no se ha encontrado ningún panel de alarma de Aegis para el destino indicado."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode necesita al menos `user` o `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "No se han podido listar las sesiones de la cuenta de Ajax: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "No se ha podido cerrar la sesión de la cuenta de Ajax: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "No se han podido cerrar las demás sesiones de la cuenta de Ajax: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "No se puede armar: sensores abiertos o averías detectadas{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "No se puede armar: hub desconectado"
+        },
+        "security_hub_busy": {
+            "message": "Hub ocupado, inténtalo en unos segundos"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Otra operación de armado/desarmado en curso"
+        },
+        "security_disarm_rejected": {
+            "message": "No se puede desarmar: comando rechazado por el hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Código de alarma incorrecto"
         },
         "not_loaded": {
             "message": "No hay ninguna cuenta de Aegis for Ajax cargada. Revisa la integración en la página Dispositivos y servicios."
@@ -710,6 +763,11 @@
                 "panic": "Panico",
                 "tamper": "Manipulacion"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Mandos"
         }
     }
 }

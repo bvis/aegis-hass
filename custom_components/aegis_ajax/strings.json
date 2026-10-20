@@ -402,6 +402,54 @@
         "command_failed": {
             "message": "The command could not be completed. The hub returned: {reason}."
         },
+        "session_entry_not_found": {
+            "message": "No Aegis account was found for the given entry_id."
+        },
+        "session_entry_required": {
+            "message": "entry_id is required when more than one Aegis account is configured."
+        },
+        "confirm_required": {
+            "message": "{service} needs `confirm: true` to run."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button needs `confirm: true`: it sends a panic alarm to the monitoring station, which on most contracts sends the police straight away."
+        },
+        "session_id_invalid": {
+            "message": "session_id must be a positive integer."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: no Aegis alarm panel found for the given target."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode needs at least one of `user` or `scenario`."
+        },
+        "sessions_list_failed": {
+            "message": "Could not list the Ajax account sessions: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Could not end the Ajax account session: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Could not end the other Ajax account sessions: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Cannot arm: open sensors or malfunctions detected{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Cannot arm: hub is offline"
+        },
+        "security_hub_busy": {
+            "message": "Hub is busy, try again in a few seconds"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Another arm/disarm operation is in progress"
+        },
+        "security_disarm_rejected": {
+            "message": "Cannot disarm: command rejected by hub"
+        },
+        "invalid_alarm_code": {
+            "message": "Invalid alarm code"
+        },
         "not_loaded": {
             "message": "No Aegis for Ajax account is loaded. Check the integration on the Devices & services page."
         }
@@ -659,6 +707,11 @@
             "cloud_video": {
                 "name": "Live view"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Group {group_id}"
+            }
         }
     },
     "device_automation": {
@@ -710,6 +763,11 @@
                 "panic": "Panic",
                 "tamper": "Tamper"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Keyfobs"
         }
     }
 }

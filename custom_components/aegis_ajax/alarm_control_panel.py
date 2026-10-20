@@ -11,7 +11,7 @@ from homeassistant.components.alarm_control_panel import (  # type: ignore[attr-
     AlarmControlPanelState,
     CodeFormat,
 )
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -39,104 +39,17 @@ _LOGGER = logging.getLogger(__name__)
 # One action at a time: never send Ajax more requests than the app would.
 PARALLEL_UPDATES = 1
 
-_ARM_ERRORS: dict[str, dict[str, str]] = {
-    "hub_detected_malfunctions": {
-        "en": "Cannot arm: open sensors or malfunctions detected",
-        "es": "No se puede armar: sensores abiertos o averías detectadas",
-        "ca": "No es pot armar: sensors oberts o avaries detectades",
-        "de": "Scharfschalten nicht möglich: offene Sensoren oder Störungen",
-        "fr": "Impossible d'armer : capteurs ouverts ou dysfonctionnements",
-        "it": "Impossibile inserire: sensori aperti o malfunzionamenti",
-        "nl": "Kan niet inschakelen: open sensoren of storingen",
-        "pl": "Nie można uzbroić: otwarte czujniki lub awarie",
-        "pt": "Não é possível armar: sensores abertos ou avarias",
-        "pt-BR": "Não é possível armar: sensores abertos ou falhas",
-        "ro": "Nu se poate arma: senzori deschiși sau defecțiuni",
-        "tr": "Kurma başarısız: açık sensörler veya arızalar",
-        "uk": "Неможливо увімкнути: відкриті датчики або несправності",
-        "cs": "Nelze zastřežit: otevřené senzory nebo poruchy",
-    },
-    "hub_not_connected": {
-        "en": "Cannot arm: hub is offline",
-        "es": "No se puede armar: hub desconectado",
-        "ca": "No es pot armar: hub desconnectat",
-        "de": "Scharfschalten nicht möglich: Hub offline",
-        "fr": "Impossible d'armer : hub hors ligne",
-        "it": "Impossibile inserire: hub offline",
-        "nl": "Kan niet inschakelen: hub offline",
-        "pl": "Nie można uzbroić: hub offline",
-        "pt": "Não é possível armar: hub offline",
-        "pt-BR": "Não é possível armar: hub offline",
-        "ro": "Nu se poate arma: hub deconectat",
-        "tr": "Kurma başarısız: hub çevrimdışı",
-        "uk": "Неможливо увімкнути: хаб офлайн",
-        "cs": "Nelze zastřežit: hub offline",
-    },
-    "hub_busy": {
-        "en": "Hub is busy, try again in a few seconds",
-        "es": "Hub ocupado, inténtalo en unos segundos",
-        "ca": "Hub ocupat, torna-ho a provar en uns segons",
-        "de": "Hub beschäftigt, versuchen Sie es in einigen Sekunden erneut",
-        "fr": "Hub occupé, réessayez dans quelques secondes",
-        "it": "Hub occupato, riprova tra qualche secondo",
-        "nl": "Hub bezet, probeer het over een paar seconden opnieuw",
-        "pl": "Hub zajęty, spróbuj ponownie za kilka sekund",
-        "pt": "Hub ocupado, tente novamente em alguns segundos",
-        "pt-BR": "Hub ocupado, tente novamente em alguns segundos",
-        "ro": "Hub ocupat, încercați din nou în câteva secunde",
-        "tr": "Hub meşgul, birkaç saniye sonra tekrar deneyin",
-        "uk": "Хаб зайнятий, спробуйте через кілька секунд",
-        "cs": "Hub je zaneprázdněn, zkuste to za několik sekund",
-    },
-    "another_transition_is_in_progress": {
-        "en": "Another arm/disarm operation is in progress",
-        "es": "Otra operación de armado/desarmado en curso",
-        "ca": "Una altra operació d'armat/desarmat en curs",
-        "de": "Eine andere Scharf-/Unscharfschaltung läuft",
-        "fr": "Une autre opération d'armement/désarmement est en cours",
-        "it": "Un'altra operazione di inserimento/disinserimento è in corso",
-        "nl": "Een andere in-/uitschakelbewerking is bezig",
-        "pl": "Inna operacja uzbrojenia/rozbrojenia w toku",
-        "pt": "Outra operação de armar/desarmar em curso",
-        "pt-BR": "Outra operação de armar/desarmar em andamento",
-        "ro": "O altă operațiune de armare/dezarmare este în curs",
-        "tr": "Başka bir kurma/devre dışı bırakma işlemi devam ediyor",
-        "uk": "Інша операція увімкнення/вимкнення в процесі",
-        "cs": "Probíhá jiná operace zastřežení/odstřežení",
-    },
-    "disarm_rejected": {
-        "en": "Cannot disarm: command rejected by hub",
-        "es": "No se puede desarmar: comando rechazado por el hub",
-        "ca": "No es pot desarmar: comanda rebutjada pel hub",
-        "de": "Unscharfschalten nicht möglich: Befehl vom Hub abgelehnt",
-        "fr": "Impossible de désarmer : commande rejetée par le hub",
-        "it": "Impossibile disinserire: comando rifiutato dall'hub",
-        "nl": "Kan niet uitschakelen: opdracht geweigerd door hub",
-        "pl": "Nie można rozbroić: polecenie odrzucone przez hub",
-        "pt": "Não é possível desarmar: comando rejeitado pelo hub",
-        "pt-BR": "Não é possível desarmar: comando rejeitado pelo hub",
-        "ro": "Nu se poate dezarma: comandă respinsă de hub",
-        "tr": "Devre dışı bırakılamıyor: komut hub tarafından reddedildi",
-        "uk": "Неможливо вимкнути: команду відхилено хабом",
-        "cs": "Nelze odstřežit: příkaz odmítnut hubem",
-    },
-    "invalid_alarm_code": {
-        "en": "Invalid alarm code",
-        "es": "Código de alarma incorrecto",
-        "ca": "Codi d'alarma incorrecte",
-        "de": "Ungültiger Alarmcode",
-        "fr": "Code d'alarme invalide",
-        "it": "Codice allarme non valido",
-        "nl": "Ongeldige alarmcode",
-        "pl": "Nieprawidłowy kod alarmu",
-        "pt": "Código de alarme inválido",
-        "pt-BR": "Código de alarme inválido",
-        "ro": "Cod de alarmă invalid",
-        "tr": "Geçersiz alarm kodu",
-        "uk": "Невірний код тривоги",
-        "cs": "Neplatný kód alarmu",
-    },
-}
+# Ajax arm/disarm failures with their own message in strings.json `exceptions`
+# (key `security_<type>`); anything else falls back to `command_failed` (#607).
+_SECURITY_ERROR_TYPES = frozenset(
+    {
+        "hub_detected_malfunctions",
+        "hub_not_connected",
+        "hub_busy",
+        "another_transition_is_in_progress",
+        "disarm_rejected",
+    }
+)
 
 _ISSUE_LABELS: dict[str, dict[str, str]] = {
     "open": {
@@ -252,8 +165,7 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
     Holds the parts that are identical across both: PIN-code option
     plumbing, code validation, `_force_arm` flag, hub `device_info` setup,
-    `_translate_error` machinery, and the malfunction-aware
-    `_arm_error` helper. Subclasses override the small surface that
+    and the malfunction-aware `_arm_error` helper. Subclasses override the small surface that
     differs — `available`, `alarm_state`, `extra_state_attributes`,
     the actual `async_alarm_*` methods (each calls a different API),
     and `_optimistic_state_update` (space vs group).
@@ -333,7 +245,9 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
             # Checking a PIN is CPU-heavy by design: keep it off the event loop.
             await self.hass.async_add_executor_job(validate_pin, options, code)
         except HomeAssistantError as err:
-            raise HomeAssistantError(self._translate_error("invalid_alarm_code")) from err
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="invalid_alarm_code"
+            ) from err
 
     def _issue_label(self, key: str) -> str:
         """Return a translated issue label for the current HA language."""
@@ -359,21 +273,24 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
                 issues.append(f"{device.name}: {self._issue_label('tamper')}")
         return "; ".join(issues[:5]) if issues else ""
 
-    def _translate_error(self, error_type: str) -> str:
-        """Translate an arm error type to the current HA language."""
-        lang = self.hass.config.language if self.hass else "en"
-        translations = _ARM_ERRORS.get(error_type, {})
-        return translations.get(lang, translations.get("en", error_type))
-
     def _arm_error(self, err: Exception) -> HomeAssistantError:
-        """Build a descriptive error, enriching malfunction errors with device details."""
+        """Build a translated error, listing the blocking devices on malfunctions."""
         error_type = str(err)
-        msg = self._translate_error(error_type)
-        if "malfunction" in error_type:
-            details = self._describe_blocking_issues()
-            if details:
-                msg = f"{msg} — {details}"
-        return HomeAssistantError(msg)
+        if error_type not in _SECURITY_ERROR_TYPES:
+            return HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": error_type},
+            )
+        details = ""
+        if error_type == "hub_detected_malfunctions":
+            issues = self._describe_blocking_issues()
+            details = f" — {issues}" if issues else ""
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=f"security_{error_type}",
+            translation_placeholders={"details": details},
+        )
 
 
 class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
@@ -496,7 +413,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         try:
             await self.coordinator.security_api.disarm(self._space_id)
         except SecurityError as err:
-            raise HomeAssistantError(self._translate_error(str(err))) from err
+            raise self._arm_error(err) from err
         self._optimistic_state_update(SecurityState.DISARMED)
         await self.coordinator.async_request_refresh()
 
@@ -564,7 +481,11 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         self._attr_unique_id = f"aegis_ajax_alarm_{space_id}_group_{group_id}"
         space = coordinator.spaces.get(space_id)
         group = space.get_group(group_id) if space else None
-        self._attr_name = group.name if group else f"Group {group_id}"
+        if group is not None:
+            self._attr_name = group.name
+        else:
+            self._attr_translation_key = "group"
+            self._attr_translation_placeholders = {"group_id": group_id}
 
     @property
     def _group(self) -> Group | None:
@@ -638,7 +559,7 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         try:
             await self.coordinator.security_api.disarm_group(self._space_id, self._group_id)
         except SecurityError as err:
-            raise HomeAssistantError(self._translate_error(str(err))) from err
+            raise self._arm_error(err) from err
         self._optimistic_state_update(SecurityState.DISARMED)
         await self.coordinator.async_request_refresh()
 

@@ -612,6 +612,11 @@
             "cloud_video": {
                 "name": "Canlı izleme"
             }
+        },
+        "alarm_control_panel": {
+            "group": {
+                "name": "Grup {group_id}"
+            }
         }
     },
     "exceptions": {
@@ -656,6 +661,54 @@
         },
         "command_failed": {
             "message": "Komut tamamlanamadı. Hub şunu döndürdü: {reason}."
+        },
+        "session_entry_not_found": {
+            "message": "Belirtilen entry_id için Aegis hesabı bulunamadı."
+        },
+        "session_entry_required": {
+            "message": "Birden fazla Aegis hesabı yapılandırıldığında entry_id gereklidir."
+        },
+        "confirm_required": {
+            "message": "{service} çalışmak için `confirm: true` gerektirir."
+        },
+        "panic_confirm_required": {
+            "message": "press_panic_button `confirm: true` gerektirir: izleme merkezine panik alarmı gönderir ve çoğu sözleşmede polis hemen gönderilir."
+        },
+        "session_id_invalid": {
+            "message": "session_id pozitif bir tam sayı olmalıdır."
+        },
+        "no_panel_for_target": {
+            "message": "{service}: belirtilen hedef için Aegis alarm paneli bulunamadı."
+        },
+        "photo_mode_option_required": {
+            "message": "set_photo_on_demand_mode en az `user` veya `scenario` gerektirir."
+        },
+        "sessions_list_failed": {
+            "message": "Ajax hesabının oturumları listelenemedi: {error}"
+        },
+        "session_terminate_failed": {
+            "message": "Ajax hesabının oturumu sonlandırılamadı: {error}"
+        },
+        "sessions_terminate_failed": {
+            "message": "Ajax hesabının diğer oturumları sonlandırılamadı: {error}"
+        },
+        "security_hub_detected_malfunctions": {
+            "message": "Kurma başarısız: açık sensörler veya arızalar{details}"
+        },
+        "security_hub_not_connected": {
+            "message": "Kurma başarısız: hub çevrimdışı"
+        },
+        "security_hub_busy": {
+            "message": "Hub meşgul, birkaç saniye sonra tekrar deneyin"
+        },
+        "security_another_transition_is_in_progress": {
+            "message": "Başka bir kurma/devre dışı bırakma işlemi devam ediyor"
+        },
+        "security_disarm_rejected": {
+            "message": "Devre dışı bırakılamıyor: komut hub tarafından reddedildi"
+        },
+        "invalid_alarm_code": {
+            "message": "Geçersiz alarm kodu"
         },
         "not_loaded": {
             "message": "Yüklü bir Aegis for Ajax hesabı yok. Cihazlar ve hizmetler sayfasından entegrasyonu kontrol edin."
@@ -710,6 +763,11 @@
                 "panic": "Panik",
                 "tamper": "Müdahale"
             }
+        }
+    },
+    "device": {
+        "keyfobs": {
+            "name": "Kumandalar"
         }
     }
 }

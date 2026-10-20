@@ -394,7 +394,7 @@ class AjaxKeyfobActiveSensor(CoordinatorEntity[AjaxCobrandedCoordinator], Binary
             self._attr_name = keyfob.name
             info = DeviceInfo(
                 identifiers={(DOMAIN, f"{keyfob.hub_id}_keyfobs")},
-                name="Keyfobs",
+                translation_key="keyfobs",
                 manufacturer=MANUFACTURER,
                 model="SpaceControl keyfobs (experimental)",
             )
