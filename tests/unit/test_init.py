@@ -616,7 +616,9 @@ class TestAutoLabeling:
         mock_label_reg.async_get_label.return_value = MagicMock()
 
         mock_entity = MagicMock()
-        mock_entity.entity_id = "sensor.alarma_ajax_ip_ethernet"
+        # Renamed by the user and in Spanish: the label follows the translation key (#612)
+        mock_entity.entity_id = "sensor.router_de_casa"
+        mock_entity.translation_key = "ethernet_ip"
         mock_entity.original_device_class = None
         mock_entity.labels = set()
 
@@ -1169,3 +1171,32 @@ class TestAsyncRemoveConfigEntryDevice:
         assert await async_remove_config_entry_device(
             hass, entry, self._device_entry((DOMAIN, "d1"))
         )
+
+
+class TestMigrateEntry:
+    @pytest.mark.asyncio
+    async def test_plaintext_password_is_hashed_once_in_migration(self) -> None:
+        """2.1 → 2.2 hashes a stored plaintext password; setup no longer does it (#612)."""
+        from custom_components.aegis_ajax import async_migrate_entry
+
+        hass = MagicMock()
+        entry = MagicMock(version=2, minor_version=1, entry_id="e1")
+        entry.data = {"email": "a@b.c", "password": "secret"}
+        entry.options = {}
+
+        assert await async_migrate_entry(hass, entry) is True
+
+        kwargs = hass.config_entries.async_update_entry.call_args.kwargs
+        assert kwargs["minor_version"] == 2
+        assert "password" not in kwargs["data"]
+        assert kwargs["data"]["password_hash"]
+
+    @pytest.mark.asyncio
+    async def test_current_entry_is_left_alone(self) -> None:
+        from custom_components.aegis_ajax import async_migrate_entry
+
+        hass = MagicMock()
+        entry = MagicMock(version=2, minor_version=2)
+
+        assert await async_migrate_entry(hass, entry) is True
+        hass.config_entries.async_update_entry.assert_not_called()
