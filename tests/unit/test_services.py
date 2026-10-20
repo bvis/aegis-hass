@@ -38,7 +38,7 @@ class TestForceArmService:
         mock_entry.runtime_data = mock_coordinator
 
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
         call.data = {}  # No entity_id → all spaces
@@ -67,7 +67,7 @@ class TestForceArmService:
         mock_entry.runtime_data = mock_coordinator
 
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
         call.data = {}  # No entity_id → all spaces
@@ -98,7 +98,7 @@ class TestDisarmNightModeService:
         mock_entry.runtime_data = mock_coordinator
 
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[mock_entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[mock_entry])
 
         call = MagicMock()
         call.data = {}  # No entity_id → all spaces
@@ -126,7 +126,7 @@ class TestRefreshAlarmImagesService:
         )
         entry = MagicMock(runtime_data=coordinator)
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[entry])
         service_call = MagicMock(data={})
 
         result = await _async_handle_refresh_alarm_images(hass, service_call)
@@ -166,7 +166,7 @@ class TestClientSessionServices:
         entry = MagicMock()
         entry.runtime_data = coordinator
         hass = MagicMock()
-        hass.config_entries.async_entries = MagicMock(return_value=[entry])
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[entry])
         call = MagicMock()
         call.data = {}
 
@@ -408,71 +408,29 @@ class TestClientSessionServices:
 
 class TestServiceRegistration:
     @pytest.mark.asyncio
-    async def test_services_registered_on_setup(self) -> None:
-        """Verify services are registered during async_setup_entry."""
-        from custom_components.aegis_ajax import async_setup_entry
-
-        hass = MagicMock()
-        hass.data = {}
-        hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
-        hass.services.async_register = MagicMock()
-        hass.services.has_service = MagicMock(return_value=False)
-
-        entry = MagicMock()
-        entry.entry_id = "entry-1"
-        entry.data = {
-            "email": "test@example.com",
-            "password_hash": "abc123hash",
-            "spaces": ["s1"],
-        }
-        entry.options = {"poll_interval": 30}
-
-        mock_client = MagicMock()
-        mock_client.connect = AsyncMock()
-        mock_client.session = MagicMock()
-
-        mock_coordinator = MagicMock()
-        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
-        mock_coordinator.async_start_push_notifications = AsyncMock()
-
-        with (
-            patch("custom_components.aegis_ajax.dr.async_get", return_value=MagicMock()),
-            patch(
-                "custom_components.aegis_ajax.AjaxGrpcClient",
-                return_value=mock_client,
-            ),
-            patch(
-                "custom_components.aegis_ajax.AjaxCobrandedCoordinator",
-                return_value=mock_coordinator,
-            ),
-            patch("custom_components.aegis_ajax.dr.async_get"),
-        ):
-            result = await async_setup_entry(hass, entry)
-
-        assert result is True
+    async def test_services_registered_in_async_setup(self) -> None:
+        """Services are registered once in async_setup, not per entry (#603)."""
         from homeassistant.core import SupportsResponse
 
-        # Verify all custom services were registered
+        from custom_components.aegis_ajax import _CUSTOM_SERVICE_NAMES, async_setup
+
+        hass = MagicMock()
+        hass.services.async_register = MagicMock()
+
+        assert await async_setup(hass, {}) is True
+
         register_calls = {
             call_args[0][1]: call_args[1].get("supports_response")
             for call_args in hass.services.async_register.call_args_list
         }
-        assert "force_arm" in register_calls
-        assert "force_arm_night" in register_calls
-        assert "disarm_night_mode" in register_calls
-        assert "press_panic_button" in register_calls
-        assert "set_photo_on_demand_mode" in register_calls
-        assert "refresh_alarm_images" in register_calls
+        assert set(register_calls) == set(_CUSTOM_SERVICE_NAMES)
         assert register_calls["refresh_alarm_images"] == SupportsResponse.OPTIONAL
-        assert "list_client_sessions" in register_calls
         assert register_calls["list_client_sessions"] == SupportsResponse.ONLY
-        assert "terminate_client_session" in register_calls
-        assert "terminate_other_client_sessions" in register_calls
         assert register_calls["terminate_other_client_sessions"] == SupportsResponse.OPTIONAL
 
     @pytest.mark.asyncio
-    async def test_services_removed_on_unload(self) -> None:
-        """Verify services are removed during async_unload_entry."""
+    async def test_unload_keeps_the_services(self) -> None:
+        """Unloading the last entry leaves the services registered (#603)."""
         from custom_components.aegis_ajax import async_unload_entry
 
         mock_coordinator = MagicMock()
@@ -486,17 +444,20 @@ class TestServiceRegistration:
         entry.entry_id = "entry-1"
         entry.runtime_data = mock_coordinator
 
-        result = await async_unload_entry(hass, entry)
+        assert await async_unload_entry(hass, entry) is True
+        hass.services.async_remove.assert_not_called()
 
-        assert result is True
-        remove_calls = {call_args[0][1] for call_args in hass.services.async_remove.call_args_list}
-        # Every service registered in async_setup_entry must be removed on unload
-        assert "force_arm" in remove_calls
-        assert "force_arm_night" in remove_calls
-        assert "disarm_night_mode" in remove_calls
-        assert "press_panic_button" in remove_calls
-        assert "set_photo_on_demand_mode" in remove_calls
-        assert "refresh_alarm_images" in remove_calls
-        assert "list_client_sessions" in remove_calls
-        assert "terminate_client_session" in remove_calls
-        assert "terminate_other_client_sessions" in remove_calls
+    @pytest.mark.asyncio
+    async def test_service_without_loaded_entry_raises_not_loaded(self) -> None:
+        """A call while no account is loaded gets a translated error, not a crash (#603)."""
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_force_arm
+
+        hass = MagicMock()
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[])
+        call = MagicMock(data={})
+
+        with pytest.raises(ServiceValidationError) as err:
+            await _async_handle_force_arm(hass, call)
+        assert err.value.translation_key == "not_loaded"

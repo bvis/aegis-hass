@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 from custom_components.aegis_ajax.notification import (
     AjaxNotificationListener,
@@ -73,6 +76,16 @@ def _restamp_push(encoded: str, *, seconds_ago: float = 0.0) -> str:
     ts.FromDatetime(datetime.now(tz=UTC) - timedelta(seconds=seconds_ago))
     dispatch.notification.server_timestamp.CopyFrom(ts)
     return base64.b64encode(dispatch.SerializeToString()).decode()
+
+
+@pytest.fixture(autouse=True)
+def _ha_sessions() -> Iterator[dict[str, MagicMock]]:
+    """The listener uses HA's client sessions; tests run with a mock hass (#612)."""
+    with (
+        patch("homeassistant.helpers.aiohttp_client.async_create_clientsession") as create,
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession") as get,
+    ):
+        yield {"create": create, "get": get}
 
 
 class TestNotificationListener:
@@ -1580,7 +1593,9 @@ class TestAsyncStartFcmAndroidPackageHeader:
     """
 
     @pytest.mark.asyncio
-    async def test_ajax_cobrand_passes_custom_session_with_package_header(self) -> None:
+    async def test_ajax_cobrand_passes_custom_session_with_package_header(
+        self, _ha_sessions: dict[str, MagicMock]
+    ) -> None:
         hass = MagicMock()
         hass.async_add_executor_job = AsyncMock(return_value={})
         coordinator = MagicMock()
@@ -1620,20 +1635,14 @@ class TestAsyncStartFcmAndroidPackageHeader:
         # FcmRegister must be constructed with a session whose default
         # headers include `X-Android-Package: com.ajaxsystems` so
         # Firebase Installations sees the package id and the api-key
-        # restriction passes.
+        # restriction passes. It's an HA client session, detached after (#612).
         assert register_cls.call_count == 1
-        kwargs = register_cls.call_args.kwargs
-        session = kwargs["http_client_session"]
-        assert session is not None
-        # aiohttp.ClientSession exposes default headers via its `headers`
-        # property — accept either dict-like (`["X-Android-Package"]`)
-        # or attr-style depending on the aiohttp version.
-        header_value = (
-            session.headers.get("X-Android-Package")
-            if hasattr(session.headers, "get")
-            else session.headers["X-Android-Package"]
-        )
-        assert header_value == "com.ajaxsystems"
+        session = register_cls.call_args.kwargs["http_client_session"]
+        assert session is _ha_sessions["create"].return_value
+        create_kwargs = _ha_sessions["create"].call_args.kwargs
+        assert create_kwargs["headers"] == {"X-Android-Package": "com.ajaxsystems"}
+        assert create_kwargs["auto_cleanup"] is False
+        session.detach.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_unknown_cobrand_passes_no_session(self) -> None:
@@ -4048,3 +4057,53 @@ class TestFcmStuckPushRecovery:
         with patch("custom_components.aegis_ajax.notification.async_clear_fcm_push_stuck"):
             await listener._async_supervise_push_client(now=5000.0 + 1800.0)
         assert listener._stuck_recovery_done is False
+
+
+class TestFcmStoresPerEntry:
+    """Each config entry keeps its own FCM state (#605)."""
+
+    def test_two_entries_use_different_store_keys(self) -> None:
+        from custom_components.aegis_ajax.notification import AjaxNotificationListener
+
+        def _listener(entry_id: str) -> AjaxNotificationListener:
+            return AjaxNotificationListener(
+                hass=MagicMock(),
+                coordinator=MagicMock(),
+                fcm_project_id="p",
+                fcm_app_id="1:2:android:3",
+                fcm_api_key="k",
+                fcm_sender_id="2",
+                entry_id=entry_id,
+            )
+
+        a, b = _listener("entry-a"), _listener("entry-b")
+        for attr in ("_store", "_rejected_store", "_delivery_store"):
+            assert getattr(a, attr).key != getattr(b, attr).key
+            assert getattr(a, attr).key.endswith("_entry-a")
+
+    @pytest.mark.asyncio
+    async def test_first_entry_adopts_the_shared_store_once(self) -> None:
+        from custom_components.aegis_ajax.notification import STORAGE_KEY, AjaxNotificationListener
+
+        listener = AjaxNotificationListener(
+            hass=MagicMock(),
+            coordinator=MagicMock(),
+            fcm_project_id="p",
+            fcm_app_id="1:2:android:3",
+            fcm_api_key="k",
+            fcm_sender_id="2",
+            entry_id="entry-a",
+        )
+        own = MagicMock(key=f"{STORAGE_KEY}_entry-a")
+        own.async_load = AsyncMock(return_value=None)
+        own.async_save = AsyncMock()
+        legacy = MagicMock()
+        legacy.async_load = AsyncMock(return_value={"fcm": "creds"})
+        legacy.async_remove = AsyncMock()
+
+        with patch("custom_components.aegis_ajax.notification.Store", return_value=legacy):
+            data = await listener._async_load_store(own, STORAGE_KEY)
+
+        assert data == {"fcm": "creds"}
+        own.async_save.assert_awaited_once_with({"fcm": "creds"})
+        legacy.async_remove.assert_awaited_once()

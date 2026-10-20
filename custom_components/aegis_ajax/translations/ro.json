@@ -8,6 +8,11 @@
                     "email": "E-mail",
                     "password": "Parolă",
                     "app_label": "Etichetă aplicație (numele aplicației co-branded)"
+                },
+                "data_description": {
+                    "email": "Adresa de e-mail cu care te conectezi în aplicația Ajax.",
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei.",
+                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Alegeți ce spații (hub-uri) să adăugați.",
                 "data": {
                     "spaces": "Spații"
+                },
+                "data_description": {
+                    "spaces": "Spațiile (hub-urile) de adăugat în Home Assistant. Alege cel puțin unul."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-mail",
                     "password": "Parolă",
                     "app_label": "Etichetă aplicație"
+                },
+                "data_description": {
+                    "email": "Adresa de e-mail cu care te conectezi în aplicația Ajax.",
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei.",
+                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Introduceți codul de 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Sesiunea Ajax pentru {email} nu mai este validă. Introduceți parola curentă a contului pentru a restabili accesul.",
                 "data": {
                     "password": "Parolă"
+                },
+                "data_description": {
+                    "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Introduceți codul din 6 cifre din aplicația de autentificare.",
                 "data": {
                     "totp_code": "Cod TOTP"
+                },
+                "data_description": {
+                    "totp_code": "Codul de 6 cifre din aplicația de autentificare."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Contul este blocat. Vă rugăm să încercați mai târziu.",
             "reauth_successful": "Reautentificare reușită.",
             "already_in_progress": "Configurarea este deja în curs. Finalizați sau anulați fluxul existent.",
-            "reconfigure_successful": "Datele de autentificare au fost actualizate cu succes."
+            "reconfigure_successful": "Datele de autentificare au fost actualizate cu succes.",
+            "cannot_connect": "Nu se poate conecta la serverele Ajax."
         }
     },
     "options": {
@@ -327,6 +353,10 @@
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",
             "description": "Aegis has seen {events} events from your hub while the push client was running, and not one of them arrived over push. Your alarm state is not affected — it comes from the hub connection and from polling, never from push — but real-time events such as doorbell rings and intrusion alarms reach Home Assistant only over push, so those are being lost.\n\nThree things produce this and they look identical from here: the four FCM values may belong to a Firebase project your co-branded app's push provider does not send through, another registration may be holding your Ajax account's push destination, or the push connection may never have completed.\n\nWhat helps: re-enter the four values for your co-branded app, under Settings > Repairs or in the integration options. If the same Ajax account is used by another Home Assistant instance, try a separate account for this integration. This notice clears by itself as soon as one push arrives."
+        },
+        "pin_code_update": {
+            "title": "Setează din nou PIN-ul alarmei",
+            "description": "PIN-ul alarmei pentru acest cont este salvat într-un format mai vechi. Deschide opțiunile integrării și introdu din nou PIN-ul pentru a-l actualiza. Între timp funcționează în continuare."
         }
     },
     "entity": {
@@ -679,6 +709,9 @@
         },
         "invalid_alarm_code": {
             "message": "Cod de alarmă invalid"
+        },
+        "not_loaded": {
+            "message": "Niciun cont Aegis for Ajax nu este încărcat. Verifică integrarea în pagina Dispozitive și servicii."
         }
     },
     "device_automation": {

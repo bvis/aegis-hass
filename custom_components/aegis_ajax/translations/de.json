@@ -8,6 +8,11 @@
                     "email": "E-Mail",
                     "password": "Passwort",
                     "app_label": "App-Bezeichnung (Co-Branded App-Name)"
+                },
+                "data_description": {
+                    "email": "Die E-Mail, mit der du dich in der Ajax-App anmeldest.",
+                    "password": "Das Passwort deines Ajax-Kontos. Home Assistant speichert nur einen Hash davon.",
+                    "app_label": "Die App, zu der dein Konto gehört: Ajax oder eine Co-Branded-App. Im README steht, wie du das herausfindest."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein.",
                 "data": {
                     "totp_code": "TOTP-Code"
+                },
+                "data_description": {
+                    "totp_code": "Der 6-stellige Code aus deiner Authenticator-App."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Wählen Sie aus, welche Bereiche (Hubs) hinzugefügt werden sollen.",
                 "data": {
                     "spaces": "Bereiche"
+                },
+                "data_description": {
+                    "spaces": "Die Bereiche (Hubs), die zu Home Assistant hinzugefügt werden. Wähle mindestens einen."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-Mail",
                     "password": "Passwort",
                     "app_label": "App-Label"
+                },
+                "data_description": {
+                    "email": "Die E-Mail, mit der du dich in der Ajax-App anmeldest.",
+                    "password": "Das Passwort deines Ajax-Kontos. Home Assistant speichert nur einen Hash davon.",
+                    "app_label": "Die App, zu der dein Konto gehört: Ajax oder eine Co-Branded-App. Im README steht, wie du das herausfindest."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein.",
                 "data": {
                     "totp_code": "TOTP-Code"
+                },
+                "data_description": {
+                    "totp_code": "Der 6-stellige Code aus deiner Authenticator-App."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Ihre Ajax-Sitzung für {email} ist nicht mehr gültig. Geben Sie das aktuelle Konto-Passwort ein, um den Zugriff wiederherzustellen.",
                 "data": {
                     "password": "Passwort"
+                },
+                "data_description": {
+                    "password": "Das Passwort deines Ajax-Kontos. Home Assistant speichert nur einen Hash davon."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
                 "data": {
                     "totp_code": "TOTP-Code"
+                },
+                "data_description": {
+                    "totp_code": "Der 6-stellige Code aus deiner Authenticator-App."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Konto ist gesperrt. Bitte versuchen Sie es später erneut.",
             "reauth_successful": "Erneute Authentifizierung erfolgreich.",
             "already_in_progress": "Konfiguration läuft bereits. Bitte schließen Sie den vorhandenen Vorgang ab.",
-            "reconfigure_successful": "Zugangsdaten erfolgreich aktualisiert."
+            "reconfigure_successful": "Zugangsdaten erfolgreich aktualisiert.",
+            "cannot_connect": "Verbindung zu Ajax-Servern nicht möglich."
         }
     },
     "options": {
@@ -327,6 +353,10 @@
         "fcm_never_delivered": {
             "title": "Push-Benachrichtigungen kommen nicht an",
             "description": "Aegis hat {events} Ereignisse Ihres Hubs gesehen, während der Push-Client lief, und keines davon kam über Push an. Ihr Alarmzustand ist nicht betroffen — er kommt aus der Hub-Verbindung und aus der Abfrage, niemals aus Push. Ereignisse in Echtzeit wie ein Türklingeln oder ein Einbruchalarm erreichen Home Assistant jedoch ausschließlich über Push und gehen daher verloren.\n\nDrei Ursachen führen dazu und sind von hier aus nicht zu unterscheiden: die vier FCM-Werte können zu einem Firebase-Projekt gehören, über das der Push-Anbieter Ihrer App nicht sendet, eine andere Registrierung kann das Push-Ziel Ihres Ajax-Kontos belegen, oder die Push-Verbindung wurde nie vollständig aufgebaut.\n\nWas hilft: Geben Sie die vier Werte Ihrer App erneut ein, unter Einstellungen > Reparaturen oder in den Optionen der Integration. Wird dasselbe Ajax-Konto von einer weiteren Home-Assistant-Instanz verwendet, versuchen Sie ein separates Konto für diese Integration. Dieser Hinweis verschwindet von selbst, sobald ein Push ankommt."
+        },
+        "pin_code_update": {
+            "title": "Alarm-PIN erneut festlegen",
+            "description": "Die Alarm-PIN dieses Kontos ist in einem älteren Format gespeichert. Öffne die Optionen der Integration und gib die PIN erneut ein, um sie zu aktualisieren. Bis dahin funktioniert sie weiter."
         }
     },
     "entity": {
@@ -679,6 +709,9 @@
         },
         "invalid_alarm_code": {
             "message": "Ungültiger Alarmcode"
+        },
+        "not_loaded": {
+            "message": "Kein Aegis for Ajax-Konto ist geladen. Prüfe die Integration auf der Seite Geräte & Dienste."
         }
     },
     "device_automation": {

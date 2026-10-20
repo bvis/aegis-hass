@@ -53,6 +53,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Entities only read coordinator data; nothing to throttle.
+PARALLEL_UPDATES = 0
+
 # Sentinel value used for both `installed_version` and `latest_version`
 # when the Ajax cloud reports no pending update. HA's `UpdateEntity`
 # treats matching non-None versions as "up to date" and renders the

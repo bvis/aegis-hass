@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Awaitable, Callable, Iterator
 
 
 @contextlib.contextmanager
@@ -72,9 +72,10 @@ class TestAsyncSetupEntry:
 
         # FCM startup should be scheduled, not awaited synchronously.
         mock_coordinator.async_start_push_notifications.assert_called_once()
-        entry.async_create_background_task.assert_called_once()
-        kwargs = entry.async_create_background_task.call_args.kwargs
-        assert kwargs.get("name", "").startswith("aegis_ajax_fcm_start_")
+        names = [
+            c.kwargs.get("name", "") for c in entry.async_create_background_task.call_args_list
+        ]
+        assert sum(n.startswith("aegis_ajax_fcm_start_") for n in names) == 1
 
     @pytest.mark.asyncio
     async def test_setup_defaults_app_label_to_the_ajax_application_label(self) -> None:
@@ -430,36 +431,15 @@ class TestProtoDescriptorCollisionGuard:
 
 
 class TestOptionsUpdateListener:
-    @pytest.mark.asyncio
-    async def test_options_change_triggers_reload(self) -> None:
-        from custom_components.aegis_ajax import _async_options_update_listener
-
-        hass = MagicMock()
-        hass.config_entries.async_reload = AsyncMock()
-
-        entry = MagicMock()
-        entry.entry_id = "entry-1"
-
-        await _async_options_update_listener(hass, entry)
-
-        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
-
-    @pytest.mark.asyncio
-    async def test_setup_registers_update_listener(self) -> None:
+    @staticmethod
+    async def _setup_and_get_listener(
+        hass: MagicMock, entry: MagicMock
+    ) -> Callable[..., Awaitable[None]]:
         from custom_components.aegis_ajax import async_setup_entry
 
-        hass = MagicMock()
         hass.data = {}
         hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
-
-        entry = MagicMock()
-        entry.entry_id = "entry-1"
-        entry.data = {
-            "email": "test@example.com",
-            "password_hash": "abc123hash",
-            "spaces": ["s1"],
-        }
-        entry.options = {}
+        hass.config_entries.async_reload = AsyncMock()
 
         mock_client = MagicMock()
         mock_client.connect = AsyncMock()
@@ -479,6 +459,53 @@ class TestOptionsUpdateListener:
             await async_setup_entry(hass, entry)
 
         entry.add_update_listener.assert_called_once()
+        return entry.add_update_listener.call_args.args[0]
+
+    @staticmethod
+    def _entry() -> MagicMock:
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.data = {
+            "email": "test@example.com",
+            "password_hash": "abc123hash",
+            "spaces": ["s1"],
+            "session_token": "tok-1",
+            "user_hex_id": "hex",
+            "device_id": "dev",
+        }
+        entry.options = {"poll_interval": 300}
+        return entry
+
+    @pytest.mark.asyncio
+    async def test_options_change_triggers_reload(self) -> None:
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.options = {"poll_interval": 120}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+
+    @pytest.mark.asyncio
+    async def test_credential_change_in_data_triggers_reload(self) -> None:
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.data = {**entry.data, "fcm_api_key": "new"}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+
+    @pytest.mark.asyncio
+    async def test_session_refresh_does_not_reload(self) -> None:
+        """A new session token written after a login doesn't restart everything (#609)."""
+        hass, entry = MagicMock(), self._entry()
+        listener = await self._setup_and_get_listener(hass, entry)
+
+        entry.data = {**entry.data, "session_token": "tok-2", "device_id": "dev-2"}
+        await listener(hass, entry)
+
+        hass.config_entries.async_reload.assert_not_awaited()
 
 
 class TestAutoLabeling:
@@ -598,7 +625,9 @@ class TestAutoLabeling:
         mock_label_reg.async_get_label.return_value = MagicMock()
 
         mock_entity = MagicMock()
-        mock_entity.entity_id = "sensor.alarma_ajax_ip_ethernet"
+        # Renamed by the user and in Spanish: the label follows the translation key (#612)
+        mock_entity.entity_id = "sensor.router_de_casa"
+        mock_entity.translation_key = "ethernet_ip"
         mock_entity.original_device_class = None
         mock_entity.labels = set()
 
@@ -972,8 +1001,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
@@ -999,8 +1033,13 @@ class TestAsyncRemoveEntry:
                 "async_remove_monitoring_companies",
                 AsyncMock(),
             ) as remove_companies,
+            patch(
+                "custom_components.aegis_ajax.notification.async_remove_fcm_stores", AsyncMock()
+            ) as remove_fcm,
         ):
             await async_remove_entry(hass, entry)
+
+        remove_fcm.assert_awaited_once_with(hass, entry.entry_id)
 
         remove_companies.assert_awaited_once_with(hass, entry.entry_id)
 
@@ -1141,3 +1180,32 @@ class TestAsyncRemoveConfigEntryDevice:
         assert await async_remove_config_entry_device(
             hass, entry, self._device_entry((DOMAIN, "d1"))
         )
+
+
+class TestMigrateEntry:
+    @pytest.mark.asyncio
+    async def test_plaintext_password_is_hashed_once_in_migration(self) -> None:
+        """2.1 → 2.2 hashes a stored plaintext password; setup no longer does it (#612)."""
+        from custom_components.aegis_ajax import async_migrate_entry
+
+        hass = MagicMock()
+        entry = MagicMock(version=2, minor_version=1, entry_id="e1")
+        entry.data = {"email": "a@b.c", "password": "secret"}
+        entry.options = {}
+
+        assert await async_migrate_entry(hass, entry) is True
+
+        kwargs = hass.config_entries.async_update_entry.call_args.kwargs
+        assert kwargs["minor_version"] == 2
+        assert "password" not in kwargs["data"]
+        assert kwargs["data"]["password_hash"]
+
+    @pytest.mark.asyncio
+    async def test_current_entry_is_left_alone(self) -> None:
+        from custom_components.aegis_ajax import async_migrate_entry
+
+        hass = MagicMock()
+        entry = MagicMock(version=2, minor_version=2)
+
+        assert await async_migrate_entry(hass, entry) is True
+        hass.config_entries.async_update_entry.assert_not_called()

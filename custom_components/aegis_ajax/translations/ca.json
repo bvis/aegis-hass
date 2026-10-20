@@ -8,6 +8,11 @@
                     "email": "Correu electronic",
                     "password": "Contrasenya",
                     "app_label": "Etiqueta d'app (nom de l'app co-branded)"
+                },
+                "data_description": {
+                    "email": "El correu amb què entres a l'app d'Ajax.",
+                    "password": "La contrasenya del teu compte d'Ajax. Home Assistant només en desa un hash.",
+                    "app_label": "L'app a la qual pertany el teu compte: Ajax o una app co-branded. Consulta el README si no n'estàs segur."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
                 "data": {
                     "totp_code": "Codi TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El codi de 6 dígits de la teva app d'autenticació."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Tria quins espais (hubs) afegir.",
                 "data": {
                     "spaces": "Espais"
+                },
+                "data_description": {
+                    "spaces": "Els espais (hubs) que vols afegir a Home Assistant. Tria'n almenys un."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "Correu electrònic",
                     "password": "Contrasenya",
                     "app_label": "Etiqueta de l'aplicació"
+                },
+                "data_description": {
+                    "email": "El correu amb què entres a l'app d'Ajax.",
+                    "password": "La contrasenya del teu compte d'Ajax. Home Assistant només en desa un hash.",
+                    "app_label": "L'app a la qual pertany el teu compte: Ajax o una app co-branded. Consulta el README si no n'estàs segur."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
                 "data": {
                     "totp_code": "Codi TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El codi de 6 dígits de la teva app d'autenticació."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "La sessio Ajax per a {email} ja no es valida. Introdueix la contrasenya actual del compte per restaurar l'acces.",
                 "data": {
                     "password": "Contrasenya"
+                },
+                "data_description": {
+                    "password": "La contrasenya del teu compte d'Ajax. Home Assistant només en desa un hash."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Introdueix el codi de 6 digits de la teva app d'autenticacio.",
                 "data": {
                     "totp_code": "Codi TOTP"
+                },
+                "data_description": {
+                    "totp_code": "El codi de 6 dígits de la teva app d'autenticació."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Compte bloquejat. Torna-ho a provar mes tard.",
             "reauth_successful": "Reautenticacio correcta.",
             "already_in_progress": "La configuració ja està en curs. Completeu o cancel·leu el flux existent.",
-            "reconfigure_successful": "Credencials actualitzades correctament."
+            "reconfigure_successful": "Credencials actualitzades correctament.",
+            "cannot_connect": "No es pot connectar als servidors d'Ajax."
         }
     },
     "options": {
@@ -327,6 +353,10 @@
         "fcm_never_delivered": {
             "title": "Les notificacions push no arriben",
             "description": "Aegis ha vist {events} esdeveniments del teu hub mentre el client push estava en marxa, i cap d'ells no ha arribat per push. L'estat de l'alarma no està afectat: ve de la connexió amb el hub i del sondeig, mai del push. Però els esdeveniments en temps real, com el timbre o una alarma d'intrusió, només arriben a Home Assistant per push, així que s'estan perdent.\n\nHi ha tres causes que ho produeixen i des d'aquí són indistingibles: els quatre valors FCM poden pertànyer a un projecte de Firebase pel qual el proveïdor de push de la teva app no envia, un altre registre pot estar ocupant la destinació de push del teu compte d'Ajax, o la connexió de push pot no haver-se completat mai.\n\nQuè ajuda: torna a introduir els quatre valors de la teva app, a Configuració > Reparacions o a les opcions de la integració. Si el mateix compte d'Ajax l'utilitza una altra instància de Home Assistant, prova un compte separat per a aquesta integració. Aquest avís desapareix tot sol tan bon punt arribi un push."
+        },
+        "pin_code_update": {
+            "title": "Torna a posar el PIN de l'alarma",
+            "description": "El PIN de l'alarma d'aquest compte està desat en un format antic. Obre les opcions de la integració i torna a introduir el PIN per actualitzar-lo. Mentrestant continua funcionant."
         }
     },
     "entity": {
@@ -679,6 +709,9 @@
         },
         "invalid_alarm_code": {
             "message": "Codi d'alarma incorrecte"
+        },
+        "not_loaded": {
+            "message": "No hi ha cap compte d'Aegis for Ajax carregat. Revisa la integració a la pàgina Dispositius i serveis."
         }
     },
     "device_automation": {

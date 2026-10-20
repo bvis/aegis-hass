@@ -8,6 +8,11 @@
                     "email": "E-posta",
                     "password": "Parola",
                     "app_label": "Uygulama etiketi (co-branded uygulama adı)"
+                },
+                "data_description": {
+                    "email": "Ajax uygulamasına giriş yaptığınız e-posta.",
+                    "password": "Ajax hesabınızın şifresi. Home Assistant yalnızca bir hash saklar.",
+                    "app_label": "Hesabınızın ait olduğu uygulama: Ajax veya co-branded bir uygulama. Emin değilseniz README'ye bakın."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Doğrulama uygulamanızdaki 6 haneli kodu girin.",
                 "data": {
                     "totp_code": "TOTP Kodu"
+                },
+                "data_description": {
+                    "totp_code": "Kimlik doğrulama uygulamanızdaki 6 haneli kod."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Eklemek istediğiniz alanları (hub'ları) seçin.",
                 "data": {
                     "spaces": "Alanlar"
+                },
+                "data_description": {
+                    "spaces": "Home Assistant'a eklenecek alanlar (hub'lar). En az birini seçin."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "E-posta",
                     "password": "Şifre",
                     "app_label": "Uygulama etiketi"
+                },
+                "data_description": {
+                    "email": "Ajax uygulamasına giriş yaptığınız e-posta.",
+                    "password": "Ajax hesabınızın şifresi. Home Assistant yalnızca bir hash saklar.",
+                    "app_label": "Hesabınızın ait olduğu uygulama: Ajax veya co-branded bir uygulama. Emin değilseniz README'ye bakın."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Doğrulama uygulamanızdaki 6 haneli kodu girin.",
                 "data": {
                     "totp_code": "TOTP Kodu"
+                },
+                "data_description": {
+                    "totp_code": "Kimlik doğrulama uygulamanızdaki 6 haneli kod."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "{email} için Ajax oturumunuz artık geçerli değil. Erişimi geri yüklemek için hesabın mevcut parolasını girin.",
                 "data": {
                     "password": "Parola"
+                },
+                "data_description": {
+                    "password": "Ajax hesabınızın şifresi. Home Assistant yalnızca bir hash saklar."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Kimlik doğrulama uygulamanızdan 6 haneli kodu girin.",
                 "data": {
                     "totp_code": "TOTP Kodu"
+                },
+                "data_description": {
+                    "totp_code": "Kimlik doğrulama uygulamanızdaki 6 haneli kod."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "account_locked": "Hesap kilitlendi. Lütfen daha sonra tekrar deneyin.",
             "reauth_successful": "Yeniden doğrulama başarılı.",
             "already_in_progress": "Yapılandırma zaten devam ediyor. Mevcut akışı tamamlayın veya iptal edin.",
-            "reconfigure_successful": "Kimlik bilgileri başarıyla güncellendi."
+            "reconfigure_successful": "Kimlik bilgileri başarıyla güncellendi.",
+            "cannot_connect": "Ajax sunucularına bağlanılamıyor."
         }
     },
     "options": {
@@ -327,6 +353,10 @@
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",
             "description": "Aegis has seen {events} events from your hub while the push client was running, and not one of them arrived over push. Your alarm state is not affected — it comes from the hub connection and from polling, never from push — but real-time events such as doorbell rings and intrusion alarms reach Home Assistant only over push, so those are being lost.\n\nThree things produce this and they look identical from here: the four FCM values may belong to a Firebase project your co-branded app's push provider does not send through, another registration may be holding your Ajax account's push destination, or the push connection may never have completed.\n\nWhat helps: re-enter the four values for your co-branded app, under Settings > Repairs or in the integration options. If the same Ajax account is used by another Home Assistant instance, try a separate account for this integration. This notice clears by itself as soon as one push arrives."
+        },
+        "pin_code_update": {
+            "title": "Alarm PIN'ini yeniden ayarlayın",
+            "description": "Bu hesabın alarm PIN'i eski bir biçimde kayıtlı. Güncellemek için entegrasyon seçeneklerini açıp PIN'i yeniden girin. Bu arada çalışmaya devam eder."
         }
     },
     "entity": {
@@ -679,6 +709,9 @@
         },
         "invalid_alarm_code": {
             "message": "Geçersiz alarm kodu"
+        },
+        "not_loaded": {
+            "message": "Yüklü bir Aegis for Ajax hesabı yok. Cihazlar ve hizmetler sayfasından entegrasyonu kontrol edin."
         }
     },
     "device_automation": {

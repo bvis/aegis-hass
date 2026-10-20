@@ -8,6 +8,11 @@
                     "email": "Email",
                     "password": "Password",
                     "app_label": "App label (co-branded app name)"
+                },
+                "data_description": {
+                    "email": "The email you use to sign in to the Ajax app.",
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it.",
+                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure."
                 }
             },
             "2fa": {
@@ -15,6 +20,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             },
             "select_spaces": {
@@ -22,6 +30,9 @@
                 "description": "Choose which spaces (hubs) to add.",
                 "data": {
                     "spaces": "Spaces"
+                },
+                "data_description": {
+                    "spaces": "The spaces (hubs) to add to Home Assistant. Pick at least one."
                 }
             },
             "reconfigure": {
@@ -31,6 +42,11 @@
                     "email": "Email",
                     "password": "Password",
                     "app_label": "App label (co-branded app name)"
+                },
+                "data_description": {
+                    "email": "The email you use to sign in to the Ajax app.",
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it.",
+                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure."
                 }
             },
             "reconfigure_2fa": {
@@ -38,6 +54,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             },
             "reauth_confirm": {
@@ -45,6 +64,9 @@
                 "description": "Your Ajax session for {email} is no longer valid. Enter the current account password to restore access.",
                 "data": {
                     "password": "Password"
+                },
+                "data_description": {
+                    "password": "Your Ajax account password. Home Assistant keeps only a hash of it."
                 }
             },
             "reauth_2fa": {
@@ -52,6 +74,9 @@
                 "description": "Enter the 6-digit code from your authenticator app.",
                 "data": {
                     "totp_code": "TOTP Code"
+                },
+                "data_description": {
+                    "totp_code": "The 6-digit code from your authenticator app."
                 }
             }
         },
@@ -67,7 +92,8 @@
             "already_in_progress": "Configuration is already in progress. Please complete or cancel the existing flow.",
             "account_locked": "Account is locked. Please try again later.",
             "reauth_successful": "Re-authentication successful.",
-            "reconfigure_successful": "Credentials updated successfully."
+            "reconfigure_successful": "Credentials updated successfully.",
+            "cannot_connect": "Cannot connect to Ajax servers."
         }
     },
     "options": {
@@ -327,6 +353,10 @@
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",
             "description": "Aegis has seen {events} events from your hub while the push client was running, and not one of them arrived over push. Your alarm state is not affected — it comes from the hub connection and from polling, never from push — but real-time events such as doorbell rings and intrusion alarms reach Home Assistant only over push, so those are being lost.\n\nThree things produce this and they look identical from here: the four FCM values may belong to a Firebase project your co-branded app's push provider does not send through, another registration may be holding your Ajax account's push destination, or the push connection may never have completed.\n\nWhat helps: re-enter the four values for your co-branded app, under Settings > Repairs or in the integration options. If the same Ajax account is used by another Home Assistant instance, try a separate account for this integration. This notice clears by itself as soon as one push arrives."
+        },
+        "pin_code_update": {
+            "title": "Set the alarm PIN again",
+            "description": "The alarm PIN for this account is saved in an older format. Open the integration options and enter the PIN again to update it. It keeps working in the meantime."
         }
     },
     "entity": {
@@ -679,6 +709,9 @@
         },
         "invalid_alarm_code": {
             "message": "Invalid alarm code"
+        },
+        "not_loaded": {
+            "message": "No Aegis for Ajax account is loaded. Check the integration on the Devices & services page."
         }
     },
     "device_automation": {
