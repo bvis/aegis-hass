@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - unreleased
+
+### Added
+- **New devices show up without a reload (#608).** A device paired in the Ajax app after setup now gets its entities on its own: the integration reloads once when it sees it. Before, only keyfobs were added and everything else waited for a manual reload. **Requests to Ajax:** one normal startup per newly paired device, nothing in steady state.
+- **Stronger storage for the alarm PIN.** A PIN set in the options is stored in a stronger form. A PIN saved before keeps working; a Repair asks you to enter it again in the options so it is stored the new way. **Requests to Ajax:** none.
+- `quality_scale.yaml` and `docs/quality-scale.md`: where the integration stands on each Home Assistant quality scale rule. README section on removing the integration.
+
+### Changed
+- **Errors are translated (#607).** Service errors and arm/disarm failures read their text from the translations in all 15 languages instead of a built-in map, and the *Keyfobs* device and the group fallback name are translated. A wrong alarm code is now reported as an input error and Ajax-side failures as service errors. **Requests to Ajax:** none.
+- **Actions go one at a time per platform (#606).** Several actions fired together (a scene switching relays, for example) are sent one after another. **Requests to Ajax:** none added.
+- **Services are registered once, at startup (#603).** They no longer depend on an account staying loaded, and calling one with no account loaded says so. **Requests to Ajax:** none.
+- Push registration uses Home Assistant's web sessions instead of its own, the old password-to-hash migration moved to the config entry migration, and the hub's automatic labels follow the entity type instead of its id, so renamed entities and other languages get them too (#612). **Requests to Ajax:** none.
+
+### Fixed
+- **A session refresh no longer restarts the integration (#609).** Saving a renewed session token reloaded everything, which meant a second full startup against Ajax after every re-login. **Requests to Ajax:** fewer.
+- **Two accounts no longer share push credentials (#605).** Each account keeps its own push registration and delivery history. Single-account setups keep theirs as they are. **Requests to Ajax:** none for one account; with two, the second registers once with its own identity.
+- **Clean unload (#604, #611).** Shutting down the coordinator now runs Home Assistant's own cleanup and only once, and follow-up tasks belong to the account, so nothing queued before an unload reaches Ajax afterwards. **Requests to Ajax:** none added.
+- **Setup form (#610).** The connection opened while adding an account is closed when the form ends, a failure listing spaces shows an error instead of breaking the form, and every field has a description. **Requests to Ajax:** none.
+- **Photo files are resolved off the event loop (#602).** Opening an alarm photo in the media browser no longer touches the disk from Home Assistant's main loop. **Requests to Ajax:** none.
+
 ## [1.26.0] - 2026-10-16
 
 ### Added

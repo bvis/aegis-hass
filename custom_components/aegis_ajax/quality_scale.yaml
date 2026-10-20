@@ -3,17 +3,13 @@
 # Not checked by hassfest for custom integrations; see docs/quality-scale.md.
 rules:
   # Bronze
-  action-setup:
-    status: todo
-    comment: Services are registered per config entry (#603).
+  action-setup: done
   appropriate-polling: done
   brands:
     status: todo
     comment: Icon ships in brand/; submission to home-assistant/brands deferred.
   common-modules: done
-  config-flow:
-    status: todo
-    comment: Config steps have no data_description (#610).
+  config-flow: done
   config-flow-test-coverage:
     status: todo
     comment: Tests build the flow directly instead of using hass.config_entries.flow (#610).
@@ -35,20 +31,14 @@ rules:
   unique-config-entry: done
 
   # Silver
-  action-exceptions:
-    status: todo
-    comment: Ajax API failures are raised as ServiceValidationError (#607).
-  config-entry-unloading:
-    status: todo
-    comment: Unload works; services are removed before the result is known and coordinator shutdown skips the base class (#603, #604).
+  action-exceptions: done
+  config-entry-unloading: done
   docs-configuration-parameters: done
   docs-installation-parameters: done
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable: done
-  parallel-updates:
-    status: todo
-    comment: No platform sets PARALLEL_UPDATES (#606).
+  parallel-updates: done
   reauthentication-flow: done
   test-coverage: done
 
@@ -66,18 +56,12 @@ rules:
   docs-supported-functions: done
   docs-troubleshooting: done
   docs-use-cases: done
-  dynamic-devices:
-    status: todo
-    comment: Only keyfobs are added at runtime; other new devices need a reload (#608).
+  dynamic-devices: done
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default: done
-  entity-translations:
-    status: todo
-    comment: The Keyfobs device and the group name fallback are untranslated (#607).
-  exception-translations:
-    status: todo
-    comment: About half of the raised errors have literal messages (#607).
+  entity-translations: done
+  exception-translations: done
   icon-translations: done
   reconfiguration-flow:
     status: exempt
@@ -87,7 +71,5 @@ rules:
 
   # Platinum
   async-dependency: done
-  inject-websession:
-    status: todo
-    comment: The push listener creates its own aiohttp session (#612); the gRPC client has no web session to inject.
+  inject-websession: done
   strict-typing: done
