@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.1] - unreleased
+
+### Fixed
+- **Reconfiguring onto an account that's already added says so (#610).** Changing an entry's email to one another entry already uses showed *Unknown error* and logged a traceback. It now stops with *already configured*. **Requests to Ajax:** none added.
+
 ## [1.27.0] - 2026-10-20
 
 ### Added
