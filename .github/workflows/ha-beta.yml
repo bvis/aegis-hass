@@ -1,7 +1,8 @@
 name: Newest HA core
 
 # The CI workflow tests against the newest *stable* core, which is what users
-# run today. This one tests against the newest release on PyPI, beta included,
+# run today. This one tests against the newest core, beta included, that Home
+# Assistant's test harness has a release for (a day behind PyPI at most),
 # installed under that core's own package_constraints.txt exactly as Home
 # Assistant would install us. A beta lands about a week before each stable and
 # can move pins under us (2026.10 took protobuf from 6 to 7 and swapped
@@ -37,22 +38,31 @@ jobs:
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc libc-dev >/dev/null
             pip install --quiet --no-cache-dir --root-user-action=ignore packaging
-            if [ -z "$HA_VERSION" ]; then
-              HA_VERSION=$(python3 -c "
-          import json, urllib.request
+            # The tests need the Home Assistant test harness, and each release of it
+            # pins one core. Take the newest release (it follows every core, beta
+            # included, within about a day), or the one built for HA_VERSION.
+            read -r PHCC CORE <<<"$(python3 -c "
+          import json, os, urllib.request
           from packaging.version import Version
-          data = json.load(urllib.request.urlopen(\"https://pypi.org/pypi/homeassistant/json\"))
-          print(max((v for v, files in data[\"releases\"].items() if files and not all(f[\"yanked\"] for f in files)), key=Version))
-          ")
-            fi
-            echo "Testing against homeassistant==$HA_VERSION"
+          url = \"https://pypi.org/pypi/pytest-homeassistant-custom-component\"
+          releases = json.load(urllib.request.urlopen(url + \"/json\"))[\"releases\"]
+          wanted = os.environ.get(\"HA_VERSION\")
+          for v in sorted((v for v, f in releases.items() if f), key=Version, reverse=True)[:60]:
+              deps = json.load(urllib.request.urlopen(f\"{url}/{v}/json\"))[\"info\"][\"requires_dist\"]
+              core = next(d.split(\"==\")[1] for d in deps if d.startswith(\"homeassistant==\"))
+              if not wanted or core == wanted:
+                  print(v, core)
+                  break
+          ")"
+            if [ -z "$PHCC" ]; then echo "No test harness release for homeassistant==$HA_VERSION"; exit 1; fi
+            HA_VERSION=$CORE
+            echo "Testing against homeassistant==$HA_VERSION (pytest-homeassistant-custom-component==$PHCC)"
             python3 -c "import urllib.request; urllib.request.urlretrieve(\"https://raw.githubusercontent.com/home-assistant/core/$HA_VERSION/homeassistant/package_constraints.txt\", \"/tmp/constraints.txt\")"
             # Runtime requirements only: the dev extra pins grpcio-tools, whose
             # protobuf cap is a codegen concern and may conflict with the core pin.
             pip install --quiet --no-cache-dir --root-user-action=ignore -c /tmp/constraints.txt \
-              "homeassistant==$HA_VERSION" \
-              $(python3 -c "import json; print(\" \".join(json.load(open(\"custom_components/aegis_ajax/manifest.json\"))[\"requirements\"]))") \
-              pytest pytest-asyncio
+              "homeassistant==$HA_VERSION" "pytest-homeassistant-custom-component==$PHCC" \
+              $(python3 -c "import json; print(\" \".join(json.load(open(\"custom_components/aegis_ajax/manifest.json\"))[\"requirements\"]))")
             pip list 2>/dev/null | grep -iE "^(homeassistant|protobuf|grpcio|firebase-messaging) "
             python3 scripts/check_proto_imports.py
             pytest tests/unit/ -q -p no:cacheprovider

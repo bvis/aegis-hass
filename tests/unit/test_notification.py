@@ -1643,6 +1643,7 @@ class TestAsyncStartFcmAndroidPackageHeader:
         assert create_kwargs["headers"] == {"X-Android-Package": "com.ajaxsystems"}
         assert create_kwargs["auto_cleanup"] is False
         session.detach.assert_called_once()
+        await listener.async_stop()
 
     @pytest.mark.asyncio
     async def test_unknown_cobrand_passes_no_session(self) -> None:
@@ -1692,6 +1693,7 @@ class TestAsyncStartFcmAndroidPackageHeader:
         # dict must not carry that key.
         assert register_cls.call_count == 1
         assert "http_client_session" not in register_cls.call_args.kwargs
+        await listener.async_stop()
 
 
 class TestAsyncStartFcmShapePreflight:

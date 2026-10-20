@@ -10,9 +10,7 @@ rules:
     comment: Icon ships in brand/; submission to home-assistant/brands deferred.
   common-modules: done
   config-flow: done
-  config-flow-test-coverage:
-    status: todo
-    comment: Tests build the flow directly instead of using hass.config_entries.flow (#610).
+  config-flow-test-coverage: done
   dependency-transparency: done
   docs-actions: done
   docs-conditions:
