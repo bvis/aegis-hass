@@ -6,6 +6,7 @@
 [![Validate with hassfest](https://github.com/bvis/aegis-hass/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml)
 [![License: MIT](https://img.shields.io/github/license/bvis/aegis-hass.svg)](LICENSE)
+[![Quality scale: Platinum (self-assessed)](https://img.shields.io/badge/quality%20scale-platinum%20(self--assessed)-8a9ba8)](custom_components/aegis_ajax/quality_scale.yaml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 > **Disclaimer**: This is an **unofficial** third-party integration and is not affiliated with, endorsed by, or supported by Ajax Systems. Use at your own risk. This integration communicates with Ajax Systems servers using the same protocol as the official mobile app. Ajax Systems may change their API at any time, which could break this integration without notice.

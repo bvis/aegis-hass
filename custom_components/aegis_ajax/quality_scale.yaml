@@ -6,8 +6,8 @@ rules:
   action-setup: done
   appropriate-polling: done
   brands:
-    status: todo
-    comment: Icon ships in brand/; submission to home-assistant/brands deferred.
+    status: done
+    comment: Icon and logo ship in brand/, which Home Assistant serves for custom integrations since 2026.3.
   common-modules: done
   config-flow: done
   config-flow-test-coverage: done
