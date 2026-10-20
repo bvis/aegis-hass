@@ -14,11 +14,11 @@
         },
         "binary_sensor": {
             "monitoring": { "default": "mdi:shield-check", "state": { "on": "mdi:shield-check", "off": "mdi:shield-off-outline" } },
-            "gsm": { "default": "mdi:signal-cellular-3", "state": { "on": "mdi:signal-cellular-3", "off": "mdi:signal-cellular-off" } },
+            "gsm": { "default": "mdi:signal-cellular-3", "state": { "on": "mdi:signal-cellular-3", "off": "mdi:signal-off" } },
             "lid": { "default": "mdi:lock", "state": { "on": "mdi:lock-open-alert", "off": "mdi:lock" } },
             "ext_contact": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
             "ext_alert": { "default": "mdi:alert", "state": { "on": "mdi:alert", "off": "mdi:alert-outline" } },
-            "drilling": { "default": "mdi:drill", "state": { "on": "mdi:drill", "off": "mdi:shield-check" } },
+            "drilling": { "default": "mdi:tools", "state": { "on": "mdi:tools", "off": "mdi:shield-check" } },
             "anti_mask": { "default": "mdi:eye-off", "state": { "on": "mdi:eye-off", "off": "mdi:eye" } },
             "malfunction": { "default": "mdi:alert-circle", "state": { "on": "mdi:alert-circle", "off": "mdi:check-circle" } },
             "interference": { "default": "mdi:access-point-off", "state": { "on": "mdi:access-point-off", "off": "mdi:access-point" } },
@@ -41,7 +41,7 @@
             "channel_1": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
             "channel_2": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
             "chime": { "default": "mdi:bell", "state": { "on": "mdi:bell-ring", "off": "mdi:bell-off" } },
-            "night_mode_arm": { "default": "mdi:weather-night", "state": { "off": "mdi:weather-night-off" } }
+            "night_mode_arm": { "default": "mdi:weather-night" }
         },
         "button": {
             "capture_photo": { "default": "mdi:camera" },

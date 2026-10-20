@@ -107,6 +107,22 @@ jobs:
       - name: Run linter
         run: docker run --rm aegis-ajax-dev ruff check .
 
+  mdi-icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # An icon missing from Material Design Icons renders as nothing (#631).
+      # 7.4.47 is the @mdi version the Home Assistant frontend bundles.
+      - name: Check every mdi icon exists
+        run: |
+          missing=0
+          for n in $(grep -rhoE 'mdi:[a-z0-9-]+' custom_components/ | sed 's/mdi://' | sort -u); do
+            if ! curl -sf -o /dev/null "https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/$n.svg"; then
+              echo "::error::mdi:$n does not exist"; missing=1
+            fi
+          done
+          exit $missing
+
   format-check:
     runs-on: ubuntu-latest
     steps:
