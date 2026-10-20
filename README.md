@@ -92,6 +92,13 @@ Click the button above, or manually:
 3. Restart Home Assistant
 4. Go to **Settings > Devices & Services > Add Integration** and search for "Aegis for Ajax"
 
+### Removing the integration
+
+1. Go to **Settings > Devices & Services**, open **Aegis for Ajax** and pick **Delete** from the entry's menu. This also signs the integration out of your Ajax account, so it disappears from the app's active sessions.
+2. If you installed through HACS, remove the repository there too; otherwise delete `config/custom_components/aegis_ajax/`.
+3. Restart Home Assistant.
+4. Optional: delete saved alarm photos in `media/ajax_photos/`.
+
 ## Configuration
 
 1. Enter your Ajax account **email** and **password**
@@ -700,6 +707,10 @@ The card names the three causes and deliberately does not pick one, because they
 If the shape checks pass and Google still rejects, the WARNING line under **Settings → System → Logs** names the specific cause (project consistency, app-id format, or network reach to Google's FCM hosts). Re-enter the four values together via the Repair card under **Settings → Repairs** once you have a coherent set.
 
 If you cannot obtain a coherent set, leaving FCM unconfigured is a fully supported (degraded) configuration — device sensors and a polled view of the alarm panel still work.
+
+## Quality scale
+
+The integration tracks Home Assistant's integration quality scale as a checklist. Status per rule and open items: [docs/quality-scale.md](docs/quality-scale.md).
 
 ## Translations
 

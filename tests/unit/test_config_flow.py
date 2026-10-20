@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.aegis_ajax.api.session import AuthenticationError, TwoFactorRequiredError
 from custom_components.aegis_ajax.config_flow import (
@@ -14,6 +15,7 @@ from custom_components.aegis_ajax.config_flow import (
     AjaxCobrandedOptionsFlow,
 )
 from custom_components.aegis_ajax.const import DOMAIN
+from custom_components.aegis_ajax.service_security import validate_pin
 
 
 class TestConfigFlowInit:
@@ -377,12 +379,16 @@ class TestAsyncStepSelectSpaces:
 
         mock_client = MagicMock()
         mock_client.session.device_id = "dev-uuid"
+        mock_client.close = AsyncMock()
         flow._client = mock_client
 
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
 
         await flow.async_step_select_spaces({"spaces": ["space-1"]})
         flow.async_create_entry.assert_called_once()
+        # The entry builds its own client: the flow's channel is closed (#610)
+        mock_client.close.assert_awaited_once()
+        assert flow._client is None
         call_kwargs = flow.async_create_entry.call_args[1]
         assert call_kwargs["data"]["email"] == "test@example.com"
         assert call_kwargs["data"]["spaces"] == ["space-1"]
@@ -414,6 +420,40 @@ class TestAsyncStepSelectSpaces:
             await flow.async_step_select_spaces(None)
 
         flow.async_show_form.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_step_select_spaces_list_error_aborts_cannot_connect(self) -> None:
+        """A network error listing spaces aborts with cannot_connect, not "Unknown error" (#610)."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.async_abort = MagicMock(return_value={"type": "abort"})
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        flow._client = mock_client
+
+        mock_spaces_api = MagicMock()
+        mock_spaces_api.list_spaces = AsyncMock(side_effect=ConnectionError("down"))
+        with patch(
+            "custom_components.aegis_ajax.config_flow.SpacesApi", return_value=mock_spaces_api
+        ):
+            await flow.async_step_select_spaces(None)
+
+        flow.async_abort.assert_called_once_with(reason="cannot_connect")
+        mock_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_abandoned_flow_closes_the_client(self) -> None:
+        """Closing the dialog midway (e.g. at 2FA) closes the channel (#610)."""
+        flow = AjaxCobrandedConfigFlow()
+        flow.hass = MagicMock()
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        flow._client = mock_client
+
+        flow.async_remove()
+
+        coro = flow.hass.async_create_task.call_args.args[0]
+        await coro
+        mock_client.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_step_select_spaces_schema_starts_empty_with_dropdown_search(self) -> None:
@@ -879,6 +919,7 @@ class TestOptionsFlow:
         # `async_step_init` awaits async_reload when data changes (#148),
         # so the default MagicMock that wraps it must be awaitable.
         flow.hass.config_entries.async_reload = AsyncMock()
+        flow.hass.async_add_executor_job = AsyncMock(side_effect=lambda fn, *args: fn(*args))
         return flow, config_entry
 
     def test_options_flow_init(self) -> None:
@@ -951,8 +992,11 @@ class TestOptionsFlow:
         flow.async_create_entry.assert_called_once()
         stored_data = flow.async_create_entry.call_args[1]["data"]
         assert "pin_code" not in stored_data
-        expected_hash = hashlib.sha256(b"1234").hexdigest()
-        assert stored_data["pin_code_hash"] == expected_hash
+        stored = stored_data["pin_code_hash"]
+        assert stored.startswith("scrypt$")
+        validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "1234")
+        with pytest.raises(HomeAssistantError):
+            validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "4321")
 
     @pytest.mark.asyncio
     async def test_options_flow_without_pin_code_no_hash(self) -> None:

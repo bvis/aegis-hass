@@ -45,6 +45,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Entities only read coordinator data; nothing to throttle.
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True)
 class SensorTypeInfo:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -67,6 +66,7 @@ from custom_components.aegis_ajax.const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
 )
+from custom_components.aegis_ajax.service_security import hash_pin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +100,7 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security."""
 
     VERSION = 2
+    MINOR_VERSION = 2
     DOMAIN = DOMAIN
 
     def __init__(self) -> None:
@@ -156,6 +157,12 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             "user_hex_id": session.user_hex_id,
             "device_id": session.device_id,
         }
+
+    @callback
+    def async_remove(self) -> None:
+        """Close the client when the flow is abandoned midway (#610)."""
+        if self._client is not None:
+            self.hass.async_create_task(self._async_close_client())
 
     async def _async_close_client(self) -> None:
         """Close and drop the in-flight gRPC client after a failed login.
@@ -266,10 +273,17 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._client.session.session_token:
                 data["session_token"] = self._client.session.session_token
                 data["user_hex_id"] = self._client.session.user_hex_id
+            # The entry builds its own client; don't leave this channel open (#610).
+            await self._async_close_client()
             return self.async_create_entry(title=f"Ajax Security ({self._email})", data=data)
         if self._client:
             spaces_api = SpacesApi(self._client)
-            spaces = await spaces_api.list_spaces()
+            try:
+                spaces = await spaces_api.list_spaces()
+            except Exception:
+                _LOGGER.exception("Could not list Ajax spaces after login")
+                await self._async_close_client()
+                return self.async_abort(reason="cannot_connect")
             space_options = [SelectOptionDict(value=s.id, label=s.name) for s in spaces]
         else:
             space_options = []
@@ -584,9 +598,9 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, user_input["poll_interval"])
                 )
             if user_input.get("pin_code"):
-                user_input["pin_code_hash"] = hashlib.sha256(
-                    user_input.pop("pin_code").encode()
-                ).hexdigest()
+                user_input["pin_code_hash"] = await self.hass.async_add_executor_job(
+                    hash_pin, user_input.pop("pin_code")
+                )
             else:
                 user_input.pop("pin_code", None)
             # FCM credentials live in `entry.data` (encrypted storage).
@@ -627,7 +641,7 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     data=new_data,
                 )
                 # Explicitly reload — mirror the repair-flow pattern (#148).
-                # The `_async_options_update_listener` would normally pick
+                # The entry update listener would normally pick
                 # this up after `async_finish_flow` writes `options`, but
                 # when only `data` changes (FCM creds, password) and
                 # `options` round-trip identical to the prior values, the

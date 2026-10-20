@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# One action at a time: never send Ajax more requests than the app would.
+PARALLEL_UPDATES = 1
+
 _ARM_ERRORS: dict[str, dict[str, str]] = {
     "hub_detected_malfunctions": {
         "en": "Cannot arm: open sensors or malfunctions detected",
@@ -319,12 +322,16 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
             features &= ~AlarmControlPanelEntityFeature.ARM_HOME
         return features
 
-    def _validate_code(self, code: str | None) -> None:
+    async def _async_validate_code(self, code: str | None) -> None:
         """Raise HomeAssistantError if the provided code does not match the stored hash."""
         from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
 
+        options = self._get_options()
+        if not options.get("use_pin_code", False):
+            return
         try:
-            validate_pin(self._get_options(), code)
+            # Checking a PIN is CPU-heavy by design: keep it off the event loop.
+            await self.hass.async_add_executor_job(validate_pin, options, code)
         except HomeAssistantError as err:
             raise HomeAssistantError(self._translate_error("invalid_alarm_code")) from err
 
@@ -452,7 +459,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         return attrs
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        self._validate_code(code)
+        await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -463,7 +470,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         await self.coordinator.async_request_refresh()
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
-        self._validate_code(code)
+        await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -483,7 +490,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         await self.async_alarm_arm_night(code)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
-        self._validate_code(code)
+        await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -607,7 +614,7 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         }
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        self._validate_code(code)
+        await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -625,7 +632,7 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         await self.async_alarm_arm_away(code)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
-        self._validate_code(code)
+        await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
