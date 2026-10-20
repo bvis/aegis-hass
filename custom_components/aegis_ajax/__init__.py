@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -726,8 +726,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         except Exception:
             _LOGGER.debug("Auto-labeling skipped (labels API not available)")
 
-    # Reload integration when options change (e.g. FCM credentials)
-    entry.async_on_unload(entry.add_update_listener(_async_options_update_listener))
+    # Reload integration when options or credentials change (e.g. FCM credentials)
+    reload_state = _reload_relevant_state(entry)
+
+    async def _async_update_listener(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> None:
+        # A refreshed session token is written to entry.data at runtime; that
+        # alone must not restart everything and call Ajax again (#609).
+        if _reload_relevant_state(entry) == reload_state:
+            return
+        await hass.config_entries.async_reload(entry.entry_id)
+
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     return True
 
@@ -843,11 +852,14 @@ async def _async_apply_labels(hass: HomeAssistant, entry: ConfigEntry) -> None:
             )
 
 
-async def _async_options_update_listener(
-    hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
-) -> None:
-    """Reload integration when options are updated."""
-    await hass.config_entries.async_reload(entry.entry_id)
+# Written by _persist_session after a login; not a reason to reload (#609).
+_SESSION_KEYS = frozenset({"session_token", "user_hex_id", "device_id"})
+
+
+def _reload_relevant_state(entry: ConfigEntry) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Options and data minus the session the integration refreshes itself."""
+    data = {k: v for k, v in entry.data.items() if k not in _SESSION_KEYS}
+    return dict(entry.options), data
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:

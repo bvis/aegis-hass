@@ -640,7 +640,7 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     data=new_data,
                 )
                 # Explicitly reload — mirror the repair-flow pattern (#148).
-                # The `_async_options_update_listener` would normally pick
+                # The entry update listener would normally pick
                 # this up after `async_finish_flow` writes `options`, but
                 # when only `data` changes (FCM creds, password) and
                 # `options` round-trip identical to the prior values, the
