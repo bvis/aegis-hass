@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.aegis_ajax.api.session import AuthenticationError, TwoFactorRequiredError
 from custom_components.aegis_ajax.config_flow import (
@@ -14,6 +15,7 @@ from custom_components.aegis_ajax.config_flow import (
     AjaxCobrandedOptionsFlow,
 )
 from custom_components.aegis_ajax.const import DOMAIN
+from custom_components.aegis_ajax.service_security import validate_pin
 
 
 class TestConfigFlowInit:
@@ -917,6 +919,7 @@ class TestOptionsFlow:
         # `async_step_init` awaits async_reload when data changes (#148),
         # so the default MagicMock that wraps it must be awaitable.
         flow.hass.config_entries.async_reload = AsyncMock()
+        flow.hass.async_add_executor_job = AsyncMock(side_effect=lambda fn, *args: fn(*args))
         return flow, config_entry
 
     def test_options_flow_init(self) -> None:
@@ -989,8 +992,11 @@ class TestOptionsFlow:
         flow.async_create_entry.assert_called_once()
         stored_data = flow.async_create_entry.call_args[1]["data"]
         assert "pin_code" not in stored_data
-        expected_hash = hashlib.sha256(b"1234").hexdigest()
-        assert stored_data["pin_code_hash"] == expected_hash
+        stored = stored_data["pin_code_hash"]
+        assert stored.startswith("scrypt$")
+        validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "1234")
+        with pytest.raises(HomeAssistantError):
+            validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "4321")
 
     @pytest.mark.asyncio
     async def test_options_flow_without_pin_code_no_hash(self) -> None:

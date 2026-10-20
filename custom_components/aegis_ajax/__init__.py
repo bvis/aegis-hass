@@ -85,7 +85,10 @@ from custom_components.aegis_ajax.const import (  # noqa: E402
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator  # noqa: E402
 from custom_components.aegis_ajax.entity import build_device_info, is_hub_device  # noqa: E402
-from custom_components.aegis_ajax.repairs import async_check_grpcio_version  # noqa: E402
+from custom_components.aegis_ajax.repairs import (  # noqa: E402
+    async_check_grpcio_version,
+    async_check_pin_code_format,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
@@ -519,6 +522,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     # need; mostly hits HA OS where the manifest's pip-level requirement
     # doesn't apply. Self-clears on the next setup if HA gets upgraded.
     async_check_grpcio_version(hass)
+    async_check_pin_code_format(hass, entry_id=entry.entry_id, options=entry.options)
 
     # Migrate plaintext password to hash (one-time migration)
     if "password" in entry.data and "password_hash" not in entry.data:
