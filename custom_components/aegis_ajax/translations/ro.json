@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Comanda nu a putut fi finalizată. Hub-ul a returnat: {reason}."
+        },
+        "not_loaded": {
+            "message": "Niciun cont Aegis for Ajax nu este încărcat. Verifică integrarea în pagina Dispozitive și servicii."
         }
     },
     "device_automation": {

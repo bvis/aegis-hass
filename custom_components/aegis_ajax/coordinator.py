@@ -3916,6 +3916,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.config_entry.async_create_background_task(self.hass, coro, f"aegis_ajax {name}")
 
     async def async_shutdown(self) -> None:
+        # HA registers this on the entry's unload and async_unload_entry calls it
+        # too: only the first call does the work (#604).
+        if self._shutdown_requested:
+            return
+        # Base class: stop the refresh timer and the request-refresh debouncer,
+        # so a debounced refresh can't fire against the closed client.
+        await super().async_shutdown()
+
         # Stop the siren-temperature refresh timer (#220)
         if self._unsub_hub_device_temp is not None:
             self._unsub_hub_device_temp()

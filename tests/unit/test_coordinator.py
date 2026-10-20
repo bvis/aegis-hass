@@ -77,7 +77,16 @@ def _make_coordinator(
         )
     coordinator.hass = hass
     coordinator.config_entry = None
+    _set_base_state(coordinator)
     return coordinator
+
+
+def _set_base_state(coordinator: AjaxCobrandedCoordinator) -> None:  # noqa: F821
+    """State the patched-out DataUpdateCoordinator.__init__ would have set."""
+    coordinator._shutdown_requested = False
+    coordinator._unsub_refresh = None
+    coordinator._unsub_shutdown = None
+    coordinator._debounced_refresh = MagicMock()
 
 
 class TestCoordinatorInit:
@@ -1001,6 +1010,20 @@ class TestAsyncUpdateData:
         coordinator._client.close.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_async_shutdown_stops_the_base_coordinator_once(self) -> None:
+        """Base shutdown runs (no refresh after unload); a second call is a no-op (#604)."""
+        coordinator = _make_coordinator(space_ids=[])
+        coordinator._client.close = AsyncMock()
+        coordinator._debounced_refresh = MagicMock()
+
+        await coordinator.async_shutdown()
+        await coordinator.async_shutdown()
+
+        assert coordinator._shutdown_requested
+        coordinator._debounced_refresh.async_shutdown.assert_called_once()
+        coordinator._client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_home_assistant_stop_stops_the_push_client(self) -> None:
         """HA doesn't unload entries on stop, so the stop event must end FCM (#570)."""
         from homeassistant.const import EVENT_HOMEASSISTANT_STOP
@@ -1148,6 +1171,7 @@ def _coordinator_with_stream() -> AjaxCobrandedCoordinator:  # noqa: F821
     coordinator.config_entry = None
     coordinator.entry_id = "entry-1"
     coordinator.async_set_updated_data = MagicMock()
+    _set_base_state(coordinator)
     return coordinator
 
 

@@ -626,6 +626,9 @@
         },
         "command_failed": {
             "message": "Kommandoen kunne ikke gennemføres. Hub'en returnerede: {reason}."
+        },
+        "not_loaded": {
+            "message": "Ingen Aegis for Ajax-konto er indlæst. Tjek integrationen på siden Enheder og tjenester."
         }
     },
     "device_automation": {

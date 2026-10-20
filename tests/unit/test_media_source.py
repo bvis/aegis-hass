@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -90,6 +90,22 @@ class TestAjaxPhotoMediaSource:
         result = await source.async_resolve_media(item)
         assert result.mime_type == "image/jpeg"
         assert "ajax_photos/DEVICE/2026-04-14_00-23-18.jpg" in result.url
+
+    @pytest.mark.asyncio
+    async def test_resolve_media_checks_disk_in_executor(self, tmp_path: Path) -> None:
+        """Path resolution and the file check stat the disk: never on the event loop (#602)."""
+        hass = _make_hass(str(tmp_path))
+        hass.async_add_executor_job = AsyncMock(return_value=None)
+        source = AjaxPhotoMediaSource(hass)
+        item = MagicMock()
+        item.identifier = "DEVICE/2026-04-14_00-23-18.jpg"
+        with (
+            patch.object(Path, "resolve", side_effect=AssertionError("resolve on the loop")),
+            patch.object(Path, "is_file", side_effect=AssertionError("is_file on the loop")),
+        ):
+            result = await source.async_resolve_media(item)
+        hass.async_add_executor_job.assert_awaited_once()
+        assert result.mime_type == "image/jpeg"
 
     @pytest.mark.asyncio
     async def test_browse_root_empty(self) -> None:

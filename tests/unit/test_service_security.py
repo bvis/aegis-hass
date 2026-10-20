@@ -39,7 +39,7 @@ async def test_all_explicit_targets_authorized_before_action(caller: str) -> Non
     coordinator.async_request_refresh = AsyncMock()
     # A configured PIN must not become a new requirement for force_arm in this PR.
     entry = SimpleNamespace(runtime_data=coordinator, options={"use_pin_code": True})
-    hass.config_entries.async_entries.return_value = [entry]
+    hass.config_entries.async_loaded_entries.return_value = [entry]
     user = MagicMock(is_active=caller != "inactive")
     user.permissions.check_entity.side_effect = lambda eid, policy: (
         caller != "denied" and not (caller == "mixed" and eid.endswith("two"))

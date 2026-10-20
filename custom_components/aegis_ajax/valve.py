@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# One action at a time: never send Ajax more requests than the app would.
+PARALLEL_UPDATES = 1
+
 # The WaterStop exposes a single valve channel; on/off commands target it.
 _VALVE_CHANNEL = 1
 
