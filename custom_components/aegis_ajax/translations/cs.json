@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entita",
                     "description": "Alarmový panel k nucenému zastřežení. Pokud je vynecháno, zastřeží všechny panely."
+                },
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z možností Aegis, pokud je povolen. Během přechodu je nepovinný: chybějící nebo neplatný kód pouze vyvolá upozornění v opravách."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entita",
                     "description": "Alarmový panel k nucenému zastřežení. Pokud je vynecháno, zastřeží všechny panely."
+                },
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z možností Aegis, pokud je povolen. Během přechodu je nepovinný: chybějící nebo neplatný kód pouze vyvolá upozornění v opravách."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Znovu nastavte PIN alarmu",
             "description": "PIN alarmu pro tento účet je uložen ve starším formátu. Otevřete možnosti integrace a zadejte PIN znovu, aby se aktualizoval. Do té doby funguje dál."
+        },
+        "service_target_required": {
+            "title": "Přidejte cíl pro {service}",
+            "description": "{service} byla zavolána bez entity_id a stále se provádí pro všechny nastavené prostory. Budoucí verze bude vyžadovat výslovné entity_id poplachového panelu. Upravte všechny automatizace a skripty používající tuto službu a poté toto upozornění zavřete."
+        },
+        "service_pin_required": {
+            "title": "Zadejte nastavený PIN pro {service}",
+            "description": "{service} byla zavolána bez platného PINu pro položku účtu {entry_id}. Během přechodného období se volání stále provede. Budoucí verze bude vyžadovat PIN, pokud je povolen v možnostech Aegis. Zadejte jej jako řetězec v uvozovkách do code ve všech dotčených automatizacích a skriptech a poté toto upozornění zavřete."
         }
     },
     "entity": {

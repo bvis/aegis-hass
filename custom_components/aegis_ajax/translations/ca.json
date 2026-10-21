@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entitat",
                     "description": "Panell d'alarma per armar forçat. Si s'omet, arma tots els panells."
+                },
+                "code": {
+                    "name": "PIN de l’alarma",
+                    "description": "PIN de les opcions d’Aegis, si està activat. Opcional durant la transició: un codi absent o no vàlid només genera un avís de reparació."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entitat",
                     "description": "Panell d'alarma per armar nocturn forçat. Si s'omet, arma tots els panells."
+                },
+                "code": {
+                    "name": "PIN de l’alarma",
+                    "description": "PIN de les opcions d’Aegis, si està activat. Opcional durant la transició: un codi absent o no vàlid només genera un avís de reparació."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Torna a posar el PIN de l'alarma",
             "description": "El PIN de l'alarma d'aquest compte està desat en un format antic. Obre les opcions de la integració i torna a introduir el PIN per actualitzar-lo. Mentrestant continua funcionant."
+        },
+        "service_target_required": {
+            "title": "Afegiu un destí a {service}",
+            "description": "S’ha cridat {service} sense entity_id i encara s’executa per a tots els espais configurats. Una versió futura requerirà un entity_id explícit del tauler d’alarma. Actualitzeu totes les automatitzacions o scripts que utilitzen aquest servei i després descarteu aquest avís."
+        },
+        "service_pin_required": {
+            "title": "Proporcioneu el PIN configurat a {service}",
+            "description": "S’ha cridat {service} sense un PIN vàlid per a l’entrada de compte {entry_id}. La crida encara s’executa durant aquesta transició. Una versió futura requerirà el PIN si està activat a les opcions d’Aegis. Indiqueu-lo com a cadena entre cometes a code en totes les automatitzacions o scripts afectats i després descarteu aquest avís."
         }
     },
     "entity": {

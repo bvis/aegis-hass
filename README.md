@@ -313,6 +313,36 @@ If you would rather not depend on the camera's own classifier, [Frigate](https:/
 
 Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.
 
+A transition toward explicit targets and force-arm PIN checks is underway (#568).
+For now, existing calls still run. Aegis creates a persistent **Repair** when
+`force_arm`, `force_arm_night`, `disarm_night_mode`, `press_panic_button`, or
+`set_photo_on_demand_mode` is called without an `entity_id`. Select the intended
+alarm panel explicitly in every automation or script; list each intended panel
+if you previously relied on the all-spaces default.
+
+If **Use PIN code** is enabled in an account's Aegis options, `force_arm` and
+`force_arm_night` also raise a Repair when the supplied `code` is missing or
+invalid. These two services still execute during this transition, even with a
+wrong code. A future release will require a valid PIN. This is the PIN configured
+in Aegis, not your Ajax login password. Supply it as a quoted string to preserve
+leading zeroes:
+
+```yaml
+action: aegis_ajax.force_arm
+target:
+  entity_id: alarm_control_panel.home
+data:
+  code: "0123"  # Replace with your configured Aegis PIN.
+```
+
+Warnings describe calls observed at runtime; they do not scan dormant automations.
+The integration saves neither the supplied code nor its hash in the Repair.
+After updating every affected automation or script, dismiss the notice in
+**Settings → System → Repairs**. A later valid call does not clear it automatically,
+because other automations may still need updating. Read-only services such as
+`refresh_alarm_images` retain their existing all-spaces behavior.
+
+
 ### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
 
 Ajax has a single partial-arm mode (the app calls it **Night mode**) plus full arm. The panel exposes **Arm Away** (full arm) and both **Arm Home** and **Arm Night** for that one partial mode — so "Arm Home" and "Arm Night" do the same thing and both settle the panel to `armed_night`. "Arm Home" is advertised mainly so the **Nabu Casa / Alexa** skill discovers the panel (it won't discover a panel that exposes Night without Home).

@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entité",
                     "description": "Panneau d'alarme à armer de force. Si omis, arme tous les panneaux."
+                },
+                "code": {
+                    "name": "Code PIN de l’alarme",
+                    "description": "PIN des options d’Aegis, s’il est activé. Facultatif pendant la transition : un code absent ou invalide génère uniquement un avis de réparation."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entité",
                     "description": "Panneau d'alarme à armer de force. Si omis, arme tous les panneaux."
+                },
+                "code": {
+                    "name": "Code PIN de l’alarme",
+                    "description": "PIN des options d’Aegis, s’il est activé. Facultatif pendant la transition : un code absent ou invalide génère uniquement un avis de réparation."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Saisissez à nouveau le PIN de l'alarme",
             "description": "Le PIN de l'alarme de ce compte est enregistré dans un ancien format. Ouvrez les options de l'intégration et saisissez à nouveau le PIN pour le mettre à jour. Il continue de fonctionner en attendant."
+        },
+        "service_target_required": {
+            "title": "Ajoutez une cible à {service}",
+            "description": "{service} a été appelé sans entity_id et continue de s’exécuter pour tous les espaces configurés. Une version future exigera un entity_id explicite du panneau d’alarme. Mettez à jour toutes les automatisations ou tous les scripts utilisant ce service, puis ignorez cet avis."
+        },
+        "service_pin_required": {
+            "title": "Fournissez le code PIN configuré à {service}",
+            "description": "{service} a été appelé sans code PIN valide pour l’entrée de compte {entry_id}. L’appel reste exécuté pendant cette transition. Une version future exigera le PIN s’il est activé dans les options d’Aegis. Indiquez-le comme chaîne entre guillemets dans code pour toutes les automatisations ou tous les scripts concernés, puis ignorez cet avis."
         }
     },
     "entity": {

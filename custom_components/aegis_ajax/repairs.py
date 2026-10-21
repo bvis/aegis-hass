@@ -63,6 +63,38 @@ def _issue_id(prefix: str, scope: str | None) -> str:
     return f"{prefix}:{scope}" if scope else prefix
 
 
+def async_register_service_target_transition(hass: HomeAssistant, *, service: str) -> None:
+    """Keep one persistent notice per service that used the all-spaces default."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _issue_id("service_target_required", service),
+        is_fixable=False,
+        is_persistent=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="service_target_required",
+        translation_placeholders={"service": f"{DOMAIN}.{service}"},
+        learn_more_url=f"{DOCS_BASE_URL}custom-services",
+    )
+
+
+def async_register_service_pin_transition(
+    hass: HomeAssistant, *, service: str, entry_id: str
+) -> None:
+    """Warn per account without saving the supplied PIN or its stored hash."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _issue_id("service_pin_required", f"{service}:{entry_id}"),
+        is_fixable=False,
+        is_persistent=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="service_pin_required",
+        translation_placeholders={"service": f"{DOMAIN}.{service}", "entry_id": entry_id},
+        learn_more_url=f"{DOCS_BASE_URL}custom-services",
+    )
+
+
 def async_register_hub_offline(
     hass: HomeAssistant,
     *,

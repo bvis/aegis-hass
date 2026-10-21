@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entität",
                     "description": "Alarmzentrale zum Scharfschalten. Ohne Angabe werden alle Zentralen scharf geschaltet."
+                },
+                "code": {
+                    "name": "Alarm-PIN",
+                    "description": "PIN aus den Aegis-Optionen, falls aktiviert. Während der Übergangszeit optional: Ein fehlender oder ungültiger Code erzeugt nur einen Reparaturhinweis."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entität",
                     "description": "Alarmzentrale zum Scharfschalten. Ohne Angabe werden alle Zentralen scharf geschaltet."
+                },
+                "code": {
+                    "name": "Alarm-PIN",
+                    "description": "PIN aus den Aegis-Optionen, falls aktiviert. Während der Übergangszeit optional: Ein fehlender oder ungültiger Code erzeugt nur einen Reparaturhinweis."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Alarm-PIN erneut festlegen",
             "description": "Die Alarm-PIN dieses Kontos ist in einem älteren Format gespeichert. Öffne die Optionen der Integration und gib die PIN erneut ein, um sie zu aktualisieren. Bis dahin funktioniert sie weiter."
+        },
+        "service_target_required": {
+            "title": "Ziel für {service} hinzufügen",
+            "description": "{service} wurde ohne entity_id aufgerufen und wird weiterhin für alle konfigurierten Bereiche ausgeführt. Eine zukünftige Version erfordert eine explizite entity_id der Alarmzentrale. Aktualisieren Sie alle Automationen oder Skripte, die diesen Dienst verwenden, und schließen Sie anschließend diesen Hinweis."
+        },
+        "service_pin_required": {
+            "title": "Konfigurierte PIN für {service} angeben",
+            "description": "{service} wurde ohne gültige PIN für den Kontoeintrag {entry_id} aufgerufen. Während der Übergangszeit wird der Aufruf weiterhin ausgeführt. Eine zukünftige Version erfordert die PIN, wenn sie in den Aegis-Optionen aktiviert ist. Geben Sie sie in allen betroffenen Automationen oder Skripten als Zeichenfolge in Anführungszeichen unter code an und schließen Sie anschließend diesen Hinweis."
         }
     },
     "entity": {

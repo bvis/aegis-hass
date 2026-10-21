@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entiteit",
                     "description": "Alarmpaneel om geforceerd in te schakelen. Indien weggelaten, worden alle panelen ingeschakeld."
+                },
+                "code": {
+                    "name": "Pincode alarm",
+                    "description": "Pincode uit de Aegis-opties, indien ingeschakeld. Optioneel tijdens de overgang: een ontbrekende of ongeldige code geeft alleen een reparatiewaarschuwing."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entiteit",
                     "description": "Alarmpaneel om geforceerd in te schakelen. Indien weggelaten, worden alle panelen ingeschakeld."
+                },
+                "code": {
+                    "name": "Pincode alarm",
+                    "description": "Pincode uit de Aegis-opties, indien ingeschakeld. Optioneel tijdens de overgang: een ontbrekende of ongeldige code geeft alleen een reparatiewaarschuwing."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Stel de alarmpincode opnieuw in",
             "description": "De alarmpincode van dit account is in een ouder formaat opgeslagen. Open de opties van de integratie en voer de pincode opnieuw in om hem bij te werken. Tot die tijd blijft hij werken."
+        },
+        "service_target_required": {
+            "title": "Voeg een doel toe aan {service}",
+            "description": "{service} is aangeroepen zonder entity_id en wordt nog steeds voor alle ingestelde ruimtes uitgevoerd. Een toekomstige versie vereist een expliciete entity_id van het alarmpaneel. Werk alle automatiseringen of scripts bij die deze dienst gebruiken en sluit daarna deze melding."
+        },
+        "service_pin_required": {
+            "title": "Geef de ingestelde pincode op voor {service}",
+            "description": "{service} is aangeroepen zonder geldige pincode voor accountvermelding {entry_id}. De aanroep wordt tijdens deze overgang nog uitgevoerd. Een toekomstige versie vereist de pincode als deze is ingeschakeld in de Aegis-opties. Geef deze als tekst tussen aanhalingstekens op in code voor alle betreffende automatiseringen of scripts en sluit daarna deze melding."
         }
     },
     "entity": {
