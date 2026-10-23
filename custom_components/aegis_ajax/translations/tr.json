@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Varlık",
                     "description": "Zorla kurulacak alarm paneli. Belirtilmezse tüm paneller kurulur."
+                },
+                "code": {
+                    "name": "Alarm PIN kodu",
+                    "description": "Etkinleştirilmişse Aegis seçeneklerindeki PIN. Geçiş sürecinde isteğe bağlıdır: eksik veya geçersiz kod yalnızca bir onarım uyarısı oluşturur."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Varlık",
                     "description": "Zorla kurulacak alarm paneli. Belirtilmezse tüm paneller kurulur."
+                },
+                "code": {
+                    "name": "Alarm PIN kodu",
+                    "description": "Etkinleştirilmişse Aegis seçeneklerindeki PIN. Geçiş sürecinde isteğe bağlıdır: eksik veya geçersiz kod yalnızca bir onarım uyarısı oluşturur."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Alarm PIN'ini yeniden ayarlayın",
             "description": "Bu hesabın alarm PIN'i eski bir biçimde kayıtlı. Güncellemek için entegrasyon seçeneklerini açıp PIN'i yeniden girin. Bu arada çalışmaya devam eder."
+        },
+        "service_target_required": {
+            "title": "{service} için bir hedef ekleyin",
+            "description": "{service}, entity_id olmadan çağrıldı ve yapılandırılmış tüm alanlar için çalışmaya devam ediyor. Gelecekteki bir sürüm, açık bir alarm paneli entity_id değeri gerektirecek. Bu hizmeti kullanan tüm otomasyonları veya betikleri güncelleyin, ardından bu bildirimi kapatın."
+        },
+        "service_pin_required": {
+            "title": "{service} için yapılandırılmış PIN kodunu sağlayın",
+            "description": "{service}, {entry_title} hesap kaydı için geçerli bir PIN olmadan çağrıldı. Bu geçiş sürecinde çağrı çalışmaya devam eder. Gelecekteki bir sürüm, Aegis seçeneklerinde etkinleştirilmişse PIN gerektirecek. Etkilenen tüm otomasyonlarda veya betiklerde code alanına tırnak içinde bir metin olarak girin, ardından bu bildirimi kapatın."
         }
     },
     "entity": {

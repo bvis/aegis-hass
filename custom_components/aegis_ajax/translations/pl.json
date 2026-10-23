@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Jednostka",
                     "description": "Panel alarmowy do wymuszonego uzbrojenia. Jeśli pominięto, uzbraja wszystkie panele."
+                },
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z opcji Aegis, jeśli jest włączony. Opcjonalny podczas okresu przejściowego: brakujący lub nieprawidłowy kod powoduje tylko ostrzeżenie w naprawach."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Jednostka",
                     "description": "Panel alarmowy do wymuszonego uzbrojenia. Jeśli pominięto, uzbraja wszystkie panele."
+                },
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z opcji Aegis, jeśli jest włączony. Opcjonalny podczas okresu przejściowego: brakujący lub nieprawidłowy kod powoduje tylko ostrzeżenie w naprawach."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Ustaw ponownie PIN alarmu",
             "description": "PIN alarmu tego konta jest zapisany w starszym formacie. Otwórz opcje integracji i wpisz PIN ponownie, aby go zaktualizować. Do tego czasu nadal działa."
+        },
+        "service_target_required": {
+            "title": "Dodaj cel do {service}",
+            "description": "Wywołano {service} bez entity_id i usługa nadal działa dla wszystkich skonfigurowanych przestrzeni. Przyszła wersja będzie wymagać jawnego entity_id panelu alarmowego. Zaktualizuj wszystkie automatyzacje lub skrypty korzystające z tej usługi, a następnie odrzuć to powiadomienie."
+        },
+        "service_pin_required": {
+            "title": "Podaj skonfigurowany PIN dla {service}",
+            "description": "Wywołano {service} bez prawidłowego PIN-u dla wpisu konta {entry_title}. Podczas okresu przejściowego wywołanie nadal jest wykonywane. Przyszła wersja będzie wymagać PIN-u, jeśli jest włączony w opcjach Aegis. Podaj go jako tekst w cudzysłowie w code we wszystkich odpowiednich automatyzacjach lub skryptach, a następnie odrzuć to powiadomienie."
         }
     },
     "entity": {
