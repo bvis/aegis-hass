@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Proporcioneu el PIN configurat a {service}",
-            "description": "S’ha cridat {service} sense un PIN vàlid per a l’entrada de compte {entry_id}. La crida encara s’executa durant aquesta transició. Una versió futura requerirà el PIN si està activat a les opcions d’Aegis. Indiqueu-lo com a cadena entre cometes a code en totes les automatitzacions o scripts afectats i després descarteu aquest avís."
+            "description": "S’ha cridat {service} sense un PIN vàlid per a l’entrada de compte {entry_title}. La crida encara s’executa durant aquesta transició. Una versió futura requerirà el PIN si està activat a les opcions d’Aegis. Indiqueu-lo com a cadena entre cometes a code en totes les automatitzacions o scripts afectats i després descarteu aquest avís."
         }
     },
     "entity": {

@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import ServiceResponse, SupportsResponse, callback
@@ -170,7 +171,14 @@ async def _async_warn_service_transition(
             continue
         if not any(coordinator is entry.runtime_data for coordinator, _ in targets):
             continue
-        code = call.data.get("code")
+        raw_code: object = call.data.get("code")
+        try:
+            # Match Home Assistant's alarm-control-panel service schema: an
+            # unquoted numeric YAML value such as `code: 1234` is accepted as
+            # the PIN string "1234".
+            code: object = cv.string(raw_code)
+        except vol.Invalid:
+            code = raw_code
         if isinstance(code, str) and code:
             try:
                 await hass.async_add_executor_job(validate_pin, entry.options, code)
@@ -178,7 +186,12 @@ async def _async_warn_service_transition(
                 pass
             else:
                 continue
-        async_register_service_pin_transition(hass, service=call.service, entry_id=entry.entry_id)
+        async_register_service_pin_transition(
+            hass,
+            service=call.service,
+            entry_id=entry.entry_id,
+            entry_title=entry.title,
+        )
 
 
 def _loaded_entries(hass: HomeAssistant) -> list[AjaxCobrandedConfigEntry]:

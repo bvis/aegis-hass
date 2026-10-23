@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Furnizați PIN-ul configurat pentru {service}",
-            "description": "{service} a fost apelat fără un PIN valid pentru intrarea de cont {entry_id}. Apelul se execută în continuare în această perioadă de tranziție. O versiune viitoare va necesita PIN-ul dacă este activat în opțiunile Aegis. Furnizați-l ca șir între ghilimele în code în toate automatizările sau scripturile afectate, apoi închideți această notificare."
+            "description": "{service} a fost apelat fără un PIN valid pentru intrarea de cont {entry_title}. Apelul se execută în continuare în această perioadă de tranziție. O versiune viitoare va necesita PIN-ul dacă este activat în opțiunile Aegis. Furnizați-l ca șir între ghilimele în code în toate automatizările sau scripturile afectate, apoi închideți această notificare."
         }
     },
     "entity": {

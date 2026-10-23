@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Proporcione el PIN configurado a {service}",
-            "description": "Se llamó a {service} sin un PIN válido para la entrada de cuenta {entry_id}. La llamada aún se ejecuta durante esta transición. Una versión futura exigirá el PIN si está activado en las opciones de Aegis. Indíquelo como una cadena entre comillas en code en todas las automatizaciones o scripts afectados y después descarte este aviso."
+            "description": "Se llamó a {service} sin un PIN válido para la entrada de cuenta {entry_title}. La llamada aún se ejecuta durante esta transición. Una versión futura exigirá el PIN si está activado en las opciones de Aegis. Indíquelo como una cadena entre comillas en code en todas las automatizaciones o scripts afectados y después descarte este aviso."
         }
     },
     "entity": {

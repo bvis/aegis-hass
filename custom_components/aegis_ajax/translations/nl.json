@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Geef de ingestelde pincode op voor {service}",
-            "description": "{service} is aangeroepen zonder geldige pincode voor accountvermelding {entry_id}. De aanroep wordt tijdens deze overgang nog uitgevoerd. Een toekomstige versie vereist de pincode als deze is ingeschakeld in de Aegis-opties. Geef deze als tekst tussen aanhalingstekens op in code voor alle betreffende automatiseringen of scripts en sluit daarna deze melding."
+            "description": "{service} is aangeroepen zonder geldige pincode voor accountvermelding {entry_title}. De aanroep wordt tijdens deze overgang nog uitgevoerd. Een toekomstige versie vereist de pincode als deze is ingeschakeld in de Aegis-opties. Geef deze als tekst tussen aanhalingstekens op in code voor alle betreffende automatiseringen of scripts en sluit daarna deze melding."
         }
     },
     "entity": {

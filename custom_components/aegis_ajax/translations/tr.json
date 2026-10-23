@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "{service} için yapılandırılmış PIN kodunu sağlayın",
-            "description": "{service}, {entry_id} hesap kaydı için geçerli bir PIN olmadan çağrıldı. Bu geçiş sürecinde çağrı çalışmaya devam eder. Gelecekteki bir sürüm, Aegis seçeneklerinde etkinleştirilmişse PIN gerektirecek. Etkilenen tüm otomasyonlarda veya betiklerde code alanına tırnak içinde bir metin olarak girin, ardından bu bildirimi kapatın."
+            "description": "{service}, {entry_title} hesap kaydı için geçerli bir PIN olmadan çağrıldı. Bu geçiş sürecinde çağrı çalışmaya devam eder. Gelecekteki bir sürüm, Aegis seçeneklerinde etkinleştirilmişse PIN gerektirecek. Etkilenen tüm otomasyonlarda veya betiklerde code alanına tırnak içinde bir metin olarak girin, ardından bu bildirimi kapatın."
         }
     },
     "entity": {

@@ -339,7 +339,8 @@ Warnings describe calls observed at runtime; they do not scan dormant automation
 The integration saves neither the supplied code nor its hash in the Repair.
 After updating every affected automation or script, dismiss the notice in
 **Settings → System → Repairs**. A later valid call does not clear it automatically,
-because other automations may still need updating. Read-only services such as
+because other automations may still need updating. If an outdated call runs again
+after you ignore its warning, the Repair reappears. Read-only services such as
 `refresh_alarm_images` retain their existing all-spaces behavior.
 
 

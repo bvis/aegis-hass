@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Provide the configured PIN to {service}",
-            "description": "{service} was called without a valid PIN for account entry {entry_id}. The call still runs during this transition. A future release will require the PIN when enabled in Aegis options. Supply it as a quoted string in code for every affected automation or script, then dismiss this notice."
+            "description": "{service} was called without a valid PIN for account {entry_title}. The call still runs during this transition. A future release will require the PIN when enabled in Aegis options. Supply it as a quoted string in code for every affected automation or script, then dismiss this notice."
         }
     },
     "entity": {

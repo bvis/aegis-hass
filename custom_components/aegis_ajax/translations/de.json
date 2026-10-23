@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Konfigurierte PIN für {service} angeben",
-            "description": "{service} wurde ohne gültige PIN für den Kontoeintrag {entry_id} aufgerufen. Während der Übergangszeit wird der Aufruf weiterhin ausgeführt. Eine zukünftige Version erfordert die PIN, wenn sie in den Aegis-Optionen aktiviert ist. Geben Sie sie in allen betroffenen Automationen oder Skripten als Zeichenfolge in Anführungszeichen unter code an und schließen Sie anschließend diesen Hinweis."
+            "description": "{service} wurde ohne gültige PIN für den Kontoeintrag {entry_title} aufgerufen. Während der Übergangszeit wird der Aufruf weiterhin ausgeführt. Eine zukünftige Version erfordert die PIN, wenn sie in den Aegis-Optionen aktiviert ist. Geben Sie sie in allen betroffenen Automationen oder Skripten als Zeichenfolge in Anführungszeichen unter code an und schließen Sie anschließend diesen Hinweis."
         }
     },
     "entity": {

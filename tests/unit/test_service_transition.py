@@ -43,7 +43,14 @@ async def accounts(hass: HomeAssistant) -> AsyncIterator[list[SimpleNamespace]]:
         coordinator.async_request_refresh = AsyncMock()
         for _, _, api, method in SENSITIVE:
             setattr(getattr(coordinator, api), method, AsyncMock())
-        entries.append(SimpleNamespace(entry_id=account, runtime_data=coordinator, options={}))
+        entries.append(
+            SimpleNamespace(
+                entry_id=account,
+                title=f"Account {account.title()}",
+                runtime_data=coordinator,
+                options={},
+            )
+        )
     registry = MagicMock()
     registry.async_get.side_effect = lambda eid: (
         SimpleNamespace(platform=DOMAIN, unique_id=f"aegis_ajax_alarm_{eid.split('.')[1]}")
@@ -97,7 +104,7 @@ async def test_explicit_target_does_not_warn_or_reach_other_accounts(
 
 
 @pytest.mark.parametrize("service", ["force_arm", "force_arm_night"])
-@pytest.mark.parametrize("code", [None, "", "wrong", 1234, "0123"])
+@pytest.mark.parametrize("code", [None, "", "wrong", 1234, 123, "0123", [], {}])
 @pytest.mark.parametrize("salted", [False, True])
 async def test_pin_checks_only_warn_and_validate_in_executor(
     hass: HomeAssistant,
@@ -121,7 +128,7 @@ async def test_pin_checks_only_warn_and_validate_in_executor(
             {"entity_id": ["alarm_control_panel.a", "alarm_control_panel.b"], "code": code},
             blocking=True,
         )
-        assert executor.call_count == (1 if isinstance(code, str) and code else 0)
+        assert executor.call_count == (1 if isinstance(code, (str, int)) and code != "" else 0)
     issue = ir.async_get(hass).async_get_issue(DOMAIN, f"service_pin_required:{service}:one")
     assert (issue is not None) == (code != "0123")
     if issue:
@@ -129,7 +136,7 @@ async def test_pin_checks_only_warn_and_validate_in_executor(
         assert issue.data is None
         assert issue.translation_placeholders == {
             "service": f"{DOMAIN}.{service}",
-            "entry_id": "one",
+            "entry_title": "Account One",
         }
     action = (
         accounts[0].runtime_data.security_api.arm
@@ -175,6 +182,136 @@ async def test_valid_calls_do_not_clear_warnings_from_other_automations(
         blocking=True,
     )
     assert len(registry.issues) == 2
+
+
+@pytest.mark.parametrize("service", ["force_arm", "force_arm_night"])
+async def test_ignored_transition_repairs_reappear_on_the_next_invalid_call(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+    service: str,
+) -> None:
+    accounts[0].options = {
+        "use_pin_code": True,
+        "pin_code_hash": hashlib.sha256(b"0123").hexdigest(),
+    }
+    await hass.services.async_call(DOMAIN, service, {}, blocking=True)
+    registry = ir.async_get(hass)
+    issue_ids = (
+        f"service_target_required:{service}",
+        f"service_pin_required:{service}:one",
+    )
+    for _ in range(2):
+        for issue_id in issue_ids:
+            ir.async_ignore_issue(hass, DOMAIN, issue_id, True)
+            issue = registry.async_get_issue(DOMAIN, issue_id)
+            assert issue is not None and issue.dismissed_version is not None
+
+        # A corrected automation must not redisplay warnings. A still-invalid
+        # automation must redisplay both, even after a second dismissal.
+        await hass.services.async_call(
+            DOMAIN,
+            service,
+            {"entity_id": "alarm_control_panel.a", "code": "0123"},
+            blocking=True,
+        )
+        for issue_id in issue_ids:
+            issue = registry.async_get_issue(DOMAIN, issue_id)
+            assert issue is not None and issue.dismissed_version is not None
+
+        await hass.services.async_call(DOMAIN, service, {}, blocking=True)
+        for issue_id in issue_ids:
+            issue = registry.async_get_issue(DOMAIN, issue_id)
+            assert issue is not None
+            assert issue.active and issue.is_persistent
+            assert issue.dismissed_version is None
+        assert len(registry.issues) == 2
+
+
+@pytest.mark.parametrize(("service", "data", "api", "method"), SENSITIVE)
+async def test_target_repair_deduplicates_until_ignored(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+    service: str,
+    data: dict,
+    api: str,
+    method: str,
+) -> None:
+    await hass.services.async_call(DOMAIN, service, data, blocking=True)
+    registry = ir.async_get(hass)
+    issue_id = f"service_target_required:{service}"
+    original = registry.async_get_issue(DOMAIN, issue_id)
+    assert original is not None
+    await hass.services.async_call(DOMAIN, service, data, blocking=True)
+    assert registry.async_get_issue(DOMAIN, issue_id) is original
+
+    ir.async_ignore_issue(hass, DOMAIN, issue_id, True)
+    await hass.services.async_call(DOMAIN, service, data, blocking=True)
+    issue = registry.async_get_issue(DOMAIN, issue_id)
+    assert issue is not None and issue.dismissed_version is None
+    assert len(registry.issues) == 1
+    for entry in accounts:
+        action = getattr(getattr(entry.runtime_data, api), method)
+        assert action.await_count == 3 * len(entry.runtime_data._space_ids)
+
+
+@pytest.mark.parametrize("service", ["force_arm", "force_arm_night"])
+@pytest.mark.parametrize("code", [1234, 0])
+@pytest.mark.parametrize("salted", [False, True])
+async def test_numeric_pin_is_coerced_to_string_like_alarm_panel_services(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+    service: str,
+    code: int,
+    salted: bool,
+) -> None:
+    stored = (
+        await hass.async_add_executor_job(hash_pin, str(code))
+        if salted
+        else hashlib.sha256(str(code).encode()).hexdigest()
+    )
+    accounts[0].options = {"use_pin_code": True, "pin_code_hash": stored}
+    await hass.services.async_call(
+        DOMAIN,
+        service,
+        {"entity_id": "alarm_control_panel.a", "code": code},
+        blocking=True,
+    )
+
+    assert not ir.async_get(hass).issues
+    method = "arm" if service == "force_arm" else "arm_night_mode"
+    getattr(accounts[0].runtime_data.security_api, method).assert_awaited_once_with(
+        "a", ignore_alarms=True
+    )
+
+
+async def test_pin_repair_uses_account_title_but_keeps_identity_after_rename(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+) -> None:
+    for entry in accounts:
+        entry.title = "Same display title"
+        entry.options = {"use_pin_code": True}
+    await hass.services.async_call(DOMAIN, "force_arm", {}, blocking=True)
+    registry = ir.async_get(hass)
+    assert len(registry.issues) == 3  # One target warning plus two separate PIN warnings.
+    for entry in accounts:
+        issue = registry.async_get_issue(DOMAIN, f"service_pin_required:force_arm:{entry.entry_id}")
+        assert issue is not None
+        assert issue.translation_placeholders == {
+            "service": f"{DOMAIN}.force_arm",
+            "entry_title": "Same display title",
+        }
+    accounts[0].title = "Renamed account"
+    await hass.services.async_call(
+        DOMAIN, "force_arm", {"entity_id": "alarm_control_panel.a"}, blocking=True
+    )
+    issue = registry.async_get_issue(DOMAIN, "service_pin_required:force_arm:one")
+    assert issue is not None
+    assert issue.translation_placeholders == {
+        "service": f"{DOMAIN}.force_arm",
+        "entry_title": "Renamed account",
+    }
+    assert len(registry.issues) == 3
 
 
 async def test_rejected_and_unmatched_calls_do_not_raise_transition_repairs(
@@ -230,6 +367,6 @@ def test_transition_translations_keep_required_placeholders() -> None:
         doc = json.loads(path.read_text())
         for key, placeholders in (
             ("service_target_required", {"service"}),
-            ("service_pin_required", {"service", "entry_id"}),
+            ("service_pin_required", {"service", "entry_title"}),
         ):
             assert set(re.findall(r"\{(\w+)\}", doc["issues"][key]["description"])) == placeholders

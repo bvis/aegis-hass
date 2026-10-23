@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Angiv den konfigurerede PIN-kode til {service}",
-            "description": "{service} blev kaldt uden en gyldig PIN-kode for kontoindgangen {entry_id}. Kaldet udføres stadig i overgangsperioden. En fremtidig version vil kræve PIN-koden, hvis den er aktiveret i Aegis-indstillingerne. Angiv den som en tekststreng i anførselstegn i code i alle berørte automatiseringer eller scripts, og afvis derefter denne meddelelse."
+            "description": "{service} blev kaldt uden en gyldig PIN-kode for kontoindgangen {entry_title}. Kaldet udføres stadig i overgangsperioden. En fremtidig version vil kræve PIN-koden, hvis den er aktiveret i Aegis-indstillingerne. Angiv den som en tekststreng i anførselstegn i code i alle berørte automatiseringer eller scripts, og afvis derefter denne meddelelse."
         }
     },
     "entity": {

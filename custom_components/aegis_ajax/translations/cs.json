@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Zadejte nastavený PIN pro {service}",
-            "description": "{service} byla zavolána bez platného PINu pro položku účtu {entry_id}. Během přechodného období se volání stále provede. Budoucí verze bude vyžadovat PIN, pokud je povolen v možnostech Aegis. Zadejte jej jako řetězec v uvozovkách do code ve všech dotčených automatizacích a skriptech a poté toto upozornění zavřete."
+            "description": "{service} byla zavolána bez platného PINu pro položku účtu {entry_title}. Během přechodného období se volání stále provede. Budoucí verze bude vyžadovat PIN, pokud je povolen v možnostech Aegis. Zadejte jej jako řetězec v uvozovkách do code ve všech dotčených automatizacích a skriptech a poté toto upozornění zavřete."
         }
     },
     "entity": {

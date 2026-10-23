@@ -372,7 +372,7 @@
         },
         "service_pin_required": {
             "title": "Podaj skonfigurowany PIN dla {service}",
-            "description": "Wywołano {service} bez prawidłowego PIN-u dla wpisu konta {entry_id}. Podczas okresu przejściowego wywołanie nadal jest wykonywane. Przyszła wersja będzie wymagać PIN-u, jeśli jest włączony w opcjach Aegis. Podaj go jako tekst w cudzysłowie w code we wszystkich odpowiednich automatyzacjach lub skryptach, a następnie odrzuć to powiadomienie."
+            "description": "Wywołano {service} bez prawidłowego PIN-u dla wpisu konta {entry_title}. Podczas okresu przejściowego wywołanie nadal jest wykonywane. Przyszła wersja będzie wymagać PIN-u, jeśli jest włączony w opcjach Aegis. Podaj go jako tekst w cudzysłowie w code we wszystkich odpowiednich automatyzacjach lub skryptach, a następnie odrzuć to powiadomienie."
         }
     },
     "entity": {
