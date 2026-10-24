@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirene ved sabotage"
+            },
+            "restore_required": {
+                "name": "Gendannelse påkrævet"
             }
         },
         "sensor": {

@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Siréna při sabotáži"
+            },
+            "restore_required": {
+                "name": "Vyžadováno obnovení"
             }
         },
         "sensor": {

@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirena amb manipulació"
+            },
+            "restore_required": {
+                "name": "Restauració pendent"
             }
         },
         "sensor": {

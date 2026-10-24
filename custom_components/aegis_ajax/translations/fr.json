@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirène sur sabotage"
+            },
+            "restore_required": {
+                "name": "Restauration requise"
             }
         },
         "sensor": {

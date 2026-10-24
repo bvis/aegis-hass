@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Syrena przy sabotażu"
+            },
+            "restore_required": {
+                "name": "Wymagane przywrócenie"
             }
         },
         "sensor": {

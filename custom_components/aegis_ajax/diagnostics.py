@@ -271,6 +271,24 @@ async def async_get_config_entry_diagnostics(
                 {space.hub_id for space in coordinator.spaces.values() if space.hub_id}
             )
         },
+        # Restoration after alarm (#634): the two hub bitmasks behind the
+        # *Restore required* sensor. Only "0xBC non-zero = restore pending" is
+        # established; the bits are dumped so their meaning can be worked out
+        # from real hubs. `null` = that key hasn't been reported (yet).
+        "hub_restore_after_alarm": {
+            hub_id: (
+                {
+                    "restore_pending": state.restore_pending,
+                    "alarm_happened_raw": state.alarm_happened_raw,
+                    "restore_required_raw": state.restore_required_raw,
+                }
+                if (state := coordinator.hub_network.get(hub_id)) is not None
+                else None
+            )
+            for hub_id in sorted(
+                {space.hub_id for space in coordinator.spaces.values() if space.hub_id}
+            )
+        },
         # Firmware update state feeding the `update.*` entities (project
         # rule: every entity-driving field is dumped here). Both maps are
         # empty most of the time — Ajax only lists a hub/device while an

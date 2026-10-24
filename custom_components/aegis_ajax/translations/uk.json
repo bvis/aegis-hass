@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Сирена при зламуванні"
+            },
+            "restore_required": {
+                "name": "Потрібне відновлення"
             }
         },
         "sensor": {

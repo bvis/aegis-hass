@@ -49,6 +49,18 @@ KEY_ACTIVE_CHANNELS = 72
 # diagnostics download.
 KEY_SIREN_ON_ANY_TAMPER = 0x65
 KEY_SIREN_ON_PANIC_BUTTON = 0x66
+# Restoration after alarm (#634). Legacy `hub_device.proto` fields 187/188,
+# both declared `repeated AlarmType`, but each arrives as ONE byte: a bitmask.
+# `0xBB` (restore_required) is the hub setting, the alarm types that need a
+# restore before arming again; it comes in SETTINGS_BODY. `0xBC`
+# (alarm_happened) comes in every STATUS_BODY refresh and is non-zero while a
+# restore is pending. Seen on a Hub 2 Plus (2.43.123): 0xBC went 00 -> 80
+# when a detector lost connection and back to 00 when the restore was
+# accepted, with 0xBB at 98 throughout. Only "non-zero = pending" is
+# established; the meaning of each bit is not, so the raw values are kept
+# for diagnostics.
+KEY_RESTORE_REQUIRED = 0xBB
+KEY_ALARM_HAPPENED = 0xBC
 KEY_ETH_ENABLED = 74
 KEY_WIFI_ENABLED = 75
 KEY_GPRS_ENABLED = 76
@@ -126,6 +138,13 @@ class HubNetworkState:
     siren_on_any_tamper: bool | None = None
     siren_on_panic_button_raw: int | None = None
     siren_on_any_tamper_raw: int | None = None
+
+    # Restoration after alarm (#634). None until the hub reports the key.
+    # `restore_pending` drives the binary sensor; the raw bitmasks are for
+    # diagnostics only.
+    restore_pending: bool | None = None
+    alarm_happened_raw: int | None = None
+    restore_required_raw: int | None = None
 
     @property
     def primary_connection(self) -> str | None:
@@ -503,6 +522,17 @@ def parse_hub_params(
         if siren_raw is not None:
             updates["siren_on_any_tamper"] = siren_raw != 0
             updates["siren_on_any_tamper_raw"] = siren_raw
+
+    # Restoration after alarm (#634) --------------------------------------------
+    if KEY_ALARM_HAPPENED in params:
+        alarm_raw = _int_be_val(params[KEY_ALARM_HAPPENED])
+        if alarm_raw is not None:
+            updates["restore_pending"] = alarm_raw != 0
+            updates["alarm_happened_raw"] = alarm_raw
+    if KEY_RESTORE_REQUIRED in params:
+        required_raw = _int_be_val(params[KEY_RESTORE_REQUIRED])
+        if required_raw is not None:
+            updates["restore_required_raw"] = required_raw
 
     # Ethernet ---------------------------------------------------------------
     if KEY_ETH_ENABLED in params:

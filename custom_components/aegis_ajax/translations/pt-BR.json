@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirene com violação"
+            },
+            "restore_required": {
+                "name": "Restauração necessária"
             }
         },
         "sensor": {
