@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Enhed",
                     "description": "Alarmpanel-enhed der skal tvangsaktiveres. Hvis udeladt, aktiveres alle paneler."
+                },
+                "code": {
+                    "name": "Alarmens PIN-kode",
+                    "description": "PIN-koden fra Aegis-indstillingerne, hvis aktiveret. Valgfri i overgangsperioden: en manglende eller ugyldig kode giver kun en advarsel under Reparationer."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Enhed",
                     "description": "Alarmpanel-enhed der skal tvangsaktiveres i natfunktion. Hvis udeladt, aktiveres alle paneler."
+                },
+                "code": {
+                    "name": "Alarmens PIN-kode",
+                    "description": "PIN-koden fra Aegis-indstillingerne, hvis aktiveret. Valgfri i overgangsperioden: en manglende eller ugyldig kode giver kun en advarsel under Reparationer."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Angiv alarm-PIN'en igen",
             "description": "Alarm-PIN'en for denne konto er gemt i et ældre format. Åbn integrationens indstillinger og indtast PIN'en igen for at opdatere den. Den virker stadig i mellemtiden."
+        },
+        "service_target_required": {
+            "title": "Tilføj et mål til {service}",
+            "description": "{service} blev kaldt uden entity_id og kører stadig for alle konfigurerede områder. En fremtidig version vil kræve et eksplicit entity_id for alarmpanelet. Opdater alle automatiseringer eller scripts, der bruger denne tjeneste, og afvis derefter denne meddelelse."
+        },
+        "service_pin_required": {
+            "title": "Angiv den konfigurerede PIN-kode til {service}",
+            "description": "{service} blev kaldt uden en gyldig PIN-kode for kontoindgangen {entry_title}. Kaldet udføres stadig i overgangsperioden. En fremtidig version vil kræve PIN-koden, hvis den er aktiveret i Aegis-indstillingerne. Angiv den som en tekststreng i anførselstegn i code i alle berørte automatiseringer eller scripts, og afvis derefter denne meddelelse."
         }
     },
     "entity": {

@@ -63,6 +63,52 @@ def _issue_id(prefix: str, scope: str | None) -> str:
     return f"{prefix}:{scope}" if scope else prefix
 
 
+def _reset_ignored_transition_issue(hass: HomeAssistant, issue_id: str) -> None:
+    """Remove a dismissed transition issue before raising it again."""
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+    if issue is not None and issue.dismissed_version is not None:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
+def async_register_service_target_transition(hass: HomeAssistant, *, service: str) -> None:
+    """Keep one persistent notice per service that used the all-spaces default."""
+    issue_id = _issue_id("service_target_required", service)
+    _reset_ignored_transition_issue(hass, issue_id)
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        is_persistent=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="service_target_required",
+        translation_placeholders={"service": f"{DOMAIN}.{service}"},
+        learn_more_url=f"{DOCS_BASE_URL}custom-services",
+    )
+
+
+def async_register_service_pin_transition(
+    hass: HomeAssistant, *, service: str, entry_id: str, entry_title: str
+) -> None:
+    """Warn per account without saving the supplied PIN or its stored hash."""
+    issue_id = _issue_id("service_pin_required", f"{service}:{entry_id}")
+    _reset_ignored_transition_issue(hass, issue_id)
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        is_persistent=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="service_pin_required",
+        translation_placeholders={
+            "service": f"{DOMAIN}.{service}",
+            "entry_title": entry_title,
+        },
+        learn_more_url=f"{DOCS_BASE_URL}custom-services",
+    )
+
+
 def async_register_hub_offline(
     hass: HomeAssistant,
     *,

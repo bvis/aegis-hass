@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import ServiceResponse, SupportsResponse, callback
@@ -88,6 +89,8 @@ from custom_components.aegis_ajax.entity import build_device_info, is_hub_device
 from custom_components.aegis_ajax.repairs import (  # noqa: E402
     async_check_grpcio_version,
     async_check_pin_code_format,
+    async_register_service_pin_transition,
+    async_register_service_target_transition,
 )
 
 if TYPE_CHECKING:
@@ -133,6 +136,64 @@ _CUSTOM_SERVICE_NAMES = (
 )
 
 
+# Read-only services and account session management have separate semantics.
+_SERVICES_REQUIRING_TARGET = frozenset(
+    {
+        "force_arm",
+        "force_arm_night",
+        "disarm_night_mode",
+        "press_panic_button",
+        "set_photo_on_demand_mode",
+    }
+)
+
+
+async def _async_warn_service_transition(
+    hass: HomeAssistant,
+    call: ServiceCall,
+    entries: list[AjaxCobrandedConfigEntry],
+    targets: list[tuple[AjaxCobrandedCoordinator, str]],
+) -> None:
+    """Report calls that would fail future requirements; keep today's behavior."""
+    if call.service not in _SERVICES_REQUIRING_TARGET or not targets:
+        return
+    if not call.data.get("entity_id"):
+        async_register_service_target_transition(hass, service=call.service)
+    if call.service not in {"force_arm", "force_arm_night"}:
+        return
+
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
+
+    for entry in entries:
+        if not entry.options.get("use_pin_code", False):
+            continue
+        if not any(coordinator is entry.runtime_data for coordinator, _ in targets):
+            continue
+        raw_code: object = call.data.get("code")
+        try:
+            # Match Home Assistant's alarm-control-panel service schema: an
+            # unquoted numeric YAML value such as `code: 1234` is accepted as
+            # the PIN string "1234".
+            code: object = cv.string(raw_code)
+        except vol.Invalid:
+            code = raw_code
+        if isinstance(code, str) and code:
+            try:
+                await hass.async_add_executor_job(validate_pin, entry.options, code)
+            except ServiceValidationError:
+                pass
+            else:
+                continue
+        async_register_service_pin_transition(
+            hass,
+            service=call.service,
+            entry_id=entry.entry_id,
+            entry_title=entry.title,
+        )
+
+
 def _loaded_entries(hass: HomeAssistant) -> list[AjaxCobrandedConfigEntry]:
     """Loaded entries; services fail with a clear error when there are none."""
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
@@ -166,6 +227,7 @@ async def _resolve_target_space_ids(
             coordinator: AjaxCobrandedCoordinator = entry.runtime_data
             for space_id in coordinator._space_ids:
                 results.append((coordinator, space_id))
+        await _async_warn_service_transition(hass, call, entries, results)
         return results
 
     # Authorize every explicit target before any service action is performed.
@@ -199,6 +261,7 @@ async def _resolve_target_space_ids(
             if space_id in coordinator._space_ids:
                 results.append((coordinator, space_id))
                 break
+    await _async_warn_service_transition(hass, call, entries, results)
     return results
 
 

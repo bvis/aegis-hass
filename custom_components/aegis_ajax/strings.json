@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entity",
                     "description": "Alarm panel entity to force arm. If omitted, arms all panels."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "PIN from Aegis options, if enabled. Optional during the transition: a missing or invalid code only raises a Repair warning."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entity",
                     "description": "Alarm panel entity to force arm night. If omitted, arms all panels."
+                },
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "PIN from Aegis options, if enabled. Optional during the transition: a missing or invalid code only raises a Repair warning."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Set the alarm PIN again",
             "description": "The alarm PIN for this account is saved in an older format. Open the integration options and enter the PIN again to update it. It keeps working in the meantime."
+        },
+        "service_target_required": {
+            "title": "Add a target to {service}",
+            "description": "{service} was called without entity_id and still runs for every configured space. A future release will require an explicit alarm-panel entity_id. Update every automation or script using this service, then dismiss this notice."
+        },
+        "service_pin_required": {
+            "title": "Provide the configured PIN to {service}",
+            "description": "{service} was called without a valid PIN for account {entry_title}. The call still runs during this transition. A future release will require the PIN when enabled in Aegis options. Supply it as a quoted string in code for every affected automation or script, then dismiss this notice."
         }
     },
     "exceptions": {

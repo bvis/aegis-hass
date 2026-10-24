@@ -153,6 +153,10 @@
                 "entity_id": {
                     "name": "Entitate",
                     "description": "Panoul de alarmă de armat forțat. Dacă este omis, armează toate panourile."
+                },
+                "code": {
+                    "name": "PIN alarmă",
+                    "description": "PIN-ul din opțiunile Aegis, dacă este activat. Opțional în perioada de tranziție: un cod lipsă sau invalid produce doar un avertisment de reparare."
                 }
             }
         },
@@ -163,6 +167,10 @@
                 "entity_id": {
                     "name": "Entitate",
                     "description": "Panoul de alarmă de armat forțat. Dacă este omis, armează toate panourile."
+                },
+                "code": {
+                    "name": "PIN alarmă",
+                    "description": "PIN-ul din opțiunile Aegis, dacă este activat. Opțional în perioada de tranziție: un cod lipsă sau invalid produce doar un avertisment de reparare."
                 }
             }
         },
@@ -357,6 +365,14 @@
         "pin_code_update": {
             "title": "Setează din nou PIN-ul alarmei",
             "description": "PIN-ul alarmei pentru acest cont este salvat într-un format mai vechi. Deschide opțiunile integrării și introdu din nou PIN-ul pentru a-l actualiza. Între timp funcționează în continuare."
+        },
+        "service_target_required": {
+            "title": "Adăugați o țintă pentru {service}",
+            "description": "{service} a fost apelat fără entity_id și se execută în continuare pentru toate spațiile configurate. O versiune viitoare va necesita un entity_id explicit al panoului de alarmă. Actualizați toate automatizările sau scripturile care folosesc acest serviciu, apoi închideți această notificare."
+        },
+        "service_pin_required": {
+            "title": "Furnizați PIN-ul configurat pentru {service}",
+            "description": "{service} a fost apelat fără un PIN valid pentru intrarea de cont {entry_title}. Apelul se execută în continuare în această perioadă de tranziție. O versiune viitoare va necesita PIN-ul dacă este activat în opțiunile Aegis. Furnizați-l ca șir între ghilimele în code în toate automatizările sau scripturile afectate, apoi închideți această notificare."
         }
     },
     "entity": {

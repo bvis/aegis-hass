@@ -6,6 +6,16 @@ force_arm:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: >-
+        The PIN configured in Aegis options, when enabled. Optional during the
+        transition; a missing or invalid code raises a Repair warning and the
+        call still runs. A future release will enforce it.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
       description: Alarm panel entity to force arm. If omitted, arms all panels.
@@ -23,6 +33,16 @@ force_arm_night:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: >-
+        The PIN configured in Aegis options, when enabled. Optional during the
+        transition; a missing or invalid code raises a Repair warning and the
+        call still runs. A future release will enforce it.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
       description: Alarm panel entity to force arm night. If omitted, arms all panels.
