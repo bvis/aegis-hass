@@ -160,6 +160,9 @@ async def async_setup_entry(
                 entities.append(
                     AjaxHubNetworkBinarySensor(coordinator, space.hub_id, "siren_on_any_tamper")
                 )
+                entities.append(
+                    AjaxHubNetworkBinarySensor(coordinator, space.hub_id, "restore_required")
+                )
 
     # #231: a previous version attached a CO sensor to the generic FireProtect 2
     # mapping. HA never evicts an entity its platform stopped providing, so on
@@ -479,7 +482,7 @@ class _HubNetworkBinarySensor(CoordinatorEntity[AjaxCobrandedCoordinator], Binar
     """Base for hub-level binary sensors sourced from HTS network data."""
 
     _attr_has_entity_name = True
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_category: EntityCategory | None = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, hub_id: str) -> None:
@@ -514,6 +517,9 @@ class _HubBinSpec:
     device_class: BinarySensorDeviceClass | None
     require_hts_alive: bool = False
     none_is_unavailable: bool = False
+    # Most hub sensors are diagnostics nobody needs by default. One that an
+    # automation is expected to act on is a primary, enabled entity.
+    primary: bool = False
 
 
 _HUB_BIN_SPECS_BY_KEY: dict[str, _HubBinSpec] = {
@@ -551,6 +557,17 @@ _HUB_BIN_SPECS_BY_KEY: dict[str, _HubBinSpec] = {
         device_class=None,
         none_is_unavailable=True,
     ),
+    # #634 — on while the hub blocks arming until someone restores after an
+    # alarm (hub key 0xBC non-zero). Unavailable through an HTS outage: a
+    # stale "off" would hide exactly the state this exists to show.
+    "restore_required": _HubBinSpec(
+        translation_key="restore_required",
+        state_attr="restore_pending",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        require_hts_alive=True,
+        none_is_unavailable=True,
+        primary=True,
+    ),
 }
 
 
@@ -564,6 +581,9 @@ class AjaxHubNetworkBinarySensor(_HubNetworkBinarySensor):
         self._attr_device_class = spec.device_class
         self._attr_translation_key = spec.translation_key
         self._attr_unique_id = f"aegis_ajax_{hub_id}_{spec.translation_key}"
+        if spec.primary:
+            self._attr_entity_category = None
+            self._attr_entity_registry_enabled_default = True
 
     @property
     def available(self) -> bool:

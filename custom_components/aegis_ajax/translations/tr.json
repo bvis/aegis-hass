@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Kurcalamada siren"
+            },
+            "restore_required": {
+                "name": "Geri yükleme gerekli"
             }
         },
         "sensor": {

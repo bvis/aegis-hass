@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirena su manomissione"
+            },
+            "restore_required": {
+                "name": "Ripristino richiesto"
             }
         },
         "sensor": {

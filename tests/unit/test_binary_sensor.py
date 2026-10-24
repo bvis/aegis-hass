@@ -1327,6 +1327,73 @@ class TestAjaxHubSirenSettingSensors:
         assert sensor._attr_device_class is None
 
 
+class TestAjaxHubRestoreRequiredSensor:
+    """#634 — on while the hub blocks arming until a restore after alarm."""
+
+    def _make_coordinator(self, restore_pending: bool | None = True) -> MagicMock:
+        hub_device = Device(
+            id="hub-1",
+            hub_id="hub-1",
+            name="Hub Two Plus",
+            device_type="hub_two_plus",
+            room_id=None,
+            group_id=None,
+            state=DeviceState.ONLINE,
+            malfunctions=0,
+            bypassed=False,
+            statuses={},
+            battery=None,
+        )
+        coordinator = MagicMock()
+        coordinator.devices = {"hub-1": hub_device}
+        coordinator.is_hts_alive = True
+        coordinator.hub_network = {"hub-1": HubNetworkState(restore_pending=restore_pending)}
+        return coordinator
+
+    def _sensor(self, coordinator: MagicMock) -> AjaxHubNetworkBinarySensor:
+        return AjaxHubNetworkBinarySensor(coordinator, "hub-1", "restore_required")
+
+    def test_on_while_pending(self) -> None:
+        sensor = self._sensor(self._make_coordinator(True))
+        assert sensor.available is True
+        assert sensor.is_on is True
+
+    def test_off_when_nothing_pending(self) -> None:
+        sensor = self._sensor(self._make_coordinator(False))
+        assert sensor.available is True
+        assert sensor.is_on is False
+
+    def test_unavailable_until_the_hub_reports_it(self) -> None:
+        assert self._sensor(self._make_coordinator(None)).available is False
+
+    def test_unavailable_when_hts_dead(self) -> None:
+        # A cached "off" through an outage would hide a pending restore.
+        coordinator = self._make_coordinator(False)
+        coordinator.is_hts_alive = False
+        assert self._sensor(coordinator).available is False
+
+    def test_problem_class_enabled_and_not_diagnostic(self) -> None:
+        # Meant for automations and dashboards, unlike the diagnostic hub
+        # sensors that are disabled by default.
+        from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        sensor = self._sensor(self._make_coordinator())
+        assert sensor._attr_device_class == BinarySensorDeviceClass.PROBLEM
+        assert sensor.entity_category is None
+        assert sensor.entity_registry_enabled_default is True
+        assert sensor._attr_unique_id == "aegis_ajax_hub-1_restore_required"
+        assert sensor._attr_translation_key == "restore_required"
+
+    def test_other_hub_sensors_stay_diagnostic(self) -> None:
+        from homeassistant.const import EntityCategory
+
+        sensor = AjaxHubNetworkBinarySensor(
+            self._make_coordinator(), "hub-1", "siren_on_any_tamper"
+        )
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.entity_registry_enabled_default is False
+
+
 class TestAjaxHubPowerSensor:
     """`mains_power` is the operational alert exception (#146).
 

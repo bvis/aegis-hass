@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirenă la sabotaj"
+            },
+            "restore_required": {
+                "name": "Restabilire necesară"
             }
         },
         "sensor": {

@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Siren on tamper"
+            },
+            "restore_required": {
+                "name": "Restore required"
             }
         },
         "sensor": {

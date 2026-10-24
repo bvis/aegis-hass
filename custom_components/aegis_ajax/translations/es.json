@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirena ante manipulación"
+            },
+            "restore_required": {
+                "name": "Restauración pendiente"
             }
         },
         "sensor": {

@@ -274,6 +274,27 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert result["hub_siren_settings"] == {"hub-1": None}
 
     @pytest.mark.asyncio
+    async def test_hub_restore_after_alarm_dumped_with_raws(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        """#634: the bits of both masks are unmapped, so the raws ride along."""
+        from custom_components.aegis_ajax.api.hts.hub_state import HubNetworkState
+
+        coordinator.hub_network = {
+            "hub-1": HubNetworkState(
+                restore_pending=True, alarm_happened_raw=0x80, restore_required_raw=0x98
+            )
+        }
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["hub_restore_after_alarm"]["hub-1"] == {
+            "restore_pending": True,
+            "alarm_happened_raw": 0x80,
+            "restore_required_raw": 0x98,
+        }
+
+    @pytest.mark.asyncio
     async def test_returns_dict(self, entry: MagicMock) -> None:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert isinstance(result, dict)

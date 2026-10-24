@@ -516,6 +516,9 @@
             },
             "siren_on_any_tamper": {
                 "name": "Sirene bij sabotage"
+            },
+            "restore_required": {
+                "name": "Herstel vereist"
             }
         },
         "sensor": {

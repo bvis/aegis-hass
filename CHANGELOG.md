@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - unreleased
+
+### Added
+- **Restore required sensor (#634).** On hubs with *Restoration after alarm* enabled, the hub won't arm after an alarm or a malfunction until someone restores it, and until now Home Assistant showed nothing: arming just failed. A new *Restore required* problem sensor on the hub turns on while a restore is pending and off once the *Restore after alarm* button (or the app) clears it, so an automation can warn you before bedtime. The README now says the account needs the *Restoration after alarm* permission, which only the PRO app can grant. **Requests to Ajax:** none; the hub already sends this in its regular status refresh.
+- **Warnings before sensitive services require a target and the PIN (#633, thanks @kamonishe).** Calls to `force_arm`, `force_arm_night`, `disarm_night_mode`, `press_panic_button` or `set_photo_on_demand_mode` without a target, and force-arm calls without a valid PIN on accounts with a PIN set, raise a Repair naming the service. They still run for now; a later release will require both. A Repair you ignore comes back if the same call runs again. **Requests to Ajax:** none.
+
 ## [1.27.2] - 2026-10-21
 
 ### Fixed

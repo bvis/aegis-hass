@@ -6,6 +6,7 @@ import pytest
 
 from custom_components.aegis_ajax.api.hts.hub_state import (
     KEY_ACTIVE_CHANNELS,
+    KEY_ALARM_HAPPENED,
     KEY_ETH_DHCP,
     KEY_ETH_DNS,
     KEY_ETH_GATE,
@@ -15,6 +16,7 @@ from custom_components.aegis_ajax.api.hts.hub_state import (
     KEY_GSM_SIGNAL_LVL,
     KEY_HUB_FIRMWARE,
     KEY_HUB_POWERED,
+    KEY_RESTORE_REQUIRED,
     KEY_SIREN_ON_ANY_TAMPER,
     KEY_SIREN_ON_PANIC_BUTTON,
     KEY_WIFI_SSID,
@@ -123,6 +125,57 @@ class TestHubSirenSettings:
     def test_key_numbers_are_the_legacy_proto_field_numbers(self) -> None:
         assert KEY_SIREN_ON_ANY_TAMPER == 0x65  # field 101
         assert KEY_SIREN_ON_PANIC_BUTTON == 0x66  # field 102
+
+
+# ---------------------------------------------------------------------------
+# Restoration after alarm (#634) — legacy proto fields 187/188, one byte each.
+# Byte values are the reporter's trace on a Hub 2 Plus, 2026-10-24.
+# ---------------------------------------------------------------------------
+
+
+class TestHubRestoreAfterAlarm:
+    def test_defaults_are_none(self) -> None:
+        s = HubNetworkState()
+        assert s.restore_pending is None
+        assert s.alarm_happened_raw is None
+        assert s.restore_required_raw is None
+
+    def test_trace_from_a_real_hub(self) -> None:
+        # SETTINGS_BODY at connect, then STATUS_BODY refreshes.
+        state = parse_hub_params({KEY_RESTORE_REQUIRED: b"\x98", KEY_ALARM_HAPPENED: b"\x00"})
+        assert state.restore_pending is False
+        assert state.restore_required_raw == 0x98
+        # A detector lost connection: restore pending.
+        state = parse_hub_params({KEY_ALARM_HAPPENED: b"\x80"}, state)
+        assert state.restore_pending is True
+        assert state.alarm_happened_raw == 0x80
+        # Restore accepted.
+        state = parse_hub_params({KEY_ALARM_HAPPENED: b"\x00"}, state)
+        assert state.restore_pending is False
+        assert state.restore_required_raw == 0x98
+
+    def test_any_bit_means_pending(self) -> None:
+        # Only "non-zero = pending" is established, not what each bit means.
+        for raw in (b"\x01", b"\x40", b"\x00\x01"):
+            assert parse_hub_params({KEY_ALARM_HAPPENED: raw}).restore_pending is True
+
+    def test_absent_key_preserves_existing(self) -> None:
+        existing = parse_hub_params({KEY_ALARM_HAPPENED: b"\x80"})
+        updated = parse_hub_params({KEY_HUB_POWERED: b"\x01"}, existing)
+        assert updated.restore_pending is True
+
+    def test_empty_value_stays_unknown(self) -> None:
+        state = parse_hub_params({KEY_ALARM_HAPPENED: b""})
+        assert state.restore_pending is None
+        assert state.alarm_happened_raw is None
+
+    def test_setting_alone_does_not_decide_pending(self) -> None:
+        state = parse_hub_params({KEY_RESTORE_REQUIRED: b"\x98"})
+        assert state.restore_pending is None
+
+    def test_key_numbers_are_the_legacy_proto_field_numbers(self) -> None:
+        assert KEY_RESTORE_REQUIRED == 0xBB  # field 187
+        assert KEY_ALARM_HAPPENED == 0xBC  # field 188
 
 
 # ---------------------------------------------------------------------------
