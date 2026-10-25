@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.28.0] - unreleased
+## [1.28.0] - 2026-10-25
 
 ### Added
 - **Restore required sensor (#634).** On hubs with *Restoration after alarm* enabled, the hub won't arm after an alarm or a malfunction until someone restores it, and until now Home Assistant showed nothing: arming just failed. A new *Restore required* problem sensor on the hub turns on while a restore is pending and off once the *Restore after alarm* button (or the app) clears it, so an automation can warn you before bedtime. The README now says the account needs the *Restoration after alarm* permission, which only the PRO app can grant. **Requests to Ajax:** none; the hub already sends this in its regular status refresh.
