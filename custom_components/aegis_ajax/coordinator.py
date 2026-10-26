@@ -481,13 +481,26 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         on_session_persist: Callable[[str, str], None] | None = None,
         entry_id: str = "",
         delay_panel_states: bool = False,
+        commands_only: bool = False,
+        primary_coordinator: AjaxCobrandedCoordinator | None = None,
+        primary_entry_id: str = "",
+        account_label: str = "",
     ) -> None:
         poll_interval = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, poll_interval))
         super().__init__(
-            hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=poll_interval)
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=None if commands_only else timedelta(seconds=poll_interval),
         )
         self._poll_interval = poll_interval
         self.entry_id = entry_id
+        self._commands_only = commands_only
+        self._primary_coordinator = primary_coordinator
+        self._primary_entry_id = primary_entry_id
+        self.account_label = account_label
+        self._command_account_authenticated = False
+        self._primary_unsub: CALLBACK_TYPE | None = None
         # Device ids the platforms saw at setup; None until they ran (#608).
         self._devices_at_setup: set[str] | None = None
         self._client = client
@@ -733,6 +746,64 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._monitoring_companies_store: MonitoringCompaniesStore | None = (
             MonitoringCompaniesStore(hass, entry_id) if entry_id else None
         )
+
+        if self._commands_only and self._primary_coordinator is not None:
+            self._primary_unsub = self._primary_coordinator.async_add_listener(
+                self._async_primary_updated
+            )
+            self._copy_primary_state()
+
+    @property
+    def commands_only(self) -> bool:
+        """Whether this entry sends commands without owning read streams."""
+        return self._commands_only
+
+    @property
+    def primary_loaded(self) -> bool:
+        """Whether the selected primary entry is currently loaded."""
+        if not self._commands_only or self._primary_coordinator is None:
+            return True
+        entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
+        if entry is None or getattr(entry, "runtime_data", None) is not self._primary_coordinator:
+            return False
+        return not bool(getattr(self._primary_coordinator, "_shutdown_requested", False))
+
+    @callback
+    def _async_primary_updated(self) -> None:
+        """Mirror primary state and notify command-only alarm entities."""
+        self._copy_primary_state()
+
+    def _copy_primary_state(self) -> None:
+        primary = self._primary_coordinator
+        if primary is None or not self.primary_loaded:
+            self.spaces = {}
+            self.devices = {}
+            self.rooms = {}
+            self.alarmed_space_ids = set()
+            self.delay_overlays = {}
+        else:
+            self.spaces = primary.spaces
+            self.devices = primary.devices
+            self.rooms = primary.rooms
+            self.alarmed_space_ids = primary.alarmed_space_ids
+            self.delay_overlays = primary.delay_overlays
+            self.delay_panel_states = primary.delay_panel_states
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    @callback
+    def async_primary_unloaded(self) -> None:
+        """Make dependent panels unavailable when the primary unloads."""
+        self.spaces = {}
+        self.devices = {}
+        self.rooms = {}
+        self.alarmed_space_ids = set()
+        self.delay_overlays = {}
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    @callback
+    def async_primary_loaded(self) -> None:
+        """Refresh dependent panels after their primary entry reloads."""
+        self._copy_primary_state()
 
     @property
     def battery_delta_shapes(self) -> dict[str, int]:
@@ -1202,6 +1273,15 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return False
 
     async def _async_update_data(self) -> dict[str, Any]:
+        if self._commands_only:
+            if not self._command_account_authenticated:
+                await self._ensure_authenticated()
+                self.update_interval = None
+                self._command_account_authenticated = True
+            self._copy_primary_state()
+            self._last_update_success_time = dt_util.utcnow()
+            return {"spaces": self.spaces, "devices": self.devices}
+
         # UNIMPLEMENTED means "API retired" only on the core calls; later
         # feature calls may lack one method without the API being gone.
         core_done = False
@@ -3968,6 +4048,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Cancel any pending security-event re-read (#270)
         self._security_refresh_debouncer.async_shutdown()
+
+        if self._commands_only:
+            if self._primary_unsub is not None:
+                self._primary_unsub()
+                self._primary_unsub = None
+            await self._client.close()
+            return
 
         # Do not leave delayed alarm-media imports alive after an integration
         # reload. Their client/session belongs to this coordinator instance.

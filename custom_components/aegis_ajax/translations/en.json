@@ -7,12 +7,18 @@
                 "data": {
                     "email": "Email",
                     "password": "Password",
-                    "app_label": "App label (co-branded app name)"
+                    "app_label": "App label (co-branded app name)",
+                    "account_role": "Account role",
+                    "primary_entry_id": "Primary Aegis account",
+                    "account_label": "Command account label"
                 },
                 "data_description": {
                     "email": "The email you use to sign in to the Ajax app.",
                     "password": "Your Ajax account password. Home Assistant keeps only a hash of it.",
-                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure."
+                    "app_label": "The app your account belongs to: Ajax or a co-branded app. See the README if you're not sure.",
+                    "account_role": "Keep the normal primary account, or add a commands-only account that shares state with a selected primary account.",
+                    "primary_entry_id": "Select the existing primary Aegis account whose shared spaces this account may control.",
+                    "account_label": "A short label shown on the extra alarm panel (for example, Upstairs user)."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Invalid TOTP code. Please try again.",
             "cannot_connect": "Cannot connect to Ajax servers.",
             "client_rejected": "Ajax is rejecting this version of Aegis for Ajax. Update the integration in HACS, restart Home Assistant and try again.",
-            "unknown": "An unexpected error occurred."
+            "unknown": "An unexpected error occurred.",
+            "primary_account_required": "Select an existing primary Aegis account for this commands-only account.",
+            "account_label_required": "Enter a label for this commands-only account.",
+            "spaces_must_match_primary": "Select only spaces that belong to the selected primary account."
         },
         "abort": {
             "already_configured": "This account is already configured.",

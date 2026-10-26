@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from homeassistant.core import HomeAssistant
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 import voluptuous as vol
@@ -34,11 +35,15 @@ from custom_components.aegis_ajax.api.session import (
 )
 from custom_components.aegis_ajax.api.spaces import SpacesApi
 from custom_components.aegis_ajax.const import (
+    ACCOUNT_ROLE_COMMANDS_ONLY,
+    ACCOUNT_ROLE_PRIMARY,
     ALL_EVENT_TYPES,
     APPLICATION_LABEL,
     BYPASS_SWITCHES_ALWAYS,
     BYPASS_SWITCHES_AUTO,
     BYPASS_SWITCHES_NEVER,
+    CONF_ACCOUNT_LABEL,
+    CONF_ACCOUNT_ROLE,
     CONF_AUTO_CREATE_LABELS,
     CONF_BYPASS_SWITCHES,
     CONF_CLOUD_VIDEO,
@@ -50,6 +55,7 @@ from custom_components.aegis_ajax.const import (
     CONF_PERSISTENT_NOTIFICATIONS,
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
+    CONF_PRIMARY_ENTRY_ID,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
     DEFAULT_CLOUD_VIDEO,
@@ -70,15 +76,43 @@ from custom_components.aegis_ajax.service_security import hash_pin
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_SCHEMA = vol.Schema(
-    {
-        vol.Required("email"): TextSelector(TextSelectorConfig(type=TextSelectorType.EMAIL)),
-        vol.Required("password"): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
-        vol.Optional("app_label", default=APPLICATION_LABEL): SelectSelector(
-            SelectSelectorConfig(options=KNOWN_APP_LABELS, custom_value=True, sort=True)
-        ),
-    }
-)
+def _user_schema(hass: HomeAssistant) -> vol.Schema:
+    """Build the login form, including optional command-account routing."""
+    primary_options = [
+        SelectOptionDict(value=entry.entry_id, label=str(entry.title))
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_ACCOUNT_ROLE, ACCOUNT_ROLE_PRIMARY) == ACCOUNT_ROLE_PRIMARY
+    ]
+    return vol.Schema(
+        {
+            vol.Required("email"): TextSelector(TextSelectorConfig(type=TextSelectorType.EMAIL)),
+            vol.Required("password"): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
+            vol.Optional("app_label", default=APPLICATION_LABEL): SelectSelector(
+                SelectSelectorConfig(options=KNOWN_APP_LABELS, custom_value=True, sort=True)
+            ),
+            vol.Optional(CONF_ACCOUNT_ROLE, default=ACCOUNT_ROLE_PRIMARY): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        SelectOptionDict(value=ACCOUNT_ROLE_PRIMARY, label="Primary account"),
+                        SelectOptionDict(
+                            value=ACCOUNT_ROLE_COMMANDS_ONLY,
+                            label="Commands-only account",
+                        ),
+                    ],
+                    sort=False,
+                )
+            ),
+            vol.Optional(CONF_PRIMARY_ENTRY_ID): SelectSelector(
+                SelectSelectorConfig(options=primary_options, sort=True)
+            ),
+            vol.Optional(CONF_ACCOUNT_LABEL): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
+            ),
+        }
+    )
+
 
 TOTP_SCHEMA = vol.Schema(
     {
@@ -113,6 +147,9 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         # closed. `AjaxGrpcClient.close()` clears the session, so reading the
         # token off the client afterwards yields nothing.
         self._session_snapshot: dict[str, Any] | None = None
+        self._account_role: str = ACCOUNT_ROLE_PRIMARY
+        self._primary_entry_id: str = ""
+        self._account_label: str = ""
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
         """Entry point when an Ajax hub is seen on the local network.
@@ -183,6 +220,22 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            self._account_role = user_input.get(CONF_ACCOUNT_ROLE, ACCOUNT_ROLE_PRIMARY)
+            self._primary_entry_id = str(user_input.get(CONF_PRIMARY_ENTRY_ID, ""))
+            self._account_label = str(user_input.get(CONF_ACCOUNT_LABEL, "")).strip()
+            if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY:
+                primary_entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
+                if primary_entry is None or primary_entry.data.get(
+                    CONF_ACCOUNT_ROLE, ACCOUNT_ROLE_PRIMARY
+                ) != ACCOUNT_ROLE_PRIMARY:
+                    errors["base"] = "primary_account_required"
+                elif not self._account_label:
+                    errors["base"] = "account_label_required"
+            if errors:
+                return self.async_show_form(
+                    step_id="user", data_schema=_user_schema(self.hass), errors=errors
+                )
+
             self._email = user_input["email"]
             self._password_hash = AjaxSession.hash_password(user_input["password"])
             self._app_label = user_input.get("app_label", APPLICATION_LABEL)
@@ -230,7 +283,10 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 errors["base"] = _unexpected_error_key(e)
                 await self._async_close_client()
-        return self.async_show_form(step_id="user", data_schema=USER_SCHEMA, errors=errors)
+        return self.async_show_form(
+            step_id="user", data_schema=_user_schema(self.hass), errors=errors
+        )
+
 
     async def async_step_2fa(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -259,23 +315,49 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_select_spaces(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
             if self._client is None:
                 raise RuntimeError("Client not initialized")
-            data: dict[str, Any] = {
-                "email": self._email,
-                "password_hash": self._password_hash,
-                "app_label": self._app_label,
-                "spaces": user_input["spaces"],
-                "device_id": self._client.session.device_id,
-            }
-            # Persist session token to avoid re-login (and 2FA) on restart
-            if self._client.session.session_token:
-                data["session_token"] = self._client.session.session_token
-                data["user_hex_id"] = self._client.session.user_hex_id
-            # The entry builds its own client; don't leave this channel open (#610).
-            await self._async_close_client()
-            return self.async_create_entry(title=f"Ajax Security ({self._email})", data=data)
+            selected_spaces = list(user_input.get("spaces", []))
+            if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY:
+                primary_entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
+                allowed_spaces = (
+                    set(primary_entry.data.get("spaces", []))
+                    if primary_entry is not None
+                    else set()
+                )
+                if not set(selected_spaces) <= allowed_spaces:
+                    errors["base"] = "spaces_must_match_primary"
+            if not errors:
+                data: dict[str, Any] = {
+                    "email": self._email,
+                    "password_hash": self._password_hash,
+                    "app_label": self._app_label,
+                    "spaces": selected_spaces,
+                    "device_id": self._client.session.device_id,
+                }
+                if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY:
+                    data.update(
+                        {
+                            CONF_ACCOUNT_ROLE: ACCOUNT_ROLE_COMMANDS_ONLY,
+                            CONF_PRIMARY_ENTRY_ID: self._primary_entry_id,
+                            CONF_ACCOUNT_LABEL: self._account_label,
+                        }
+                    )
+                # Persist session token to avoid re-login (and 2FA) on restart
+                if self._client.session.session_token:
+                    data["session_token"] = self._client.session.session_token
+                    data["user_hex_id"] = self._client.session.user_hex_id
+                # The entry builds its own client; don't leave this channel open (#610).
+                await self._async_close_client()
+                title = (
+                    f"Ajax Security ({self._account_label})"
+                    if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY
+                    else f"Ajax Security ({self._email})"
+                )
+                return self.async_create_entry(title=title, data=data)
+
         if self._client:
             spaces_api = SpacesApi(self._client)
             try:
@@ -284,6 +366,14 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Could not list Ajax spaces after login")
                 await self._async_close_client()
                 return self.async_abort(reason="cannot_connect")
+            if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY:
+                primary_entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
+                allowed_spaces = (
+                    set(primary_entry.data.get("spaces", []))
+                    if primary_entry is not None
+                    else set()
+                )
+                spaces = [space for space in spaces if space.id in allowed_spaces]
             space_options = [SelectOptionDict(value=s.id, label=s.name) for s in spaces]
         else:
             space_options = []
@@ -293,13 +383,8 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     # `default=[]` is intentional: HA's frontend treats a
                     # missing default on a `Required` multi-select as
-                    # "everything selected", which is dangerous for
-                    # installers who see many customer spaces in one
-                    # account and could accept the wrong one by inertia
-                    # (#166). Starting empty forces an explicit choice.
-                    # `mode=DROPDOWN` renders the chip-input with the
-                    # built-in name filter, replacing the linear checkbox
-                    # list that doesn't scale past a handful of spaces.
+                    # "everything selected", which is dangerous for installers
+                    # who see many customer spaces in one account.
                     vol.Required("spaces", default=[]): vol.All(
                         SelectSelector(
                             SelectSelectorConfig(
@@ -309,17 +394,11 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                                 sort=True,
                             )
                         ),
-                        # The selector accepts an empty list once we add
-                        # `default=[]` (the marker no longer fails on a
-                        # missing key). Without this length check, a user
-                        # could submit with no space chosen and we'd
-                        # create a do-nothing entry. The frontend already
-                        # disables Submit while empty for `Required`, so
-                        # this is the belt-and-braces server-side guard.
                         vol.Length(min=1),
                     ),
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_reconfigure(

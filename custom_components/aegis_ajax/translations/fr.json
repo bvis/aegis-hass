@@ -7,12 +7,18 @@
                 "data": {
                     "email": "Adresse e-mail",
                     "password": "Mot de passe",
-                    "app_label": "Libellé de l'application (nom de l'app co-branded)"
+                    "app_label": "Libellé de l'application (nom de l'app co-branded)",
+                    "account_role": "Rôle du compte",
+                    "primary_entry_id": "Compte Aegis principal",
+                    "account_label": "Libellé du compte de commandes"
                 },
                 "data_description": {
                     "email": "L'e-mail avec lequel vous vous connectez à l'app Ajax.",
                     "password": "Le mot de passe de votre compte Ajax. Home Assistant n'en garde qu'un hash.",
-                    "app_label": "L'app à laquelle appartient votre compte : Ajax ou une app co-branded. Voir le README en cas de doute."
+                    "app_label": "L'app à laquelle appartient votre compte : Ajax ou une app co-branded. Voir le README en cas de doute.",
+                    "account_role": "Conservez le compte principal habituel ou ajoutez un compte réservé aux commandes qui partage l’état avec un compte principal sélectionné.",
+                    "primary_entry_id": "Sélectionnez le compte Aegis principal existant dont ce compte pourra contrôler les espaces partagés.",
+                    "account_label": "Un libellé court affiché sur le panneau d’alarme supplémentaire."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Code TOTP invalide. Veuillez réessayer.",
             "cannot_connect": "Impossible de se connecter aux serveurs Ajax.",
             "client_rejected": "Ajax rejette cette version d'Aegis for Ajax. Mettez à jour l'intégration dans HACS, redémarrez Home Assistant et réessayez.",
-            "unknown": "Une erreur inattendue s'est produite."
+            "unknown": "Une erreur inattendue s'est produite.",
+            "primary_account_required": "Sélectionnez un compte Aegis principal existant.",
+            "account_label_required": "Saisissez un libellé pour ce compte de commandes.",
+            "spaces_must_match_primary": "Sélectionnez uniquement des espaces du compte principal."
         },
         "abort": {
             "already_configured": "Ce compte est déjà configuré.",

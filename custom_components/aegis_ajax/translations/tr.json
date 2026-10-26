@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-posta",
                     "password": "Parola",
-                    "app_label": "Uygulama etiketi (co-branded uygulama adı)"
+                    "app_label": "Uygulama etiketi (co-branded uygulama adı)",
+                    "account_role": "Hesap rolü",
+                    "primary_entry_id": "Birincil Aegis hesabı",
+                    "account_label": "Komut hesabı etiketi"
                 },
                 "data_description": {
                     "email": "Ajax uygulamasına giriş yaptığınız e-posta.",
                     "password": "Ajax hesabınızın şifresi. Home Assistant yalnızca bir hash saklar.",
-                    "app_label": "Hesabınızın ait olduğu uygulama: Ajax veya co-branded bir uygulama. Emin değilseniz README'ye bakın."
+                    "app_label": "Hesabınızın ait olduğu uygulama: Ajax veya co-branded bir uygulama. Emin değilseniz README'ye bakın.",
+                    "account_role": "Normal birincil hesabı koruyun veya durumu seçilen birincil hesapla paylaşan yalnızca komut hesabı ekleyin.",
+                    "primary_entry_id": "Bu hesabın kontrol edebileceği paylaşılan alanlara sahip mevcut birincil Aegis hesabını seçin.",
+                    "account_label": "Ek alarm panelinde gösterilecek kısa etiket."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Geçersiz TOTP kodu. Lütfen tekrar deneyin.",
             "cannot_connect": "Ajax sunucularına bağlanılamıyor.",
             "client_rejected": "Ajax, Aegis for Ajax'ın bu sürümünü reddediyor. Entegrasyonu HACS'ten güncelleyin, Home Assistant'ı yeniden başlatın ve tekrar deneyin.",
-            "unknown": "Beklenmeyen bir hata oluştu."
+            "unknown": "Beklenmeyen bir hata oluştu.",
+            "primary_account_required": "Mevcut birincil Aegis hesabını seçin.",
+            "account_label_required": "Bu komut hesabı için bir etiket girin.",
+            "spaces_must_match_primary": "Yalnızca birincil hesaptaki alanları seçin."
         },
         "abort": {
             "already_configured": "Bu hesap zaten yapılandırılmış.",

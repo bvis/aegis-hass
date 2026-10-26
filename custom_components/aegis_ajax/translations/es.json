@@ -7,12 +7,18 @@
                 "data": {
                     "email": "Correo electronico",
                     "password": "Contrasena",
-                    "app_label": "Etiqueta de app (nombre de la app co-branded)"
+                    "app_label": "Etiqueta de app (nombre de la app co-branded)",
+                    "account_role": "Rol de cuenta",
+                    "primary_entry_id": "Cuenta Aegis principal",
+                    "account_label": "Etiqueta de cuenta de comandos"
                 },
                 "data_description": {
                     "email": "El correo con el que entras en la app de Ajax.",
                     "password": "La contraseña de tu cuenta de Ajax. Home Assistant solo guarda un hash.",
-                    "app_label": "La app a la que pertenece tu cuenta: Ajax o una app co-branded. Consulta el README si no estás seguro."
+                    "app_label": "La app a la que pertenece tu cuenta: Ajax o una app co-branded. Consulta el README si no estás seguro.",
+                    "account_role": "Mantén la cuenta principal normal o añade una cuenta solo para comandos que comparta el estado con una cuenta principal seleccionada.",
+                    "primary_entry_id": "Selecciona la cuenta Aegis principal existente cuyos espacios compartidos podrá controlar esta cuenta.",
+                    "account_label": "Una etiqueta corta que se mostrará en el panel de alarma adicional."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Codigo TOTP incorrecto. Intentalo de nuevo.",
             "cannot_connect": "No se puede conectar a los servidores de Ajax.",
             "client_rejected": "Ajax está rechazando esta versión de Aegis for Ajax. Actualiza la integración en HACS, reinicia Home Assistant y vuelve a intentarlo.",
-            "unknown": "Ha ocurrido un error inesperado."
+            "unknown": "Ha ocurrido un error inesperado.",
+            "primary_account_required": "Selecciona una cuenta Aegis principal existente.",
+            "account_label_required": "Introduce una etiqueta para esta cuenta de comandos.",
+            "spaces_must_match_primary": "Selecciona solo espacios de la cuenta principal."
         },
         "abort": {
             "already_configured": "Esta cuenta ya esta configurada.",

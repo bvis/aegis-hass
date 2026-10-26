@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-mail",
                     "password": "Parolă",
-                    "app_label": "Etichetă aplicație (numele aplicației co-branded)"
+                    "app_label": "Etichetă aplicație (numele aplicației co-branded)",
+                    "account_role": "Rol cont",
+                    "primary_entry_id": "Cont Aegis principal",
+                    "account_label": "Etichetă cont de comenzi"
                 },
                 "data_description": {
                     "email": "Adresa de e-mail cu care te conectezi în aplicația Ajax.",
                     "password": "Parola contului Ajax. Home Assistant păstrează doar un hash al ei.",
-                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur."
+                    "app_label": "Aplicația căreia îi aparține contul: Ajax sau o aplicație co-branded. Vezi README dacă nu ești sigur.",
+                    "account_role": "Păstrează contul principal obișnuit sau adaugă un cont doar pentru comenzi, care partajează starea cu un cont principal selectat.",
+                    "primary_entry_id": "Selectează contul Aegis principal existent ale cărui spații partajate pot fi controlate de acest cont.",
+                    "account_label": "O etichetă scurtă afișată pe panoul de alarmă suplimentar."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Cod TOTP invalid. Vă rugăm să încercați din nou.",
             "cannot_connect": "Nu se poate conecta la serverele Ajax.",
             "client_rejected": "Ajax respinge această versiune de Aegis for Ajax. Actualizează integrarea în HACS, repornește Home Assistant și încearcă din nou.",
-            "unknown": "A apărut o eroare neașteptată."
+            "unknown": "A apărut o eroare neașteptată.",
+            "primary_account_required": "Selectează un cont Aegis principal existent.",
+            "account_label_required": "Introdu o etichetă pentru acest cont de comenzi.",
+            "spaces_must_match_primary": "Selectează doar spații ale contului principal."
         },
         "abort": {
             "already_configured": "Acest cont este deja configurat.",

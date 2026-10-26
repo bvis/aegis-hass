@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-mail",
                     "password": "Heslo",
-                    "app_label": "Označení aplikace (název co-branded aplikace)"
+                    "app_label": "Označení aplikace (název co-branded aplikace)",
+                    "account_role": "Role účtu",
+                    "primary_entry_id": "Primární účet Aegis",
+                    "account_label": "Štítek příkazového účtu"
                 },
                 "data_description": {
                     "email": "E-mail, kterým se přihlašujete do aplikace Ajax.",
                     "password": "Heslo k účtu Ajax. Home Assistant ukládá jen jeho hash.",
-                    "app_label": "Aplikace, ke které účet patří: Ajax nebo co-branded aplikace. Pokud si nejste jisti, podívejte se do README."
+                    "app_label": "Aplikace, ke které účet patří: Ajax nebo co-branded aplikace. Pokud si nejste jisti, podívejte se do README.",
+                    "account_role": "Ponechte běžný primární účet, nebo přidejte účet pouze pro příkazy se stavem sdíleným s vybraným primárním účtem.",
+                    "primary_entry_id": "Vyberte existující primární účet Aegis, jehož sdílené prostory může tento účet ovládat.",
+                    "account_label": "Krátký štítek zobrazený na panelu tohoto účtu."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Neplatný kód TOTP. Zkuste to znovu.",
             "cannot_connect": "Nelze se připojit k serverům Ajax.",
             "client_rejected": "Ajax odmítá tuto verzi Aegis for Ajax. Aktualizujte integraci v HACS, restartujte Home Assistant a zkuste to znovu.",
-            "unknown": "Došlo k neočekávané chybě."
+            "unknown": "Došlo k neočekávané chybě.",
+            "primary_account_required": "Vyberte existující primární účet Aegis.",
+            "account_label_required": "Zadejte štítek pro tento účet pouze pro příkazy.",
+            "spaces_must_match_primary": "Vyberte pouze prostory z primárního účtu."
         },
         "abort": {
             "already_configured": "Tento účet je již nakonfigurován.",

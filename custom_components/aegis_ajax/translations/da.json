@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-mail",
                     "password": "Adgangskode",
-                    "app_label": "App-navn (co-branded appnavn)"
+                    "app_label": "App-navn (co-branded appnavn)",
+                    "account_role": "Kontorolle",
+                    "primary_entry_id": "Primær Aegis-konto",
+                    "account_label": "Etiket til kommando-konto"
                 },
                 "data_description": {
                     "email": "Den e-mail, du bruger til at logge ind i Ajax-appen.",
                     "password": "Adgangskoden til din Ajax-konto. Home Assistant gemmer kun en hash af den.",
-                    "app_label": "Den app, din konto hører til: Ajax eller en co-branded app. Se README, hvis du er i tvivl."
+                    "app_label": "Den app, din konto hører til: Ajax eller en co-branded app. Se README, hvis du er i tvivl.",
+                    "account_role": "Behold den normale primære konto, eller tilføj en konto kun til kommandoer, der deler status med en valgt primær konto.",
+                    "primary_entry_id": "Vælg den eksisterende primære Aegis-konto, hvis delte områder denne konto må styre.",
+                    "account_label": "En kort etiket, der vises på det ekstra alarmpanel."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Forkert TOTP-kode. Prøv igen.",
             "cannot_connect": "Kan ikke oprette forbindelse til Ajax-serverne.",
             "client_rejected": "Ajax afviser denne version af Aegis for Ajax. Opdater integrationen i HACS, genstart Home Assistant og prøv igen.",
-            "unknown": "Der opstod en uventet fejl."
+            "unknown": "Der opstod en uventet fejl.",
+            "primary_account_required": "Vælg en eksisterende primær Aegis-konto.",
+            "account_label_required": "Indtast en etiket til denne kommando-konto.",
+            "spaces_must_match_primary": "Vælg kun områder fra den primære konto."
         },
         "abort": {
             "already_configured": "Denne konto er allerede konfigureret.",

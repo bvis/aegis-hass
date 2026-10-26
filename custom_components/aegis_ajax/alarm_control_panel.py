@@ -140,6 +140,13 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
+    if coordinator.commands_only is True:
+        async_add_entities(
+            AjaxAlarmControlPanel(coordinator=coordinator, space_id=space_id)
+            for space_id in coordinator.spaces
+        )
+        return
+
     entities: list[AlarmControlPanelEntity] = []
     for space_id, space in coordinator.spaces.items():
         # Always create the space-level panel. It carries night-mode support
@@ -307,10 +314,17 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
 
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str) -> None:
         super().__init__(coordinator, space_id)
-        self._attr_unique_id = f"aegis_ajax_alarm_{space_id}"
+        if coordinator.commands_only is True:
+            self._attr_unique_id = f"aegis_ajax_alarm_{coordinator.entry_id}_{space_id}"
+            self._attr_name = coordinator.account_label or "Commands"
+            self._attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
+        else:
+            self._attr_unique_id = f"aegis_ajax_alarm_{space_id}"
 
     @property
     def available(self) -> bool:
+        if self.coordinator.commands_only is True and not self.coordinator.primary_loaded:
+            return False
         space = self._space
         return space is not None and space.is_online
 
@@ -387,6 +401,8 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         await self.coordinator.async_request_refresh()
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
+        if self.coordinator.commands_only is True:
+            raise HomeAssistantError("Night mode is not available on a commands-only account")
         await self._async_validate_code(code)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
@@ -427,7 +443,10 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         import asyncio  # noqa: PLC0415
         from dataclasses import replace  # noqa: PLC0415
 
-        space = self._space
+        state_coordinator = self.coordinator
+        if self.coordinator.commands_only is True:
+            state_coordinator = self.coordinator._primary_coordinator or self.coordinator
+        space = state_coordinator.spaces.get(self._space_id)
         if space is None:
             return
         # Mirror the push-event rule (#284): arming night sets the flag,
@@ -439,7 +458,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         elif new_state in (SecurityState.ARMED, SecurityState.DISARMED):
             night_mode_enabled = False
         try:
-            self.coordinator.spaces[self._space_id] = replace(
+            state_coordinator.spaces[self._space_id] = replace(
                 space, security_state=new_state, night_mode_enabled=night_mode_enabled
             )
         except TypeError:
@@ -449,11 +468,15 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         # a poll to observe the disarm, which the 10 s optimistic window can
         # outlast when the server briefly serves stale state.
         if new_state == SecurityState.DISARMED:
-            self.coordinator.alarmed_space_ids.discard(self._space_id)
+            state_coordinator.alarmed_space_ids.discard(self._space_id)
         # Our own arm is the earliest an exit delay can be seen starting (#454).
-        self.coordinator.sync_delay_overlays()
+        state_coordinator.sync_delay_overlays()
         expiry = asyncio.get_running_loop().time() + 10
-        self.coordinator._optimistic_space_states[self._space_id] = (expiry, new_state)
+        state_coordinator._optimistic_space_states[self._space_id] = (expiry, new_state)
+        if state_coordinator is not self.coordinator:
+            state_coordinator.async_set_updated_data(
+                {"spaces": state_coordinator.spaces, "devices": state_coordinator.devices}
+            )
         if self.hass is not None:
             self.async_write_ha_state()
 

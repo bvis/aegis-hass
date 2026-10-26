@@ -10,6 +10,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import ServiceResponse, SupportsResponse, callback
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
@@ -69,12 +70,16 @@ except TypeError as exc:
 from custom_components.aegis_ajax.api.hts.client import HtsConnectionError  # noqa: E402
 from custom_components.aegis_ajax.api.session import log_fingerprint  # noqa: E402
 from custom_components.aegis_ajax.const import (  # noqa: E402
+    ACCOUNT_ROLE_COMMANDS_ONLY,
     APPLICATION_LABEL,
+    CONF_ACCOUNT_LABEL,
+    CONF_ACCOUNT_ROLE,
     CONF_AUTO_CREATE_LABELS,
     CONF_DELAY_PANEL_STATES,
     CONF_DISABLE_PUSH_WARNING,
     CONF_PERSISTENT_NOTIFICATION_EVENTS,
     CONF_PERSISTENT_NOTIFICATIONS,
+    CONF_PRIMARY_ENTRY_ID,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_DELAY_PANEL_STATES,
     DEFAULT_DISABLE_PUSH_WARNING,
@@ -103,6 +108,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _PHOTO_CLEANUP_LOCK = asyncio.Lock()
 
 _FCM_KEYS = {"fcm_project_id", "fcm_app_id", "fcm_api_key", "fcm_sender_id"}
+
+PLATFORMS_COMMANDS_ONLY = [Platform.ALARM_CONTROL_PANEL]
 
 PLATFORMS = [
     Platform.ALARM_CONTROL_PANEL,
@@ -195,12 +202,21 @@ async def _async_warn_service_transition(
 
 
 def _loaded_entries(hass: HomeAssistant) -> list[AjaxCobrandedConfigEntry]:
-    """Loaded entries; services fail with a clear error when there are none."""
+    """Loaded primary entries used by domain-level custom services.
+
+    A commands-only account owns only native alarm-panel commands. Keeping it
+    out of this list prevents legacy/custom services from routing read or
+    destructive actions through the secondary credentials.
+    """
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    entries = cast(
-        "list[AjaxCobrandedConfigEntry]", hass.config_entries.async_loaded_entries(DOMAIN)
-    )
+    entries = [
+        entry
+        for entry in cast(
+            "list[AjaxCobrandedConfigEntry]", hass.config_entries.async_loaded_entries(DOMAIN)
+        )
+        if getattr(entry.runtime_data, "commands_only", False) is not True
+    ]
     if not entries:
         raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
     return entries
@@ -621,6 +637,25 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:
+    commands_only = entry.data.get(CONF_ACCOUNT_ROLE) == ACCOUNT_ROLE_COMMANDS_ONLY
+    primary_coordinator: AjaxCobrandedCoordinator | None = None
+    primary_entry_id = str(entry.data.get(CONF_PRIMARY_ENTRY_ID, ""))
+    if commands_only:
+        primary_entry = hass.config_entries.async_get_entry(primary_entry_id)
+        if primary_entry is None or getattr(primary_entry, "runtime_data", None) is None:
+            raise ConfigEntryNotReady("The selected primary Ajax account is not loaded yet")
+        primary_coordinator = primary_entry.runtime_data
+        if getattr(primary_coordinator, "commands_only", False) is True:
+            raise ConfigEntryNotReady("A commands-only account cannot be used as the primary")
+        if getattr(primary_coordinator, "_shutdown_requested", False) is True:
+            raise ConfigEntryNotReady("The selected primary Ajax account is shutting down")
+
+        primary_spaces = set(primary_entry.data.get("spaces", []))
+        if not set(entry.data.get("spaces", [])) <= primary_spaces:
+            raise ConfigEntryNotReady(
+                "The commands-only account must use spaces from its primary account"
+            )
+
     # Surface a Repair when HA's runtime grpcio is below the version we
     # need; mostly hits HA OS where the manifest's pip-level requirement
     # doesn't apply. Self-clears on the next setup if HA gets upgraded.
@@ -714,16 +749,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         delay_panel_states=bool(
             entry.options.get(CONF_DELAY_PANEL_STATES, DEFAULT_DELAY_PANEL_STATES)
         ),
+        commands_only=commands_only,
+        primary_coordinator=primary_coordinator,
+        primary_entry_id=primary_entry_id,
+        account_label=str(entry.data.get(CONF_ACCOUNT_LABEL, "")),
     )
+    coordinator.config_entry = entry
+
     try:
         await coordinator.async_config_entry_first_refresh()
     except BaseException:
         # HA retries setup after ConfigEntryNotReady, building a fresh client
         # each attempt. Close this attempt's channel so retries don't leak one
         # gRPC channel per failure (also covers cancellation during refresh).
-        await client.close()
+        # A command-only coordinator also owns a listener on the primary, so
+        # shut it down here rather than leaving that listener behind when setup
+        # fails before runtime_data is assigned.
+        if commands_only:
+            await coordinator.async_shutdown()
+        else:
+            await client.close()
         raise
     entry.runtime_data = coordinator
+    if not commands_only:
+        for dependent in hass.config_entries.async_entries(DOMAIN):
+            if dependent.data.get(CONF_PRIMARY_ENTRY_ID) != entry.entry_id:
+                continue
+            dependent_coordinator = getattr(dependent, "runtime_data", None)
+            if getattr(dependent_coordinator, "commands_only", False) is True:
+                dependent_coordinator.async_primary_loaded()
+
 
     # Attach the persistent-notification manager (2.2). Reads the current
     # options; the entry reloads on any options change, so this is rebuilt with
@@ -736,7 +791,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     pn_event_types = entry.options.get(
         CONF_PERSISTENT_NOTIFICATION_EVENTS, DEFAULT_PERSISTENT_NOTIFICATION_EVENTS
     )
-    if pn_enabled and pn_event_types:
+    if not commands_only and pn_enabled and pn_event_types:
         from custom_components.aegis_ajax.persistent_notification import (  # noqa: PLC0415
             AjaxPersistentNotifier,
         )
@@ -768,48 +823,53 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
     def _get_fcm(key: str) -> str:
         return str(entry.data.get(key, entry.options.get(key, "")))
 
-    entry.async_create_background_task(
-        hass,
-        coordinator.async_start_push_notifications(
-            fcm_project_id=_get_fcm("fcm_project_id"),
-            fcm_app_id=_get_fcm("fcm_app_id"),
-            fcm_api_key=_get_fcm("fcm_api_key"),
-            fcm_sender_id=_get_fcm("fcm_sender_id"),
-            entry_id=entry.entry_id,
-            app_label=str(entry.data.get("app_label", APPLICATION_LABEL)),
-            disable_push_warning=bool(
-                entry.options.get(CONF_DISABLE_PUSH_WARNING, DEFAULT_DISABLE_PUSH_WARNING)
+    if not commands_only:
+        entry.async_create_background_task(
+            hass,
+            coordinator.async_start_push_notifications(
+                fcm_project_id=_get_fcm("fcm_project_id"),
+                fcm_app_id=_get_fcm("fcm_app_id"),
+                fcm_api_key=_get_fcm("fcm_api_key"),
+                fcm_sender_id=_get_fcm("fcm_sender_id"),
+                entry_id=entry.entry_id,
+                app_label=str(entry.data.get("app_label", APPLICATION_LABEL)),
+                disable_push_warning=bool(
+                    entry.options.get(CONF_DISABLE_PUSH_WARNING, DEFAULT_DISABLE_PUSH_WARNING)
+                ),
             ),
-        ),
-        name=f"aegis_ajax_fcm_start_{entry.entry_id}",
+            name=f"aegis_ajax_fcm_start_{entry.entry_id}",
+        )
+
+    if not commands_only:
+        # Schedule photo cleanup
+        from datetime import timedelta  # noqa: PLC0415
+
+        from homeassistant.helpers.event import async_track_time_interval  # noqa: PLC0415
+
+        from custom_components.aegis_ajax.photo_storage import cleanup_old_photos  # noqa: PLC0415
+
+        retention_days = entry.options.get("photo_retention_days", 30)
+        max_photos = entry.options.get("photo_max_per_device", 100)
+
+        async def _photo_cleanup(_now: object = None) -> None:
+            # Every entry cleans the same photo folder: one cleanup at a time (#611).
+            async with _PHOTO_CLEANUP_LOCK:
+                deleted = await cleanup_old_photos(hass, retention_days, max_photos)
+            if deleted:
+                _LOGGER.debug("Cleaned up %d old photos", len(deleted))
+
+        # Schedule cleanup every 24h (first run deferred to avoid blocking startup)
+        unsub_cleanup = async_track_time_interval(hass, _photo_cleanup, timedelta(hours=24))
+        entry.async_create_background_task(
+            hass, _photo_cleanup(), name=f"aegis_ajax_photo_cleanup_{entry.entry_id}"
+        )
+        entry.async_on_unload(unsub_cleanup)
+
+    if not commands_only:
+        _async_register_hub_devices(hass, entry, coordinator)
+    await hass.config_entries.async_forward_entry_setups(
+        entry, PLATFORMS_COMMANDS_ONLY if commands_only else PLATFORMS
     )
-
-    # Schedule photo cleanup
-    from datetime import timedelta  # noqa: PLC0415
-
-    from homeassistant.helpers.event import async_track_time_interval  # noqa: PLC0415
-
-    from custom_components.aegis_ajax.photo_storage import cleanup_old_photos  # noqa: PLC0415
-
-    retention_days = entry.options.get("photo_retention_days", 30)
-    max_photos = entry.options.get("photo_max_per_device", 100)
-
-    async def _photo_cleanup(_now: object = None) -> None:
-        # Every entry cleans the same photo folder: one cleanup at a time (#611).
-        async with _PHOTO_CLEANUP_LOCK:
-            deleted = await cleanup_old_photos(hass, retention_days, max_photos)
-        if deleted:
-            _LOGGER.debug("Cleaned up %d old photos", len(deleted))
-
-    # Schedule cleanup every 24h (first run deferred to avoid blocking startup)
-    unsub_cleanup = async_track_time_interval(hass, _photo_cleanup, timedelta(hours=24))
-    entry.async_create_background_task(
-        hass, _photo_cleanup(), name=f"aegis_ajax_photo_cleanup_{entry.entry_id}"
-    )
-    entry.async_on_unload(unsub_cleanup)
-
-    _async_register_hub_devices(hass, entry, coordinator)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.mark_platforms_set_up()
 
     # Auto-label entities for easy grouping in automations.
@@ -959,10 +1019,19 @@ def _reload_relevant_state(entry: ConfigEntry) -> tuple[dict[str, Any], dict[str
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    commands_only = entry.data.get(CONF_ACCOUNT_ROLE) == ACCOUNT_ROLE_COMMANDS_ONLY
+    platforms = PLATFORMS_COMMANDS_ONLY if commands_only else PLATFORMS
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, platforms)
     if unload_ok:
         coordinator: AjaxCobrandedCoordinator = entry.runtime_data
         await coordinator.async_shutdown()
+        if not commands_only:
+            for dependent in hass.config_entries.async_entries(DOMAIN):
+                if dependent.data.get(CONF_PRIMARY_ENTRY_ID) != entry.entry_id:
+                    continue
+                dependent_coordinator = getattr(dependent, "runtime_data", None)
+                if getattr(dependent_coordinator, "commands_only", False) is True:
+                    dependent_coordinator.async_primary_unloaded()
     return unload_ok
 
 

@@ -7,12 +7,18 @@
                 "data": {
                     "email": "Correu electronic",
                     "password": "Contrasenya",
-                    "app_label": "Etiqueta d'app (nom de l'app co-branded)"
+                    "app_label": "Etiqueta d'app (nom de l'app co-branded)",
+                    "account_role": "Rol del compte",
+                    "primary_entry_id": "Compte Aegis principal",
+                    "account_label": "Etiqueta del compte de comandes"
                 },
                 "data_description": {
                     "email": "El correu amb què entres a l'app d'Ajax.",
                     "password": "La contrasenya del teu compte d'Ajax. Home Assistant només en desa un hash.",
-                    "app_label": "L'app a la qual pertany el teu compte: Ajax o una app co-branded. Consulta el README si no n'estàs segur."
+                    "app_label": "L'app a la qual pertany el teu compte: Ajax o una app co-branded. Consulta el README si no n'estàs segur.",
+                    "account_role": "Mantén el compte principal o afegeix un compte que només pugui enviar ordres i comparteixi l’estat amb un compte principal.",
+                    "primary_entry_id": "Selecciona el compte Aegis principal existent amb els espais compartits que aquest compte podrà controlar.",
+                    "account_label": "Etiqueta curta que es mostrarà al tauler d’alarma addicional."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Codi TOTP incorrecte. Torna-ho a provar.",
             "cannot_connect": "No es pot connectar als servidors d'Ajax.",
             "client_rejected": "Ajax està rebutjant aquesta versió d'Aegis for Ajax. Actualitza la integració a HACS, reinicia Home Assistant i torna-ho a provar.",
-            "unknown": "S'ha produit un error inesperat."
+            "unknown": "S'ha produit un error inesperat.",
+            "primary_account_required": "Selecciona un compte Aegis principal existent.",
+            "account_label_required": "Introdueix una etiqueta per a aquest compte de comandes.",
+            "spaces_must_match_primary": "Selecciona només espais del compte principal."
         },
         "abort": {
             "already_configured": "Aquest compte ja esta configurat.",
