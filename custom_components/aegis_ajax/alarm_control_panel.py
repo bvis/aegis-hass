@@ -141,10 +141,21 @@ async def async_setup_entry(
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
     if coordinator.commands_only is True:
-        async_add_entities(
-            AjaxAlarmControlPanel(coordinator=coordinator, space_id=space_id)
-            for space_id in coordinator.spaces
-        )
+        entities: list[AlarmControlPanelEntity] = []
+        for space_id, space in coordinator.spaces.items():
+            # Keep the whole-space control for users who want to arm or
+            # disarm every zone at once. Commands-only accounts do not own
+            # read streams; their state and group list come from the
+            # selected primary account.
+            entities.append(AjaxAlarmControlPanel(coordinator=coordinator, space_id=space_id))
+            if space.group_mode_enabled and space.groups:
+                entities.extend(
+                    AjaxGroupAlarmControlPanel(
+                        coordinator=coordinator, space_id=space_id, group_id=group.id
+                    )
+                    for group in space.groups
+                )
+        async_add_entities(entities)
         return
 
     entities: list[AlarmControlPanelEntity] = []
@@ -501,14 +512,25 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
     def __init__(self, coordinator: AjaxCobrandedCoordinator, space_id: str, group_id: str) -> None:
         super().__init__(coordinator, space_id)
         self._group_id = group_id
-        self._attr_unique_id = f"aegis_ajax_alarm_{space_id}_group_{group_id}"
+        if coordinator.commands_only is True:
+            self._attr_unique_id = (
+                f"aegis_ajax_alarm_{coordinator.entry_id}_{space_id}_group_{group_id}"
+            )
+        else:
+            self._attr_unique_id = f"aegis_ajax_alarm_{space_id}_group_{group_id}"
         space = coordinator.spaces.get(space_id)
         group = space.get_group(group_id) if space else None
         if group is not None:
-            self._attr_name = group.name
+            self._attr_name = (
+                f"{coordinator.account_label or 'Commands'} {group.name}"
+                if coordinator.commands_only is True
+                else group.name
+            )
         else:
             self._attr_translation_key = "group"
             self._attr_translation_placeholders = {"group_id": group_id}
+        if coordinator.commands_only is True:
+            self._attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
 
     @property
     def _group(self) -> Group | None:
@@ -589,15 +611,22 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
     def _optimistic_state_update(self, new_state: SecurityState) -> None:
         from dataclasses import replace  # noqa: PLC0415
 
-        space = self._space
+        state_coordinator = self.coordinator
+        if self.coordinator.commands_only is True:
+            state_coordinator = self.coordinator._primary_coordinator or self.coordinator
+        space = state_coordinator.spaces.get(self._space_id)
         group = self._group
         if space is None or group is None:
             return
         try:
             new_group = replace(group, security_state=new_state)
             new_groups = tuple(new_group if g.id == self._group_id else g for g in space.groups)
-            self.coordinator.spaces[self._space_id] = replace(space, groups=new_groups)
+            state_coordinator.spaces[self._space_id] = replace(space, groups=new_groups)
         except TypeError:
             return  # not a real dataclass (e.g. during tests)
+        if state_coordinator is not self.coordinator:
+            state_coordinator.async_set_updated_data(
+                {"spaces": state_coordinator.spaces, "devices": state_coordinator.devices}
+            )
         if self.hass is not None:
             self.async_write_ha_state()

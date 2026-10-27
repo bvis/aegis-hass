@@ -14,8 +14,11 @@ from homeassistant.config_entries import SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.aegis_ajax.alarm_control_panel import AjaxAlarmControlPanel
-from custom_components.aegis_ajax.api.models import Space
+from custom_components.aegis_ajax.alarm_control_panel import (
+    AjaxAlarmControlPanel,
+    AjaxGroupAlarmControlPanel,
+)
+from custom_components.aegis_ajax.api.models import Group, Space
 from custom_components.aegis_ajax.const import (
     ACCOUNT_ROLE_COMMANDS_ONLY,
     CONF_ACCOUNT_LABEL,
@@ -115,6 +118,15 @@ def test_commands_only_panel_is_labeled_and_arm_disarm_only() -> None:
         security_state=SecurityState.DISARMED,
         connection_status=ConnectionStatus.ONLINE,
         malfunctions_count=0,
+        groups=(
+            Group(
+                id="group-1",
+                space_id="space-1",
+                name="Downstairs",
+                security_state=SecurityState.DISARMED,
+            ),
+        ),
+        group_mode_enabled=True,
     )
     primary = MagicMock()
     primary.spaces = {"space-1": space}
@@ -145,4 +157,9 @@ def test_commands_only_panel_is_labeled_and_arm_disarm_only() -> None:
     assert panel.unique_id == "aegis_ajax_alarm_secondary-entry_space-1"
     assert panel.name == "Night shift"
     assert panel.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
+    group_panel = AjaxGroupAlarmControlPanel(secondary, "space-1", "group-1")
+    assert group_panel.unique_id == "aegis_ajax_alarm_secondary-entry_space-1_group_group-1"
+    assert group_panel.name == "Night shift Downstairs"
+    assert group_panel.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
+    assert group_panel.available is True
 
