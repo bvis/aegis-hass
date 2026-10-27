@@ -312,7 +312,9 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
     @property
     def available(self) -> bool:
         space = self._space
-        return space is not None and space.is_online
+        # A hub-less space (camera only, #636) never reports its hub online,
+        # but the cloud still arms and disarms it.
+        return space is not None and (space.is_online or not space.hub_id)
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:

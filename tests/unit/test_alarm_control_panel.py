@@ -142,6 +142,22 @@ class TestAlarmControlPanel:
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.available is False
 
+    def test_available_without_hub(self) -> None:
+        # #636: a camera-only space has no hub, so its hub status never
+        # reads online; the cloud still arms it.
+        coordinator = MagicMock()
+        space = Space(
+            id="s1",
+            hub_id="",
+            name="Home",
+            security_state=SecurityState.DISARMED,
+            connection_status=ConnectionStatus.OFFLINE,
+            malfunctions_count=0,
+        )
+        coordinator.spaces = {"s1": space}
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.available is True
+
     def test_unavailable_when_space_missing(self) -> None:
         coordinator = MagicMock()
         coordinator.spaces = {}

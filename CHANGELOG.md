@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - unreleased
+
+### Fixed
+- **Arm and disarm spaces without a hub (#636, thanks @kevinzenou).** A space with only an Ajax camera (for example a Video Edge) and no hub can be armed from the Ajax app, but its alarm panel in Home Assistant was always unavailable, so it couldn't be armed from automations or the dashboard. The panel is now available for spaces without a hub. **Requests to Ajax:** none added; arming uses the same request as for any space.
+
 ## [1.28.1] - 2026-10-27
 
 ### Fixed
