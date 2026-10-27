@@ -446,10 +446,10 @@
                 "name": "Mobilforbindelse"
             },
             "lid": {
-                "name": "Låg åbnet"
+                "name": "Sabotage af låg"
             },
             "ext_contact": {
-                "name": "Ekstern kontakt brudt"
+                "name": "Fejl i ekstern kontakt"
             },
             "ext_alert": {
                 "name": "Ekstern kontaktalarm"

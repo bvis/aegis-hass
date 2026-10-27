@@ -446,10 +446,10 @@
                 "name": "Rețea celulară conectată"
             },
             "lid": {
-                "name": "Capac deschis"
+                "name": "Sabotaj capac"
             },
             "ext_contact": {
-                "name": "Contact extern deschis"
+                "name": "Defecțiune contact extern"
             },
             "ext_alert": {
                 "name": "Alertă contact extern"

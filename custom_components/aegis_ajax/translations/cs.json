@@ -446,10 +446,10 @@
                 "name": "Mobilní síť připojena"
             },
             "lid": {
-                "name": "Kryt otevřen"
+                "name": "Sabotáž víka"
             },
             "ext_contact": {
-                "name": "Externí kontakt přerušen"
+                "name": "Porucha externího kontaktu"
             },
             "ext_alert": {
                 "name": "Poplach externího kontaktu"

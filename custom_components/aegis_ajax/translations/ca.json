@@ -446,10 +446,10 @@
                 "name": "Mobil connectat"
             },
             "lid": {
-                "name": "Tapa oberta"
+                "name": "Manipulació de tapa"
             },
             "ext_contact": {
-                "name": "Contacte extern trencat"
+                "name": "Avaria del contacte extern"
             },
             "ext_alert": {
                 "name": "Alerta contacte extern"

@@ -446,10 +446,10 @@
                 "name": "Celular conectado"
             },
             "lid": {
-                "name": "Tapa abierta"
+                "name": "Manipulación de tapa"
             },
             "ext_contact": {
-                "name": "Contacto externo roto"
+                "name": "Fallo de contacto externo"
             },
             "ext_alert": {
                 "name": "Alerta contacto externo"

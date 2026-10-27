@@ -446,10 +446,10 @@
                 "name": "Mobiel netwerk verbonden"
             },
             "lid": {
-                "name": "Deksel geopend"
+                "name": "Deksel sabotage"
             },
             "ext_contact": {
-                "name": "Extern contact verbroken"
+                "name": "Storing extern contact"
             },
             "ext_alert": {
                 "name": "Alarm extern contact"
