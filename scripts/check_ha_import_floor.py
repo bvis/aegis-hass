@@ -21,6 +21,7 @@ import argparse
 import ast
 import functools
 import json
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -36,12 +37,17 @@ _SOURCE_URL = "https://raw.githubusercontent.com/home-assistant/core/{ref}/{path
 def _source(ha: str, module: str) -> str | None:
     base = module.replace(".", "/")
     for path in (f"{base}.py", f"{base}/__init__.py"):
-        try:
-            with urllib.request.urlopen(_SOURCE_URL.format(ref=ha, path=path), timeout=30) as r:
-                return r.read().decode()
-        except urllib.error.HTTPError as err:
-            if err.code != 404:
-                raise
+        # GitHub answers 429 when a tag push and a main push run this at once.
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(_SOURCE_URL.format(ref=ha, path=path), timeout=30) as r:
+                    return r.read().decode()
+            except urllib.error.HTTPError as err:
+                if err.code == 404:
+                    break
+                if (err.code != 429 and err.code < 500) or attempt == 3:
+                    raise
+                time.sleep(10 * (attempt + 1))
     return None
 
 
