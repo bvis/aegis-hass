@@ -446,10 +446,10 @@
                 "name": "Mobilfunk verbunden"
             },
             "lid": {
-                "name": "Gehäusedeckel geöffnet"
+                "name": "Deckelmanipulation"
             },
             "ext_contact": {
-                "name": "Externer Kontakt unterbrochen"
+                "name": "Störung externer Kontakt"
             },
             "ext_alert": {
                 "name": "Externer Kontaktalarm"

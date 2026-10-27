@@ -446,10 +446,10 @@
                 "name": "Rede celular conectada"
             },
             "lid": {
-                "name": "Tampa aberta"
+                "name": "Violação da tampa"
             },
             "ext_contact": {
-                "name": "Contato externo aberto"
+                "name": "Falha do contato externo"
             },
             "ext_alert": {
                 "name": "Alerta de contato externo"

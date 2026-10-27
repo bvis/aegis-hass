@@ -494,7 +494,7 @@ An [example automations file](docs/automations.yaml) is also available with 24 a
 - **Hub network sensors** — Ethernet/Wi-Fi connectivity, Wi-Fi SSID/signal, Ethernet/Wi-Fi IP addressing, cellular signal/network, and mains power status
 - **Siren on panic button / Siren on tamper** — disabled-by-default diagnostic binary sensors mirroring the hub's siren behaviour settings (read-only; configured in the Ajax app, refreshed on integration reload)
 - **Delay when leaving** — disabled-by-default diagnostic binary sensor on door, motion and combi detectors and MotionCams, mirroring whether the detector has an exit delay configured in the Ajax app (read-only). The delay itself can surface as the panel's `arming` / `pending` state with the [Show exit / entry delays](#exit-and-entry-delays) option
-- **Lid opened** — tamper detection for the hub enclosure
+- **Lid tamper** — tamper detection for the hub enclosure (shows Clear while the lid is closed)
 - **Battery** — hub battery level
 - **IMEI** — hub cellular modem identifier
 

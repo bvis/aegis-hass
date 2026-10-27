@@ -446,10 +446,10 @@
                 "name": "Hücresel ağ bağlı"
             },
             "lid": {
-                "name": "Kapak açık"
+                "name": "Kapak kurcalama"
             },
             "ext_contact": {
-                "name": "Harici kontak açık"
+                "name": "Harici kontak arızası"
             },
             "ext_alert": {
                 "name": "Harici kontak alarmı"

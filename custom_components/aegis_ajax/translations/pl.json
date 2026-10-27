@@ -446,10 +446,10 @@
                 "name": "Sieć komórkowa"
             },
             "lid": {
-                "name": "Pokrywa otwarta"
+                "name": "Sabotaż pokrywy"
             },
             "ext_contact": {
-                "name": "Zewnętrzny styk przerwany"
+                "name": "Usterka zewnętrznego styku"
             },
             "ext_alert": {
                 "name": "Alarm zewnętrznego styku"
