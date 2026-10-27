@@ -549,6 +549,15 @@ class HtsClient:
         self._connection_token = connected.token
         self._hubs = connected.hubs
         self._connected = True
+        if not connected.hubs:
+            # #638: a hub id now only counts with its is_master flag after it.
+            # A hub sent without one would be dropped here; say so instead of
+            # running a stream that never receives anything.
+            _LOGGER.warning(
+                "HTS connected but found no hub in the response (%d params); "
+                "please report this with a debug log",
+                len(params2),
+            )
 
         _LOGGER.debug(
             "HTS authenticated: %d hub(s), token=%s...",
