@@ -446,10 +446,10 @@
                 "name": "Réseau cellulaire connecté"
             },
             "lid": {
-                "name": "Couvercle ouvert"
+                "name": "Sabotage du couvercle"
             },
             "ext_contact": {
-                "name": "Contact externe ouvert"
+                "name": "Défaut du contact externe"
             },
             "ext_alert": {
                 "name": "Alerte contact externe"

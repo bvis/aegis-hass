@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.1] - 2026-10-27
+
+### Fixed
+- **Lid sensor no longer reads like an alarm (#637, thanks @Cm-8).** The hub's lid sensor was named *Lid opened*, so with the lid closed the dashboard showed *Lid opened: Clear* (in Italian, *Coperchio aperto: Assente*). It's now *Lid tamper*, like the existing *Case tamper*. The external contact sensor had the same problem (*External contact broken: OK*) and is now *External contact fault*. All 15 languages updated. Only the displayed name changes: entity IDs and names you set yourself stay as they are. **Requests to Ajax:** none.
+
 ## [1.28.0] - 2026-10-25
 
 ### Added

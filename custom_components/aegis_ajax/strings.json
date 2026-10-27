@@ -541,10 +541,10 @@
                 "name": "Cellular connected"
             },
             "lid": {
-                "name": "Lid opened"
+                "name": "Lid tamper"
             },
             "ext_contact": {
-                "name": "External contact broken"
+                "name": "External contact fault"
             },
             "ext_alert": {
                 "name": "External contact alert"

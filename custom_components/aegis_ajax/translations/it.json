@@ -446,10 +446,10 @@
                 "name": "Rete cellulare connessa"
             },
             "lid": {
-                "name": "Coperchio aperto"
+                "name": "Manomissione coperchio"
             },
             "ext_contact": {
-                "name": "Contatto esterno aperto"
+                "name": "Guasto contatto esterno"
             },
             "ext_alert": {
                 "name": "Allarme contatto esterno"
