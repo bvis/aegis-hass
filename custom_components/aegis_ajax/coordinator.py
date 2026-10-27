@@ -802,7 +802,24 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @callback
     def async_primary_loaded(self) -> None:
-        """Refresh dependent panels after their primary entry reloads."""
+        """Rebind and refresh dependent panels after the primary reloads.
+
+        A primary config-entry reload creates a new coordinator object. The
+        dependent account must follow that object; otherwise its old
+        ``_primary_coordinator`` is shut down and ``primary_loaded`` remains
+        false forever, even though the primary entities are healthy again.
+        """
+        if not self._commands_only:
+            return
+        entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
+        primary = getattr(entry, "runtime_data", None) if entry is not None else None
+        if primary is None or getattr(primary, "commands_only", False) is True:
+            return
+        if primary is not self._primary_coordinator:
+            if self._primary_unsub is not None:
+                self._primary_unsub()
+            self._primary_coordinator = primary
+            self._primary_unsub = primary.async_add_listener(self._async_primary_updated)
         self._copy_primary_state()
 
     @property
