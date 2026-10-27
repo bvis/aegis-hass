@@ -108,6 +108,7 @@
                     "cloud_video": "Vue en direct via le cloud pour les caméras vidéo (expérimental)",
                     "use_pin_code": "Exiger un code PIN pour armer/désarmer",
                     "pin_code": "Code PIN",
+                    "arm_requires_pin": "Exiger aussi le code PIN pour armer",
                     "fcm_project_id": "ID de projet FCM (pour les notifications push)",
                     "fcm_app_id": "ID d'application FCM",
                     "fcm_api_key": "Clé API FCM",
@@ -124,6 +125,7 @@
                 "data_description": {
                     "bypass_switches": "Les interrupteurs de contournement permettent de désactiver un appareil avant l'armement. « Auto » ne les crée que si votre compte Ajax a l'autorisation de désactiver des appareils.",
                     "expose_arm_home": "Ajoute un mode Armer à la maison au panneau d'alarme. Il reproduit le mode Nuit et n'est nécessaire que pour Amazon Alexa ou Nabu Casa Cloud. Désactivez-le pour masquer le bouton en double si vous ne les utilisez pas.",
+                    "arm_requires_pin": "Désactivé : l'armement se fait d'un geste et le code PIN n'est demandé que pour désarmer. S'applique seulement si l'option code PIN est active.",
                     "delay_panel_states": "Lorsque cette option est active, le panneau d'alarme affiche \"arming\" pendant que la centrale exécute le \"Délai de sortie\" d'un détecteur et \"pending\" pendant un \"Délai d'entrée\", tous deux pilotés par les signaux de la centrale elle-même, pas par une minuterie de notre part. Les détecteurs sans délai (alarme instantanée) sont déjà actifs pendant \"arming\". Les automatisations qui attendent \"armed_away\" se déclencheront à la fin du délai de sortie. L'état brut de la centrale reste dans l'attribut \"hub_state\".",
                     "cloud_video": "Ajoute une caméra de vue en direct pour chaque caméra vidéo Ajax, diffusée via le cloud Ajax comme le fait l'application hors du domicile, ce qui fonctionne aussi lorsque Home Assistant n'est pas sur le réseau de la caméra. Expérimental : peut ne pas encore fonctionner avec toutes les caméras. Chaque visionnage ouvre une session vidéo ; rien ne tourne tant que personne ne regarde.",
                     "disable_push_warning": "Activez si vous fonctionnez volontairement sans push. Masque le rappel récurrent « FCM non configuré » et la carte de réparation. Les événements en temps réel (sonnette, armement/désarmement, alarme, mouvement) n'atteindront Home Assistant qu'une fois FCM configuré.",

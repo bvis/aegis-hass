@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.29.0] - unreleased
 
+### Added
+- **PIN for disarm only (#642, thanks @themluckylegs).** With *Use PIN code* on, a new option *Also require the PIN to arm* (on by default, so nothing changes) can be turned off. Then the alarm panels arm with one tap and only ask for the PIN to disarm, the way Home Assistant's own manual alarm panel works without an arm code. That allows arming Night mode from a bedside screen or an automation without keeping a copy of the PIN in a script, and lets Alexa find the panel again. Force-arm services follow the same option. **Requests to Ajax:** none.
+
 ### Fixed
 - **Real-time updates kept dropping every ~20 seconds on some accounts (#638, thanks @qaigor).** On some accounts the server adds an extra value at the end of the connection reply, and the integration took it for a second hub. It then asked that non-existent hub for data, and the server closed the connection about 20 seconds later, every time, so live updates only arrived for a few seconds out of every 5 minutes. @qaigor found the cause in a debug log and validated the fix on a Hub 2 Plus. If the connection ever finds no hub at all, the log now says so. **Requests to Ajax:** fewer; the two requests per connection to the non-existent hub are gone.
 - **Arm and disarm spaces without a hub (#636, thanks @kevinzenou).** A space with only an Ajax camera (for example a Video Edge) and no hub can be armed from the Ajax app, but its alarm panel in Home Assistant was always unavailable, so it couldn't be armed from automations or the dashboard. The panel is now available for spaces without a hub. **Requests to Ajax:** none added; arming uses the same request as for any space.

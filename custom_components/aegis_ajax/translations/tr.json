@@ -108,6 +108,7 @@
                     "cloud_video": "Video kameralar için bulut üzerinden canlı izleme (deneysel)",
                     "use_pin_code": "Kurma/devre dışı bırakma için PIN kodu gerektir",
                     "pin_code": "PIN kodu",
+                    "arm_requires_pin": "Kurmak için de PIN kodu gerektir",
                     "fcm_project_id": "FCM Proje Kimliği (anlık bildirimler için)",
                     "fcm_app_id": "FCM Uygulama Kimliği",
                     "fcm_api_key": "FCM API Anahtarı",
@@ -124,6 +125,7 @@
                 "data_description": {
                     "bypass_switches": "Atlama anahtarları, kurma öncesinde bir cihazı devre dışı bırakmanı sağlar. 'Otomatik' bunları yalnızca Ajax hesabının cihazları devre dışı bırakma izni varsa oluşturur.",
                     "expose_arm_home": "Alarm paneline bir Evde Devreye Alma modu ekler. Gece modunu yansıtır ve esas olarak Amazon Alexa veya Nabu Casa Cloud için gereklidir. Bunları kullanmıyorsanız yinelenen düğmeyi gizlemek için kapatın.",
+                    "arm_requires_pin": "Kapalı: kurma tek dokunuşla yapılır, PIN yalnızca devre dışı bırakırken sorulur. Yalnızca PIN kodu seçeneği açıkken geçerlidir.",
                     "delay_panel_states": "Açıkken alarm paneli, hub bir dedektörün \"Çıkarken gecikme\" süresini işletirken \"arming\", bir \"Girerken gecikme\" sürerken \"pending\" gösterir; ikisi de bizim bir zamanlayıcımıza değil hub'ın kendi sinyallerine dayanır. Gecikmesi olmayan dedektörler (anlık alarm) \"arming\" sırasında zaten etkindir. \"armed_away\" bekleyen otomasyonlar çıkış gecikmesi tamamlandığında tetiklenir. Hub'ın ham durumu \"hub_state\" özniteliğinde kalır.",
                     "cloud_video": "Her Ajax video kamerası için, uygulamanın evden uzaktayken yaptığı gibi Ajax bulutu üzerinden aktarılan bir canlı izleme kamerası ekler; bu yüzden Home Assistant kameranın ağında olmadığında da çalışır. Deneysel: henüz her kamerada çalışmayabilir. Her izleme bir video oturumu açar; kimse izlemezken hiçbir şey çalışmaz.",
                     "disable_push_warning": "Bilerek push olmadan çalışıyorsanız etkinleştirin. Yinelenen \"FCM yapılandırılmadı\" hatırlatmasını ve Onarım kartını gizler. Gerçek zamanlı olaylar (kapı zili, kurma/devre dışı bırakma, alarm, hareket) FCM'yi yapılandırana kadar Home Assistant'a ulaşmaz.",

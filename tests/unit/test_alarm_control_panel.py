@@ -399,6 +399,38 @@ class TestAlarmControlPanel:
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
         assert panel.code_arm_required is False
 
+    def test_pin_for_disarm_only_keeps_keypad_but_not_arm_code(self) -> None:
+        from homeassistant.components.alarm_control_panel import CodeFormat
+
+        coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
+        coordinator.config_entry.options["arm_requires_pin"] = False
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        assert panel.code_arm_required is False
+        assert panel.code_format == CodeFormat.NUMBER
+
+    @pytest.mark.asyncio
+    async def test_pin_for_disarm_only_arms_without_code_and_disarm_still_checks(
+        self,
+    ) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = self._make_coordinator(use_pin_code=True, pin_code="1234")
+        coordinator.config_entry.options["arm_requires_pin"] = False
+        coordinator.security_api.arm = AsyncMock()
+        coordinator.security_api.arm_night_mode = AsyncMock()
+        coordinator.security_api.disarm = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+        panel.hass = _executor_hass()
+        panel.async_write_ha_state = MagicMock()
+        await panel.async_alarm_arm_away(code=None)
+        await panel.async_alarm_arm_night(code=None)
+        coordinator.security_api.arm.assert_awaited_once()
+        coordinator.security_api.arm_night_mode.assert_awaited_once()
+        with pytest.raises(HomeAssistantError):
+            await panel.async_alarm_disarm(code=None)
+        coordinator.security_api.disarm.assert_not_called()
+
     def test_code_arm_required_true_when_enabled(self) -> None:
         coordinator = self._make_coordinator(use_pin_code=True)
         panel = AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
@@ -608,6 +640,29 @@ class TestGroupAlarmControlPanel:
         coordinator = MagicMock()
         coordinator.config_entry.options = {}
         return coordinator
+
+    @pytest.mark.asyncio
+    async def test_group_pin_for_disarm_only(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = self._make_coordinator()
+        coordinator.config_entry.options = {
+            "use_pin_code": True,
+            "pin_code_hash": hash_pin("1234"),
+            "arm_requires_pin": False,
+        }
+        coordinator.security_api.arm_group = AsyncMock()
+        coordinator.security_api.disarm_group = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        panel = AjaxGroupAlarmControlPanel(coordinator=coordinator, space_id="s1", group_id="g1")
+        panel.hass = _executor_hass()
+        panel.async_write_ha_state = MagicMock()
+        assert panel.code_arm_required is False
+        await panel.async_alarm_arm_away(code=None)
+        coordinator.security_api.arm_group.assert_awaited_once()
+        with pytest.raises(HomeAssistantError):
+            await panel.async_alarm_disarm(code=None)
+        coordinator.security_api.disarm_group.assert_not_called()
 
     def test_unique_id_per_group(self) -> None:
         coordinator = self._make_coordinator()

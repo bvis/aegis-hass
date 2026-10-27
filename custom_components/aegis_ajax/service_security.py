@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.aegis_ajax.const import DOMAIN
+from custom_components.aegis_ajax.const import (
+    CONF_ARM_REQUIRES_PIN,
+    DEFAULT_ARM_REQUIRES_PIN,
+    DOMAIN,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -45,6 +49,13 @@ def _pin_matches(code: str, stored: str) -> bool:
     except ValueError:
         return False
     return hmac.compare_digest(computed, digest)
+
+
+def arm_requires_pin(options: Mapping[str, Any]) -> bool:
+    """Whether arming needs the PIN: a PIN is on and not limited to disarm (#642)."""
+    return bool(options.get("use_pin_code", False)) and bool(
+        options.get(CONF_ARM_REQUIRES_PIN, DEFAULT_ARM_REQUIRES_PIN)
+    )
 
 
 def validate_pin(options: Mapping[str, Any], code: object) -> None:
