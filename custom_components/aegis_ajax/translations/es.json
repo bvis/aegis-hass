@@ -108,6 +108,7 @@
                     "cloud_video": "Vista en directo por la nube para cámaras de vídeo (experimental)",
                     "use_pin_code": "Requerir codigo PIN para armar/desarmar",
                     "pin_code": "Codigo PIN",
+                    "arm_requires_pin": "Requerir tambien el PIN para armar",
                     "fcm_project_id": "ID de proyecto FCM (para notificaciones push)",
                     "fcm_app_id": "ID de app FCM",
                     "fcm_api_key": "Clave de API FCM",
@@ -124,6 +125,7 @@
                 "data_description": {
                     "bypass_switches": "Los switches de bypass permiten desactivar un dispositivo antes de armar. 'Auto' solo los crea si tu cuenta de Ajax tiene permiso para desactivar dispositivos.",
                     "expose_arm_home": "Añade un modo Armar en casa al panel de alarma. Duplica el modo Noche y solo hace falta para Amazon Alexa o Nabu Casa Cloud. Desactívalo para ocultar el botón duplicado si no los usas.",
+                    "arm_requires_pin": "Desactivado: se arma con un toque y el PIN solo se pide para desarmar. Solo se aplica si la opcion de codigo PIN esta activada.",
                     "delay_panel_states": "Al activarlo, el panel de alarma muestra \"arming\" mientras el hub ejecuta el \"Retardo al salir\" de un detector y \"pending\" mientras corre un \"Retardo al entrar\", ambos a partir de las señales del propio hub, no de un temporizador nuestro. Los detectores sin retardo (alarma instantánea) ya están activos durante \"arming\". Las automatizaciones que esperan \"armed_away\" se dispararán cuando termine el retardo de salida. El estado bruto del hub queda en el atributo \"hub_state\".",
                     "cloud_video": "Añade una cámara de vista en directo por cada cámara de vídeo Ajax, transmitida a través de la nube de Ajax como hace la app fuera de casa, así que también funciona cuando Home Assistant no está en la red de la cámara. Experimental: puede que aún no funcione con todas las cámaras. Cada visualización abre una sesión de vídeo; no se ejecuta nada mientras nadie mira.",
                     "disable_push_warning": "Actívalo si funcionas a propósito sin push. Oculta el recordatorio recurrente \"FCM no configurado\" y su tarjeta de reparación. Los eventos en tiempo real (timbre, armar/desarmar, alarma, movimiento) seguirán sin llegar a Home Assistant hasta que configures FCM.",

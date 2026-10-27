@@ -379,6 +379,11 @@ CONF_FORCE_ARM = "force_arm"
 # Defaults to True to preserve the discovery path for existing Alexa users.
 CONF_EXPOSE_ARM_HOME = "expose_arm_home"
 DEFAULT_EXPOSE_ARM_HOME = True
+# With "Use PIN code" on, whether arming also needs the PIN (#642). Off keeps
+# the keypad for disarm only, the way HA's own manual / template panels behave
+# with `code_arm_required: false`. Default True: nothing changes for existing PINs.
+CONF_ARM_REQUIRES_PIN = "arm_requires_pin"
+DEFAULT_ARM_REQUIRES_PIN = True
 # Show the hub's exit / entry delays as the panel's `arming` / `pending`
 # states (#454), driven by the hub's own HTS delay events. Opt-in and default
 # OFF: with it on, automations keyed on `armed_*` fire once the exit delay
