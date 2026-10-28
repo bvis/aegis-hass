@@ -140,8 +140,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: AjaxCobrandedCoordinator = entry.runtime_data
+    entities: list[AlarmControlPanelEntity] = []
     if coordinator.commands_only is True:
-        entities: list[AlarmControlPanelEntity] = []
         for space_id, space in coordinator.spaces.items():
             # Keep the whole-space control for users who want to arm or
             # disarm every zone at once. Commands-only accounts do not own
@@ -158,7 +158,6 @@ async def async_setup_entry(
         async_add_entities(entities)
         return
 
-    entities: list[AlarmControlPanelEntity] = []
     for space_id, space in coordinator.spaces.items():
         # Always create the space-level panel. It carries night-mode support
         # (Ajax exposes night mode only at the space level) and acts as the

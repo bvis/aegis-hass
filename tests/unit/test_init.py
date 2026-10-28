@@ -1185,7 +1185,7 @@ class TestAsyncRemoveConfigEntryDevice:
 class TestMigrateEntry:
     @pytest.mark.asyncio
     async def test_plaintext_password_is_hashed_once_in_migration(self) -> None:
-        """2.1 → 2.2 hashes a stored plaintext password; setup no longer does it (#612)."""
+        """Legacy plaintext passwords are hashed during the v3 migration (#612)."""
         from custom_components.aegis_ajax import async_migrate_entry
 
         hass = MagicMock()
@@ -1196,7 +1196,8 @@ class TestMigrateEntry:
         assert await async_migrate_entry(hass, entry) is True
 
         kwargs = hass.config_entries.async_update_entry.call_args.kwargs
-        assert kwargs["minor_version"] == 2
+        assert kwargs["version"] == 3
+        assert kwargs["minor_version"] == 0
         assert "password" not in kwargs["data"]
         assert kwargs["data"]["password_hash"]
 
@@ -1205,7 +1206,24 @@ class TestMigrateEntry:
         from custom_components.aegis_ajax import async_migrate_entry
 
         hass = MagicMock()
-        entry = MagicMock(version=2, minor_version=2)
+        entry = MagicMock(version=3, minor_version=0)
 
         assert await async_migrate_entry(hass, entry) is True
         hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_v2_entry_is_migrated_to_v3(self) -> None:
+        from custom_components.aegis_ajax import async_migrate_entry
+
+        hass = MagicMock()
+        entry = MagicMock(version=2, minor_version=2, entry_id="e2")
+        entry.data = {"email": "a@b.c", "account_role": "primary"}
+        entry.options = {"poll_interval": 30}
+
+        assert await async_migrate_entry(hass, entry) is True
+
+        kwargs = hass.config_entries.async_update_entry.call_args.kwargs
+        assert kwargs["version"] == 3
+        assert kwargs["minor_version"] == 0
+        assert kwargs["data"] == entry.data
+        assert kwargs["options"] == entry.options

@@ -605,11 +605,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate config entry to newer version."""
+    """Migrate config entries to the current version."""
+    if entry.version >= 3:
+        return True
+
+    new_data = dict(entry.data)
+    new_options = dict(entry.options)
+
     if entry.version == 1:
-        # v1 → v2: Move FCM credentials from options to data
-        new_data = dict(entry.data)
-        new_options = dict(entry.options)
+        # v1 → v2: Move FCM credentials from options to data.
         migrated = False
         for key in _FCM_KEYS:
             if key in new_options and new_options[key]:
@@ -619,20 +623,34 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 new_options.pop(key)
         if migrated:
             _LOGGER.info("Migrated FCM credentials from options to data")
-        hass.config_entries.async_update_entry(entry, data=new_data, options=new_options, version=2)
-    if entry.version == 2 and entry.minor_version < 2:
-        # 2.1 → 2.2: plaintext password → hash (#612; used to run on every setup)
-        new_data = dict(entry.data)
-        if "password" in new_data and "password_hash" not in new_data:
-            from custom_components.aegis_ajax.api.session import AjaxSession  # noqa: PLC0415
 
-            new_data["password_hash"] = AjaxSession.hash_password(new_data.pop("password"))
-            _LOGGER.warning(
-                "Migrated plaintext password to hash for entry %s. "
-                "Please reconfigure if issues arise.",
-                entry.entry_id,
-            )
-        hass.config_entries.async_update_entry(entry, data=new_data, minor_version=2)
+    # 2.1 → 2.2: plaintext password → hash (#612).
+    if (
+        (entry.version == 1 or (entry.version == 2 and entry.minor_version < 2))
+        and "password" in new_data
+        and "password_hash" not in new_data
+    ):
+        from custom_components.aegis_ajax.api.session import AjaxSession  # noqa: PLC0415
+
+        new_data["password_hash"] = AjaxSession.hash_password(new_data.pop("password"))
+        _LOGGER.warning(
+            "Migrated plaintext password to hash for entry %s. Please reconfigure if issues arise.",
+            entry.entry_id,
+        )
+
+    # v3 marks entries created by the commands-only flow. Updating every
+    # existing entry to the same version makes an older release refuse the
+    # whole restored configuration rather than partially loading entries and
+    # creating duplicate entities. Users rolling back should restore the HA
+    # backup made before this migration.
+    hass.config_entries.async_update_entry(
+        entry,
+        data=new_data,
+        options=new_options,
+        version=3,
+        minor_version=0,
+    )
+    _LOGGER.info("Migrated Aegis config entry %s to version 3", entry.entry_id)
     return True
 
 
@@ -776,9 +794,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
             if dependent.data.get(CONF_PRIMARY_ENTRY_ID) != entry.entry_id:
                 continue
             dependent_coordinator = getattr(dependent, "runtime_data", None)
-            if getattr(dependent_coordinator, "commands_only", False) is True:
+            if (
+                dependent_coordinator is not None
+                and getattr(dependent_coordinator, "commands_only", False) is True
+            ):
                 dependent_coordinator.async_primary_loaded()
-
 
     # Attach the persistent-notification manager (2.2). Reads the current
     # options; the entry reloads on any options change, so this is rebuilt with
@@ -871,7 +891,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         entry, PLATFORMS_COMMANDS_ONLY if commands_only else PLATFORMS
     )
     coordinator.mark_platforms_set_up()
-
     # Auto-label entities for easy grouping in automations.
     # Users can disable this from the OptionsFlow when they prefer to manage
     # labels manually (the label registry is otherwise authoritative and
@@ -1030,7 +1049,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntr
                 if dependent.data.get(CONF_PRIMARY_ENTRY_ID) != entry.entry_id:
                     continue
                 dependent_coordinator = getattr(dependent, "runtime_data", None)
-                if getattr(dependent_coordinator, "commands_only", False) is True:
+                if (
+                    dependent_coordinator is not None
+                    and getattr(dependent_coordinator, "commands_only", False) is True
+                ):
                     dependent_coordinator.async_primary_unloaded()
     return unload_ok
 

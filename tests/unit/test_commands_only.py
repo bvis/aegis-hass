@@ -68,9 +68,7 @@ async def test_commands_only_flow_requires_primary_and_persists_label(hass: Home
         patch("custom_components.aegis_ajax.config_flow.SpacesApi") as spaces_api,
     ):
         spaces_api.return_value.list_spaces = AsyncMock(return_value=[space])
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {
@@ -162,4 +160,3 @@ def test_commands_only_panel_is_labeled_and_arm_disarm_only() -> None:
     assert group_panel.name == "Night shift Downstairs"
     assert group_panel.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
     assert group_panel.available is True
-

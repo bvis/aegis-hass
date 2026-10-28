@@ -76,6 +76,7 @@ from custom_components.aegis_ajax.service_security import hash_pin
 
 _LOGGER = logging.getLogger(__name__)
 
+
 def _user_schema(hass: HomeAssistant) -> vol.Schema:
     """Build the login form, including optional command-account routing."""
     primary_options = [
@@ -133,8 +134,11 @@ def _unexpected_error_key(err: Exception) -> str:
 class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security."""
 
-    VERSION = 2
-    MINOR_VERSION = 2
+    # v3 marks entries created by the commands-only account flow. Older
+    # releases must refuse those entries instead of loading them as full
+    # accounts and creating duplicate entity IDs during a rollback.
+    VERSION = 3
+    MINOR_VERSION = 0
     DOMAIN = DOMAIN
 
     def __init__(self) -> None:
@@ -225,9 +229,11 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
             self._account_label = str(user_input.get(CONF_ACCOUNT_LABEL, "")).strip()
             if self._account_role == ACCOUNT_ROLE_COMMANDS_ONLY:
                 primary_entry = self.hass.config_entries.async_get_entry(self._primary_entry_id)
-                if primary_entry is None or primary_entry.data.get(
-                    CONF_ACCOUNT_ROLE, ACCOUNT_ROLE_PRIMARY
-                ) != ACCOUNT_ROLE_PRIMARY:
+                if (
+                    primary_entry is None
+                    or primary_entry.data.get(CONF_ACCOUNT_ROLE, ACCOUNT_ROLE_PRIMARY)
+                    != ACCOUNT_ROLE_PRIMARY
+                ):
                     errors["base"] = "primary_account_required"
                 elif not self._account_label:
                     errors["base"] = "account_label_required"
@@ -286,7 +292,6 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=_user_schema(self.hass), errors=errors
         )
-
 
     async def async_step_2fa(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
