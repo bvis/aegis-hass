@@ -41,7 +41,8 @@
             "channel_1": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
             "channel_2": { "default": "mdi:electric-switch", "state": { "on": "mdi:electric-switch-closed", "off": "mdi:electric-switch" } },
             "chime": { "default": "mdi:bell", "state": { "on": "mdi:bell-ring", "off": "mdi:bell-off" } },
-            "night_mode_arm": { "default": "mdi:weather-night" }
+            "night_mode_arm": { "default": "mdi:weather-night" },
+            "light_switch_buttons_locked": { "default": "mdi:gesture-tap-button", "state": { "on": "mdi:lock", "off": "mdi:lock-open-variant" } }
         },
         "button": {
             "capture_photo": { "default": "mdi:camera" },
