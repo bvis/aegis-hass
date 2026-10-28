@@ -289,6 +289,19 @@ async def async_get_config_entry_diagnostics(
                 {space.hub_id for space in coordinator.spaces.values() if space.hub_id}
             )
         },
+        # LightSwitch settings byte, HTS 0x34 (#641), behind the "Lock switch
+        # buttons" switch. Raw value plus the decoded bits so a report can be
+        # checked against what the app shows.
+        "light_switch_settings": {
+            device_id: {
+                "raw": f"0x{value:02x}",
+                "backlight": bool(value & 0x01),
+                "buttons_locked": bool(value & 0x02),
+                "state_memory": bool(value & 0x04),
+                "current_threshold": bool(value & 0x08),
+            }
+            for device_id, value in sorted(coordinator.light_switch_settings.items())
+        },
         # Firmware update state feeding the `update.*` entities (project
         # rule: every entity-driving field is dumped here). Both maps are
         # empty most of the time — Ajax only lists a hub/device while an

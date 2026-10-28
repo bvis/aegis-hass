@@ -63,6 +63,11 @@ from custom_components.aegis_ajax.const import (
     DOMAIN,
     HUB_DEVICE_TEMP_REFRESH_INTERVAL,
     HUB_DEVICE_TEMPERATURE_DEVICE_TYPES,
+    LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES,
+    LIGHT_SWITCH_BUTTONS_LOCKED_BIT,
+    LIGHT_SWITCH_LEGACY_LOCK_KEY,
+    LIGHT_SWITCH_OBJECT_TYPE,
+    LIGHT_SWITCH_SETTINGS_KEY,
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
@@ -411,6 +416,20 @@ def _describe_hts_epoch(value: bytes) -> str:
     return dt_util.utc_from_timestamp(seconds).isoformat()
 
 
+def _describe_light_switch_settings(raw: bytes | None) -> str:
+    """Spell out a LightSwitch 0x34 byte bit by bit for the #641 debug log."""
+    if raw is None:
+        return "absent"
+    if len(raw) != 1:
+        return f"unexpected {len(raw)}b {raw.hex()}"
+    value = raw[0]
+    return (
+        f"0x{value:02x} backlight={value & 1} buttons_locked={value >> 1 & 1} "
+        f"state_memory={value >> 2 & 1} current_threshold={value >> 3 & 1} "
+        f"other_bits=0x{value & 0xF0:02x}"
+    )
+
+
 # Marks a `tamper` status as sourced from the HTS status stream rather than the
 # gRPC device stream. The gRPC snapshot on these hubs has no tamper field at
 # all, so a fresh snapshot would silently wipe the status; this lets
@@ -649,6 +668,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # (same shape as `self.devices` keys). Empty dict = no readings
         # snapshotted yet OR no electrical devices in the install.
         self.device_readings: dict[str, DeviceReadings] = {}
+        # LightSwitch settings byte, HTS key 0x34 (#641), keyed like
+        # `self.devices`. Only rows of the families that report it land here.
+        self.light_switch_settings: dict[str, int] = {}
+        # Byte we wrote and are waiting to see the hub report back (#641).
+        self._light_switch_expected: dict[str, int] = {}
         # SpaceControl keyfobs (HTS-only; not in the gRPC device snapshot).
         # Populated from SETTINGS_BODY rows via `_on_hts_device_kv`. Keyed by
         # upper-case 8-char device id. The binary_sensor platform creates a
@@ -2078,6 +2102,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Per-detector exit/entry delay seconds, 0xAC/0xAD (#454) — only the
         # SETTINGS_BODY row carries them; a row without the keys is left alone.
         self._track_arm_delays(device_id_hex, kv)
+        # LightSwitch "Lock switch buttons" and its sibling flags, 0x34 (#641).
+        self._track_light_switch_settings(device_id_hex, device, kv, from_body=from_body)
         # Case tampering via HTS 0x04/0x0f (#339), for hubs that carry the
         # signal only on the status stream. Runs before anything that can
         # return early so every device family is covered.
@@ -3200,6 +3226,123 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             delays.arm_delay_seconds,
             delays.alarm_delay_seconds,
             delays.night_mode,
+        )
+
+    def _track_light_switch_settings(
+        self, device_id_hex: str, device: Device, kv: dict[int, bytes], *, from_body: bool
+    ) -> None:
+        """Keep a LightSwitch's 0x34 settings byte from its HTS row (#641).
+
+        Bit 1 is "Lock switch buttons"; bits 0, 2 and 3 are backlight, state
+        memory and the current threshold. Every sighting is logged at DEBUG
+        with the decoded bits, so a reporter's log shows what the hub said
+        before and after a change. A row that also carries 0x4b belongs to the
+        older family, where 0x34 isn't this setting, so it is never tracked.
+        """
+        if device.device_type not in LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES:
+            return
+        raw = kv.get(LIGHT_SWITCH_SETTINGS_KEY)
+        legacy = kv.get(LIGHT_SWITCH_LEGACY_LOCK_KEY)
+        if raw is None and legacy is None:
+            return
+        _LOGGER.debug(
+            "LightSwitch %s (%s) %s row: 0x34=%s 0x4b=%s keys=%s",
+            device_id_hex,
+            device.device_type,
+            "body" if from_body else "update",
+            _describe_light_switch_settings(raw),
+            legacy.hex() if legacy is not None else None,
+            ",".join(f"0x{k:02x}" for k in sorted(kv)),
+        )
+        if legacy is not None or raw is None or len(raw) != 1:
+            return
+        value = raw[0]
+        expected = self._light_switch_expected.pop(device_id_hex, None)
+        if expected is not None:
+            if value == expected:
+                _LOGGER.info(
+                    "LightSwitch %s confirmed the write: settings 0x%02x (%s)",
+                    device_id_hex,
+                    value,
+                    _describe_light_switch_settings(raw),
+                )
+            else:
+                _LOGGER.warning(
+                    "LightSwitch %s reported settings 0x%02x after we wrote 0x%02x (%s)",
+                    device_id_hex,
+                    value,
+                    expected,
+                    _describe_light_switch_settings(raw),
+                )
+        if self.light_switch_settings.get(device_id_hex) == value:
+            return
+        self.light_switch_settings[device_id_hex] = value
+        self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+
+    async def async_set_light_switch_buttons_locked(self, device_id: str, *, locked: bool) -> None:
+        """Lock or unlock a LightSwitch's touch buttons, like the app (#641).
+
+        Rewrites the whole 0x34 byte from the value the hub last reported,
+        flipping only bit 1, because that's how the app writes it. One HTS
+        frame per call; no request is sent when nothing would change.
+        """
+        device = self.devices.get(device_id)
+        current = self.light_switch_settings.get(device_id)
+        hts_client = self._hts_client
+        if device is None or current is None or hts_client is None or not hts_client.is_connected:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": "hub connection (HTS) not active"},
+            )
+        if locked:
+            new = current | LIGHT_SWITCH_BUTTONS_LOCKED_BIT
+        else:
+            new = current & ~LIGHT_SWITCH_BUTTONS_LOCKED_BIT
+        if new == current:
+            return
+        try:
+            answer = await hts_client.write_device_parameter(
+                device.hub_id,
+                LIGHT_SWITCH_OBJECT_TYPE,
+                device_id,
+                LIGHT_SWITCH_SETTINGS_KEY,
+                bytes([new]),
+            )
+        except HtsConnectionError as exc:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": str(exc)},
+            ) from exc
+        name = COMMAND_ANSWERS.get(answer, f"0x{answer:02X}")
+        _LOGGER.info(
+            "LightSwitch %s buttons %s: wrote settings 0x%02x -> 0x%02x, hub answered %s",
+            device_id,
+            "locked" if locked else "unlocked",
+            current,
+            new,
+            name,
+        )
+        if answer in (0x01, 0x02, 0x09):
+            # The entity follows the byte the hub reports next; until then show
+            # what we wrote, and check the report against it.
+            self._light_switch_expected[device_id] = new
+            self.light_switch_settings[device_id] = new
+            self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
+            return
+        key = {
+            0x03: "command_not_performed",
+            0x05: "command_permission_denied",
+            0x06: "command_unknown",
+            0x07: "command_hub_offline",
+            0x0F: "command_hub_wrong_state",
+            0x11: "command_hub_wrong_state",
+        }.get(answer, "command_failed")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=key,
+            translation_placeholders={"reason": name} if key == "command_failed" else None,
         )
 
     def _space_arm_delays(self, space_id: str) -> list[ArmDelays]:

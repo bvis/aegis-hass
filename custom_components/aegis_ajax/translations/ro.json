@@ -603,6 +603,9 @@
             },
             "chime": {
                 "name": "Sonerie"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Blochează butoanele"
             }
         },
         "number": {

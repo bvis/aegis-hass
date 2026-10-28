@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - unreleased
+
+### Added
+- **Lock LightSwitch buttons from Home Assistant (#641, thanks @Tehnikis).** Each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app: when it's on, touching the wall panel does nothing, and the light still works from the app and from Home Assistant. It's one setting per device, so on a 2-gang switch it locks both buttons. The state comes from what the hub reports; after a change, the debug log says whether the hub's next report matches what was written. Older LightSwitch models that report the setting differently don't get the switch yet. **Requests to Ajax:** none to read it (it rides the hub connection that's already open); one message to the hub per change, the same one the app sends.
+
 ## [1.29.0] - 2026-10-28
 
 ### Added
