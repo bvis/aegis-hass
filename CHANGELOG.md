@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.1-beta.4] - 2026-10-28
+
+### Fixed
+- **Commands-only entries now fail safely on older releases.** Existing entries migrate to version 3, while older Aegis releases refuse them instead of partially loading the accounts and creating duplicate entities during a rollback. Restore a Home Assistant backup from before the migration when downgrading.
+- **CI validation for the migration.** The versioned commands-only flow, account migration, and alarm-panel setup now pass the complete Python 3.13 and 3.14 test matrices and static checks.
+
 ## [1.28.0] - 2026-10-25
 
 ### Added
