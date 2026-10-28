@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.29.0] - unreleased
+## [1.29.0] - 2026-10-28
 
 ### Added
 - **PIN for disarm only (#642, thanks @themluckylegs).** With *Use PIN code* on, a new option *Also require the PIN to arm* (on by default, so nothing changes) can be turned off. Then the alarm panels arm with one tap and only ask for the PIN to disarm, the way Home Assistant's own manual alarm panel works without an arm code. That allows arming Night mode from a bedside screen or an automation without keeping a copy of the PIN in a script, and lets Alexa find the panel again. Force-arm services follow the same option. **Requests to Ajax:** none.
