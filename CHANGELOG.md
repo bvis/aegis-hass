@@ -5,13 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.29.0-beta.3] - 2026-10-28
+## [1.30.0] - unreleased
+
+### Added
+- **Lock LightSwitch buttons from Home Assistant (#641, thanks @Tehnikis).** Each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app: when it's on, touching the wall panel does nothing, and the light still works from the app and from Home Assistant. It's one setting per device, so on a 2-gang switch it locks both buttons. The state comes from what the hub reports; after a change, the debug log says whether the hub's next report matches what was written. Older LightSwitch models that report the setting differently don't get the switch yet. **Requests to Ajax:** none to read it (it rides the hub connection that's already open); one message to the hub per change, the same one the app sends.
+
+- **Commands-only Ajax accounts.** A commands-only account uses its own Ajax credentials for separate arm/disarm controls while reusing linked primary account state and space data; it does not create duplicate sensors, cameras, or devices.
 
 ### Fixed
-- **Commands-only entries now fail safely on older releases.** Existing entries migrate to version 3, while older Aegis releases refuse them instead of partially loading the accounts and creating duplicate entities during a rollback. Restore a Home Assistant backup from before the migration when downgrading.
-- **CI validation for the migration.** The versioned commands-only flow, account migration, and alarm-panel setup now pass the complete Python 3.13 and 3.14 test matrices and static checks.
+- **Commands-only entries now fail safely on older releases.** Existing entries migrate to version 3, while older Aegis releases refuse them instead of partially loading accounts and creating duplicate entities during rollback. Restore a Home Assistant backup made before migration when downgrading.
+- **CI validation for the migration.** The versioned commands-only flow, account migration, and alarm-panel setup pass the complete Python 3.13 and 3.14 test matrices and static checks.
 
-## [1.29.0] - unreleased
+## [1.29.0] - 2026-10-28
 
 ### Added
 - **PIN for disarm only (#642, thanks @themluckylegs).** With *Use PIN code* on, a new option *Also require the PIN to arm* (on by default, so nothing changes) can be turned off. Then the alarm panels arm with one tap and only ask for the PIN to disarm, the way Home Assistant's own manual alarm panel works without an arm code. That allows arming Night mode from a bedside screen or an automation without keeping a copy of the PIN in a script, and lets Alexa find the panel again. Force-arm services follow the same option. **Requests to Ajax:** none.

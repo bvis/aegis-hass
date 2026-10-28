@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Deurbel"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Knoppen vergrendelen"
             }
         },
         "number": {

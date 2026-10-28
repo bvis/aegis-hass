@@ -210,6 +210,28 @@ HUB_DEVICE_TEMPERATURE_DEVICE_TYPES = frozenset(
     }
 )
 
+# LightSwitch models whose "Lock switch buttons" setting rides HTS key 0x34
+# (#641). Bit 1 of that byte is the lock; bits 0, 2 and 3 are backlight, state
+# memory and the current threshold, so a write must keep them as reported.
+# Older LightSwitch rows report the lock on 0x4b instead and are left alone.
+LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES = frozenset(
+    {
+        "light_switch",
+        "light_switch_one_gang",
+        "light_switch_one_gang_na",
+        "light_switch_2_way",
+        "light_switch_crossover",
+        "light_switch_three_way_na",
+        "light_switch_two_gang",
+        "light_switch_two_channel_two_way",
+        "light_switch_four_way_na",
+    }
+)
+LIGHT_SWITCH_SETTINGS_KEY = 0x34
+LIGHT_SWITCH_LEGACY_LOCK_KEY = 0x4B
+LIGHT_SWITCH_BUTTONS_LOCKED_BIT = 0x02
+LIGHT_SWITCH_OBJECT_TYPE = 0x44
+
 
 class SecurityState(IntEnum):
     """Maps DisplayedSpaceSecurityState proto enum."""

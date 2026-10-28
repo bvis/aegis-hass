@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Gong"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Zablokuj przyciski"
             }
         },
         "number": {

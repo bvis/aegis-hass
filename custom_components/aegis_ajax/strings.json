@@ -707,6 +707,9 @@
             },
             "chime": {
                 "name": "Chime"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Lock switch buttons"
             }
         },
         "number": {

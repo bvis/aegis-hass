@@ -113,6 +113,11 @@ HUB_COMMAND_MSG_TYPE = 0x06
 HUB_COMMAND_KEY = 0x00
 OBJECT_TYPE_HUB = 0x21
 HUB_COMMAND_RESTORE_AFTER_ALARM = 0x16
+# A device setting change (#641) goes out as a type-0x07 frame addressed to the
+# hub, the same one the app sends: [object type, object id, key, value, ...]
+# closed by an `fe fe` param. Its result comes back like a hub command's.
+WRITE_PARAMETER_MSG_TYPE = 0x07
+WRITE_PARAMETER_TERMINATOR = b"\xfe\xfe"
 HUB_COMMAND_TIMEOUT = 15
 COMMAND_ANSWERS = {
     0x01: "DELIVERED",
@@ -795,7 +800,32 @@ class HtsClient:
             ],
         )
 
-    async def _send_hub_command(self, hub: int, params: list[bytes]) -> int:
+    async def write_device_parameter(
+        self, hub_id: str, object_type: int, device_id: str, key: int, value: bytes
+    ) -> int:
+        """Write one device setting the way the app does (#641); return the answer code."""
+        params = [
+            bytes([object_type]),
+            int(device_id, 16).to_bytes(4, "big"),
+            bytes([key]),
+            value,
+            WRITE_PARAMETER_TERMINATOR,
+        ]
+        _LOGGER.debug(
+            "Writing device %s parameter 0x%02x=%s on hub %s (payload %s)",
+            device_id,
+            key,
+            value.hex(),
+            hub_id,
+            tlv_encode(params).hex(),
+        )
+        return await self._send_hub_command(
+            int(hub_id, 16), params, msg_type=WRITE_PARAMETER_MSG_TYPE
+        )
+
+    async def _send_hub_command(
+        self, hub: int, params: list[bytes], *, msg_type: int = HUB_COMMAND_MSG_TYPE
+    ) -> int:
         """Send one hub command and wait for its answer code."""
         if not self._connected:
             raise HtsConnectionError("HTS is not connected")
@@ -803,9 +833,7 @@ class HtsClient:
             future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
             self._pending_hub_command = (None, future)
             try:
-                seq = await self._send_message(
-                    HUB_COMMAND_MSG_TYPE, tlv_encode(params), receiver=hub
-                )
+                seq = await self._send_message(msg_type, tlv_encode(params), receiver=hub)
                 self._pending_hub_command = (seq, future)
                 return await asyncio.wait_for(future, timeout=HUB_COMMAND_TIMEOUT)
             except TimeoutError as exc:
@@ -836,6 +864,13 @@ class HtsClient:
             and int.from_bytes(params[1]) != seq
         ):
             return
+        _LOGGER.debug(
+            "Hub answer to seq %s: 0x%02x %s (params %s)",
+            seq,
+            params[0][0],
+            COMMAND_ANSWERS.get(params[0][0], "?"),
+            [p.hex() for p in params],
+        )
         if not pending[1].done():
             pending[1].set_result(params[0][0])
 

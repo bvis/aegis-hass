@@ -295,6 +295,25 @@ class TestAsyncGetConfigEntryDiagnostics:
         }
 
     @pytest.mark.asyncio
+    async def test_light_switch_settings_dumped_bit_by_bit(
+        self, coordinator: MagicMock, entry: MagicMock
+    ) -> None:
+        """#641: the raw 0x34 byte and its decoded flags."""
+        coordinator.light_switch_settings = {"3A1B2C4D": 0x07}
+
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+        assert result["light_switch_settings"] == {
+            "3A1B2C4D": {
+                "raw": "0x07",
+                "backlight": True,
+                "buttons_locked": True,
+                "state_memory": True,
+                "current_threshold": False,
+            }
+        }
+
+    @pytest.mark.asyncio
     async def test_returns_dict(self, entry: MagicMock) -> None:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert isinstance(result, dict)

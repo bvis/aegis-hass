@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Zil sesi"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Düğmeleri kilitle"
             }
         },
         "number": {

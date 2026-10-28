@@ -23,6 +23,8 @@ from custom_components.aegis_ajax.const import (
     CONF_BYPASS_SWITCHES,
     DEFAULT_BYPASS_SWITCHES,
     DOMAIN,
+    LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES,
+    LIGHT_SWITCH_BUTTONS_LOCKED_BIT,
 )
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
@@ -130,6 +132,10 @@ async def async_setup_entry(
                     hub_id=device.hub_id,
                     device_type=device.device_type,
                 )
+            )
+        if device.device_type in LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES:
+            entities.append(
+                AjaxLightSwitchButtonLockSwitch(coordinator=coordinator, device_id=device_id)
             )
         if capabilities_for(device).has_night_mode_arm:
             entities.append(
@@ -453,6 +459,53 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
                     translation_domain=DOMAIN, translation_key="night_mode_arm_while_armed"
                 ) from err
             raise
+
+
+class AjaxLightSwitchButtonLockSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
+    """A LightSwitch's "Lock switch buttons" setting (#641).
+
+    `on` = the touch buttons on the wall do nothing, while the light still
+    works from the Ajax app and Home Assistant. One setting per device, so it
+    covers every gang. The state is the hub's own report (HTS key 0x34), read
+    from the stream that's already open; the switch stays unavailable until
+    the hub has reported it, because a write needs the current byte.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "light_switch_buttons_locked"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: AjaxCobrandedCoordinator, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._device_id = device_id
+        self._attr_unique_id = f"aegis_ajax_{device_id}_buttons_locked"
+        device = coordinator.devices.get(device_id)
+        if device:
+            self._attr_device_info = build_device_info(
+                device, coordinator.rooms, via_device_id=coordinator.hub_registry_id(device.hub_id)
+            )
+
+    @property
+    def available(self) -> bool:
+        device = self.coordinator.devices.get(self._device_id)
+        return (
+            device is not None
+            and device.is_online
+            and self._device_id in self.coordinator.light_switch_settings
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        value = self.coordinator.light_switch_settings.get(self._device_id)
+        if value is None:
+            return None
+        return bool(value & LIGHT_SWITCH_BUTTONS_LOCKED_BIT)
+
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await self.coordinator.async_set_light_switch_buttons_locked(self._device_id, locked=True)
+
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await self.coordinator.async_set_light_switch_buttons_locked(self._device_id, locked=False)
 
 
 class AjaxChimeSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):

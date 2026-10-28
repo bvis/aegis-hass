@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Campanello"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Blocca i pulsanti"
             }
         },
         "number": {

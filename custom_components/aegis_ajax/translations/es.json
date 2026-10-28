@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Timbre"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Bloquear botones"
             }
         },
         "number": {

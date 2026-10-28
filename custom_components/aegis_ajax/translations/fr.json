@@ -612,6 +612,9 @@
             },
             "chime": {
                 "name": "Carillon"
+            },
+            "light_switch_buttons_locked": {
+                "name": "Verrouiller les boutons"
             }
         },
         "number": {
