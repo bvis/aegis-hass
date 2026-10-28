@@ -44,6 +44,7 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_NEVER,
     CONF_ACCOUNT_LABEL,
     CONF_ACCOUNT_ROLE,
+    CONF_ARM_REQUIRES_PIN,
     CONF_AUTO_CREATE_LABELS,
     CONF_BYPASS_SWITCHES,
     CONF_CLOUD_VIDEO,
@@ -56,6 +57,7 @@ from custom_components.aegis_ajax.const import (
     CONF_PHOTO_MAX_PER_DEVICE,
     CONF_PHOTO_RETENTION_DAYS,
     CONF_PRIMARY_ENTRY_ID,
+    DEFAULT_ARM_REQUIRES_PIN,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_BYPASS_SWITCHES,
     DEFAULT_CLOUD_VIDEO,
@@ -775,6 +777,12 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                     vol.Optional("pin_code"): TextSelector(
                         TextSelectorConfig(type=TextSelectorType.PASSWORD)
                     ),
+                    vol.Optional(
+                        CONF_ARM_REQUIRES_PIN,
+                        default=self._entry.options.get(
+                            CONF_ARM_REQUIRES_PIN, DEFAULT_ARM_REQUIRES_PIN
+                        ),
+                    ): bool,
                     vol.Optional(
                         "fcm_project_id",
                         description={"suggested_value": self._get_fcm("fcm_project_id")},

@@ -117,6 +117,7 @@
                     "cloud_video": "Cloud live view for video cameras (experimental)",
                     "use_pin_code": "Require PIN code for arm/disarm",
                     "pin_code": "PIN code",
+                    "arm_requires_pin": "Also require the PIN to arm",
                     "fcm_project_id": "FCM Project ID (for push notifications)",
                     "fcm_app_id": "FCM App ID",
                     "fcm_api_key": "FCM API Key",
@@ -133,6 +134,7 @@
                 "data_description": {
                     "bypass_switches": "Bypass switches let you deactivate a device before arming. 'Auto' creates them only if your Ajax account has permission to deactivate devices.",
                     "expose_arm_home": "Adds an Arm Home option to the alarm panel. It mirrors Night mode and is mainly needed for Amazon Alexa or Nabu Casa Cloud. Turn it off to hide the duplicate button if you don't use them.",
+                    "arm_requires_pin": "Off: arming works with one tap and the PIN is only asked for disarm. Only applies when the PIN code option is on.",
                     "delay_panel_states": "When on, the alarm panel shows \"arming\" while the hub runs a detector's \"Delay when leaving\" and \"pending\" while a \"Delay when entering\" runs — both driven by the hub's own signals, not a timer of ours. Detectors without a delay (Instant Alarm) are already live during \"arming\". Automations waiting for \"armed_away\" will fire once the exit delay completes. The hub's raw state stays in the \"hub_state\" attribute.",
                     "cloud_video": "Adds a live-view camera for each Ajax video camera, streamed through the Ajax cloud the way the app does away from home, so it also works when Home Assistant is not on the camera's network. Experimental: it may not work on every camera yet. Each view opens one video session; nothing runs while nobody is watching.",
                     "disable_push_warning": "Enable this if you intentionally run without push. It hides the recurring \"FCM not configured\" reminder and Repair card. Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM.",
@@ -550,10 +552,10 @@
                 "name": "Cellular connected"
             },
             "lid": {
-                "name": "Lid opened"
+                "name": "Lid tamper"
             },
             "ext_contact": {
-                "name": "External contact broken"
+                "name": "External contact fault"
             },
             "ext_alert": {
                 "name": "External contact alert"

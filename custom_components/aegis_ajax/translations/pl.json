@@ -117,6 +117,7 @@
                     "cloud_video": "Podgląd na żywo przez chmurę dla kamer wideo (eksperymentalne)",
                     "use_pin_code": "Wymagaj kodu PIN do uzbrojenia/rozbrojenia",
                     "pin_code": "Kod PIN",
+                    "arm_requires_pin": "Wymagaj kodu PIN także do uzbrojenia",
                     "fcm_project_id": "ID projektu FCM (dla powiadomień push)",
                     "fcm_app_id": "ID aplikacji FCM",
                     "fcm_api_key": "Klucz API FCM",
@@ -133,6 +134,7 @@
                 "data_description": {
                     "bypass_switches": "Przełączniki pomijania pozwalają dezaktywować urządzenie przed uzbrojeniem. 'Auto' tworzy je tylko, gdy Twoje konto Ajax ma uprawnienia do dezaktywacji urządzeń.",
                     "expose_arm_home": "Dodaje do panelu alarmu tryb Uzbrój w domu. Odzwierciedla tryb nocny i jest potrzebny głównie dla Amazon Alexa lub Nabu Casa Cloud. Wyłącz, aby ukryć zduplikowany przycisk, jeśli ich nie używasz.",
+                    "arm_requires_pin": "Wyłączone: uzbrojenie jednym dotknięciem, PIN jest wymagany tylko do rozbrojenia. Działa tylko przy włączonej opcji kodu PIN.",
                     "delay_panel_states": "Po włączeniu panel alarmowy pokazuje \"arming\", gdy hub odlicza \"Opóźnienie przy wyjściu\" czujnika, oraz \"pending\", gdy trwa \"Opóźnienie przy wejściu\" — oba na podstawie sygnałów samego huba, a nie naszego zegara. Czujniki bez opóźnienia (alarm natychmiastowy) są już aktywne podczas \"arming\". Automatyzacje czekające na \"armed_away\" uruchomią się po zakończeniu opóźnienia wyjścia. Surowy stan huba pozostaje w atrybucie \"hub_state\".",
                     "cloud_video": "Dodaje kamerę z podglądem na żywo dla każdej kamery wideo Ajax, przesyłanym przez chmurę Ajax tak jak w aplikacji poza domem, więc działa także wtedy, gdy Home Assistant nie jest w sieci kamery. Eksperymentalne: może jeszcze nie działać z każdą kamerą. Każde oglądanie otwiera jedną sesję wideo; gdy nikt nie ogląda, nic nie działa.",
                     "disable_push_warning": "Włącz, jeśli celowo działasz bez push. Ukrywa powracające przypomnienie „FCM nieskonfigurowane” oraz kartę naprawy. Zdarzenia w czasie rzeczywistym (dzwonek, uzbrajanie/rozbrajanie, alarm, ruch) nie dotrą do Home Assistant, dopóki nie skonfigurujesz FCM.",
@@ -455,10 +457,10 @@
                 "name": "Sieć komórkowa"
             },
             "lid": {
-                "name": "Pokrywa otwarta"
+                "name": "Sabotaż pokrywy"
             },
             "ext_contact": {
-                "name": "Zewnętrzny styk przerwany"
+                "name": "Usterka zewnętrznego styku"
             },
             "ext_alert": {
                 "name": "Alarm zewnętrznego styku"

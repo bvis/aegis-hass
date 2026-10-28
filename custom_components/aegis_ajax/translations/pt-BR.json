@@ -117,6 +117,7 @@
                     "cloud_video": "Visualização ao vivo pela nuvem para câmeras de vídeo (experimental)",
                     "use_pin_code": "Exigir código PIN para armar/desarmar",
                     "pin_code": "Código PIN",
+                    "arm_requires_pin": "Exigir o PIN também para armar",
                     "fcm_project_id": "ID do projeto FCM (para notificações push)",
                     "fcm_app_id": "ID do aplicativo FCM",
                     "fcm_api_key": "Chave de API FCM",
@@ -133,6 +134,7 @@
                 "data_description": {
                     "bypass_switches": "Os interruptores de bypass permitem desativar um dispositivo antes de armar. 'Auto' só os cria se sua conta Ajax tiver permissão para desativar dispositivos.",
                     "expose_arm_home": "Adiciona um modo Armar em casa ao painel de alarme. Ele espelha o modo Noturno e é necessário principalmente para Amazon Alexa ou Nabu Casa Cloud. Desative para ocultar o botão duplicado se você não os usa.",
+                    "arm_requires_pin": "Desligado: arma com um toque e o PIN só é pedido para desarmar. Só vale com a opção de código PIN ativada.",
                     "delay_panel_states": "Quando ativado, o painel de alarme mostra \"arming\" enquanto o hub executa o \"Atraso ao sair\" de um detector e \"pending\" enquanto um \"Atraso ao entrar\" está em andamento, ambos a partir dos sinais do próprio hub, não de um temporizador nosso. Detectores sem atraso (alarme instantâneo) já estão ativos durante \"arming\". Automações que aguardam \"armed_away\" serão disparadas quando o atraso de saída terminar. O estado bruto do hub permanece no atributo \"hub_state\".",
                     "cloud_video": "Adiciona uma câmera de visualização ao vivo para cada câmera de vídeo Ajax, transmitida pela nuvem da Ajax como o app faz fora de casa, então também funciona quando o Home Assistant não está na rede da câmera. Experimental: pode ainda não funcionar com todas as câmeras. Cada visualização abre uma sessão de vídeo; nada roda enquanto ninguém está assistindo.",
                     "disable_push_warning": "Ative se você roda de propósito sem push. Oculta o lembrete recorrente \"FCM não configurado\" e o cartão de reparo. Eventos em tempo real (campainha, armar/desarmar, alarme, movimento) ainda não chegarão ao Home Assistant até você configurar o FCM.",
@@ -455,10 +457,10 @@
                 "name": "Rede celular conectada"
             },
             "lid": {
-                "name": "Tampa aberta"
+                "name": "Violação da tampa"
             },
             "ext_contact": {
-                "name": "Contato externo aberto"
+                "name": "Falha do contato externo"
             },
             "ext_alert": {
                 "name": "Alerta de contato externo"

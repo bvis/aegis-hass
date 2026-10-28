@@ -153,6 +153,19 @@ class TestParseConnectedResponse:
         with pytest.raises(ValueError, match="too short"):
             parse_connected_response(payload)
 
+    def test_trailing_param_without_flag_is_not_a_hub(self) -> None:
+        payload = tlv_encode(
+            [
+                bytes([AUTH_KEY_CONNECTED]),
+                b"\x01" * 16,
+                (0x0A1B2C3D).to_bytes(4, "big"),
+                b"\x01",
+                bytes.fromhex("4A0A6372"),
+            ]
+        )
+        response = parse_connected_response(payload)
+        assert [hub.hub_id for hub in response.hubs] == ["0A1B2C3D"]
+
     def test_hub_id_uppercase_hex(self) -> None:
         payload = self._make_payload(b"\x01", [(0xDEADBEEF, False)])
         response = parse_connected_response(payload)

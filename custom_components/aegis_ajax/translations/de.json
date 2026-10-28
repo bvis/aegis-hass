@@ -117,6 +117,7 @@
                     "cloud_video": "Cloud-Liveansicht für Videokameras (experimentell)",
                     "use_pin_code": "PIN-Code für Scharf-/Unscharfschalten erforderlich",
                     "pin_code": "PIN-Code",
+                    "arm_requires_pin": "PIN-Code auch zum Scharfschalten erforderlich",
                     "fcm_project_id": "FCM-Projekt-ID (für Push-Benachrichtigungen)",
                     "fcm_app_id": "FCM-App-ID",
                     "fcm_api_key": "FCM-API-Schlüssel",
@@ -133,6 +134,7 @@
                 "data_description": {
                     "bypass_switches": "Überbrückungsschalter ermöglichen das Deaktivieren eines Geräts vor dem Scharfschalten. „Auto“ erstellt sie nur, wenn dein Ajax-Konto die Berechtigung zum Deaktivieren von Geräten hat.",
                     "expose_arm_home": "Fügt dem Alarmfeld einen Modus „Zu Hause scharfschalten“ hinzu. Er entspricht dem Nachtmodus und wird hauptsächlich für Amazon Alexa oder Nabu Casa Cloud benötigt. Deaktivieren, um die doppelte Schaltfläche auszublenden, wenn Sie diese nicht verwenden.",
+                    "arm_requires_pin": "Aus: Scharfschalten mit einem Tippen, der PIN-Code wird nur zum Unscharfschalten abgefragt. Gilt nur, wenn die PIN-Code-Option aktiv ist.",
                     "delay_panel_states": "Wenn aktiv, zeigt das Alarmpanel \"arming\", während der Hub die \"Verzögerung beim Verlassen\" eines Melders ausführt, und \"pending\", während eine \"Verzögerung beim Betreten\" läuft — beides anhand der Signale des Hubs selbst, nicht eines eigenen Timers. Melder ohne Verzögerung (Sofortalarm) sind während \"arming\" bereits aktiv. Automationen, die auf \"armed_away\" warten, lösen aus, sobald die Ausgangsverzögerung abgelaufen ist. Der Rohzustand des Hubs bleibt im Attribut \"hub_state\" erhalten.",
                     "cloud_video": "Fügt für jede Ajax-Videokamera eine Liveansicht-Kamera hinzu, die wie in der App unterwegs über die Ajax-Cloud gestreamt wird. Sie funktioniert daher auch, wenn Home Assistant nicht im Netzwerk der Kamera ist. Experimentell: funktioniert eventuell noch nicht mit jeder Kamera. Jede Ansicht öffnet eine Videositzung; solange niemand zusieht, läuft nichts.",
                     "disable_push_warning": "Aktivieren, wenn Sie absichtlich ohne Push arbeiten. Blendet die wiederkehrende Erinnerung „FCM nicht konfiguriert“ und die Reparaturkarte aus. Echtzeit-Ereignisse (Türklingel, Scharf-/Unscharfschalten, Alarm, Bewegung) erreichen Home Assistant erst, wenn FCM konfiguriert ist.",
@@ -455,10 +457,10 @@
                 "name": "Mobilfunk verbunden"
             },
             "lid": {
-                "name": "Gehäusedeckel geöffnet"
+                "name": "Deckelmanipulation"
             },
             "ext_contact": {
-                "name": "Externer Kontakt unterbrochen"
+                "name": "Störung externer Kontakt"
             },
             "ext_alert": {
                 "name": "Externer Kontaktalarm"

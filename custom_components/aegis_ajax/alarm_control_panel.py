@@ -218,7 +218,11 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
     @property
     def code_arm_required(self) -> bool:
-        return bool(self._get_options().get("use_pin_code", False))
+        from custom_components.aegis_ajax.service_security import (  # noqa: PLC0415
+            arm_requires_pin,
+        )
+
+        return arm_requires_pin(self._get_options())
 
     @property
     def code_format(self) -> CodeFormat | None:
@@ -228,9 +232,10 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         numeric keypad and lets the Nabu Casa / Alexa skill prompt for a PIN on
         disarm. `None` (no PIN configured) keeps the card keypad-free and is
         also what lets Alexa discover the panel — its skill only exposes panels
-        that don't require a code to arm.
+        that don't require a code to arm. With the PIN limited to disarm (#642)
+        the keypad stays, and the card arms with one tap.
         """
-        return CodeFormat.NUMBER if self.code_arm_required else None
+        return CodeFormat.NUMBER if self._get_options().get("use_pin_code", False) else None
 
     @property
     def _force_arm(self) -> bool:
@@ -251,12 +256,14 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
             features &= ~AlarmControlPanelEntityFeature.ARM_HOME
         return features
 
-    async def _async_validate_code(self, code: str | None) -> None:
+    async def _async_validate_code(self, code: str | None, *, arming: bool = False) -> None:
         """Raise HomeAssistantError if the provided code does not match the stored hash."""
         from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
 
         options = self._get_options()
         if not options.get("use_pin_code", False):
+            return
+        if arming and not self.code_arm_required:
             return
         try:
             # Checking a PIN is CPU-heavy by design: keep it off the event loop.
@@ -336,7 +343,9 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         if self.coordinator.commands_only is True and not self.coordinator.primary_loaded:
             return False
         space = self._space
-        return space is not None and space.is_online
+        # A hub-less space (camera only, #636) never reports its hub online,
+        # but the cloud still arms and disarms it.
+        return space is not None and (space.is_online or not space.hub_id)
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
@@ -400,7 +409,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         return attrs
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        await self._async_validate_code(code)
+        await self._async_validate_code(code, arming=True)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -413,7 +422,7 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         if self.coordinator.commands_only is True:
             raise HomeAssistantError("Night mode is not available on a commands-only account")
-        await self._async_validate_code(code)
+        await self._async_validate_code(code, arming=True)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:
@@ -579,7 +588,7 @@ class AjaxGroupAlarmControlPanel(_AjaxAlarmPanelBase):
         }
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        await self._async_validate_code(code)
+        await self._async_validate_code(code, arming=True)
         from custom_components.aegis_ajax.api.security import SecurityError  # noqa: PLC0415
 
         try:

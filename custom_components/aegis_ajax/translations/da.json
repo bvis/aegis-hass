@@ -117,6 +117,7 @@
                     "cloud_video": "Livevisning via skyen for videokameraer (eksperimentel)",
                     "use_pin_code": "Kræv PIN-kode ved aktivering/deaktivering",
                     "pin_code": "PIN-kode",
+                    "arm_requires_pin": "Kræv også PIN-kode ved aktivering",
                     "fcm_project_id": "FCM-projekt-ID (til pushnotifikationer)",
                     "fcm_app_id": "FCM-app-ID",
                     "fcm_api_key": "FCM-API-nøgle",
@@ -133,6 +134,7 @@
                 "data_description": {
                     "bypass_switches": "Bypass-kontakter gør det muligt at deaktivere en enhed, før systemet aktiveres. \"Auto\" opretter dem kun, hvis din Ajax-konto har tilladelse til at deaktivere enheder.",
                     "expose_arm_home": "Tilføjer en \"Aktiver hjemme\"-mulighed til alarmpanelet. Den spejler natfunktionen og er primært nødvendig til Amazon Alexa eller Nabu Casa Cloud. Slå den fra for at skjule den ekstra knap, hvis du ikke bruger disse.",
+                    "arm_requires_pin": "Fra: aktivering sker med ét tryk, og PIN-koden kræves kun ved deaktivering. Gælder kun, når PIN-kode er slået til.",
                     "delay_panel_states": "Når denne er slået til, viser alarmpanelet \"aktiverer\", mens hub'en kører en detektors \"Forsinkelse ved udgang\", og \"afventer\", mens en \"Forsinkelse ved indgang\" kører — begge dele styres af hub'ens egne signaler, ikke af en timer fra vores side. Detektorer uden forsinkelse (Instant Alarm) er allerede aktive under \"aktiverer\". Automatiseringer, der venter på \"armed_away\", udløses, når udgangsforsinkelsen er afsluttet. Hub'ens rå status ligger fortsat i attributten \"hub_state\".",
                     "cloud_video": "Tilføjer et kamera med livevisning for hvert Ajax-videokamera, streamet via Ajax-skyen, som appen gør hjemmefra, så det også virker, når Home Assistant ikke er på kameraets netværk. Eksperimentel: virker måske ikke med alle kameraer endnu. Hver visning åbner én videosession; intet kører, mens ingen ser med.",
                     "disable_push_warning": "Slå denne til, hvis du bevidst kører uden push. Den skjuler den gentagne \"FCM ikke konfigureret\"-påmindelse og reparationskortet. Hændelser i realtid (dørklokke, aktiver/deaktiver, alarm, bevægelse) når stadig ikke Home Assistant, før du konfigurerer FCM.",
@@ -455,10 +457,10 @@
                 "name": "Mobilforbindelse"
             },
             "lid": {
-                "name": "Låg åbnet"
+                "name": "Sabotage af låg"
             },
             "ext_contact": {
-                "name": "Ekstern kontakt brudt"
+                "name": "Fejl i ekstern kontakt"
             },
             "ext_alert": {
                 "name": "Ekstern kontaktalarm"

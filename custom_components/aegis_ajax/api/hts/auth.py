@@ -149,21 +149,16 @@ def parse_connected_response(payload: bytes) -> ConnectedResponse:
 
     token = params[1]
 
-    # Hub entries: hub_id (4 bytes) + is_master (1 byte) as separate params
-    # Stop parsing when we encounter params that don't look like hub data
+    # Hub entries: hub_id (4 bytes) + is_master (1 byte) as separate params.
+    # Some accounts also get a trailing 4-byte value with no flag after it
+    # (it changes on every connection), so a 4-byte param only counts as a hub
+    # when its flag follows. Taken for a hub, it made the client send
+    # requests to a receiver that doesn't exist, and the server closed the
+    # connection about 20 s later, every time.
     hubs: list[HubInfo] = []
     i = 2
-    while i < len(params):
-        chunk = params[i]
-        if len(chunk) == 4:
-            hub_id = chunk.hex().upper()
-            is_master = False
-            if i + 1 < len(params) and len(params[i + 1]) == 1:
-                is_master = params[i + 1][0] != 0
-                i += 1
-            hubs.append(HubInfo(hub_id=hub_id, is_master=is_master))
-            i += 1
-        else:
-            break  # not hub data, stop parsing
+    while i + 1 < len(params) and len(params[i]) == 4 and len(params[i + 1]) == 1:
+        hubs.append(HubInfo(hub_id=params[i].hex().upper(), is_master=params[i + 1][0] != 0))
+        i += 2
 
     return ConnectedResponse(token=token, hubs=hubs)

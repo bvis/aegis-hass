@@ -163,6 +163,22 @@ async def test_pin_warnings_only_cover_affected_accounts(
     }
 
 
+async def test_pin_limited_to_disarm_skips_force_arm_pin_warning(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+) -> None:
+    """#642: with the PIN only for disarm, force-arming without one is expected."""
+    accounts[0].options = {
+        "use_pin_code": True,
+        "pin_code_hash": hash_pin("1234"),
+        "arm_requires_pin": False,
+    }
+    await hass.services.async_call(
+        DOMAIN, "force_arm", {"entity_id": "alarm_control_panel.a"}, blocking=True
+    )
+    assert not ir.async_get(hass).issues
+
+
 async def test_valid_calls_do_not_clear_warnings_from_other_automations(
     hass: HomeAssistant,
     accounts: list[SimpleNamespace],

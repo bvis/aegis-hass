@@ -149,6 +149,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 | Show exit / entry delays as panel states | disabled | Shows the hub's per-detector **Delay when leaving** as the panel's `arming` state and **Delay when entering** as `pending`, driven by the hub's own signals. Opt-in because automations waiting for `armed_away` then fire once the exit delay completes. See [Exit and entry delays](#exit-and-entry-delays). |
 | Cloud live view for video cameras | disabled | Experimental. Adds a **Live view** camera per Ajax video camera, streamed through the Ajax cloud, for installs where Home Assistant can't reach the camera locally. See [Cloud live view](#cloud-live-view-experimental). |
 | PIN code | disabled | Require PIN for arm/disarm from HA UI |
+| Also require the PIN to arm | enabled | Only with **PIN code** on. Turn it off to arm with one tap and keep the PIN for disarm only, for example to arm Night mode from a bedside screen or an automation. Force-arm services then don't need the PIN either. |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
 | I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
 | Photo retention (days) | 30 | How many days to keep captured photos (1-365) |
@@ -320,7 +321,8 @@ For now, existing calls still run. Aegis creates a persistent **Repair** when
 alarm panel explicitly in every automation or script; list each intended panel
 if you previously relied on the all-spaces default.
 
-If **Use PIN code** is enabled in an account's Aegis options, `force_arm` and
+If **Use PIN code** is enabled in an account's Aegis options (and **Also require
+the PIN to arm** is left on), `force_arm` and
 `force_arm_night` also raise a Repair when the supplied `code` is missing or
 invalid. These two services still execute during this transition, even with a
 wrong code. A future release will require a valid PIN. This is the PIN configured
@@ -352,7 +354,7 @@ If you don't use Alexa / Home Assistant Cloud, the **Arm Home** button on the Lo
 
 Notes for Alexa:
 
-- The skill only exposes a panel that does **not** require a code to arm. If you enable the PIN option (`use_pin_code`), the panel won't be discovered by Alexa.
+- The skill only exposes a panel that does **not** require a code to arm. If you enable the PIN option (`use_pin_code`), the panel won't be discovered by Alexa unless you also turn off **Also require the PIN to arm**, which keeps the PIN for disarm only.
 - Alexa requests a PIN only on **disarm**, and only supports a **4-digit** numeric code — Ajax PINs longer than 4 digits won't work for voice disarm.
 - When a PIN is configured, the panel reports `code_format: number`, which also makes the Home Assistant Lovelace alarm card render a numeric keypad.
 - **A bare "Alexa, arm \<name\>" arms _Home_, not Away.** This is Alexa's own default for an unqualified "arm" (it requests Armed Stay / Home), and since Arm Home maps to Ajax's partial mode the panel ends up partially armed. Home Assistant only forwards the mode Alexa asks for — the integration can't change Alexa's default. To arm fully: say **"Alexa, arm \<name\> in away mode"**, or create an **Alexa Routine** that maps your phrase (e.g. "arm the house") to the action *set panel → Armed Away*.
@@ -494,7 +496,7 @@ An [example automations file](docs/automations.yaml) is also available with 24 a
 - **Hub network sensors** — Ethernet/Wi-Fi connectivity, Wi-Fi SSID/signal, Ethernet/Wi-Fi IP addressing, cellular signal/network, and mains power status
 - **Siren on panic button / Siren on tamper** — disabled-by-default diagnostic binary sensors mirroring the hub's siren behaviour settings (read-only; configured in the Ajax app, refreshed on integration reload)
 - **Delay when leaving** — disabled-by-default diagnostic binary sensor on door, motion and combi detectors and MotionCams, mirroring whether the detector has an exit delay configured in the Ajax app (read-only). The delay itself can surface as the panel's `arming` / `pending` state with the [Show exit / entry delays](#exit-and-entry-delays) option
-- **Lid opened** — tamper detection for the hub enclosure
+- **Lid tamper** — tamper detection for the hub enclosure (shows Clear while the lid is closed)
 - **Battery** — hub battery level
 - **IMEI** — hub cellular modem identifier
 

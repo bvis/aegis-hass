@@ -171,10 +171,13 @@ async def _async_warn_service_transition(
 
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
+    from custom_components.aegis_ajax.service_security import (  # noqa: PLC0415
+        arm_requires_pin,
+        validate_pin,
+    )
 
     for entry in entries:
-        if not entry.options.get("use_pin_code", False):
+        if not arm_requires_pin(entry.options):
             continue
         if not any(coordinator is entry.runtime_data for coordinator, _ in targets):
             continue
