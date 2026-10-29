@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-mailadres",
                     "password": "Wachtwoord",
-                    "app_label": "App-label (naam co-branded app)"
+                    "app_label": "App-label (naam co-branded app)",
+                    "account_role": "Accountrol",
+                    "primary_entry_id": "Primair Aegis-account",
+                    "account_label": "Label voor commando-account"
                 },
                 "data_description": {
                     "email": "Het e-mailadres waarmee je inlogt in de Ajax-app.",
                     "password": "Het wachtwoord van je Ajax-account. Home Assistant bewaart alleen een hash.",
-                    "app_label": "De app waar je account bij hoort: Ajax of een co-branded app. Zie de README als je het niet zeker weet."
+                    "app_label": "De app waar je account bij hoort: Ajax of een co-branded app. Zie de README als je het niet zeker weet.",
+                    "account_role": "Behoud het normale primaire account of voeg een account alleen voor opdrachten toe dat de status deelt met een gekozen primair account.",
+                    "primary_entry_id": "Selecteer het bestaande primaire Aegis-account waarvan dit account gedeelde ruimtes mag bedienen.",
+                    "account_label": "Een korte label die op het extra alarmpaneel wordt getoond."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Ongeldige TOTP-code. Probeer het opnieuw.",
             "cannot_connect": "Kan geen verbinding maken met de Ajax-servers.",
             "client_rejected": "Ajax weigert deze versie van Aegis for Ajax. Werk de integratie bij in HACS, herstart Home Assistant en probeer het opnieuw.",
-            "unknown": "Er is een onverwachte fout opgetreden."
+            "unknown": "Er is een onverwachte fout opgetreden.",
+            "primary_account_required": "Selecteer een bestaand primair Aegis-account.",
+            "account_label_required": "Voer een label voor dit commando-account in.",
+            "spaces_must_match_primary": "Selecteer alleen ruimtes van het primaire account."
         },
         "abort": {
             "already_configured": "Dit account is al geconfigureerd.",

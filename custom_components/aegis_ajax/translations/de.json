@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-Mail",
                     "password": "Passwort",
-                    "app_label": "App-Bezeichnung (Co-Branded App-Name)"
+                    "app_label": "App-Bezeichnung (Co-Branded App-Name)",
+                    "account_role": "Kontorolle",
+                    "primary_entry_id": "Primäres Aegis-Konto",
+                    "account_label": "Bezeichnung des Befehlskontos"
                 },
                 "data_description": {
                     "email": "Die E-Mail, mit der du dich in der Ajax-App anmeldest.",
                     "password": "Das Passwort deines Ajax-Kontos. Home Assistant speichert nur einen Hash davon.",
-                    "app_label": "Die App, zu der dein Konto gehört: Ajax oder eine Co-Branded-App. Im README steht, wie du das herausfindest."
+                    "app_label": "Die App, zu der dein Konto gehört: Ajax oder eine Co-Branded-App. Im README steht, wie du das herausfindest.",
+                    "account_role": "Behalte das normale primäre Konto oder füge ein Konto nur für Befehle hinzu, das den Status mit einem ausgewählten primären Konto teilt.",
+                    "primary_entry_id": "Wähle das vorhandene primäre Aegis-Konto, dessen gemeinsame Bereiche dieses Konto steuern darf.",
+                    "account_label": "Eine kurze Bezeichnung für das zusätzliche Alarmbedienfeld."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Ungültiger TOTP-Code. Bitte versuchen Sie es erneut.",
             "cannot_connect": "Verbindung zu Ajax-Servern nicht möglich.",
             "client_rejected": "Ajax lehnt diese Version von Aegis for Ajax ab. Aktualisiere die Integration in HACS, starte Home Assistant neu und versuche es erneut.",
-            "unknown": "Ein unerwarteter Fehler ist aufgetreten."
+            "unknown": "Ein unerwarteter Fehler ist aufgetreten.",
+            "primary_account_required": "Wähle ein vorhandenes primäres Aegis-Konto aus.",
+            "account_label_required": "Gib eine Bezeichnung für dieses Befehls-konto ein.",
+            "spaces_must_match_primary": "Wähle nur Bereiche des primären Kontos aus."
         },
         "abort": {
             "already_configured": "Dieses Konto ist bereits konfiguriert.",

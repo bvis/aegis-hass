@@ -7,12 +7,18 @@
                 "data": {
                     "email": "Adres e-mail",
                     "password": "Hasło",
-                    "app_label": "Etykieta aplikacji (nazwa aplikacji co-branded)"
+                    "app_label": "Etykieta aplikacji (nazwa aplikacji co-branded)",
+                    "account_role": "Rola konta",
+                    "primary_entry_id": "Główne konto Aegis",
+                    "account_label": "Etykieta konta poleceń"
                 },
                 "data_description": {
                     "email": "E-mail, którym logujesz się do aplikacji Ajax.",
                     "password": "Hasło do konta Ajax. Home Assistant przechowuje tylko jego hash.",
-                    "app_label": "Aplikacja, do której należy konto: Ajax lub aplikacja co-branded. W razie wątpliwości zajrzyj do README."
+                    "app_label": "Aplikacja, do której należy konto: Ajax lub aplikacja co-branded. W razie wątpliwości zajrzyj do README.",
+                    "account_role": "Pozostaw zwykłe konto główne albo dodaj konto tylko do poleceń, współdzielące stan z wybranym kontem głównym.",
+                    "primary_entry_id": "Wybierz istniejące główne konto Aegis, którego współdzielone przestrzenie może obsługiwać to konto.",
+                    "account_label": "Krótka etykieta wyświetlana na dodatkowym panelu alarmu."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Nieprawidłowy kod TOTP. Spróbuj ponownie.",
             "cannot_connect": "Nie można połączyć się z serwerami Ajax.",
             "client_rejected": "Ajax odrzuca tę wersję Aegis for Ajax. Zaktualizuj integrację w HACS, uruchom ponownie Home Assistant i spróbuj jeszcze raz.",
-            "unknown": "Wystąpił nieoczekiwany błąd."
+            "unknown": "Wystąpił nieoczekiwany błąd.",
+            "primary_account_required": "Wybierz istniejące główne konto Aegis.",
+            "account_label_required": "Wpisz etykietę tego konta poleceń.",
+            "spaces_must_match_primary": "Wybierz tylko przestrzenie z konta głównego."
         },
         "abort": {
             "already_configured": "To konto jest już skonfigurowane.",

@@ -138,6 +138,25 @@ Click the button above, or manually:
 > a warning when the panel disagrees, so the switch never shows a state the
 > hardware isn't in.
 
+### Several people, one space (commands-only accounts)
+
+When several people share a space and each arms and disarms with their own Ajax
+account, add each extra login as a **commands-only** account: start a new Aegis entry,
+choose **Commands-only account** as the account role, pick the main Aegis entry it
+belongs to and give it a label (for example the person's name). Only spaces the main
+entry already has can be chosen.
+
+A commands-only entry adds just alarm panels named after that label: one for the whole
+space and one per group. Arming or disarming from them is done as that Ajax user, the
+same as from their phone. Everything else (sensors, cameras, state, push) still comes
+from the main entry, so nothing is duplicated. These panels arm away and disarm; Night
+mode stays on the main panels, and the custom `aegis_ajax.*` services always use the main
+entry. If the commands-only entry has no PIN of its own, its panels ask for the main
+entry's PIN.
+
+Requests to Ajax: one login when the entry loads, then only the arm and disarm
+requests you make. No streams, polling or push run for a commands-only account.
+
 ### Options
 
 After setup, configure these in **Settings > Devices & Services > Aegis for Ajax > Configure**:

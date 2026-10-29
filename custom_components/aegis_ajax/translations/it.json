@@ -7,12 +7,18 @@
                 "data": {
                     "email": "E-mail",
                     "password": "Password",
-                    "app_label": "Etichetta app (nome app co-branded)"
+                    "app_label": "Etichetta app (nome app co-branded)",
+                    "account_role": "Ruolo account",
+                    "primary_entry_id": "Account Aegis principale",
+                    "account_label": "Etichetta account comandi"
                 },
                 "data_description": {
                     "email": "L'email con cui accedi all'app Ajax.",
                     "password": "La password del tuo account Ajax. Home Assistant ne conserva solo un hash.",
-                    "app_label": "L'app a cui appartiene il tuo account: Ajax o un'app co-branded. In caso di dubbi consulta il README."
+                    "app_label": "L'app a cui appartiene il tuo account: Ajax o un'app co-branded. In caso di dubbi consulta il README.",
+                    "account_role": "Mantieni l’account principale oppure aggiungi un account solo comandi che condivide lo stato con un account principale selezionato.",
+                    "primary_entry_id": "Seleziona l’account Aegis principale esistente con gli spazi condivisi che questo account può controllare.",
+                    "account_label": "Un’etichetta breve mostrata sul pannello di allarme aggiuntivo."
                 }
             },
             "2fa": {
@@ -85,7 +91,10 @@
             "invalid_totp": "Codice TOTP non valido. Riprova.",
             "cannot_connect": "Impossibile connettersi ai server Ajax.",
             "client_rejected": "Ajax sta rifiutando questa versione di Aegis for Ajax. Aggiorna l'integrazione in HACS, riavvia Home Assistant e riprova.",
-            "unknown": "Si è verificato un errore imprevisto."
+            "unknown": "Si è verificato un errore imprevisto.",
+            "primary_account_required": "Seleziona un account Aegis principale esistente.",
+            "account_label_required": "Inserisci un’etichetta per questo account comandi.",
+            "spaces_must_match_primary": "Seleziona solo spazi dell’account principale."
         },
         "abort": {
             "already_configured": "Questo account è già configurato.",

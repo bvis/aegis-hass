@@ -141,6 +141,54 @@ class TestCoordinatorInit:
         coordinator = _make_coordinator()
         assert coordinator.last_update_success_time is None
 
+    def test_commands_only_rebinds_after_primary_reload(self) -> None:
+        """A rebuilt primary coordinator must not strand secondary panels."""
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        hass = MagicMock()
+        old_primary = MagicMock()
+        old_primary.commands_only = False
+        old_unsub = MagicMock()
+        old_primary.async_add_listener.return_value = old_unsub
+
+        new_primary = MagicMock()
+        new_primary.commands_only = False
+        new_primary._shutdown_requested = False
+        new_primary.spaces = {"s1": _make_space("s1")}
+        new_primary.devices = {}
+        new_primary.rooms = {}
+        new_primary.alarmed_space_ids = set()
+        new_primary.delay_overlays = {}
+        new_primary.delay_panel_states = False
+        new_unsub = MagicMock()
+        new_primary.async_add_listener.return_value = new_unsub
+
+        primary_entry = MagicMock()
+        primary_entry.runtime_data = new_primary
+        hass.config_entries.async_get_entry.return_value = primary_entry
+
+        secondary = object.__new__(AjaxCobrandedCoordinator)
+        secondary.hass = hass
+        secondary._commands_only = True
+        secondary._primary_entry_id = "primary-entry"
+        secondary._primary_coordinator = old_primary
+        secondary._primary_unsub = old_unsub
+        secondary.spaces = {}
+        secondary.devices = {}
+        secondary.rooms = {}
+        secondary.alarmed_space_ids = set()
+        secondary.delay_overlays = {}
+        secondary.delay_panel_states = False
+        secondary.async_set_updated_data = MagicMock()
+
+        secondary.async_primary_loaded()
+
+        old_unsub.assert_called_once()
+        new_primary.async_add_listener.assert_called_once_with(secondary._async_primary_updated)
+        assert secondary._primary_coordinator is new_primary
+        assert secondary.primary_loaded is True
+        assert secondary.spaces == new_primary.spaces
+
 
 class TestRoomsRefresh:
     @pytest.mark.asyncio

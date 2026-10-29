@@ -4,6 +4,15 @@ from enum import IntEnum, StrEnum
 
 DOMAIN = "aegis_ajax"
 
+# Config-entry account roles. A primary account owns the read/state stream;
+# commands-only accounts authenticate separately and expose only their own
+# alarm panel commands while reading state from the selected primary entry.
+CONF_ACCOUNT_ROLE = "account_role"
+CONF_PRIMARY_ENTRY_ID = "primary_entry_id"
+CONF_ACCOUNT_LABEL = "account_label"
+ACCOUNT_ROLE_PRIMARY = "primary"
+ACCOUNT_ROLE_COMMANDS_ONLY = "commands_only"
+
 # FCM rejection marker (#227, #464). Records the SHA-256 fingerprint of the
 # most recent credential set that Firebase Installations terminally rejected,
 # so the integration does not re-hit the Firebase project on every restart

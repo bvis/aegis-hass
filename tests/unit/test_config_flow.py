@@ -103,8 +103,8 @@ def _entry(
         title=f"Ajax Security ({data.get('email', '')})",
         unique_id=data.get("email"),
         data=data,
-        version=2,
-        minor_version=2,
+        version=3,
+        minor_version=0,
         options=options or {},
     )
     entry.add_to_hass(hass)
@@ -140,8 +140,8 @@ class TestConfigFlowInit:
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"spaces": ["space-1"]}
         )
-        assert result["result"].version == 2
-        assert result["result"].minor_version == 2
+        assert result["result"].version == 3
+        assert result["result"].minor_version == 0
 
 
 class TestAsyncStepDhcp:
