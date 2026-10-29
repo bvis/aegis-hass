@@ -16,6 +16,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.const import (
+    CONF_ARM_REQUIRES_PIN,
     CONF_EXPOSE_ARM_HOME,
     CONF_FORCE_ARM,
     DEFAULT_EXPOSE_ARM_HOME,
@@ -214,7 +215,17 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         entry = self.coordinator.config_entry
         if entry is None:
             return {}
-        return dict(entry.options)
+        options = dict(entry.options)
+        if self.coordinator.commands_only is True and not options.get("use_pin_code", False):
+            # A commands-only account without its own PIN must not become a
+            # way around the PIN of the account whose spaces it controls.
+            primary = self.coordinator._primary_coordinator
+            primary_entry = primary.config_entry if primary is not None else None
+            if primary_entry is not None and primary_entry.options.get("use_pin_code", False):
+                for key in ("use_pin_code", "pin_code_hash", CONF_ARM_REQUIRES_PIN):
+                    if key in primary_entry.options:
+                        options[key] = primary_entry.options[key]
+        return options
 
     @property
     def code_arm_required(self) -> bool:

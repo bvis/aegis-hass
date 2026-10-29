@@ -160,3 +160,52 @@ def test_commands_only_panel_is_labeled_and_arm_disarm_only() -> None:
     assert group_panel.name == "Night shift Downstairs"
     assert group_panel.supported_features == AlarmControlPanelEntityFeature.ARM_AWAY
     assert group_panel.available is True
+
+
+def _pin_panel(own_options: dict, primary_options: dict) -> AjaxAlarmControlPanel:
+    space = Space(
+        id="space-1",
+        hub_id="hub-1",
+        name="Home",
+        security_state=SecurityState.ARMED,
+        connection_status=ConnectionStatus.ONLINE,
+        malfunctions_count=0,
+    )
+    primary = MagicMock()
+    primary.spaces = {"space-1": space}
+    primary.devices = {}
+    primary.config_entry.options = primary_options
+    secondary = MagicMock()
+    secondary.commands_only = True
+    secondary.entry_id = "secondary-entry"
+    secondary.account_label = "Night shift"
+    secondary.spaces = primary.spaces
+    secondary.devices = {}
+    secondary.rooms = {}
+    secondary._primary_coordinator = primary
+    secondary.config_entry.options = own_options
+    secondary.security_api.disarm = AsyncMock()
+    panel = AjaxAlarmControlPanel(secondary, "space-1")
+    panel.hass = MagicMock()
+    panel.hass.async_add_executor_job = AsyncMock(side_effect=lambda func, *args: func(*args))
+    return panel
+
+
+async def test_commands_only_panel_falls_back_to_the_primary_pin() -> None:
+    """A commands-only account without its own PIN can't disarm around the primary's."""
+    from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.aegis_ajax.service_security import hash_pin
+
+    primary_options = {"use_pin_code": True, "pin_code_hash": hash_pin("0123")}
+    panel = _pin_panel({}, primary_options)
+    assert panel.code_format is not None
+    with pytest.raises(ServiceValidationError):
+        await panel.async_alarm_disarm(None)
+    panel.coordinator.security_api.disarm.assert_not_awaited()
+
+    # The account's own PIN wins when it has one.
+    own = {"use_pin_code": True, "pin_code_hash": hash_pin("9999")}
+    panel = _pin_panel(own, primary_options)
+    with pytest.raises(ServiceValidationError):
+        await panel.async_alarm_disarm("0123")
