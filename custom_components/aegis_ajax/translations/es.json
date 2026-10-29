@@ -180,6 +180,10 @@
             "name": "Desarmar modo noche",
             "description": "Sal del modo noche dejando armados los grupos armados de forma independiente (modo ausente). A diferencia de un desarmado total, solo desactiva los grupos en modo noche: la operación nativa de Ajax \"desarmar modo noche\".",
             "fields": {
+                "code": {
+                    "name": "PIN de alarma",
+                    "description": "PIN de las opciones de Aegis. Obligatorio si el PIN está activado: un código ausente o incorrecto se rechaza, como en un desarmado normal."
+                },
                 "entity_id": {
                     "name": "Entidad",
                     "description": "Entidad del panel de alarma del espacio que se desarmará del modo noche. Si se omite, se aplica a todos los paneles."

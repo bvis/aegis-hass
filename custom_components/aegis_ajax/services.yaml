@@ -63,6 +63,15 @@ disarm_night_mode:
       domain: alarm_control_panel
       integration: aegis_ajax
   fields:
+    code:
+      name: Alarm PIN
+      description: >-
+        The PIN configured in Aegis options. Required when Use PIN code is on:
+        a missing or wrong code is refused, as with a normal disarm.
+      required: false
+      selector:
+        text:
+          type: password
     entity_id:
       name: Entity
       description: Alarm panel entity for the space to disarm from night mode. If omitted, applies to all panels.

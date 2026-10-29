@@ -180,6 +180,10 @@
             "name": "Desarmar modo noturno",
             "description": "Sai do modo noturno mantendo armados os grupos armados de forma independente (modo ausente). Ao contrário de um desarme total, apenas desativa os grupos em modo noturno — a operação nativa do Ajax \"desarmar modo noturno\".",
             "fields": {
+                "code": {
+                    "name": "PIN do alarme",
+                    "description": "PIN das opções do Aegis. Obrigatório quando o PIN está ativo: um código em falta ou errado é recusado, como num desarme normal."
+                },
                 "entity_id": {
                     "name": "Entidade",
                     "description": "Entidade do painel de alarme do espaço a desarmar do modo noturno. Se omitido, aplica-se a todos os painéis."

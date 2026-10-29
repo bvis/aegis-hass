@@ -305,7 +305,7 @@ If you would rather not depend on the camera's own classifier, [Frigate](https:/
 |---|---|
 | `aegis_ajax.force_arm` | Arm the system ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
 | `aegis_ajax.force_arm_night` | Arm night mode ignoring open sensors and active alarms. Supports entity target to arm a specific panel. |
-| `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Supports entity target; if omitted, applies to all panels. |
+| `aegis_ajax.disarm_night_mode` | Exit night mode while leaving any independently armed (away) groups armed — the native Ajax "disarm night mode" operation. Unlike a panel-level disarm (which stands the whole space down), this only disarms the night-mode groups. Supports entity target; if omitted, applies to all panels. With **Use PIN code** on it needs the PIN in `code`, like any disarm. |
 | `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
 | `aegis_ajax.refresh_alarm_images` | Import recent alarm-photo albums without triggering a capture. Target an alarm panel with `entity_id`, or omit it for all spaces. One history query + at most 10 media streams per space, once per five minutes; completed albums are skipped. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
@@ -326,7 +326,13 @@ If **Use PIN code** is enabled in an account's Aegis options (and **Also require
 the PIN to arm** is left on), `force_arm` and
 `force_arm_night` also raise a Repair when the supplied `code` is missing or
 invalid. These two services still execute during this transition, even with a
-wrong code. A future release will require a valid PIN. This is the PIN configured
+wrong code. A future release will require a valid PIN.
+
+`disarm_night_mode` is a disarm, so it already requires the PIN whenever **Use PIN
+code** is on (since 1.29.1): a missing or wrong `code` is refused and nothing is
+sent, the same as disarming from the panel.
+
+The PIN is the one configured
 in Aegis, not your Ajax login password. Supply it as a quoted string to preserve
 leading zeroes:
 

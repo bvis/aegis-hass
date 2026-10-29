@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.30.0] - unreleased
 
+### Security
+- Includes the 1.29.1 fix: `aegis_ajax.disarm_night_mode` needs the PIN when *Use PIN code* is on (GHSA-593m-f4j6-8pj5).
+
 ### Added
 - **Lock LightSwitch buttons from Home Assistant (#641, thanks @Tehnikis).** Each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app: when it's on, touching the wall panel does nothing, and the light still works from the app and from Home Assistant. It's one setting per device, so on a 2-gang switch it locks both buttons. The state comes from what the hub reports; after a change, the debug log says whether the hub's next report matches what was written. Older LightSwitch models that report the setting differently don't get the switch yet. **Requests to Ajax:** none to read it (it rides the hub connection that's already open); one message to the hub per change, the same one the app sends.
+
+## [1.29.1] - 2026-10-29
+
+### Security
+- **`aegis_ajax.disarm_night_mode` now needs the PIN (GHSA-593m-f4j6-8pj5, thanks @themluckylegs).** With *Use PIN code* on, this service took the alarm out of Night mode without any code, while disarming from the panel asked for it. It now takes a `code` field and refuses a missing or wrong PIN before sending anything, whatever *Also require the PIN to arm* is set to. Automations that call it on an account with a PIN need `code: "<your PIN>"` added. **Requests to Ajax:** none added; a refused call sends nothing.
 
 ## [1.29.0] - 2026-10-28
 
