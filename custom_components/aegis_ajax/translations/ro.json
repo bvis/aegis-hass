@@ -180,6 +180,10 @@
             "name": "Dezarmează modul de noapte",
             "description": "Iese din modul de noapte lăsând armate grupurile armate independent (mod plecat). Spre deosebire de o dezarmare totală, dezactivează doar grupurile în modul de noapte — operațiunea nativă Ajax „dezarmează modul de noapte\".",
             "fields": {
+                "code": {
+                    "name": "PIN alarmă",
+                    "description": "PIN din opțiunile Aegis. Obligatoriu când PIN-ul este activat: un cod lipsă sau greșit este refuzat, ca la o dezarmare obișnuită."
+                },
                 "entity_id": {
                     "name": "Entitate",
                     "description": "Entitatea panoului de alarmă pentru spațiul care va fi dezarmat din modul de noapte. Dacă este omis, se aplică tuturor panourilor."
