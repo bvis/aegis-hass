@@ -96,6 +96,7 @@ class TestDisarmNightModeService:
 
         mock_entry = MagicMock()
         mock_entry.runtime_data = mock_coordinator
+        mock_entry.options = {}
 
         hass = MagicMock()
         hass.config_entries.async_loaded_entries = MagicMock(return_value=[mock_entry])

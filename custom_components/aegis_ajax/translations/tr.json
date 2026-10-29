@@ -189,6 +189,10 @@
             "name": "Gece modunu devre dışı bırak",
             "description": "Bağımsız olarak (dışarıda modu) kurulu grupları kurulu bırakarak gece modundan çıkar. Tam devre dışı bırakmanın aksine yalnızca gece modu gruplarını devre dışı bırakır — Ajax'ın yerel \"gece modunu devre dışı bırak\" işlemi.",
             "fields": {
+                "code": {
+                    "name": "Alarm PIN kodu",
+                    "description": "Aegis seçeneklerindeki PIN. PIN açıkken zorunludur: eksik veya yanlış kod, normal devre dışı bırakmada olduğu gibi reddedilir."
+                },
                 "entity_id": {
                     "name": "Varlık",
                     "description": "Gece modundan çıkarılacak alanın alarm paneli varlığı. Belirtilmezse tüm panellere uygulanır."

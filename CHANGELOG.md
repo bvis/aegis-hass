@@ -7,14 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.30.0] - unreleased
 
+### Security
+- Includes the 1.29.1 fix: `aegis_ajax.disarm_night_mode` needs the PIN when *Use PIN code* is on (GHSA-593m-f4j6-8pj5).
+
 ### Added
+- **Commands-only Ajax accounts (#645, thanks @kamonishe).** When several people share one Ajax space, each can add their own Ajax login as a *commands-only* account linked to the main one. It adds only alarm panels labelled for that person (the whole space and each group), so arming and disarming from them is done as that Ajax user, the same as from their phone. Sensors, cameras and state still come from the main account, so nothing is duplicated. These panels arm away and disarm; Night mode stays on the main panels. If the commands-only account has no PIN of its own, its panels ask for the main account's PIN. **Requests to Ajax:** one login when the account loads, then only the arm and disarm requests you make; no streams, polling or push for that account. **Downgrading:** this release moves every Aegis entry to a new config version, so an older Aegis refuses to load them. To go back, restore a Home Assistant backup taken before updating.
 - **Lock LightSwitch buttons from Home Assistant (#641, thanks @Tehnikis).** Each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app: when it's on, touching the wall panel does nothing, and the light still works from the app and from Home Assistant. It's one setting per device, so on a 2-gang switch it locks both buttons. The state comes from what the hub reports; after a change, the debug log says whether the hub's next report matches what was written. Older LightSwitch models that report the setting differently don't get the switch yet. **Requests to Ajax:** none to read it (it rides the hub connection that's already open); one message to the hub per change, the same one the app sends.
 
-- **Commands-only Ajax accounts.** A commands-only account uses its own Ajax credentials for separate arm/disarm controls while reusing linked primary account state and space data; it does not create duplicate sensors, cameras, or devices.
+## [1.29.1] - 2026-10-29
 
-### Fixed
-- **Commands-only entries now fail safely on older releases.** Existing entries migrate to version 3, while older Aegis releases refuse them instead of partially loading accounts and creating duplicate entities during rollback. Restore a Home Assistant backup made before migration when downgrading.
-- **CI validation for the migration.** The versioned commands-only flow, account migration, and alarm-panel setup pass the complete Python 3.13 and 3.14 test matrices and static checks.
+### Security
+- **`aegis_ajax.disarm_night_mode` now needs the PIN (GHSA-593m-f4j6-8pj5, thanks @themluckylegs).** With *Use PIN code* on, this service took the alarm out of Night mode without any code, while disarming from the panel asked for it. It now takes a `code` field and refuses a missing or wrong PIN before sending anything, whatever *Also require the PIN to arm* is set to. Automations that call it on an account with a PIN need `code: "<your PIN>"` added. **Requests to Ajax:** none added; a refused call sends nothing.
 
 ## [1.29.0] - 2026-10-28
 

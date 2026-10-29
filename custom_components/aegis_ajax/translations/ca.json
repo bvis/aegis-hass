@@ -189,6 +189,10 @@
             "name": "Desarmar mode nit",
             "description": "Surt del mode nit deixant armats els grups armats de manera independent (mode absent). A diferència d'un desarmat total, només desactiva els grups en mode nit: l'operació nativa d'Ajax \"desarmar mode nit\".",
             "fields": {
+                "code": {
+                    "name": "PIN de l’alarma",
+                    "description": "PIN de les opcions d’Aegis. Obligatori si el PIN està activat: un codi absent o incorrecte es rebutja, com en una desactivació normal."
+                },
                 "entity_id": {
                     "name": "Entitat",
                     "description": "Entitat del panell d'alarma de l'espai que es desarmarà del mode nit. Si s'omet, s'aplica a tots els panells."

@@ -189,6 +189,10 @@
             "name": "Disinserisci modalità notte",
             "description": "Esce dalla modalità notte lasciando inseriti i gruppi inseriti in modo indipendente (fuori casa). A differenza di un disinserimento totale, disattiva solo i gruppi in modalità notte: l'operazione nativa di Ajax \"disinserisci modalità notte\".",
             "fields": {
+                "code": {
+                    "name": "PIN allarme",
+                    "description": "PIN delle opzioni di Aegis. Obbligatorio se il PIN è attivo: un codice mancante o errato viene rifiutato, come in un normale disinserimento."
+                },
                 "entity_id": {
                     "name": "Entità",
                     "description": "Entità del pannello di allarme dello spazio da disinserire dalla modalità notte. Se omesso, si applica a tutti i pannelli."

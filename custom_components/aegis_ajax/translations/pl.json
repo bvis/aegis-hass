@@ -189,6 +189,10 @@
             "name": "Rozbrój tryb nocny",
             "description": "Wyłącza tryb nocny, pozostawiając uzbrojone grupy uzbrojone niezależnie (tryb wyjścia). W przeciwieństwie do pełnego rozbrojenia rozbraja tylko grupy w trybie nocnym — natywna operacja Ajax „rozbrój tryb nocny\".",
             "fields": {
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z opcji Aegis. Wymagany, gdy PIN jest włączony: brakujący lub błędny kod zostanie odrzucony, jak przy zwykłym rozbrojeniu."
+                },
                 "entity_id": {
                     "name": "Jednostka",
                     "description": "Jednostka panelu alarmowego przestrzeni do rozbrojenia z trybu nocnego. W przypadku pominięcia dotyczy wszystkich paneli."

@@ -189,6 +189,10 @@
             "name": "Odjistit noční režim",
             "description": "Ukončí noční režim a ponechá nezávisle zastřežené (odchodové) skupiny zastřežené. Na rozdíl od úplného odjištění deaktivuje pouze skupiny nočního režimu – nativní operace Ajax „odjistit noční režim\".",
             "fields": {
+                "code": {
+                    "name": "PIN alarmu",
+                    "description": "PIN z možností Aegis. Povinný, pokud je PIN zapnutý: chybějící nebo nesprávný kód je odmítnut, stejně jako při běžném odjištění."
+                },
                 "entity_id": {
                     "name": "Entita",
                     "description": "Entita poplachového panelu prostoru, který se má odjistit z nočního režimu. Pokud je vynecháno, platí pro všechny panely."

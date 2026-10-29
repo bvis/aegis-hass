@@ -410,8 +410,24 @@ async def _async_handle_disarm_night_mode(hass: HomeAssistant, call: ServiceCall
     night mode" operation. Unlike a full disarm, it only stands down the
     night-mode groups and leaves any independently armed (away) groups armed,
     which `alarm_disarm` on the space panel cannot express (#233).
+
+    Like `alarm_disarm`, it needs the PIN of every targeted account that has
+    one, checked before anything is sent (GHSA-593m-f4j6-8pj5).
     """
+    from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
+
     targets = await _resolve_target_space_ids(hass, call)
+    raw_code: object = call.data.get("code")
+    try:
+        # Same coercion as the panel's disarm: `code: 1234` is the PIN "1234".
+        code: object = cv.string(raw_code)
+    except vol.Invalid:
+        code = raw_code
+    for entry in _loaded_entries(hass):
+        if not entry.options.get("use_pin_code", False):
+            continue
+        if any(coordinator is entry.runtime_data for coordinator, _ in targets):
+            await hass.async_add_executor_job(validate_pin, entry.options, code)
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.disarm_from_night_mode(space_id)

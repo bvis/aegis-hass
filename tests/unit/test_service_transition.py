@@ -386,3 +386,56 @@ def test_transition_translations_keep_required_placeholders() -> None:
             ("service_pin_required", {"service", "entry_title"}),
         ):
             assert set(re.findall(r"\{(\w+)\}", doc["issues"][key]["description"])) == placeholders
+
+
+@pytest.mark.parametrize("code", [None, "", "wrong", 123, [], {}])
+async def test_disarm_night_mode_refuses_a_missing_or_wrong_pin(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+    code: object,
+) -> None:
+    """GHSA-593m-f4j6-8pj5: the PIN gates this disarm as it gates alarm_disarm."""
+    accounts[0].options = {"use_pin_code": True, "pin_code_hash": hash_pin("0123")}
+    data = {"entity_id": "alarm_control_panel.a"}
+    if code is not None:
+        data["code"] = code
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "disarm_night_mode", data, blocking=True)
+    accounts[0].runtime_data.security_api.disarm_from_night_mode.assert_not_awaited()
+
+
+@pytest.mark.parametrize("arm_requires_pin", [True, False])
+async def test_disarm_night_mode_runs_with_the_right_pin(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+    arm_requires_pin: bool,
+) -> None:
+    accounts[0].options = {
+        "use_pin_code": True,
+        "pin_code_hash": hash_pin("1234"),
+        "arm_requires_pin": arm_requires_pin,
+    }
+    await hass.services.async_call(
+        DOMAIN,
+        "disarm_night_mode",
+        {"entity_id": "alarm_control_panel.a", "code": 1234},
+        blocking=True,
+    )
+    accounts[0].runtime_data.security_api.disarm_from_night_mode.assert_awaited_once_with("a")
+
+
+async def test_disarm_night_mode_checks_every_targeted_account_before_sending(
+    hass: HomeAssistant,
+    accounts: list[SimpleNamespace],
+) -> None:
+    """A PIN on one account blocks an untargeted call before any space is touched."""
+    accounts[1].options = {"use_pin_code": True, "pin_code_hash": hash_pin("0123")}
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "disarm_night_mode", {}, blocking=True)
+    for entry in accounts:
+        entry.runtime_data.security_api.disarm_from_night_mode.assert_not_awaited()
+    # An account without a PIN is not affected by another account's PIN.
+    await hass.services.async_call(
+        DOMAIN, "disarm_night_mode", {"entity_id": "alarm_control_panel.a"}, blocking=True
+    )
+    accounts[0].runtime_data.security_api.disarm_from_night_mode.assert_awaited_once_with("a")

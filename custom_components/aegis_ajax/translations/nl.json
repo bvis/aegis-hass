@@ -189,6 +189,10 @@
             "name": "Nachtmodus uitschakelen",
             "description": "Verlaat de nachtmodus terwijl onafhankelijk ingeschakelde (afwezig) groepen ingeschakeld blijven. Anders dan een volledige uitschakeling worden alleen de nachtmodusgroepen uitgeschakeld — de native Ajax-bewerking \"nachtmodus uitschakelen\".",
             "fields": {
+                "code": {
+                    "name": "Pincode alarm",
+                    "description": "Pincode uit de Aegis-opties. Verplicht als de pincode aan staat: een ontbrekende of foute code wordt geweigerd, net als bij gewoon uitschakelen."
+                },
                 "entity_id": {
                     "name": "Entiteit",
                     "description": "Alarmpaneel-entiteit voor de ruimte die uit de nachtmodus moet worden gehaald. Indien weggelaten, geldt voor alle panelen."
