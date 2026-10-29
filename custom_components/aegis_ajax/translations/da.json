@@ -180,6 +180,10 @@
             "name": "Deaktiver natfunktion",
             "description": "Afslut natfunktion, mens uafhængigt aktiverede (fraværs-) grupper forbliver aktiveret. I modsætning til en fuld deaktivering nedjusterer denne handling kun natfunktionsgrupperne — Ajax' indbyggede \"deaktiver natfunktion\"-handling.",
             "fields": {
+                "code": {
+                    "name": "Alarmens PIN-kode",
+                    "description": "PIN-kode fra Aegis-indstillingerne. Påkrævet når PIN-koden er slået til: en manglende eller forkert kode afvises, som ved en normal frakobling."
+                },
                 "entity_id": {
                     "name": "Enhed",
                     "description": "Alarmpanel-enhed for det space, der skal deaktiveres fra natfunktion. Hvis udeladt, gælder det alle paneler."

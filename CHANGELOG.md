@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.1] - 2026-10-29
+
+### Security
+- **`aegis_ajax.disarm_night_mode` now needs the PIN (GHSA-593m-f4j6-8pj5, thanks @themluckylegs).** With *Use PIN code* on, this service took the alarm out of Night mode without any code, while disarming from the panel asked for it. It now takes a `code` field and refuses a missing or wrong PIN before sending anything, whatever *Also require the PIN to arm* is set to. Automations that call it on an account with a PIN need `code: "<your PIN>"` added. **Requests to Ajax:** none added; a refused call sends nothing.
+
 ## [1.29.0] - 2026-10-28
 
 ### Added

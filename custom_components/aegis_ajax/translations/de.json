@@ -180,6 +180,10 @@
             "name": "Nachtmodus deaktivieren",
             "description": "Beendet den Nachtmodus, während unabhängig (abwesend) scharf geschaltete Gruppen scharf bleiben. Anders als ein vollständiges Unscharfschalten werden nur die Nachtmodus-Gruppen deaktiviert – die native Ajax-Funktion „Nachtmodus deaktivieren\".",
             "fields": {
+                "code": {
+                    "name": "Alarm-PIN",
+                    "description": "PIN aus den Aegis-Optionen. Erforderlich, wenn die PIN aktiviert ist: Ein fehlender oder falscher Code wird abgelehnt, wie beim normalen Unscharfschalten."
+                },
                 "entity_id": {
                     "name": "Entität",
                     "description": "Alarmpanel-Entität des Bereichs, der aus dem Nachtmodus genommen werden soll. Wenn nicht angegeben, gilt für alle Panels."

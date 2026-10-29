@@ -180,6 +180,10 @@
             "name": "Disarm night mode",
             "description": "Exit night mode while leaving any independently armed (away) groups armed. Unlike a full disarm, this only stands down the night-mode groups — the native Ajax \"disarm night mode\" operation.",
             "fields": {
+                "code": {
+                    "name": "Alarm PIN",
+                    "description": "PIN from Aegis options. Required when the PIN is enabled: a missing or wrong code is refused, as with a normal disarm."
+                },
                 "entity_id": {
                     "name": "Entity",
                     "description": "Alarm panel entity for the space to disarm from night mode. If omitted, applies to all panels."
