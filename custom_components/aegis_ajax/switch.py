@@ -65,6 +65,9 @@ SWITCH_DEVICE_TYPES: dict[str, int] = {
     "light_switch_two_gang": 2,
     "light_switch_two_channel_two_way": 2,
     "light_switch_four_way_na": 4,
+    # #600: two relays + two logical outputs; which ids are the relays is
+    # still unconfirmed, so all four are exposed for the reporter to map.
+    "transmitter_fibra_four_channels_two_relays_two_logical": 4,
 }
 
 
