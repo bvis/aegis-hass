@@ -22,6 +22,9 @@ class TestSwitchDeviceTypes:
     def test_light_switch_two_gang_has_two_channels(self) -> None:
         assert SWITCH_DEVICE_TYPES["light_switch_two_gang"] == 2
 
+    def test_transmitter_fibra_two_relays_has_four_channels(self) -> None:
+        assert SWITCH_DEVICE_TYPES["transmitter_fibra_four_channels_two_relays_two_logical"] == 4
+
     @pytest.mark.parametrize(
         "device_type",
         [
