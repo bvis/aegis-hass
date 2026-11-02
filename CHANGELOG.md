@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Relays on the Transmitter Fibra with two relays (#600, thanks @Arthur-44).** The module now gets four switches, one per output: its two relays and its two logical outputs. Turning one on does what the app's button does, so a relay set to pulse (for example 1 second for a gate) opens and the switch drops back to off on its own. Which channel is which relay isn't confirmed yet, so the switches are named Channel 1 to 4 for now. **Requests to Ajax:** none to read them (they come with the device data already fetched); one request per switch you flip, the same one the app sends.
 - **Lock LightSwitch buttons from Home Assistant (#641, thanks @Tehnikis).** Each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app: when it's on, touching the wall panel does nothing, and the light still works from the app and from Home Assistant. It's one setting per device, so on a 2-gang switch it locks both buttons. The state comes from what the hub reports; after a change, the debug log says whether the hub's next report matches what was written. Older LightSwitch models that report the setting differently don't get the switch yet. **Requests to Ajax:** none to read it (it rides the hub connection that's already open); one message to the hub per change, the same one the app sends.
 
+### Fixed
+- **Push notifications on G4S SHIELDalarm accounts (#649, thanks @caspererichsen-spec).** Google refused to register push for this app (`API_KEY_ANDROID_APP_BLOCKED`) because the integration didn't tell it which app it was. It now identifies as the G4S app, like it already did for AIKO and Protegim. **Requests to Ajax:** none.
+
 ## [1.29.1] - 2026-10-29
 
 ### Security
