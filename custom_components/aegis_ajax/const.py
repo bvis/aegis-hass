@@ -143,6 +143,7 @@ APP_LABEL_TO_ANDROID_PACKAGE: dict[str, str] = {
     "Ajax": "com.ajaxsystems",
     "ajax_pro": "com.ajaxsystems.pro",
     "AIKO": "com.ajaxsystems.aiko",
+    "G4S_SHIELDalarm": "com.ajaxsystems.g4s",
     "Protegim_alarma": "com.ajaxsystems.protegim",
 }
 
