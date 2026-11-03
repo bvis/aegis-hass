@@ -90,7 +90,7 @@
             "invalid_auth": "Forkert e-mail eller adgangskode.",
             "invalid_totp": "Forkert TOTP-kode. Prøv igen.",
             "cannot_connect": "Kan ikke oprette forbindelse til Ajax-serverne.",
-            "client_rejected": "Ajax afviser denne version af Aegis for Ajax. Opdater integrationen i HACS, genstart Home Assistant og prøv igen.",
+            "client_rejected": "Ajax afviser denne version af Aegis for Ajax. Opdater integrationen, genstart Home Assistant og prøv igen.",
             "unknown": "Der opstod en uventet fejl.",
             "primary_account_required": "Vælg en eksisterende primær Aegis-konto.",
             "account_label_required": "Indtast en etiket til denne kommando-konto.",
@@ -371,7 +371,7 @@
         },
         "client_rejected": {
             "title": "Ajax afviser denne version af Aegis for Ajax",
-            "description": "Ajax-serverne er holdt op med at acceptere forespørgsler fra denne version af integrationen, så den kan ikke logge ind, opdatere tilstande eller sende kommandoer. Din konto og dine loginoplysninger er i orden. Opdater Aegis for Ajax i HACS til den nyeste version, og genstart Home Assistant. Denne reparation forsvinder af sig selv, når Ajax accepterer integrationen igen."
+            "description": "Ajax-serverne er holdt op med at acceptere forespørgsler fra denne version af integrationen, så den kan ikke logge ind, opdatere tilstande eller sende kommandoer. Din konto og dine loginoplysninger er i orden. Opdater Aegis for Ajax til den nyeste version, og genstart Home Assistant. Denne reparation forsvinder af sig selv, når Ajax accepterer integrationen igen."
         },
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",

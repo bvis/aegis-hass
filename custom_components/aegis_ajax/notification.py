@@ -421,7 +421,7 @@ class AjaxNotificationListener:
         except ImportError:
             _LOGGER.warning(
                 "firebase_messaging package not installed — push notifications disabled. "
-                "This is unexpected; reinstall the integration via HACS."
+                "This is unexpected; reinstall the integration."
             )
             return
 

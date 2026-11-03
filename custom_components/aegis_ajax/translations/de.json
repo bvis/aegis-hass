@@ -90,7 +90,7 @@
             "invalid_auth": "Ungültige E-Mail-Adresse oder falsches Passwort.",
             "invalid_totp": "Ungültiger TOTP-Code. Bitte versuchen Sie es erneut.",
             "cannot_connect": "Verbindung zu Ajax-Servern nicht möglich.",
-            "client_rejected": "Ajax lehnt diese Version von Aegis for Ajax ab. Aktualisiere die Integration in HACS, starte Home Assistant neu und versuche es erneut.",
+            "client_rejected": "Ajax lehnt diese Version von Aegis for Ajax ab. Aktualisiere die Integration, starte Home Assistant neu und versuche es erneut.",
             "unknown": "Ein unerwarteter Fehler ist aufgetreten.",
             "primary_account_required": "Wähle ein vorhandenes primäres Aegis-Konto aus.",
             "account_label_required": "Gib eine Bezeichnung für dieses Befehls-konto ein.",
@@ -311,7 +311,7 @@
         },
         "client_rejected": {
             "title": "Ajax lehnt diese Version von Aegis for Ajax ab",
-            "description": "Die Ajax-Server akzeptieren keine Anfragen mehr von dieser Version der Integration. Sie kann sich daher weder anmelden noch Zustände aktualisieren oder Befehle senden. Dein Konto und deine Zugangsdaten sind in Ordnung. Aktualisiere Aegis for Ajax in HACS auf die neueste Version und starte Home Assistant neu. Diese Reparatur verschwindet von selbst, sobald Ajax die Integration wieder akzeptiert."
+            "description": "Die Ajax-Server akzeptieren keine Anfragen mehr von dieser Version der Integration. Sie kann sich daher weder anmelden noch Zustände aktualisieren oder Befehle senden. Dein Konto und deine Zugangsdaten sind in Ordnung. Aktualisiere Aegis for Ajax auf die neueste Version und starte Home Assistant neu. Diese Reparatur verschwindet von selbst, sobald Ajax die Integration wieder akzeptiert."
         },
         "fcm_credentials_invalid": {
             "title": "Push-Benachrichtigungen deaktiviert - FCM-Anmeldedaten abgelehnt",

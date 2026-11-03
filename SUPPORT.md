@@ -6,7 +6,7 @@ Thanks for using Aegis for Ajax. Here's where to get help, ask questions or repo
 
 - Read the **[README](README.md)** — it covers setup, supported devices, app labels, options and the example dashboard.
 - Browse **[existing issues](https://github.com/bvis/aegis-hass/issues?q=is%3Aissue)** (open *and* closed) — most setup hiccups have already been answered.
-- Make sure you're on the latest release. Many problems disappear after a HACS update.
+- Make sure you're on the latest release. Many problems disappear after an update from the Marketplace.
 
 ## Reporting a bug
 

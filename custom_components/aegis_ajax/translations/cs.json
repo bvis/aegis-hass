@@ -90,7 +90,7 @@
             "invalid_auth": "Neplatný e-mail nebo heslo.",
             "invalid_totp": "Neplatný kód TOTP. Zkuste to znovu.",
             "cannot_connect": "Nelze se připojit k serverům Ajax.",
-            "client_rejected": "Ajax odmítá tuto verzi Aegis for Ajax. Aktualizujte integraci v HACS, restartujte Home Assistant a zkuste to znovu.",
+            "client_rejected": "Ajax odmítá tuto verzi Aegis for Ajax. Aktualizujte integraci, restartujte Home Assistant a zkuste to znovu.",
             "unknown": "Došlo k neočekávané chybě.",
             "primary_account_required": "Vyberte existující primární účet Aegis.",
             "account_label_required": "Zadejte štítek pro tento účet pouze pro příkazy.",
@@ -311,7 +311,7 @@
         },
         "client_rejected": {
             "title": "Ajax odmítá tuto verzi Aegis for Ajax",
-            "description": "Servery Ajax přestaly přijímat požadavky z této verze integrace, takže se nemůže přihlásit, aktualizovat stavy ani odesílat příkazy. Váš účet a přihlašovací údaje jsou v pořádku. Aktualizujte Aegis for Ajax v HACS na nejnovější verzi a restartujte Home Assistant. Tato oprava zmizí sama, jakmile Ajax integraci opět přijme."
+            "description": "Servery Ajax přestaly přijímat požadavky z této verze integrace, takže se nemůže přihlásit, aktualizovat stavy ani odesílat příkazy. Váš účet a přihlašovací údaje jsou v pořádku. Aktualizujte Aegis for Ajax na nejnovější verzi a restartujte Home Assistant. Tato oprava zmizí sama, jakmile Ajax integraci opět přijme."
         },
         "fcm_credentials_invalid": {
             "title": "Push oznameni vypnuta - prihlasovaci udaje FCM odmitnuty",
