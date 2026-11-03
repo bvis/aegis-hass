@@ -90,7 +90,7 @@
             "invalid_auth": "E-mail o password non validi.",
             "invalid_totp": "Codice TOTP non valido. Riprova.",
             "cannot_connect": "Impossibile connettersi ai server Ajax.",
-            "client_rejected": "Ajax sta rifiutando questa versione di Aegis for Ajax. Aggiorna l'integrazione in HACS, riavvia Home Assistant e riprova.",
+            "client_rejected": "Ajax sta rifiutando questa versione di Aegis for Ajax. Aggiorna l'integrazione, riavvia Home Assistant e riprova.",
             "unknown": "Si è verificato un errore imprevisto.",
             "primary_account_required": "Seleziona un account Aegis principale esistente.",
             "account_label_required": "Inserisci un’etichetta per questo account comandi.",
@@ -311,7 +311,7 @@
         },
         "client_rejected": {
             "title": "Ajax sta rifiutando questa versione di Aegis for Ajax",
-            "description": "I server Ajax hanno smesso di accettare richieste da questa versione dell'integrazione, quindi non può accedere, aggiornare gli stati né inviare comandi. Il tuo account e le tue credenziali sono a posto. Aggiorna Aegis for Ajax in HACS all'ultima versione e riavvia Home Assistant. Questa riparazione scompare da sola quando Ajax accetta di nuovo l'integrazione."
+            "description": "I server Ajax hanno smesso di accettare richieste da questa versione dell'integrazione, quindi non può accedere, aggiornare gli stati né inviare comandi. Il tuo account e le tue credenziali sono a posto. Aggiorna Aegis for Ajax all'ultima versione e riavvia Home Assistant. Questa riparazione scompare da sola quando Ajax accetta di nuovo l'integrazione."
         },
         "fcm_credentials_invalid": {
             "title": "Notifiche push disabilitate - credenziali FCM rifiutate",

@@ -90,7 +90,7 @@
             "invalid_auth": "Ongeldig e-mailadres of wachtwoord.",
             "invalid_totp": "Ongeldige TOTP-code. Probeer het opnieuw.",
             "cannot_connect": "Kan geen verbinding maken met de Ajax-servers.",
-            "client_rejected": "Ajax weigert deze versie van Aegis for Ajax. Werk de integratie bij in HACS, herstart Home Assistant en probeer het opnieuw.",
+            "client_rejected": "Ajax weigert deze versie van Aegis for Ajax. Werk de integratie bij, herstart Home Assistant en probeer het opnieuw.",
             "unknown": "Er is een onverwachte fout opgetreden.",
             "primary_account_required": "Selecteer een bestaand primair Aegis-account.",
             "account_label_required": "Voer een label voor dit commando-account in.",
@@ -311,7 +311,7 @@
         },
         "client_rejected": {
             "title": "Ajax weigert deze versie van Aegis for Ajax",
-            "description": "De Ajax-servers accepteren geen verzoeken meer van deze versie van de integratie, dus kan die niet inloggen, statussen bijwerken of commando's versturen. Je account en inloggegevens zijn in orde. Werk Aegis for Ajax in HACS bij naar de nieuwste versie en herstart Home Assistant. Deze reparatie verdwijnt vanzelf zodra Ajax de integratie weer accepteert."
+            "description": "De Ajax-servers accepteren geen verzoeken meer van deze versie van de integratie, dus kan die niet inloggen, statussen bijwerken of commando's versturen. Je account en inloggegevens zijn in orde. Werk Aegis for Ajax bij naar de nieuwste versie en herstart Home Assistant. Deze reparatie verdwijnt vanzelf zodra Ajax de integratie weer accepteert."
         },
         "fcm_credentials_invalid": {
             "title": "Pushmeldingen uitgeschakeld - FCM-inloggegevens afgewezen",

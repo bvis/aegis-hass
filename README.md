@@ -1,10 +1,10 @@
 # Aegis for Ajax — Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Default-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![GitHub Release](https://img.shields.io/github/release/bvis/aegis-hass.svg)](https://github.com/bvis/aegis-hass/releases)
 [![Tests](https://github.com/bvis/aegis-hass/actions/workflows/ci.yml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/ci.yml)
 [![Validate with hassfest](https://github.com/bvis/aegis-hass/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/hassfest.yaml)
-[![HACS Validation](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml)
+[![Marketplace validation](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml/badge.svg)](https://github.com/bvis/aegis-hass/actions/workflows/validate.yaml)
 [![License: MIT](https://img.shields.io/github/license/bvis/aegis-hass.svg)](LICENSE)
 [![Quality scale: Platinum (self-assessed)](https://img.shields.io/badge/quality%20scale-platinum%20(self--assessed)-8a9ba8)](custom_components/aegis_ajax/quality_scale.yaml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -72,20 +72,20 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 
 ## Installation
 
-### HACS (Recommended)
+### Marketplace (Recommended)
 
-[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bvis&repository=aegis-hass&category=integration)
+[![Open in the Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=bvis&repository=aegis-hass&category=integration)
 
-Click the button above, or manually:
+Click the button above, or on Home Assistant 2026.11 or newer:
 
-1. Open HACS in Home Assistant
-2. Click the three dots menu (top right) and select **Custom repositories**
-3. Add `https://github.com/bvis/aegis-hass` with category **Integration**
-4. Search for "Aegis for Ajax" in HACS and click **Install**
-5. Restart Home Assistant
-6. Add the integration:
+1. Go to **Settings > Marketplace**
+2. Search for "Aegis for Ajax" and click **Install**
+3. Restart Home Assistant if it asks you to
+4. Add the integration:
 
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=aegis_ajax)
+
+Before 2026.11, Home Assistant had no Marketplace and community integrations were installed through HACS. If you're still on an older version, search for "Aegis for Ajax" in HACS instead.
 
 ### Manual
 
@@ -97,7 +97,7 @@ Click the button above, or manually:
 ### Removing the integration
 
 1. Go to **Settings > Devices & Services**, open **Aegis for Ajax** and pick **Delete** from the entry's menu. This also signs the integration out of your Ajax account, so it disappears from the app's active sessions.
-2. If you installed through HACS, remove the repository there too; otherwise delete `config/custom_components/aegis_ajax/`.
+2. If you installed it from the Marketplace (or HACS on older versions), remove it there too; otherwise delete `config/custom_components/aegis_ajax/`.
 3. Restart Home Assistant.
 4. Optional: delete saved alarm photos in `media/ajax_photos/`.
 

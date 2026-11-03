@@ -90,7 +90,7 @@
             "invalid_auth": "Correu o contrasenya incorrectes.",
             "invalid_totp": "Codi TOTP incorrecte. Torna-ho a provar.",
             "cannot_connect": "No es pot connectar als servidors d'Ajax.",
-            "client_rejected": "Ajax està rebutjant aquesta versió d'Aegis for Ajax. Actualitza la integració a HACS, reinicia Home Assistant i torna-ho a provar.",
+            "client_rejected": "Ajax està rebutjant aquesta versió d'Aegis for Ajax. Actualitza la integració, reinicia Home Assistant i torna-ho a provar.",
             "unknown": "S'ha produit un error inesperat.",
             "primary_account_required": "Selecciona un compte Aegis principal existent.",
             "account_label_required": "Introdueix una etiqueta per a aquest compte de comandes.",
@@ -311,7 +311,7 @@
         },
         "client_rejected": {
             "title": "Ajax està rebutjant aquesta versió d'Aegis for Ajax",
-            "description": "Els servidors d'Ajax han deixat d'acceptar peticions d'aquesta versió de la integració, així que no pot iniciar sessió, actualitzar estats ni enviar ordres. El teu compte i les teves credencials estan bé. Actualitza Aegis for Ajax a HACS a la darrera versió i reinicia Home Assistant. Aquest avís desapareix sol quan Ajax torni a acceptar la integració."
+            "description": "Els servidors d'Ajax han deixat d'acceptar peticions d'aquesta versió de la integració, així que no pot iniciar sessió, actualitzar estats ni enviar ordres. El teu compte i les teves credencials estan bé. Actualitza Aegis for Ajax a la darrera versió i reinicia Home Assistant. Aquest avís desapareix sol quan Ajax torni a acceptar la integració."
         },
         "fcm_credentials_invalid": {
             "title": "Notificacions push desactivades: credencials FCM rebutjades",

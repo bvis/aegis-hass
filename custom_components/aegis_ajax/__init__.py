@@ -30,7 +30,7 @@ def _log_proto_descriptor_collision(exc: TypeError) -> None:
        in `custom_components/` (any folder whose name starts with
        `aegis_ajax` other than the active install). Most common cause.
     2. Another custom integration in `custom_components/` (typically a
-       different Ajax-related HACS integration) that compiles the same
+       different Ajax-related custom integration) that compiles the same
        upstream `systems/ajax/...` proto files into its own
        `_pb2.py` modules. Python protobuf keeps a single global descriptor
        pool, so both integrations cannot coexist in the same HA process
@@ -48,7 +48,7 @@ def _log_proto_descriptor_collision(exc: TypeError) -> None:
         "  (a) A stale or backup copy of this integration alongside the "
         "live one — any folder under custom_components/ whose name starts "
         "with 'aegis_ajax' other than the active install will trip this. "
-        "Fix: move or rename the extra folder (a clean HACS uninstall + "
+        "Fix: move or rename the extra folder (a clean uninstall + "
         "reinstall also clears it) and restart Home Assistant.\n"
         "  (b) A different Ajax-related custom integration in "
         "custom_components/ that bundles overlapping 'systems/ajax/...' "

@@ -90,7 +90,7 @@
             "invalid_auth": "Invalid email or password.",
             "invalid_totp": "Invalid TOTP code. Please try again.",
             "cannot_connect": "Cannot connect to Ajax servers.",
-            "client_rejected": "Ajax is rejecting this version of Aegis for Ajax. Update the integration in HACS, restart Home Assistant and try again.",
+            "client_rejected": "Ajax is rejecting this version of Aegis for Ajax. Update the integration, restart Home Assistant and try again.",
             "unknown": "An unexpected error occurred.",
             "primary_account_required": "Select an existing primary Aegis account for this commands-only account.",
             "account_label_required": "Enter a label for this commands-only account.",
@@ -371,7 +371,7 @@
         },
         "client_rejected": {
             "title": "Ajax is rejecting this version of Aegis for Ajax",
-            "description": "The Ajax servers stopped accepting requests from this version of the integration, so it can't log in, update states or send commands. Your account and credentials are fine. Update Aegis for Ajax in HACS to the latest release and restart Home Assistant. This Repair clears itself once Ajax accepts the integration again."
+            "description": "The Ajax servers stopped accepting requests from this version of the integration, so it can't log in, update states or send commands. Your account and credentials are fine. Update Aegis for Ajax to the latest release and restart Home Assistant. This Repair clears itself once Ajax accepts the integration again."
         },
         "fcm_never_delivered": {
             "title": "Push notifications are not arriving",
