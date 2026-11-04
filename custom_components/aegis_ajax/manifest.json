@@ -12,6 +12,7 @@
     "integration_type": "hub",
     "iot_class": "cloud_push",
     "issue_tracker": "https://github.com/bvis/aegis-hass/issues",
+    "loggers": ["firebase_messaging"],
     "requirements": ["grpcio>=1.75.1", "protobuf>=6.31.1", "firebase-messaging>=0.4.5"],
     "version": "1.30.0-beta.5"
 }
