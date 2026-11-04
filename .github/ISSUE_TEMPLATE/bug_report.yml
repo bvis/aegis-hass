@@ -111,13 +111,7 @@ body:
     attributes:
       label: Relevant logs
       description: |
-        Enable debug logging by adding this to `configuration.yaml`:
-        ```yaml
-        logger:
-          logs:
-            custom_components.aegis_ajax: debug
-        ```
-        Then restart HA, reproduce the issue, and paste the relevant logs.
+        Settings → Devices & services → Aegis for Ajax → **Enable debug logging**. If the problem happens at startup, restart Home Assistant now: debug logging stays on through that restart. Reproduce the issue. On Home Assistant 2026.11 or newer, choose **Show logs** and download them; on older versions, choose **Disable debug logging** and the browser downloads the log. Attach the file or paste the relevant lines.
       render: text
     validations:
       required: false
