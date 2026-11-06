@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.30.0] - unreleased
+## [1.30.0] - 2026-11-06
+
+Consolidates the 1.30.0 betas. Commands-only accounts were tested by @kamonishe in production and run on our own install. The Transmitter Fibra switches (#600) and the LightSwitch button lock (#641) ship without a test on real hardware, because nobody who owns one could try the beta; both only act when you flip them. If either does something unexpected, say so in its issue and a patch follows.
 
 ### Security
 - Includes the 1.29.1 fix: `aegis_ajax.disarm_night_mode` needs the PIN when *Use PIN code* is on (GHSA-593m-f4j6-8pj5).
@@ -17,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Push notifications on G4S SHIELDalarm accounts (#649, thanks @caspererichsen-spec).** Google refused to register push for this app (`API_KEY_ANDROID_APP_BLOCKED`) because the integration didn't tell it which app it was. It now identifies as the G4S app, like it already did for AIKO and Protegim. **Requests to Ajax:** none.
+
+### Documentation
+- The README lists the Transmitter Fibra with two relays in Supported Devices.
 
 ## [1.29.1] - 2026-10-29
 
