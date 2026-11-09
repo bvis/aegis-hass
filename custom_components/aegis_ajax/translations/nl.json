@@ -383,11 +383,11 @@
         },
         "service_target_required": {
             "title": "Voeg een doel toe aan {service}",
-            "description": "{service} is aangeroepen zonder entity_id en wordt nog steeds voor alle ingestelde ruimtes uitgevoerd. Een toekomstige versie vereist een expliciete entity_id van het alarmpaneel. Werk alle automatiseringen of scripts bij die deze dienst gebruiken en sluit daarna deze melding."
+            "description": "{service} is aangeroepen zonder entity_id en wordt nog steeds voor alle ingestelde ruimtes uitgevoerd. Versie 2.0.0 vereist een expliciete entity_id van het alarmpaneel. Werk alle automatiseringen of scripts bij die deze dienst gebruiken en sluit daarna deze melding."
         },
         "service_pin_required": {
             "title": "Geef de ingestelde pincode op voor {service}",
-            "description": "{service} is aangeroepen zonder geldige pincode voor accountvermelding {entry_title}. De aanroep wordt tijdens deze overgang nog uitgevoerd. Een toekomstige versie vereist de pincode als deze is ingeschakeld in de Aegis-opties. Geef deze als tekst tussen aanhalingstekens op in code voor alle betreffende automatiseringen of scripts en sluit daarna deze melding."
+            "description": "{service} is aangeroepen zonder geldige pincode voor accountvermelding {entry_title}. De aanroep wordt tijdens deze overgang nog uitgevoerd. Versie 2.0.0 vereist de pincode als deze is ingeschakeld in de Aegis-opties. Geef deze als tekst tussen aanhalingstekens op in code voor alle betreffende automatiseringen of scripts en sluit daarna deze melding."
         }
     },
     "entity": {

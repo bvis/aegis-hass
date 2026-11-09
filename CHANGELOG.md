@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- The two Repairs about service calls without a target or without the PIN (#568) now say the change arrives in 2.0.0, instead of "a future release". Nothing changes in how those calls behave.
+
 ## [1.30.0] - 2026-11-06
 
 Consolidates the 1.30.0 betas. Commands-only accounts were tested by @kamonishe in production and run on our own install. The Transmitter Fibra switches (#600) and the LightSwitch button lock (#641) ship without a test on real hardware, because nobody who owns one could try the beta; both only act when you flip them. If either does something unexpected, say so in its issue and a patch follows.

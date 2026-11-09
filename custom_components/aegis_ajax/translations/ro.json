@@ -383,11 +383,11 @@
         },
         "service_target_required": {
             "title": "Adăugați o țintă pentru {service}",
-            "description": "{service} a fost apelat fără entity_id și se execută în continuare pentru toate spațiile configurate. O versiune viitoare va necesita un entity_id explicit al panoului de alarmă. Actualizați toate automatizările sau scripturile care folosesc acest serviciu, apoi închideți această notificare."
+            "description": "{service} a fost apelat fără entity_id și se execută în continuare pentru toate spațiile configurate. Versiunea 2.0.0 va necesita un entity_id explicit al panoului de alarmă. Actualizați toate automatizările sau scripturile care folosesc acest serviciu, apoi închideți această notificare."
         },
         "service_pin_required": {
             "title": "Furnizați PIN-ul configurat pentru {service}",
-            "description": "{service} a fost apelat fără un PIN valid pentru intrarea de cont {entry_title}. Apelul se execută în continuare în această perioadă de tranziție. O versiune viitoare va necesita PIN-ul dacă este activat în opțiunile Aegis. Furnizați-l ca șir între ghilimele în code în toate automatizările sau scripturile afectate, apoi închideți această notificare."
+            "description": "{service} a fost apelat fără un PIN valid pentru intrarea de cont {entry_title}. Apelul se execută în continuare în această perioadă de tranziție. Versiunea 2.0.0 va necesita PIN-ul dacă este activat în opțiunile Aegis. Furnizați-l ca șir între ghilimele în code în toate automatizările sau scripturile afectate, apoi închideți această notificare."
         }
     },
     "entity": {

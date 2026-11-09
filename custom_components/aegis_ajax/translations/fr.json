@@ -383,11 +383,11 @@
         },
         "service_target_required": {
             "title": "Ajoutez une cible à {service}",
-            "description": "{service} a été appelé sans entity_id et continue de s’exécuter pour tous les espaces configurés. Une version future exigera un entity_id explicite du panneau d’alarme. Mettez à jour toutes les automatisations ou tous les scripts utilisant ce service, puis ignorez cet avis."
+            "description": "{service} a été appelé sans entity_id et continue de s’exécuter pour tous les espaces configurés. La version 2.0.0 exigera un entity_id explicite du panneau d’alarme. Mettez à jour toutes les automatisations ou tous les scripts utilisant ce service, puis ignorez cet avis."
         },
         "service_pin_required": {
             "title": "Fournissez le code PIN configuré à {service}",
-            "description": "{service} a été appelé sans code PIN valide pour l’entrée de compte {entry_title}. L’appel reste exécuté pendant cette transition. Une version future exigera le PIN s’il est activé dans les options d’Aegis. Indiquez-le comme chaîne entre guillemets dans code pour toutes les automatisations ou tous les scripts concernés, puis ignorez cet avis."
+            "description": "{service} a été appelé sans code PIN valide pour l’entrée de compte {entry_title}. L’appel reste exécuté pendant cette transition. La version 2.0.0 exigera le PIN s’il est activé dans les options d’Aegis. Indiquez-le comme chaîne entre guillemets dans code pour toutes les automatisations ou tous les scripts concernés, puis ignorez cet avis."
         }
     },
     "entity": {
