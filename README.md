@@ -345,7 +345,7 @@ If **Use PIN code** is enabled in an account's Aegis options (and **Also require
 the PIN to arm** is left on), `force_arm` and
 `force_arm_night` also raise a Repair when the supplied `code` is missing or
 invalid. These two services still execute during this transition, even with a
-wrong code. A future release will require a valid PIN.
+wrong code. 2.0.0 will require a valid PIN.
 
 `disarm_night_mode` is a disarm, so it already requires the PIN whenever **Use PIN
 code** is on (since 1.29.1): a missing or wrong `code` is refused and nothing is

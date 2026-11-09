@@ -383,11 +383,11 @@
         },
         "service_target_required": {
             "title": "Tilføj et mål til {service}",
-            "description": "{service} blev kaldt uden entity_id og kører stadig for alle konfigurerede områder. En fremtidig version vil kræve et eksplicit entity_id for alarmpanelet. Opdater alle automatiseringer eller scripts, der bruger denne tjeneste, og afvis derefter denne meddelelse."
+            "description": "{service} blev kaldt uden entity_id og kører stadig for alle konfigurerede områder. Version 2.0.0 vil kræve et eksplicit entity_id for alarmpanelet. Opdater alle automatiseringer eller scripts, der bruger denne tjeneste, og afvis derefter denne meddelelse."
         },
         "service_pin_required": {
             "title": "Angiv den konfigurerede PIN-kode til {service}",
-            "description": "{service} blev kaldt uden en gyldig PIN-kode for kontoindgangen {entry_title}. Kaldet udføres stadig i overgangsperioden. En fremtidig version vil kræve PIN-koden, hvis den er aktiveret i Aegis-indstillingerne. Angiv den som en tekststreng i anførselstegn i code i alle berørte automatiseringer eller scripts, og afvis derefter denne meddelelse."
+            "description": "{service} blev kaldt uden en gyldig PIN-kode for kontoindgangen {entry_title}. Kaldet udføres stadig i overgangsperioden. Version 2.0.0 vil kræve PIN-koden, hvis den er aktiveret i Aegis-indstillingerne. Angiv den som en tekststreng i anførselstegn i code i alle berørte automatiseringer eller scripts, og afvis derefter denne meddelelse."
         }
     },
     "entity": {

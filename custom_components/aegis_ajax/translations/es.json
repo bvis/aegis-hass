@@ -383,11 +383,11 @@
         },
         "service_target_required": {
             "title": "Añada un destino a {service}",
-            "description": "Se llamó a {service} sin entity_id y aún se ejecuta para todos los espacios configurados. Una versión futura exigirá un entity_id explícito del panel de alarma. Actualice todas las automatizaciones o scripts que utilicen este servicio y después descarte este aviso."
+            "description": "Se llamó a {service} sin entity_id y aún se ejecuta para todos los espacios configurados. La versión 2.0.0 exigirá un entity_id explícito del panel de alarma. Actualice todas las automatizaciones o scripts que utilicen este servicio y después descarte este aviso."
         },
         "service_pin_required": {
             "title": "Proporcione el PIN configurado a {service}",
-            "description": "Se llamó a {service} sin un PIN válido para la entrada de cuenta {entry_title}. La llamada aún se ejecuta durante esta transición. Una versión futura exigirá el PIN si está activado en las opciones de Aegis. Indíquelo como una cadena entre comillas en code en todas las automatizaciones o scripts afectados y después descarte este aviso."
+            "description": "Se llamó a {service} sin un PIN válido para la entrada de cuenta {entry_title}. La llamada aún se ejecuta durante esta transición. La versión 2.0.0 exigirá el PIN si está activado en las opciones de Aegis. Indíquelo como una cadena entre comillas en code en todas las automatizaciones o scripts afectados y después descarte este aviso."
         }
     },
     "entity": {
