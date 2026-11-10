@@ -421,6 +421,13 @@ What it does (controlled by hub configuration):
 
 Whether sirens sound is decided **entirely by the hub** — the panic request carries no siren field, so the integration cannot influence it. To see what your hub will do, enable the diagnostic binary sensors **Siren on panic button** and **Siren on tamper** on the hub device (disabled by default). They are read-only mirrors of the hub configuration; changing the behaviour is done in the Ajax app, and a change made there becomes visible after the integration reloads.
 
+### Alarms from non-Ajax sensors (Zigbee, Z-Wave…)
+
+There is no command that tells the hub "this zone was breached", so a sensor that only Home Assistant knows about can't start a real intrusion alarm, and the panic button is not a substitute for one. What you can do:
+
+- **Make noise only:** press the siren's **Test sound** button from an automation. It sounds for a few seconds (the siren decides how long) and nothing reaches the Ajax app or a monitoring station. Presses less than 10 s apart are ignored, so repeat it every 10 s until someone disarms. Handle the entry delay in the automation itself: wait, then check the alarm panel is still armed.
+- **A real alarm:** have Home Assistant close a relay wired to a Transmitter or MultiTransmitter input. The hub then treats it as one of its own detectors, with its own delay, sirens and monitoring station rules.
+
 ### Service: `aegis_ajax.press_panic_button`
 
 | Field | Required | Description |
