@@ -352,8 +352,21 @@ code** is on (since 1.29.1): a missing or wrong `code` is refused and nothing is
 sent, the same as disarming from the panel.
 
 The PIN is the one configured
-in Aegis, not your Ajax login password. Supply it as a quoted string to preserve
-leading zeroes:
+in Aegis, not your Ajax login password.
+
+This PIN only exists in Home Assistant. Ajax doesn't know it, so it guards what
+goes through Home Assistant (the alarm panel card, services, automations, voice
+assistants) and nothing else: the Ajax app, keypads and key fobs keep working
+with their own Ajax credentials and never ask for it.
+
+The same goes for the lockout. After 5 wrong codes in a row Home Assistant
+refuses every code for 5 minutes, the right one included, so nobody can keep
+guessing through it. During those 5 minutes you can still disarm from the Ajax
+app, a keypad or a key fob. The count is kept in memory: a correct code, a new
+PIN or a Home Assistant restart clears it. A call with no code at all is refused
+without counting, so an automation that forgets the code can't lock you out.
+
+Supply the code as a quoted string to preserve leading zeroes:
 
 ```yaml
 action: aegis_ajax.force_arm
