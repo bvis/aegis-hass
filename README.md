@@ -359,6 +359,14 @@ goes through Home Assistant (the alarm panel card, services, automations, voice
 assistants) and nothing else: the Ajax app, keypads and key fobs keep working
 with their own Ajax credentials and never ask for it.
 
+It asks for the PIN to arm and disarm, and nothing else. Two things that weaken
+the alarm don't ask for it: a device's bypass switch, which takes that detector
+out of the alarm, and unlocking a lock. Bypass switches only exist when the Ajax
+account used by the integration may edit devices, or when **Bypass switches** is
+set to `always`; set it to `never` if you rely on the PIN and don't need them.
+Whether the hub accepts a bypass while the system is armed hasn't been checked on
+real hardware. For a lock, limit who can reach the entity in Home Assistant.
+
 The same goes for the lockout. After 5 wrong codes in a row Home Assistant
 refuses every code for 5 minutes, the right one included, so nobody can keep
 guessing through it. During those 5 minutes you can still disarm from the Ajax
