@@ -5,10 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.30.1] - unreleased
+
+### Security
+- **The account session services are for administrators only.** Any Home Assistant user could call `aegis_ajax.list_client_sessions`, `terminate_client_session` and `terminate_other_client_sessions`, so a user with no admin rights could see which devices are signed in to the Ajax account and sign the owner's phone out. A logged-in user who isn't an administrator is now refused. Automations and scripts keep working. **Requests to Ajax:** none.
+- **`confirm` has to be a real yes.** `press_panic_button` and the two services that end sessions accepted any non-empty value, so `confirm: "false"` written as text counted as confirmed. Only `true`, `yes`, `on` or `1` confirm now. **Requests to Ajax:** none.
+- **Wrong alarm codes are counted.** After 5 wrong codes in a row every code is refused for 5 minutes, the right one included, and each wrong code leaves a warning in the log (never the code). Entering the right code, a restart or setting a new PIN starts the count again. A call with no code at all is refused as before and doesn't count, and neither does `force_arm` with a wrong code while it still runs (#568). The Ajax app and the keypads aren't affected. **Requests to Ajax:** none.
+- Diagnostics no longer include the Ajax account id.
 
 ### Changed
 - The two Repairs about service calls without a target or without the PIN (#568) now say the change arrives in 2.0.0, instead of "a future release". Nothing changes in how those calls behave.
+- **Signing in again restarts the integration once.** A new password entered from the re-authentication prompt or from *Reconfigure* could restart it twice in a row, and Home Assistant 2026.11 logged a warning about how the restart was asked for. **Requests to Ajax:** fewer after a password change (one start instead of two); otherwise none.
+
+### Fixed
+- **`force_arm`, `force_arm_night` and `disarm_night_mode` on something that isn't an Aegis alarm panel now fail with an error.** They used to do nothing and look as if they had worked. A call with no target still acts on every space, as before. **Requests to Ajax:** none.
 
 ## [1.30.0] - 2026-11-06
 

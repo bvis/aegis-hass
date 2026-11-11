@@ -90,3 +90,11 @@ def mock_session_token() -> bytes:
 @pytest.fixture
 def mock_user_hex_id() -> str:
     return "user123hex"
+
+
+@pytest.fixture(autouse=True)
+def _reset_failed_pin_attempts() -> None:
+    """Wrong codes are counted per stored PIN; tests share a handful of PINs."""
+    from custom_components.aegis_ajax import service_security  # noqa: PLC0415
+
+    service_security._failed_attempts.clear()

@@ -13,6 +13,7 @@ from homeassistant.core import ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.service import async_register_admin_service
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,6 +100,8 @@ from custom_components.aegis_ajax.repairs import (  # noqa: E402
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from homeassistant.core import HomeAssistant, ServiceCall
     from homeassistant.helpers.device_registry import DeviceEntry
     from homeassistant.helpers.typing import ConfigType
@@ -142,6 +145,12 @@ _CUSTOM_SERVICE_NAMES = (
     "terminate_other_client_sessions",
 )
 
+# They show and end the sessions of the Ajax account itself, the owner's phone
+# included, so only Home Assistant administrators may call them.
+_ADMIN_SERVICE_NAMES = frozenset(
+    {"list_client_sessions", "terminate_client_session", "terminate_other_client_sessions"}
+)
+
 
 # Read-only services and account session management have separate semantics.
 _SERVICES_REQUIRING_TARGET = frozenset(
@@ -169,11 +178,9 @@ async def _async_warn_service_transition(
     if call.service not in {"force_arm", "force_arm_night"}:
         return
 
-    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
-
     from custom_components.aegis_ajax.service_security import (  # noqa: PLC0415
         arm_requires_pin,
-        validate_pin,
+        pin_is_correct,
     )
 
     for entry in entries:
@@ -189,13 +196,14 @@ async def _async_warn_service_transition(
             code: object = cv.string(raw_code)
         except vol.Invalid:
             code = raw_code
-        if isinstance(code, str) and code:
-            try:
-                await hass.async_add_executor_job(validate_pin, entry.options, code)
-            except ServiceValidationError:
-                pass
-            else:
-                continue
+        # The call runs either way here, so a wrong code must not count
+        # towards the lockout that refuses real disarms.
+        if (
+            isinstance(code, str)
+            and code
+            and await hass.async_add_executor_job(pin_is_correct, entry.options, code)
+        ):
+            continue
         async_register_service_pin_transition(
             hass,
             service=call.service,
@@ -284,6 +292,26 @@ async def _resolve_target_space_ids(
     return results
 
 
+def _require_panel_targets(targets: list[Any], service: str) -> None:
+    """A target that is not an Aegis alarm panel is an error, not a silent no-op."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    if not targets:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_panel_for_target",
+            translation_placeholders={"service": service},
+        )
+
+
+def _confirmed(call: ServiceCall) -> bool:
+    """True only for a real yes: `confirm: "false"` is a non-empty string, not a yes."""
+    try:
+        return bool(cv.boolean(call.data.get("confirm")))
+    except vol.Invalid:
+        return False
+
+
 def _resolve_session_coordinator(
     hass: HomeAssistant, call: ServiceCall
 ) -> AjaxCobrandedCoordinator:
@@ -330,7 +358,7 @@ async def _async_handle_terminate_client_session(hass: HomeAssistant, call: Serv
         ServiceValidationError,
     )
 
-    if not call.data.get("confirm"):
+    if not _confirmed(call):
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="confirm_required",
@@ -360,7 +388,7 @@ async def _async_handle_terminate_other_client_sessions(
         ServiceValidationError,
     )
 
-    if not call.data.get("confirm"):
+    if not _confirmed(call):
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="confirm_required",
@@ -382,6 +410,9 @@ async def _async_handle_terminate_other_client_sessions(
 async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm service call (arm ignoring open sensors)."""
     targets = await _resolve_target_space_ids(hass, call)
+    if call.data.get("entity_id"):
+        # With no target these still act on every space (until 2.0.0, #568).
+        _require_panel_targets(targets, "force_arm")
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm(space_id, ignore_alarms=True)
@@ -394,6 +425,9 @@ async def _async_handle_force_arm(hass: HomeAssistant, call: ServiceCall) -> Non
 async def _async_handle_force_arm_night(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle force_arm_night service call (night mode ignoring open sensors)."""
     targets = await _resolve_target_space_ids(hass, call)
+    if call.data.get("entity_id"):
+        # With no target these still act on every space (until 2.0.0, #568).
+        _require_panel_targets(targets, "force_arm_night")
     refreshed: set[int] = set()
     for coordinator, space_id in targets:
         await coordinator.security_api.arm_night_mode(space_id, ignore_alarms=True)
@@ -417,6 +451,9 @@ async def _async_handle_disarm_night_mode(hass: HomeAssistant, call: ServiceCall
     from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
 
     targets = await _resolve_target_space_ids(hass, call)
+    if call.data.get("entity_id"):
+        # With no target these still act on every space (until 2.0.0, #568).
+        _require_panel_targets(targets, "disarm_night_mode")
     raw_code: object = call.data.get("code")
     try:
         # Same coercion as the panel's disarm: `code: 1234` is the PIN "1234".
@@ -451,7 +488,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     """
     from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
 
-    if not call.data.get("confirm"):
+    if not _confirmed(call):
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="panic_confirm_required"
         )
@@ -460,12 +497,7 @@ async def _async_handle_press_panic_button(hass: HomeAssistant, call: ServiceCal
     longitude = call.data.get("longitude")
 
     targets = await _resolve_target_space_ids(hass, call)
-    if not targets:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="no_panel_for_target",
-            translation_placeholders={"service": "press_panic_button"},
-        )
+    _require_panel_targets(targets, "press_panic_button")
 
     for coordinator, space_id in targets:
         await coordinator.spaces_api.press_panic_button(
@@ -494,12 +526,7 @@ async def _async_handle_set_photo_on_demand_mode(hass: HomeAssistant, call: Serv
         )
 
     targets = await _resolve_target_space_ids(hass, call)
-    if not targets:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="no_panel_for_target",
-            translation_placeholders={"service": "set_photo_on_demand_mode"},
-        )
+    _require_panel_targets(targets, "set_photo_on_demand_mode")
 
     for coordinator, space_id in targets:
         space = coordinator.spaces.get(space_id)
@@ -598,23 +625,29 @@ def _async_register_services(hass: HomeAssistant) -> None:
     }
     # KeyError here means a name was added to _CUSTOM_SERVICE_NAMES without a
     # handler — fail loudly at setup rather than silently skipping it.
+    responses = {
+        "list_client_sessions": SupportsResponse.ONLY,
+        "terminate_other_client_sessions": SupportsResponse.OPTIONAL,
+        "refresh_alarm_images": SupportsResponse.OPTIONAL,
+    }
     for name in _CUSTOM_SERVICE_NAMES:
-        if name == "list_client_sessions":
-            hass.services.async_register(
+        supports_response = responses.get(name, SupportsResponse.NONE)
+        if name in _ADMIN_SERVICE_NAMES:
+            # Refuses a logged-in user who is not an administrator. Calls with
+            # no user (automations, scripts) still run. The schema keeps the
+            # helper's default from rejecting the service's own fields.
+            async_register_admin_service(
+                hass,
                 DOMAIN,
                 name,
                 service_handlers[name],
-                supports_response=SupportsResponse.ONLY,
-            )
-        elif name in {"terminate_other_client_sessions", "refresh_alarm_images"}:
-            hass.services.async_register(
-                DOMAIN,
-                name,
-                service_handlers[name],
-                supports_response=SupportsResponse.OPTIONAL,
+                schema=vol.Schema({}, extra=vol.ALLOW_EXTRA),
+                supports_response=supports_response,
             )
         else:
-            hass.services.async_register(DOMAIN, name, service_handlers[name])
+            hass.services.async_register(
+                DOMAIN, name, service_handlers[name], supports_response=supports_response
+            )
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -920,19 +953,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry
         except Exception:
             _LOGGER.debug("Auto-labeling skipped (labels API not available)")
 
-    # Reload integration when options or credentials change (e.g. FCM credentials)
-    reload_state = _reload_relevant_state(entry)
+    _async_register_reload_listener(entry)
 
-    async def _async_update_listener(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> None:
+    return True
+
+
+@callback
+def _async_register_reload_listener(entry: ConfigEntry) -> None:
+    """Reload the integration when options or credentials change (e.g. FCM credentials)."""
+    reload_state = reload_relevant_state(entry.data, entry.options)
+
+    async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
         # A refreshed session token is written to entry.data at runtime; that
         # alone must not restart everything and call Ajax again (#609).
-        if _reload_relevant_state(entry) == reload_state:
+        if reload_relevant_state(entry.data, entry.options) == reload_state:
             return
         await hass.config_entries.async_reload(entry.entry_id)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-
-    return True
 
 
 _LABEL_RULES: dict[str, set[str]] = {
@@ -1050,10 +1088,11 @@ async def _async_apply_labels(hass: HomeAssistant, entry: ConfigEntry) -> None:
 _SESSION_KEYS = frozenset({"session_token", "user_hex_id", "device_id"})
 
 
-def _reload_relevant_state(entry: ConfigEntry) -> tuple[dict[str, Any], dict[str, Any]]:
+def reload_relevant_state(
+    data: Mapping[str, Any], options: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Options and data minus the session the integration refreshes itself."""
-    data = {k: v for k, v in entry.data.items() if k not in _SESSION_KEYS}
-    return dict(entry.options), data
+    return dict(options), {k: v for k, v in data.items() if k not in _SESSION_KEYS}
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AjaxCobrandedConfigEntry) -> bool:

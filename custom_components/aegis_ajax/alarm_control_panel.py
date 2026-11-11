@@ -11,7 +11,7 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
     CodeFormat,
 )
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -268,7 +268,7 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         return features
 
     async def _async_validate_code(self, code: str | None, *, arming: bool = False) -> None:
-        """Raise HomeAssistantError if the provided code does not match the stored hash."""
+        """Raise if the provided code does not match the stored hash."""
         from custom_components.aegis_ajax.service_security import validate_pin  # noqa: PLC0415
 
         options = self._get_options()
@@ -276,13 +276,9 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
             return
         if arming and not self.code_arm_required:
             return
-        try:
-            # Checking a PIN is CPU-heavy by design: keep it off the event loop.
-            await self.hass.async_add_executor_job(validate_pin, options, code)
-        except HomeAssistantError as err:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="invalid_alarm_code"
-            ) from err
+        # Checking a PIN is CPU-heavy by design: keep it off the event loop.
+        # Its errors are already translated (wrong code, or too many of them).
+        await self.hass.async_add_executor_job(validate_pin, options, code)
 
     def _issue_label(self, key: str) -> str:
         """Return a translated issue label for the current HA language."""

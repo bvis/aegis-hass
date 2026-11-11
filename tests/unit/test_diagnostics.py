@@ -331,6 +331,12 @@ class TestAsyncGetConfigEntryDiagnostics:
         assert entry_data.get("password") != "secret"
 
     @pytest.mark.asyncio
+    async def test_account_id_redacted(self, entry: MagicMock) -> None:
+        entry.data = {**entry.data, "user_hex_id": "0A1B2C3D"}
+        result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+        assert "0A1B2C3D" not in str(result)
+
+    @pytest.mark.asyncio
     async def test_spaces_included(self, entry: MagicMock) -> None:
         result = await async_get_config_entry_diagnostics(MagicMock(), entry)
         assert "space-1" in result["spaces"]

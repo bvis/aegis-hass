@@ -613,14 +613,14 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
                 "the entry keeps its previous (rejected) token",
                 entry.entry_id,
             )
-        return self.async_update_reload_and_abort(entry, data=new_data, reason="reauth_successful")
+        return self._async_save_and_reload_once(entry, new_data)
 
     async def _async_finish_reconfigure(self) -> ConfigFlowResult:
         """Persist new credentials and session token, then reload."""
         entry = self._get_reconfigure_entry()
         if self._email != entry.unique_id:
             await self.async_set_unique_id(self._email)
-            self._abort_if_unique_id_configured(updates={"email": self._email})
+            self._abort_if_unique_id_configured()
         new_data: dict[str, Any] = {
             **entry.data,
             "email": self._email,
@@ -656,12 +656,41 @@ class AjaxCobrandedConfigFlow(ConfigFlow, domain=DOMAIN):
         # Refresh the visible title and unique_id too, not just the data —
         # otherwise switching accounts leaves the old email on the entry's
         # front page until a second reconfigure (#241).
-        return self.async_update_reload_and_abort(
+        return self._async_save_and_reload_once(
             entry,
+            new_data,
             unique_id=self._email,
             title=f"Ajax Security ({self._email})",
-            data=new_data,
         )
+
+    def _async_save_and_reload_once(
+        self,
+        entry: ConfigEntry,
+        data: dict[str, Any],
+        *,
+        unique_id: str | None = None,
+        title: str | None = None,
+    ) -> ConfigFlowResult:
+        """Save the entry and make sure it reloads exactly once.
+
+        A loaded entry has the update listener, which reloads when credentials
+        change; reloading here as well would start the integration twice. The
+        listener ignores a change that is only a new session, and an entry that
+        failed to start has no listener at all, so those two are reloaded here.
+        """
+        from custom_components.aegis_ajax import reload_relevant_state  # noqa: PLC0415
+
+        listener_reloads = bool(entry.update_listeners) and reload_relevant_state(
+            data, entry.options
+        ) != reload_relevant_state(entry.data, entry.options)
+        if unique_id is None or title is None:
+            # Reauth: same account, so the id and the title stay.
+            result = self.async_update_and_abort(entry, data=data, reason="reauth_successful")
+        else:
+            result = self.async_update_and_abort(entry, unique_id=unique_id, title=title, data=data)
+        if not listener_reloads:
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
+        return result
 
     @staticmethod
     @callback

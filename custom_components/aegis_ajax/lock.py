@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.lock import LockEntity, LockEntityFeature
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.api.devices import (
@@ -13,6 +14,7 @@ from custom_components.aegis_ajax.api.devices import (
     SmartLockError,
 )
 from custom_components.aegis_ajax.api.models import DeviceCommand
+from custom_components.aegis_ajax.const import DOMAIN
 from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
 from custom_components.aegis_ajax.device_handlers import capabilities_for
 from custom_components.aegis_ajax.entity import async_send_device_command, build_device_info
@@ -155,14 +157,20 @@ class AjaxLock(CoordinatorEntity[AjaxCobrandedCoordinator], LockEntity):
                 "Cannot resolve space for SmartLock %s — no matching hub in coordinator",
                 self._device_id,
             )
-            return
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="command_not_performed"
+            )
         try:
             await self.coordinator.devices_api.switch_smart_lock(
                 space_id=space_id, smart_lock_id=self._device_id, action=action
             )
         except SmartLockError as exc:
-            _LOGGER.error("SmartLock %s action %s failed: %s", self._device_id, action, exc)
-            return
+            # Raised, so a refused unlatch doesn't look like it worked.
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": str(exc)},
+            ) from exc
         await self.coordinator.async_request_refresh()
 
     async def async_lock(self, **kwargs: object) -> None:

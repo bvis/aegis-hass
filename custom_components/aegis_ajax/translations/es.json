@@ -747,6 +747,9 @@
         "invalid_alarm_code": {
             "message": "Código de alarma incorrecto"
         },
+        "alarm_code_locked": {
+            "message": "Demasiados códigos de alarma incorrectos. Espera {minutes} min e inténtalo de nuevo."
+        },
         "not_loaded": {
             "message": "No hay ninguna cuenta de Aegis for Ajax cargada. Revisa la integración en la página Dispositivos y servicios."
         }

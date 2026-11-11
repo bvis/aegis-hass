@@ -747,6 +747,9 @@
         "invalid_alarm_code": {
             "message": "Geçersiz alarm kodu"
         },
+        "alarm_code_locked": {
+            "message": "Çok fazla yanlış alarm kodu girildi. {minutes} dk bekleyin ve tekrar deneyin."
+        },
         "not_loaded": {
             "message": "Yüklü bir Aegis for Ajax hesabı yok. Cihazlar ve hizmetler sayfasından entegrasyonu kontrol edin."
         }

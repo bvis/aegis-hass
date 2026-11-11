@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import grpc
 import pytest
 import voluptuous as vol
-from homeassistant.config_entries import SOURCE_DHCP, SOURCE_USER
+from homeassistant.config_entries import SOURCE_DHCP, SOURCE_USER, ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorMode
@@ -770,6 +770,120 @@ class TestAsyncStepReauth:
         (entry,) = hass.config_entries.async_entries(DOMAIN)
         assert entry.data["session_token"] == "tok-2fa"
         assert entry.data["password_hash"] == hashlib.sha256(b"newpass").hexdigest()
+
+
+class TestReloadsExactlyOnce:
+    """Reauth and Reconfigure restart the integration once, loaded or not."""
+
+    @pytest.fixture(autouse=True)
+    def _unload(self) -> Iterator[None]:
+        with patch("custom_components.aegis_ajax.async_unload_entry", return_value=True):
+            yield
+
+    @staticmethod
+    async def _load(hass: HomeAssistant, entry: MockConfigEntry, setup_entry: AsyncMock) -> None:
+        """Load the entry with the integration's real update listener."""
+        from custom_components.aegis_ajax import _async_register_reload_listener
+
+        def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> bool:
+            _async_register_reload_listener(entry)
+            return True
+
+        setup_entry.side_effect = _setup
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        setup_entry.reset_mock()
+
+    @staticmethod
+    async def _reauth(hass: HomeAssistant, entry: MockConfigEntry, password: str) -> None:
+        result = await entry.start_reauth_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"password": password}
+        )
+        await hass.async_block_till_done()
+        assert result["reason"] == "reauth_successful"
+
+    async def test_reauth_with_a_new_password_on_a_loaded_entry(
+        self,
+        hass: HomeAssistant,
+        client: MagicMock,
+        setup_entry: AsyncMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        entry = _entry(hass)
+        await self._load(hass, entry, setup_entry)
+
+        await self._reauth(hass, entry, "newpass")
+
+        setup_entry.assert_awaited_once()
+        assert entry.state is ConfigEntryState.LOADED
+        assert "update listener" not in caplog.text
+
+    async def test_reauth_with_the_same_password_on_a_loaded_entry(
+        self, hass: HomeAssistant, client: MagicMock, setup_entry: AsyncMock
+    ) -> None:
+        """Only the session changes, which the listener ignores (#609): the flow reloads."""
+        entry = _entry(
+            hass,
+            {
+                "email": "user@example.com",
+                "app_label": "Ajax",
+                "password_hash": hashlib.sha256(b"same").hexdigest(),
+                "session_token": "tok-rejected",
+            },
+        )
+        await self._load(hass, entry, setup_entry)
+        client.session.session_token = "tok-fresh"
+
+        await self._reauth(hass, entry, "same")
+
+        setup_entry.assert_awaited_once()
+        assert entry.data["session_token"] == "tok-fresh"
+
+    async def test_reauth_after_a_failed_start_loads_the_entry(
+        self, hass: HomeAssistant, client: MagicMock, setup_entry: AsyncMock
+    ) -> None:
+        """No listener exists when the start failed, so the flow has to reload."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        entry = _entry(hass)
+        setup_entry.side_effect = ConfigEntryAuthFailed("rejected")
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.SETUP_ERROR
+        setup_entry.reset_mock(side_effect=True)
+        for flow in hass.config_entries.flow.async_progress():
+            hass.config_entries.flow.async_abort(flow["flow_id"])
+
+        await self._reauth(hass, entry, "newpass")
+
+        setup_entry.assert_awaited_once()
+        assert entry.state is ConfigEntryState.LOADED
+
+    async def test_reconfigure_on_a_loaded_entry(
+        self,
+        hass: HomeAssistant,
+        client: MagicMock,
+        setup_entry: AsyncMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        entry = _entry(hass)
+        await self._load(hass, entry, setup_entry)
+
+        with patch(
+            "custom_components.aegis_ajax.monitoring_companies.async_remove_monitoring_companies",
+            AsyncMock(),
+        ):
+            result = await entry.start_reconfigure_flow(hass)
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {"email": "new@example.com", "password": "pw"}
+            )
+            await hass.async_block_till_done()
+
+        assert result["reason"] == "reconfigure_successful"
+        setup_entry.assert_awaited_once()
+        assert "update listener" not in caplog.text
 
 
 class TestAsyncFinishReconfigure:

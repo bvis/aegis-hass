@@ -11,6 +11,8 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from homeassistant.core import HomeAssistant
+
 
 @contextlib.contextmanager
 def _raises_key(exc: type[Exception], key: str) -> Iterator[None]:
@@ -406,6 +408,115 @@ class TestClientSessionServices:
         with _raises_key(ServiceValidationError, "confirm_required"):
             await _async_handle_terminate_client_session(MagicMock(), MagicMock(data={}))
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("confirm", ["false", "no", "off", "0", 0, False, None, "maybe", []])
+    async def test_confirm_must_be_a_real_yes(self, confirm: object) -> None:
+        """`confirm: "false"` is a non-empty string; it used to count as a yes."""
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import (
+            _async_handle_press_panic_button,
+            _async_handle_terminate_client_session,
+            _async_handle_terminate_other_client_sessions,
+        )
+
+        call = MagicMock(data={"confirm": confirm, "session_id": 2})
+        with _raises_key(ServiceValidationError, "confirm_required"):
+            await _async_handle_terminate_client_session(MagicMock(), call)
+        with _raises_key(ServiceValidationError, "confirm_required"):
+            await _async_handle_terminate_other_client_sessions(MagicMock(), call)
+        with _raises_key(ServiceValidationError, "panic_confirm_required"):
+            await _async_handle_press_panic_button(MagicMock(), call)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("confirm", [True, "true", "yes", "on", 1])
+    async def test_confirm_accepts_what_a_template_renders(self, confirm: object) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_handle_terminate_client_session
+
+        # Past the confirmation: the next check is the one that refuses.
+        call = MagicMock(data={"confirm": confirm, "session_id": "nope"})
+        with _raises_key(ServiceValidationError, "session_id_invalid"):
+            await _async_handle_terminate_client_session(MagicMock(), call)
+
+
+class TestSessionServicesAreAdminOnly:
+    """They show and end the sessions of the Ajax account, the owner's phone included."""
+
+    SERVICES = (
+        ("list_client_sessions", {}),
+        ("terminate_client_session", {"confirm": True, "session_id": 2}),
+        ("terminate_other_client_sessions", {"confirm": True}),
+    )
+
+    @staticmethod
+    async def _call(hass: HomeAssistant, name: str, data: dict, user_id: str | None) -> None:
+        from homeassistant.core import Context
+
+        await hass.services.async_call(
+            "aegis_ajax",
+            name,
+            data,
+            blocking=True,
+            return_response=name == "list_client_sessions",
+            context=Context(user_id=user_id),
+        )
+
+    @pytest.mark.parametrize(("name", "data"), SERVICES)
+    async def test_a_user_who_is_not_admin_is_refused(
+        self, hass: HomeAssistant, name: str, data: dict
+    ) -> None:
+        from homeassistant.exceptions import Unauthorized
+
+        from custom_components.aegis_ajax import async_setup
+
+        await async_setup(hass, {})
+        # Home Assistant makes the first user it creates the owner, an administrator.
+        await hass.auth.async_create_user("owner", group_ids=["system-admin"])
+        user = await hass.auth.async_create_user("guest", group_ids=["system-users"])
+        assert not user.is_admin
+
+        with pytest.raises(Unauthorized):
+            await self._call(hass, name, data, user.id)
+
+    @pytest.mark.parametrize(("name", "data"), SERVICES)
+    @pytest.mark.parametrize("caller", ["admin", "automation"])
+    async def test_admins_and_automations_get_through(
+        self, hass: HomeAssistant, name: str, data: dict, caller: str
+    ) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import async_setup
+
+        await async_setup(hass, {})
+        user_id = None  # automations and scripts call with no user
+        if caller == "admin":
+            user_id = (await hass.auth.async_create_user("boss", group_ids=["system-admin"])).id
+
+        # Reaches the service itself, which has no account loaded in this test.
+        with _raises_key(ServiceValidationError, "not_loaded"):
+            await self._call(hass, name, data, user_id)
+
+
+class TestTargetThatIsNotAPanel:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("service", ["force_arm", "force_arm_night", "disarm_night_mode"])
+    async def test_raises_instead_of_doing_nothing(self, service: str) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        import custom_components.aegis_ajax as integration
+
+        handler = getattr(integration, f"_async_handle_{service}")
+        with (
+            patch.object(integration, "_resolve_target_space_ids", AsyncMock(return_value=[])),
+            pytest.raises(ServiceValidationError) as err,
+        ):
+            await handler(MagicMock(), MagicMock(data={"entity_id": ["light.kitchen"]}))
+
+        assert err.value.translation_key == "no_panel_for_target"
+        assert err.value.translation_placeholders == {"service": service}
+
 
 class TestServiceRegistration:
     @pytest.mark.asyncio
@@ -420,8 +531,10 @@ class TestServiceRegistration:
 
         assert await async_setup(hass, {}) is True
 
+        # The admin-only ones are registered by Home Assistant's helper, positionally.
         register_calls = {
             call_args[0][1]: call_args[1].get("supports_response")
+            or (call_args[0][4] if len(call_args[0]) > 4 else None)
             for call_args in hass.services.async_register.call_args_list
         }
         assert set(register_calls) == set(_CUSTOM_SERVICE_NAMES)

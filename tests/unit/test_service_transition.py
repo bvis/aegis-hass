@@ -338,9 +338,12 @@ async def test_rejected_and_unmatched_calls_do_not_raise_transition_repairs(
     for service, data in (("press_panic_button", {}), ("set_photo_on_demand_mode", {})):
         with pytest.raises(ServiceValidationError):
             await hass.services.async_call(DOMAIN, service, data, blocking=True)
-    await hass.services.async_call(
-        DOMAIN, "force_arm", {"entity_id": "alarm_control_panel.missing"}, blocking=True
-    )
+    # A target that is no Aegis panel is refused, not silently skipped.
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN, "force_arm", {"entity_id": "alarm_control_panel.missing"}, blocking=True
+        )
+    assert err.value.translation_key == "no_panel_for_target"
     user = MagicMock(is_active=True)
     user.permissions.check_entity.return_value = False
     with (
