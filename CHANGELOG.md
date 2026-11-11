@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.30.1] - unreleased
+## [1.30.1] - 2026-11-11
 
 ### Security
 - **The account session services are for administrators only.** Any Home Assistant user could call `aegis_ajax.list_client_sessions`, `terminate_client_session` and `terminate_other_client_sessions`, so a user with no admin rights could see which devices are signed in to the Ajax account and sign the owner's phone out. A logged-in user who isn't an administrator is now refused. Automations and scripts keep working. **Requests to Ajax:** none.
@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **`force_arm`, `force_arm_night` and `disarm_night_mode` on something that isn't an Aegis alarm panel now fail with an error.** They used to do nothing and look as if they had worked. A call with no target still acts on every space, as before. **Requests to Ajax:** none.
+
+### Documentation
+- The README says what the alarm code covers: it is asked to arm and disarm, and wrong codes are counted only in Home Assistant. A device's bypass switch and unlocking a lock don't ask for it.
 
 ## [1.30.0] - 2026-11-06
 
