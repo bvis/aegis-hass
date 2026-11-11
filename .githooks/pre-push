@@ -39,4 +39,11 @@ echo -e "${YELLOW}[6/6] Running tests...${NC}"
 docker run --rm "$DOCKER_IMAGE" pytest tests/unit/ -v --cov=custom_components/aegis_ajax --cov-fail-under=80 --cov-report=term-missing
 echo -e "${GREEN}  ✓ Tests passed${NC}"
 
+# CI also runs the tests on Python 3.14, the interpreter every Home Assistant
+# from 2026.3 on needs. The pip layer is cached, so this only costs the tests.
+echo -e "${YELLOW}[+] Running tests on Python 3.14...${NC}"
+docker build -f Dockerfile.dev --build-arg PYTHON_VERSION=3.14 -t "$DOCKER_IMAGE-py314" . -q > /dev/null
+docker run --rm "$DOCKER_IMAGE-py314" pytest tests/unit/ -q
+echo -e "${GREEN}  ✓ Tests passed on Python 3.14${NC}"
+
 echo -e "${GREEN}=== All CI checks passed! ===${NC}"

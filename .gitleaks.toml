@@ -1,6 +1,6 @@
 # Gitleaks configuration for aegis-hass.
 # Extends the built-in default ruleset and adds allowlisting for known
-# non-secret values so the pre-commit hook stays low-noise.
+# non-secret values so the scan stays low-noise.
 [extend]
 useDefault = true
 
