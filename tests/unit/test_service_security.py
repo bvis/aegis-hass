@@ -119,3 +119,85 @@ def test_old_pin_format_raises_a_repair(options: dict, expect_issue: bool) -> No
         async_check_pin_code_format(hass, entry_id="e1", options=options)
     assert create.called is expect_issue
     assert delete.called is not expect_issue
+
+
+def _pin_options() -> dict[str, object]:
+    return {"use_pin_code": True, "pin_code_hash": hashlib.sha256(b"1234").hexdigest()}
+
+
+def _raises_key(key: str, options: dict[str, object], code: object) -> None:
+    with pytest.raises(HomeAssistantError) as err:
+        validate_pin(options, code)
+    assert err.value.translation_key == key
+
+
+def test_five_wrong_codes_lock_out_even_the_right_one() -> None:
+    from custom_components.aegis_ajax import service_security
+
+    options = _pin_options()
+    with patch.object(service_security.time, "monotonic", return_value=1000.0):
+        for _ in range(service_security.MAX_FAILED_PIN_ATTEMPTS):
+            _raises_key("invalid_alarm_code", options, "0000")
+        _raises_key("alarm_code_locked", options, "1234")
+    # Still locked one second before the end, open one second after.
+    end = 1000.0 + service_security.PIN_LOCKOUT_SECONDS
+    with patch.object(service_security.time, "monotonic", return_value=end - 1):
+        _raises_key("alarm_code_locked", options, "1234")
+    with patch.object(service_security.time, "monotonic", return_value=end + 1):
+        validate_pin(options, "1234")
+
+
+def test_a_right_code_resets_the_count() -> None:
+    from custom_components.aegis_ajax.service_security import MAX_FAILED_PIN_ATTEMPTS
+
+    options = _pin_options()
+    for _ in range(2):
+        for _ in range(MAX_FAILED_PIN_ATTEMPTS - 1):
+            _raises_key("invalid_alarm_code", options, "0000")
+        validate_pin(options, "1234")
+
+
+def test_a_missing_code_is_refused_without_counting() -> None:
+    from custom_components.aegis_ajax.service_security import MAX_FAILED_PIN_ATTEMPTS
+
+    options = _pin_options()
+    for code in [None, ""] * MAX_FAILED_PIN_ATTEMPTS:
+        _raises_key("invalid_alarm_code", options, code)
+    validate_pin(options, "1234")
+
+
+def test_lockout_is_per_pin() -> None:
+    from custom_components.aegis_ajax.service_security import MAX_FAILED_PIN_ATTEMPTS
+
+    for _ in range(MAX_FAILED_PIN_ATTEMPTS):
+        _raises_key("invalid_alarm_code", _pin_options(), "0000")
+    other = {"use_pin_code": True, "pin_code_hash": hashlib.sha256(b"9999").hexdigest()}
+    validate_pin(other, "9999")
+
+
+def test_wrong_code_is_logged_without_the_code(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("WARNING"):
+        _raises_key("invalid_alarm_code", _pin_options(), "7731")
+    assert "Wrong alarm code" in caplog.text
+    assert "7731" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_force_arm_with_a_wrong_code_does_not_count_towards_the_lockout() -> None:
+    """Until 2.0.0 force_arm runs with a wrong code (#568); it must not lock the PIN."""
+    from custom_components.aegis_ajax import _async_warn_service_transition
+    from custom_components.aegis_ajax.service_security import MAX_FAILED_PIN_ATTEMPTS
+
+    options = _pin_options()
+    coordinator = MagicMock()
+    entry = SimpleNamespace(options=options, runtime_data=coordinator, entry_id="e", title="t")
+    hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock(side_effect=lambda func, *args: func(*args))
+    call = SimpleNamespace(service="force_arm", data={"entity_id": ["x"], "code": "0000"})
+
+    with patch("custom_components.aegis_ajax.async_register_service_pin_transition") as repair:
+        for _ in range(MAX_FAILED_PIN_ATTEMPTS + 1):
+            await _async_warn_service_transition(hass, call, [entry], [(coordinator, "s1")])
+
+    assert repair.call_count == MAX_FAILED_PIN_ATTEMPTS + 1
+    validate_pin(options, "1234")

@@ -747,6 +747,9 @@
         "invalid_alarm_code": {
             "message": "Neplatný kód alarmu"
         },
+        "alarm_code_locked": {
+            "message": "Příliš mnoho neplatných kódů alarmu. Počkejte {minutes} min a zkuste to znovu."
+        },
         "not_loaded": {
             "message": "Není načten žádný účet Aegis for Ajax. Zkontrolujte integraci na stránce Zařízení a služby."
         }

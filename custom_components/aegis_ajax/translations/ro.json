@@ -747,6 +747,9 @@
         "invalid_alarm_code": {
             "message": "Cod de alarmă invalid"
         },
+        "alarm_code_locked": {
+            "message": "Prea multe coduri de alarmă greșite. Așteaptă {minutes} min și încearcă din nou."
+        },
         "not_loaded": {
             "message": "Niciun cont Aegis for Ajax nu este încărcat. Verifică integrarea în pagina Dispozitive și servicii."
         }

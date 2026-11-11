@@ -168,7 +168,7 @@ After setup, configure these in **Settings > Devices & Services > Aegis for Ajax
 | Show "Arm Home" button | enabled | Whether the alarm panel advertises **Arm Home**. It duplicates Ajax's single partial (Night) mode and exists mainly so the Nabu Casa / Alexa skill discovers the panel. Disable to hide the redundant button if you don't use Alexa / Home Assistant Cloud — **Arm Away** and **Arm Night** are unaffected. |
 | Show exit / entry delays as panel states | disabled | Shows the hub's per-detector **Delay when leaving** as the panel's `arming` state and **Delay when entering** as `pending`, driven by the hub's own signals. Opt-in because automations waiting for `armed_away` then fire once the exit delay completes. See [Exit and entry delays](#exit-and-entry-delays). |
 | Cloud live view for video cameras | disabled | Experimental. Adds a **Live view** camera per Ajax video camera, streamed through the Ajax cloud, for installs where Home Assistant can't reach the camera locally. See [Cloud live view](#cloud-live-view-experimental). |
-| PIN code | disabled | Require PIN for arm/disarm from HA UI |
+| PIN code | disabled | Require PIN for arm/disarm from HA UI. After 5 wrong codes in a row, every code is refused for 5 minutes. |
 | Also require the PIN to arm | enabled | Only with **PIN code** on. Turn it off to arm with one tap and keep the PIN for disarm only, for example to arm Night mode from a bedside screen or an automation. Force-arm services then don't need the PIN either. |
 | FCM credentials | — | Firebase credentials for push notifications (optional) |
 | I don't use push notifications | disabled | Enable if you intentionally run without push. Hides the recurring "FCM not configured" reminder and Repair card (and the WARNING log). Real-time events (doorbell, arm/disarm, alarm, motion) still won't reach Home Assistant until you configure FCM — this only silences the reminder. |
@@ -328,9 +328,9 @@ If you would rather not depend on the camera's own classifier, [Frigate](https:/
 | `aegis_ajax.set_photo_on_demand_mode` | Enable/disable Photo on Demand mode on a hub: `user` (hub users may request photos from the app) and/or `scenario` (scenarios/automations may trigger captures). Target a space via `entity_id`; leave a field unset to keep its current value. |
 | `aegis_ajax.refresh_alarm_images` | Import recent alarm-photo albums without triggering a capture. Target an alarm panel with `entity_id`, or omit it for all spaces. One history query + at most 10 media streams per space, once per five minutes; completed albums are skipped. |
 | `aegis_ajax.press_panic_button` | **⚠️ SOS / panic button.** See dedicated section below before using. |
-| `aegis_ajax.list_client_sessions` | Return the sessions Ajax holds for the account (device model, OS, client version, app label, created / expires), with the integration's own session marked `is_current`. On-demand only — the endpoint rate-limits repeated calls. |
-| `aegis_ajax.terminate_client_session` | Log one selected device out of the Ajax account. Requires an explicit confirmation flag and refuses to touch the integration's own session. |
-| `aegis_ajax.terminate_other_client_sessions` | Log every other device out of the Ajax account, keeping this integration's session. Same confirmation flag; reports how many sessions it terminated if the endpoint stops it part way. |
+| `aegis_ajax.list_client_sessions` | Return the sessions Ajax holds for the account (device model, OS, client version, app label, created / expires), with the integration's own session marked `is_current`. On-demand only — the endpoint rate-limits repeated calls. Administrators only. |
+| `aegis_ajax.terminate_client_session` | Log one selected device out of the Ajax account. Requires an explicit confirmation flag and refuses to touch the integration's own session. Administrators only. |
+| `aegis_ajax.terminate_other_client_sessions` | Log every other device out of the Ajax account, keeping this integration's session. Same confirmation flag; reports how many sessions it terminated if the endpoint stops it part way. Administrators only. |
 
 Both `force_arm` services accept an optional `entity_id` target (alarm control panel entity). If no target is specified, all panels across all configured accounts are armed.
 

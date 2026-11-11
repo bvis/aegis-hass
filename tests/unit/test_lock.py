@@ -231,13 +231,36 @@ class TestAjaxLockCommands:
         coordinator.async_request_refresh.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_open_no_op_when_space_unresolvable(self) -> None:
+    async def test_open_raises_when_space_unresolvable(self) -> None:
+        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+
         device = _make_device("smart_lock", "locked")
         coordinator = _make_coordinator(device)
         coordinator.spaces = {}  # no space matches the hub_id
         lock = AjaxLock(coordinator=coordinator, device_id=device.id)
 
-        await lock.async_open()
+        with pytest.raises(HomeAssistantError) as err:
+            await lock.async_open()
 
+        assert err.value.translation_key == "command_not_performed"
         coordinator.devices_api.switch_smart_lock.assert_not_called()
+        coordinator.async_request_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_open_raises_when_the_unlatch_is_refused(self) -> None:
+        # A refused unlatch must fail the action, not look like it worked.
+        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+
+        from custom_components.aegis_ajax.api.devices import SmartLockError  # noqa: PLC0415
+
+        device = _make_device("smart_lock", "locked")
+        coordinator = _make_coordinator(device)
+        coordinator.devices_api.switch_smart_lock.side_effect = SmartLockError("lock_jammed")
+        lock = AjaxLock(coordinator=coordinator, device_id=device.id)
+
+        with pytest.raises(HomeAssistantError) as err:
+            await lock.async_open()
+
+        assert err.value.translation_key == "command_failed"
+        assert err.value.translation_placeholders == {"reason": "lock_jammed"}
         coordinator.async_request_refresh.assert_not_called()

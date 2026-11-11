@@ -747,6 +747,9 @@
         "invalid_alarm_code": {
             "message": "Ugyldig alarmkode"
         },
+        "alarm_code_locked": {
+            "message": "For mange forkerte alarmkoder. Vent {minutes} min, og prøv igen."
+        },
         "not_loaded": {
             "message": "Ingen Aegis for Ajax-konto er indlæst. Tjek integrationen på siden Enheder og tjenester."
         }

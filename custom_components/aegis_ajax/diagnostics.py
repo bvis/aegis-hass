@@ -25,6 +25,7 @@ TO_REDACT = {
     "password_hash",
     "email",
     "session_token",
+    "user_hex_id",
     "device_id",
     "push_token",
     "fcm_api_key",
