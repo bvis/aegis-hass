@@ -37,14 +37,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/update_version_dropdown.py
 
+      # Through the API, not `git push`: GitHub signs commits made this way, so
+      # main can require signed commits without locking this job out.
       - name: Commit if changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORM: .github/ISSUE_TEMPLATE/bug_report.yml
         run: |
-          if git diff --quiet .github/ISSUE_TEMPLATE/bug_report.yml; then
+          if git diff --quiet "$FORM"; then
             echo "No change to commit."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/ISSUE_TEMPLATE/bug_report.yml
-          git commit -m "chore: refresh issue-form version dropdown [skip ci]"
-          git push
+          jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg head "$(git rev-parse HEAD)" \
+            --arg path "$FORM" \
+            --arg contents "$(base64 -w0 "$FORM")" \
+            '{
+              query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }",
+              variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: "main"},
+                expectedHeadOid: $head,
+                message: {headline: "chore: refresh issue-form version dropdown [skip ci]"},
+                fileChanges: {additions: [{path: $path, contents: $contents}]}
+              }}
+            }' | gh api graphql --input -
