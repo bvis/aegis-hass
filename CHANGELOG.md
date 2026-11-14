@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.31.0] - unreleased
 
 ### Added
 - **The alarm panel says who armed or disarmed it (#659).** The name that already came with the arm/disarm push (the person, keyfob or keypad) now shows as *changed by* on the main alarm panel, in its activity and as the `changed_by` attribute. It needs push notifications set up. A change that arrives with no push shows no name, per-group panels don't have it yet, and it isn't kept across a restart. **Requests to Ajax:** none.
