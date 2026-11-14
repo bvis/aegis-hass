@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.alarm_control_panel import (
@@ -11,6 +12,7 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
     CodeFormat,
 )
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -131,6 +133,16 @@ _STATE_MAP = {
     SecurityState.AWAITING_VDS: AlarmControlPanelState.ARMING,
     SecurityState.NONE: AlarmControlPanelState.DISARMED,
 }
+
+
+# The panel state each arm/disarm push leaves behind (`changed_by`, #659).
+_ACTOR_STATES = {
+    "arm": AlarmControlPanelState.ARMED_AWAY,
+    "arm_night": AlarmControlPanelState.ARMED_NIGHT,
+    "disarm": AlarmControlPanelState.DISARMED,
+    "disarm_night": AlarmControlPanelState.DISARMED,
+}
+_ACTOR_SETTLE_SECONDS = 60
 
 
 def map_security_state(state: SecurityState) -> AlarmControlPanelState:
@@ -353,6 +365,31 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         # A hub-less space (camera only, #636) never reports its hub online,
         # but the cloud still arms and disarms it.
         return space is not None and (space.is_online or not space.hub_id)
+
+    @property
+    def changed_by(self) -> str | None:
+        """Who armed or disarmed, when the last arm/disarm push is for this state.
+
+        A change that arrives with no push (push off, or lost) shows no name
+        instead of the previous person's.
+        """
+        actor = self.coordinator.last_actors.get(self._space_id)
+        if actor is None or _ACTOR_STATES.get(actor[0]) != self._hub_state():
+            return None
+        return actor[1]
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        # The push and the state change arrive in either order, so a name that
+        # doesn't match the state is only dropped once it has had time to.
+        actor = self.coordinator.last_actors.get(self._space_id)
+        if (
+            actor is not None
+            and self.changed_by is None
+            and time.monotonic() - actor[2] > _ACTOR_SETTLE_SECONDS
+        ):
+            self.coordinator.last_actors.pop(self._space_id, None)
+        super()._handle_coordinator_update()
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
