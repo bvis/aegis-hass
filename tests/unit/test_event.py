@@ -279,7 +279,7 @@ class TestCoordinatorEventDispatch:
         entity = coordinator._event_entities["space-1"]
 
         AjaxCobrandedCoordinator.fire_push_event(coordinator, "space-1", "alarm", {"test": True})
-        entity.handle_event.assert_called_once_with("alarm", {"test": True})
+        assert entity.handle_event.call_args.args[:2] == ("alarm", {"test": True})
 
     def test_fire_event_no_entity(self) -> None:
         from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator

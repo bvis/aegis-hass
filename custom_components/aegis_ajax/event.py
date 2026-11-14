@@ -23,7 +23,7 @@ from custom_components.aegis_ajax.entity import build_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import Context, HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,11 +104,15 @@ class AjaxSecurityEvent(_AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordin
         self.coordinator._event_entities.pop(self._space_id, None)
         await super().async_will_remove_from_hass()
 
-    def handle_event(self, event_type: str, data: dict[str, Any]) -> None:
+    def handle_event(
+        self, event_type: str, data: dict[str, Any], context: Context | None = None
+    ) -> None:
         """Called by coordinator when a push event arrives."""
         if event_type not in ALL_EVENT_TYPES:
             _LOGGER.debug("Ignoring unknown event type: %s", event_type)
             return
+        if context is not None:
+            self.async_set_context(context)
         self._trigger_event(event_type, data)
         self.async_write_ha_state()
         # Fire bus event for logbook descriptions and device triggers. The
@@ -118,6 +122,7 @@ class AjaxSecurityEvent(_AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordin
         self.hass.bus.async_fire(
             f"{DOMAIN}_event",
             {"event_type": event_type, **data, "hub_id": self._hub_id, "space_id": self._space_id},
+            context=context,
         )
         # Optionally surface the event as an HA persistent notification (2.2).
         # The coordinator no-ops when the feature is off or the type isn't in
