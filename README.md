@@ -581,6 +581,8 @@ Each event includes enriched data attributes:
 
 Use these in automation templates, e.g. `{{ trigger.event.data.device_name }}`.
 
+The alarm panel shows the same name as **changed by** after an arm or disarm (the person, keyfob or keypad), so it appears in the panel's activity and in `{{ state_attr('alarm_control_panel.my_hub', 'changed_by') }}`. It needs push notifications, covers the main panel (not per-group panels), is empty when a change arrives with no push, and is not kept across a restart.
+
 ### Security sensors
 - **Case tamper** — physical manipulation of device enclosure
 - **Device problem** — device malfunction or communication issue

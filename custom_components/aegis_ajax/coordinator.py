@@ -72,6 +72,7 @@ from custom_components.aegis_ajax.const import (
     MIN_POLL_INTERVAL,
     MOTION_PUSH_AUTO_OFF_SECONDS,
     SECURITY_EVENT_REFRESH_COOLDOWN,
+    SECURITY_STATE_EVENT_TYPES,
     SIGNAL_NEW_DEVICE,
     SIREN_ALARM_DURATION_KEY,
     SIREN_SETTINGS_CONFIRM_DELAY,
@@ -562,6 +563,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._stream_tasks: list[asyncio.Task[None]] = []
         self._streams_started: bool = False
         self._event_entities: dict[str, Any] = {}
+        # Who last armed or disarmed each space, from the arm/disarm push:
+        # space id -> (event type, name, monotonic time). The alarm panel
+        # reads it for `changed_by` (#659). Not persisted.
+        self.last_actors: dict[str, tuple[str, str, float]] = {}
         # device_id -> per-device doorbell event entity (#173)
         self._device_event_entities: dict[str, Any] = {}
         # device_id -> cancel handle for a pending motion auto-off timer (#173)
@@ -4063,6 +4068,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def fire_push_event(self, space_id: str, event_type: str, data: dict[str, Any]) -> None:
         """Dispatch a push event to the corresponding event entity."""
+        if event_type in SECURITY_STATE_EVENT_TYPES:
+            name = data.get("device_name")
+            if name:
+                self.last_actors[space_id] = (event_type, str(name), time.monotonic())
+            else:
+                self.last_actors.pop(space_id, None)
+            self.async_update_listeners()
         entity = self._event_entities.get(space_id)
         if entity is not None:
             entity.handle_event(event_type, data)

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **The alarm panel says who armed or disarmed it (#659).** The name that already came with the arm/disarm push (the person, keyfob or keypad) now shows as *changed by* on the main alarm panel, in its activity and as the `changed_by` attribute. It needs push notifications set up. A change that arrives with no push shows no name, per-group panels don't have it yet, and it isn't kept across a restart. **Requests to Ajax:** none.
+
+### Fixed
+- The example dashboard showed "56 years ago" as the end of the running delay whenever no exit or entry delay was running. The row now only appears while the panel is `arming` or `pending`.
+
 ## [1.30.1] - 2026-11-11
 
 ### Security

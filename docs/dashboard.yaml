@@ -53,12 +53,19 @@ sections:
             name: Exit delay
             suffix: s
             icon: mdi:exit-run
-          - type: attribute
-            entity: alarm_control_panel.my_hub
-            attribute: delay_ends_at
-            name: Running delay ends
-            format: relative
-            icon: mdi:timer-outline
+          # Only while a delay runs: with no delay the attribute is empty and
+          # a relative time of nothing renders as 1970.
+          - type: conditional
+            conditions:
+              - entity: alarm_control_panel.my_hub
+                state: [arming, pending]
+            row:
+              type: attribute
+              entity: alarm_control_panel.my_hub
+              attribute: delay_ends_at
+              name: Running delay ends
+              format: relative
+              icon: mdi:timer-outline
 
       # ─── System Health at a Glance ───
       - type: entities

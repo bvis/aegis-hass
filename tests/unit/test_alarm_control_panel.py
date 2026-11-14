@@ -990,3 +990,100 @@ class TestTranslatedErrors:
 
         assert panel.translation_key == "group"
         assert panel.translation_placeholders == {"group_id": "7"}
+
+
+class TestChangedBy:
+    """The panel names who armed or disarmed, from the arm/disarm push (#659)."""
+
+    @staticmethod
+    def _panel(
+        state: SecurityState, actors: dict[str, tuple[str, str, float]]
+    ) -> AjaxAlarmControlPanel:
+        coordinator = MagicMock()
+        coordinator.spaces = {
+            "s1": Space(
+                id="s1",
+                hub_id="h1",
+                name="Home",
+                security_state=state,
+                connection_status=ConnectionStatus.ONLINE,
+                malfunctions_count=0,
+            )
+        }
+        coordinator.alarmed_space_ids = set()
+        coordinator.delay_overlays = {}
+        coordinator.last_actors = actors
+        return AjaxAlarmControlPanel(coordinator=coordinator, space_id="s1")
+
+    def test_none_before_any_push(self) -> None:
+        assert self._panel(SecurityState.DISARMED, {}).changed_by is None
+
+    @pytest.mark.parametrize(
+        ("event_type", "state"),
+        [
+            ("arm", SecurityState.ARMED),
+            ("arm_night", SecurityState.NIGHT_MODE),
+            ("disarm", SecurityState.DISARMED),
+            ("disarm_night", SecurityState.DISARMED),
+        ],
+    )
+    def test_names_the_actor_of_the_current_state(
+        self, event_type: str, state: SecurityState
+    ) -> None:
+        panel = self._panel(state, {"s1": (event_type, "Alice", 0.0)})
+        assert panel.changed_by == "Alice"
+
+    def test_none_when_the_push_is_for_another_state(self) -> None:
+        """A disarm with no push must not keep the name of whoever armed."""
+        panel = self._panel(SecurityState.DISARMED, {"s1": ("arm", "Alice", 0.0)})
+        assert panel.changed_by is None
+
+    def test_other_spaces_are_ignored(self) -> None:
+        panel = self._panel(SecurityState.DISARMED, {"s2": ("disarm", "Alice", 0.0)})
+        assert panel.changed_by is None
+
+
+class TestCoordinatorRecordsActor:
+    @staticmethod
+    def _fire(event_type: str, data: dict[str, object]) -> MagicMock:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock()
+        coordinator._event_entities = {}
+        coordinator.last_actors = {"s1": ("arm", "Alice", 0.0)}
+        AjaxCobrandedCoordinator.fire_push_event(coordinator, "s1", event_type, data)
+        return coordinator
+
+    def test_arm_push_records_the_name_and_refreshes_entities(self) -> None:
+        coordinator = self._fire("disarm", {"device_name": "Bob"})
+        assert coordinator.last_actors["s1"][:2] == ("disarm", "Bob")
+        coordinator.async_update_listeners.assert_called_once()
+
+    def test_arm_push_without_a_name_clears_the_previous_one(self) -> None:
+        coordinator = self._fire("disarm", {})
+        assert "s1" not in coordinator.last_actors
+
+    def test_other_pushes_leave_it_alone(self) -> None:
+        coordinator = self._fire("motion", {"device_name": "Hallway"})
+        assert coordinator.last_actors["s1"][:2] == ("arm", "Alice")
+        coordinator.async_update_listeners.assert_not_called()
+
+
+class TestActorIsDroppedOnceStale:
+    @staticmethod
+    def _update(age: float) -> MagicMock:
+        import time
+
+        panel = TestChangedBy._panel(
+            SecurityState.DISARMED, {"s1": ("arm", "Alice", time.monotonic() - age)}
+        )
+        panel.async_write_ha_state = MagicMock()
+        panel._handle_coordinator_update()
+        return panel.coordinator
+
+    def test_kept_while_the_state_may_still_catch_up(self) -> None:
+        assert "s1" in self._update(age=5).last_actors
+
+    def test_dropped_after_the_settle_time(self) -> None:
+        """Otherwise the next arm with no push would show the old name again."""
+        assert "s1" not in self._update(age=120).last_actors
