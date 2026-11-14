@@ -374,21 +374,24 @@ class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
         instead of the previous person's.
         """
         actor = self.coordinator.last_actors.get(self._space_id)
-        if actor is None or _ACTOR_STATES.get(actor[0]) != self._hub_state():
+        if actor is None or _ACTOR_STATES.get(actor.event_type) != self._hub_state():
             return None
-        return actor[1]
+        return actor.name
 
     @callback
     def _handle_coordinator_update(self) -> None:
         # The push and the state change arrive in either order, so a name that
         # doesn't match the state is only dropped once it has had time to.
         actor = self.coordinator.last_actors.get(self._space_id)
-        if (
-            actor is not None
-            and self.changed_by is None
-            and time.monotonic() - actor[2] > _ACTOR_SETTLE_SECONDS
-        ):
-            self.coordinator.last_actors.pop(self._space_id, None)
+        if actor is not None:
+            fresh = time.monotonic() - actor.at <= _ACTOR_SETTLE_SECONDS
+            if self.changed_by is None:
+                if not fresh:
+                    self.coordinator.last_actors.pop(self._space_id, None)
+            elif fresh and actor.context is not None:
+                # The changes this push explains (armed, and the exit delay
+                # ending) carry its context, so the activity shows the cause.
+                self.async_set_context(actor.context)
         super()._handle_coordinator_update()
 
     @property

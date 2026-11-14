@@ -13,6 +13,7 @@ from custom_components.aegis_ajax.alarm_control_panel import (
 )
 from custom_components.aegis_ajax.api.models import Device, Group, Space
 from custom_components.aegis_ajax.const import ConnectionStatus, DeviceState, SecurityState
+from custom_components.aegis_ajax.coordinator import Actor
 from custom_components.aegis_ajax.service_security import hash_pin
 
 
@@ -996,9 +997,7 @@ class TestChangedBy:
     """The panel names who armed or disarmed, from the arm/disarm push (#659)."""
 
     @staticmethod
-    def _panel(
-        state: SecurityState, actors: dict[str, tuple[str, str, float]]
-    ) -> AjaxAlarmControlPanel:
+    def _panel(state: SecurityState, actors: dict[str, Actor]) -> AjaxAlarmControlPanel:
         coordinator = MagicMock()
         coordinator.spaces = {
             "s1": Space(
@@ -1030,16 +1029,16 @@ class TestChangedBy:
     def test_names_the_actor_of_the_current_state(
         self, event_type: str, state: SecurityState
     ) -> None:
-        panel = self._panel(state, {"s1": (event_type, "Alice", 0.0)})
+        panel = self._panel(state, {"s1": Actor(event_type, "Alice", 0.0)})
         assert panel.changed_by == "Alice"
 
     def test_none_when_the_push_is_for_another_state(self) -> None:
         """A disarm with no push must not keep the name of whoever armed."""
-        panel = self._panel(SecurityState.DISARMED, {"s1": ("arm", "Alice", 0.0)})
+        panel = self._panel(SecurityState.DISARMED, {"s1": Actor("arm", "Alice", 0.0)})
         assert panel.changed_by is None
 
     def test_other_spaces_are_ignored(self) -> None:
-        panel = self._panel(SecurityState.DISARMED, {"s2": ("disarm", "Alice", 0.0)})
+        panel = self._panel(SecurityState.DISARMED, {"s2": Actor("disarm", "Alice", 0.0)})
         assert panel.changed_by is None
 
 
@@ -1050,7 +1049,7 @@ class TestCoordinatorRecordsActor:
 
         coordinator = MagicMock()
         coordinator._event_entities = {}
-        coordinator.last_actors = {"s1": ("arm", "Alice", 0.0)}
+        coordinator.last_actors = {"s1": Actor("arm", "Alice", 0.0)}
         AjaxCobrandedCoordinator.fire_push_event(coordinator, "s1", event_type, data)
         return coordinator
 
@@ -1075,7 +1074,7 @@ class TestActorIsDroppedOnceStale:
         import time
 
         panel = TestChangedBy._panel(
-            SecurityState.DISARMED, {"s1": ("arm", "Alice", time.monotonic() - age)}
+            SecurityState.DISARMED, {"s1": Actor("arm", "Alice", time.monotonic() - age)}
         )
         panel.async_write_ha_state = MagicMock()
         panel._handle_coordinator_update()
@@ -1087,3 +1086,58 @@ class TestActorIsDroppedOnceStale:
     def test_dropped_after_the_settle_time(self) -> None:
         """Otherwise the next arm with no push would show the old name again."""
         assert "s1" not in self._update(age=120).last_actors
+
+
+class TestActivityCause:
+    """The panel change carries the push event's context, so HA links them (#659)."""
+
+    def test_event_and_bus_event_share_the_context_the_actor_keeps(self) -> None:
+        from homeassistant.core import Context
+
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock()
+        entity = MagicMock()
+        coordinator._event_entities = {"s1": entity}
+        coordinator.last_actors = {}
+        AjaxCobrandedCoordinator.fire_push_event(coordinator, "s1", "arm", {"device_name": "Bob"})
+        context = entity.handle_event.call_args.args[2]
+        assert isinstance(context, Context)
+        assert coordinator.last_actors["s1"].context is context
+
+    def test_listeners_are_refreshed_after_the_event_is_fired(self) -> None:
+        from custom_components.aegis_ajax.coordinator import AjaxCobrandedCoordinator
+
+        coordinator = MagicMock()
+        calls: list[str] = []
+        entity = MagicMock()
+        entity.handle_event.side_effect = lambda *_: calls.append("event")
+        coordinator.async_update_listeners.side_effect = lambda: calls.append("listeners")
+        coordinator._event_entities = {"s1": entity}
+        coordinator.last_actors = {}
+        AjaxCobrandedCoordinator.fire_push_event(coordinator, "s1", "arm", {"device_name": "Bob"})
+        assert calls == ["event", "listeners"]
+
+    @staticmethod
+    def _updated_panel(state: SecurityState, age: float) -> AjaxAlarmControlPanel:
+        import time
+
+        from homeassistant.core import Context
+
+        panel = TestChangedBy._panel(
+            state, {"s1": Actor("arm", "Alice", time.monotonic() - age, Context())}
+        )
+        panel.async_write_ha_state = MagicMock()
+        panel.async_set_context = MagicMock()
+        panel._handle_coordinator_update()
+        return panel
+
+    def test_panel_takes_the_context_while_the_push_explains_its_state(self) -> None:
+        panel = self._updated_panel(SecurityState.ARMED, age=1)
+        panel.async_set_context.assert_called_once_with(panel.coordinator.last_actors["s1"].context)
+
+    def test_panel_leaves_the_context_alone_for_another_state(self) -> None:
+        self._updated_panel(SecurityState.DISARMED, age=1).async_set_context.assert_not_called()
+
+    def test_panel_leaves_the_context_alone_once_the_push_is_old(self) -> None:
+        self._updated_panel(SecurityState.ARMED, age=120).async_set_context.assert_not_called()

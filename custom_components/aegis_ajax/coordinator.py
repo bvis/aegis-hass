@@ -7,10 +7,10 @@ import contextlib
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
-from homeassistant.core import CALLBACK_TYPE, Event, callback
+from homeassistant.core import CALLBACK_TYPE, Context, Event, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -491,6 +491,15 @@ _STATUS_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
 _AUTO_RELOADED_FOR: dict[str, set[str]] = {}
 
 
+class Actor(NamedTuple):
+    """Who armed or disarmed a space, as told by the arm/disarm push."""
+
+    event_type: str
+    name: str
+    at: float  # time.monotonic()
+    context: Context | None = None
+
+
 class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(
         self,
@@ -564,9 +573,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._streams_started: bool = False
         self._event_entities: dict[str, Any] = {}
         # Who last armed or disarmed each space, from the arm/disarm push:
-        # space id -> (event type, name, monotonic time). The alarm panel
-        # reads it for `changed_by` (#659). Not persisted.
-        self.last_actors: dict[str, tuple[str, str, float]] = {}
+        # The alarm panel reads it for `changed_by` (#659). Not persisted.
+        self.last_actors: dict[str, Actor] = {}
         # device_id -> per-device doorbell event entity (#173)
         self._device_event_entities: dict[str, Any] = {}
         # device_id -> cancel handle for a pending motion auto-off timer (#173)
@@ -4068,18 +4076,25 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def fire_push_event(self, space_id: str, event_type: str, data: dict[str, Any]) -> None:
         """Dispatch a push event to the corresponding event entity."""
-        if event_type in SECURITY_STATE_EVENT_TYPES:
+        # One context for the event and for the panel change it explains, so
+        # the panel's activity names this event as its cause (#659).
+        context = Context()
+        is_arm_or_disarm = event_type in SECURITY_STATE_EVENT_TYPES
+        if is_arm_or_disarm:
             name = data.get("device_name")
             if name:
-                self.last_actors[space_id] = (event_type, str(name), time.monotonic())
+                self.last_actors[space_id] = Actor(event_type, str(name), time.monotonic(), context)
             else:
                 self.last_actors.pop(space_id, None)
-            self.async_update_listeners()
         entity = self._event_entities.get(space_id)
         if entity is not None:
-            entity.handle_event(event_type, data)
+            entity.handle_event(event_type, data, context)
         else:
             _LOGGER.debug("No event entity for space %s", space_id)
+        # After the event is fired: the activity only links a change to an
+        # event that was recorded before it.
+        if is_arm_or_disarm:
+            self.async_update_listeners()
 
     def register_device_event_entity(self, device_id: str, entity: object) -> None:
         """Register a per-device doorbell event entity (#173)."""
