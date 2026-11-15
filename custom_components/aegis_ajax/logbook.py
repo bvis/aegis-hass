@@ -58,6 +58,31 @@ _ACTOR_MESSAGES: dict[str, str] = {
     "disarm_night": "disarmed night mode",
 }
 
+# How it was done, appended to that name ("Ana (app)"): the push's source type
+# says it, and the same person can arm from the app, with a card or by code.
+# Matched by prefix so the model variants (KEYPAD_PLUS, KEYBOARD_FIBRA,
+# SPACE_CONTROL_S…) are covered; a type not listed adds nothing.
+_ACTOR_METHODS: tuple[tuple[str, str], ...] = (
+    ("SPACE_MEMBER", "app"),
+    ("USER", "app"),
+    ("ACCESS_CARD", "card or tag"),
+    ("ACCESS_CODE", "code"),
+    ("ACCESS_RRU_CODE", "code"),
+    ("KEYPAD", "keypad"),
+    ("KEYBOARD", "keypad"),
+    ("SPACE_CONTROL", "keyfob"),
+    ("SCENARIO", "scenario"),
+    ("SPACE_SCENARIO", "scenario"),
+    ("SCHEDULE", "schedule"),
+)
+
+
+def _actor_method(device_type: object) -> str | None:
+    if not isinstance(device_type, str):
+        return None
+    return next((label for prefix, label in _ACTOR_METHODS if device_type.startswith(prefix)), None)
+
+
 _MALFUNCTION_TAG_SUFFIX = "_with_malfunctions"
 _MALFUNCTION_SUFFIX = " — with malfunctions"
 
@@ -81,7 +106,8 @@ def async_describe_events(
 
         name = "Aegis"
         if actor and event_type in _ACTOR_MESSAGES:
-            name = actor
+            method = _actor_method(data.get("device_type"))
+            name = f"{actor} ({method})" if method else actor
             message = _ACTOR_MESSAGES[event_type]
         else:
             template = _EVENT_DESCRIPTIONS.get(event_type, "Security event: {device_name}")
