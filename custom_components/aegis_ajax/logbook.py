@@ -48,6 +48,16 @@ _EVENT_DESCRIPTIONS: dict[str, str] = {
 # haven't seen yet is covered on arrival; every tag Ajax uses for this shares
 # it. Appended rather than folded into the templates above so the marker is
 # independent of which arm description was chosen.
+# Arm/disarm entries are named after who did it (#659): the activity view
+# shows only the entry name as the cause of the panel change ("By Ana"),
+# never the message.
+_ACTOR_MESSAGES: dict[str, str] = {
+    "arm": "armed",
+    "arm_night": "armed night mode",
+    "disarm": "disarmed",
+    "disarm_night": "disarmed night mode",
+}
+
 _MALFUNCTION_TAG_SUFFIX = "_with_malfunctions"
 _MALFUNCTION_SUFFIX = " — with malfunctions"
 
@@ -63,20 +73,26 @@ def async_describe_events(
     def async_describe_aegis_event(event: Event) -> dict[str, str]:
         data: dict[str, Any] = dict(event.data)
         event_type: str = data.get("event_type", "unknown")
-        device_name: str = data.get("device_name", "Unknown device")
+        actor: str | None = data.get("device_name") or None
+        device_name: str = actor or "Unknown device"
         room_name: str | None = data.get("room_name")
 
         raw_tag = data.get("raw_tag")
 
-        template = _EVENT_DESCRIPTIONS.get(event_type, "Security event: {device_name}")
-        message = template.format(device_name=device_name)
+        name = "Aegis"
+        if actor and event_type in _ACTOR_MESSAGES:
+            name = actor
+            message = _ACTOR_MESSAGES[event_type]
+        else:
+            template = _EVENT_DESCRIPTIONS.get(event_type, "Security event: {device_name}")
+            message = template.format(device_name=device_name)
         if room_name:
             message += f" ({room_name})"
         if isinstance(raw_tag, str) and raw_tag.endswith(_MALFUNCTION_TAG_SUFFIX):
             message += _MALFUNCTION_SUFFIX
 
         return {
-            LOGBOOK_ENTRY_NAME: "Aegis",
+            LOGBOOK_ENTRY_NAME: name,
             LOGBOOK_ENTRY_MESSAGE: message,
         }
 

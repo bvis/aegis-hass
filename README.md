@@ -604,7 +604,7 @@ SpaceControl keyfobs are grouped under a single **Keyfobs** device (one per hub)
 >
 > **You can help finalize it:** if you have a keyfob that your installer/CRA has deactivated, a **Download diagnostics** (Settings → Devices & Services → Aegis for Ajax → ⋮ → Download diagnostics) plus a debug log (`custom_components.aegis_ajax: debug`) attached to a [GitHub issue](https://github.com/bvis/aegis-hass/issues/new) would let us confirm the indicator and get it right. See [Help Wanted](#help-wanted).
 
-Who armed or disarmed the system with a keyfob already appears in the logbook ("Disarmed (via …)") and on the hub's security event entity — that's independent of these sensors.
+Who armed or disarmed the system with a keyfob already appears in the logbook ("… disarmed") and on the hub's security event entity — that's independent of these sensors.
 
 ## Automation Blueprints
 

@@ -53,6 +53,21 @@ class TestAjaxSecurityEvent:
         entity.async_write_ha_state.assert_called_once()
         entity.hass.bus.async_fire.assert_called_once()
 
+    def test_bus_event_fires_before_the_state_is_written(self) -> None:
+        # #659: the activity view names as the cause whatever was recorded
+        # first under the shared context. Only the bus event's logbook entry
+        # carries who armed, so it has to come before the state write.
+        entity = self._make_event_entity()
+        calls: list[str] = []
+        entity._trigger_event = MagicMock()
+        entity.async_write_ha_state = MagicMock(side_effect=lambda: calls.append("state"))
+        entity.hass = MagicMock()
+        entity.hass.bus.async_fire.side_effect = lambda *_a, **_k: calls.append("bus")
+
+        entity.handle_event("disarm", {"device_name": "Ana"})
+
+        assert calls == ["bus", "state"]
+
     def test_handle_event_forwards_to_persistent_notifier(self) -> None:
         # The hub-level entity is the single choke point that also drives the
         # optional persistent-notification feature (2.2).
