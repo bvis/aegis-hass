@@ -51,6 +51,24 @@ class TestLogbookDescriptions:
         assert result[LOGBOOK_ENTRY_NAME] == "App User"
         assert result[LOGBOOK_ENTRY_MESSAGE] == "disarmed"
 
+    def test_arm_and_disarm_name_says_how_it_was_done(self) -> None:
+        # The same person can arm from the app, with a card or by code; the
+        # push's source type is the only thing that tells them apart.
+        handler = self._get_handler()
+        for device_type, expected in (
+            ("SPACE_MEMBER", "Ana (app)"),
+            ("ACCESS_CARD", "Ana (card or tag)"),
+            ("ACCESS_CODE", "Ana (code)"),
+            ("KEYPAD_COMBI", "Ana (keypad)"),
+            ("KEYBOARD_FIBRA", "Ana (keypad)"),
+            ("SPACE_CONTROL_S", "Ana (keyfob)"),
+            ("SOMETHING_NEW", "Ana"),
+            (None, "Ana"),
+        ):
+            result = handler(_make_event("disarm", device_name="Ana", device_type=device_type))
+            assert result[LOGBOOK_ENTRY_NAME] == expected
+            assert result[LOGBOOK_ENTRY_MESSAGE] == "disarmed"
+
     def test_other_events_stay_under_the_integration_name(self) -> None:
         handler = self._get_handler()
         result = handler(_make_event("alarm", device_name="Front Door"))
