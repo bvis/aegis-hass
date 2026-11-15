@@ -39,16 +39,22 @@ class TestLogbookDescriptions:
 
     def test_arm_event(self) -> None:
         handler = self._get_handler()
+        # #659: the activity view shows only the entry NAME as the cause of
+        # the panel change, so who armed has to be the name.
         result = handler(_make_event("arm", device_name="Keypad"))
-        assert result[LOGBOOK_ENTRY_NAME] == "Aegis"
-        assert "Armed" in result[LOGBOOK_ENTRY_MESSAGE]
-        assert "Keypad" in result[LOGBOOK_ENTRY_MESSAGE]
+        assert result[LOGBOOK_ENTRY_NAME] == "Keypad"
+        assert result[LOGBOOK_ENTRY_MESSAGE] == "armed"
 
     def test_disarm_event(self) -> None:
         handler = self._get_handler()
         result = handler(_make_event("disarm", device_name="App User"))
-        assert "Disarmed" in result[LOGBOOK_ENTRY_MESSAGE]
-        assert "App User" in result[LOGBOOK_ENTRY_MESSAGE]
+        assert result[LOGBOOK_ENTRY_NAME] == "App User"
+        assert result[LOGBOOK_ENTRY_MESSAGE] == "disarmed"
+
+    def test_other_events_stay_under_the_integration_name(self) -> None:
+        handler = self._get_handler()
+        result = handler(_make_event("alarm", device_name="Front Door"))
+        assert result[LOGBOOK_ENTRY_NAME] == "Aegis"
 
     def test_alarm_event(self) -> None:
         handler = self._get_handler()
@@ -86,6 +92,7 @@ class TestLogbookDescriptions:
     def test_missing_device_name(self) -> None:
         handler = self._get_handler()
         result = handler(_make_event("arm"))
+        assert result[LOGBOOK_ENTRY_NAME] == "Aegis"
         assert "Unknown device" in result[LOGBOOK_ENTRY_MESSAGE]
 
     def test_panic_event(self) -> None:
@@ -107,8 +114,8 @@ class TestLogbookDescriptions:
         result = handler(
             _make_event("arm", device_name="App User", raw_tag="space_armed_with_malfunctions")
         )
-        assert "Armed" in result[LOGBOOK_ENTRY_MESSAGE]
-        assert "App User" in result[LOGBOOK_ENTRY_MESSAGE]
+        assert result[LOGBOOK_ENTRY_NAME] == "App User"
+        assert result[LOGBOOK_ENTRY_MESSAGE].startswith("armed")
         assert "malfunction" in result[LOGBOOK_ENTRY_MESSAGE].lower()
 
     def test_night_arm_with_malfunctions_says_so(self) -> None:
@@ -122,7 +129,7 @@ class TestLogbookDescriptions:
                 raw_tag="space_night_mode_on_with_malfunctions",
             )
         )
-        assert "Night mode armed" in result[LOGBOOK_ENTRY_MESSAGE]
+        assert "armed night mode" in result[LOGBOOK_ENTRY_MESSAGE]
         assert "malfunction" in result[LOGBOOK_ENTRY_MESSAGE].lower()
 
     def test_clean_arm_does_not_mention_malfunctions(self) -> None:

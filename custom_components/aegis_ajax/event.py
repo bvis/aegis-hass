@@ -111,19 +111,23 @@ class AjaxSecurityEvent(_AlwaysAvailable, CoordinatorEntity[AjaxCobrandedCoordin
         if event_type not in ALL_EVENT_TYPES:
             _LOGGER.debug("Ignoring unknown event type: %s", event_type)
             return
-        if context is not None:
-            self.async_set_context(context)
-        self._trigger_event(event_type, data)
-        self.async_write_ha_state()
         # Fire bus event for logbook descriptions and device triggers. The
         # identity stamp goes after the payload spread: `data` carries the
         # *source* device (a fob, a sensor), and the device trigger filters
         # on which hub fired (#358) — only this entity knows that.
+        #
+        # Fired before the state is written: the activity view names as the
+        # cause whatever was recorded first under this context, and only the
+        # bus event's logbook entry carries who it was (#659).
         self.hass.bus.async_fire(
             f"{DOMAIN}_event",
             {"event_type": event_type, **data, "hub_id": self._hub_id, "space_id": self._space_id},
             context=context,
         )
+        if context is not None:
+            self.async_set_context(context)
+        self._trigger_event(event_type, data)
+        self.async_write_ha_state()
         # Optionally surface the event as an HA persistent notification (2.2).
         # The coordinator no-ops when the feature is off or the type isn't in
         # the configured filter. Include this entity's space_id so the notifier
