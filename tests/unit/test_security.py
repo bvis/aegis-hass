@@ -554,9 +554,9 @@ class TestGroupProtoIntegration:
 
         mock_stub_instance = MagicMock()
         mock_stub_instance.armGroup = fake_arm_group
-        mock_grpc_module = MagicMock(SpaceSecurityServiceStub=lambda _ch: mock_stub_instance)
-
-        with patch.dict("sys.modules", {_GRPC_MOD: mock_grpc_module}):
+        # Replace the stub on the real module: a sys.modules entry is ignored once
+        # the package has the real submodule as an attribute.
+        with patch(f"{_GRPC_MOD}.SpaceSecurityServiceStub", lambda _ch: mock_stub_instance):
             await api.arm_group("space-1", "group-2", ignore_alarms=True)
 
         request = captured["request"]
@@ -583,9 +583,9 @@ class TestGroupProtoIntegration:
 
         mock_stub_instance = MagicMock()
         mock_stub_instance.disarmGroup = fake_disarm_group
-        mock_grpc_module = MagicMock(SpaceSecurityServiceStub=lambda _ch: mock_stub_instance)
-
-        with patch.dict("sys.modules", {_GRPC_MOD: mock_grpc_module}):
+        # Replace the stub on the real module: a sys.modules entry is ignored once
+        # the package has the real submodule as an attribute.
+        with patch(f"{_GRPC_MOD}.SpaceSecurityServiceStub", lambda _ch: mock_stub_instance):
             await api.disarm_group("space-1", "group-2")
 
         request = captured["request"]
