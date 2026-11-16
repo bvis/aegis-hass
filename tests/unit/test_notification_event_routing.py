@@ -86,13 +86,21 @@ def test_only_a_push_dispatched_too_long_ago_is_stale(encoded: str, stale: bool)
         assert _listener()._is_stale_push(encoded) is stale
 
 
+def test_the_fraction_of_a_second_of_the_dispatch_time_is_not_ignored() -> None:
+    # A quarter of a second past the limit by whole seconds, but the push was
+    # dispatched half a second into its second: still fresh.
+    encoded = _push(age=STALE_PUSH_THRESHOLD_SECONDS, nanos=500_000_000)
+    with patch.object(module.time, "time", return_value=_NOW + 0.25):
+        assert _listener()._is_stale_push(encoded) is False
+
+
 def _route(
     listener: AjaxNotificationListener,
     event_type: str,
     *,
     space: str | None,
     notification_id: str | None = None,
-    photo_context: tuple[str, ...] | None = None,
+    photo_context: tuple[str, str, float] | None = None,
 ) -> tuple[dict[str, Any], MagicMock, MagicMock, MagicMock]:
     data: dict[str, Any] = {"raw_tag": "not-a-group-tag"}
     with (
@@ -149,12 +157,23 @@ def test_an_alarm_with_a_photo_schedules_its_import_for_that_space(
 ) -> None:
     listener = _listener(*(("space-1", "space-2") if named else ("space-1",)))
     data, _, _, photo = _route(
-        listener, "alarm", space=named, notification_id="notif-1", photo_context=("D1", "cam")
+        listener,
+        "alarm",
+        space=named,
+        notification_id="notif-1",
+        photo_context=("D1", "hub-1", 1_700_000_000.5),
     )
     photo.assert_called_once_with(_RAW, "notif-1")
     assert _dispatched(listener)[:2] == [
         (listener._coordinator.fire_push_event, delivered, "alarm", data),
-        (listener._coordinator.schedule_alarm_image_import, delivered, "notif-1", "D1", "cam"),
+        (
+            listener._coordinator.schedule_alarm_image_import,
+            delivered,
+            "notif-1",
+            "D1",
+            "hub-1",
+            1_700_000_000.5,
+        ),
     ]
 
 

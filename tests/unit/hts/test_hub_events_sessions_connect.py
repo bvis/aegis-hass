@@ -108,7 +108,14 @@ async def test_an_unconfirmed_termination_reports_which_one_and_what_was_done() 
         await client.kill_client_sessions([1_000, 2_000, 3_000])
     assert err.value.session_id == 2_000
     assert err.value.succeeded_session_ids == [1_000]
-    assert client._request_user_registration.await_count == 2
+    # The third session is never attempted.
+    assert [
+        (call.kwargs["termination_session_id"], call.kwargs["params"])
+        for call in client._request_user_registration.await_args_list
+    ] == [
+        (1_000, [b"\x00\x00\x00\x00\x00\x00\x03\xe8"]),
+        (2_000, [b"\x00\x00\x00\x00\x00\x00\x07\xd0"]),
+    ]
 
 
 async def test_connect_opens_a_verified_tls_connection_to_the_configured_host() -> None:
