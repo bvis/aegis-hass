@@ -40,6 +40,8 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="Release ${TAG_NAME}"
           fi
+          # Shown in Home Assistant's update dialog, where most users read the notes.
+          NOTES=$(printf '%s\n\n---\n%s' "$NOTES" "Find it useful? You can [buy me a coffee](https://buymeacoffee.com/basiliovera) ☕")
           {
             echo "notes<<CHANGELOG_EOF"
             echo "$NOTES"
