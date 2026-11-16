@@ -118,6 +118,10 @@ class TestEndToEndSuppression:
         logger.addHandler(handler)
         logger.propagate = False
         try:
+            # A guard left attached by an earlier test has already spent its allowance.
+            for existing in original_filters:
+                if isinstance(existing, FcmExceptionLogThrottle):
+                    logger.removeFilter(existing)
             attach_fcm_log_guard()
             for _ in range(20):
                 try:
@@ -130,9 +134,7 @@ class TestEndToEndSuppression:
         finally:
             logger.removeHandler(handler)
             logger.propagate = original_propagate
-            for f in list(logger.filters):
-                if f not in original_filters:
-                    logger.removeFilter(f)
+            logger.filters[:] = original_filters
 
 
 class TestAttachFcmLogGuard:
