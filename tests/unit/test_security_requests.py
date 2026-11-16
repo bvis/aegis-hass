@@ -190,6 +190,10 @@ async def test_disarm_retries_while_the_hub_is_busy(busy: str) -> None:
     assert harness.rpc.await_count == 3
     assert [call.args for call in sleep.await_args_list] == [(2,), (2,)]
     assert all(call.args[0] is harness.request for call in harness.rpc.await_args_list)
+    assert all(
+        call.kwargs == {"metadata": _METADATA, "timeout": 15}
+        for call in harness.rpc.await_args_list
+    )
 
 
 async def test_disarm_gives_up_after_three_busy_answers() -> None:
