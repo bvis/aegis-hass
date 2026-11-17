@@ -716,12 +716,15 @@ class AjaxCobrandedOptionsFlow(OptionsFlow):
                 user_input["poll_interval"] = max(
                     MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, user_input["poll_interval"])
                 )
-            if user_input.get("pin_code"):
+            # Password selectors are blank when reopening the form. Preserve the
+            # existing PIN hash unless a new PIN was explicitly entered.
+            pin_code = user_input.pop("pin_code", None)
+            if pin_code:
                 user_input["pin_code_hash"] = await self.hass.async_add_executor_job(
-                    hash_pin, user_input.pop("pin_code")
+                    hash_pin, pin_code
                 )
-            else:
-                user_input.pop("pin_code", None)
+            elif "pin_code_hash" in self._entry.options:
+                user_input["pin_code_hash"] = self._entry.options["pin_code_hash"]
             # FCM credentials live in `entry.data` (encrypted storage).
             # Two routes can update them:
             #   1. The dedicated "Delete FCM credentials" toggle wipes all
