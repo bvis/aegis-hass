@@ -50,7 +50,8 @@ def _stream(*messages: Message) -> MagicMock:
 
 def _hub_device_snapshot() -> Message:
     message = hub_device_response_pb2.StreamHubDeviceResponse()
-    message.success.snapshot.hub_device.SetInParent()
+    # Not an empty device: the parser must be given this one, not just any.
+    message.success.snapshot.hub_device.motion_protect.SetInParent()
     return message
 
 
@@ -112,8 +113,10 @@ async def test_hub_device_reads_ask_for_that_device_and_return_the_parsed_snapsh
     ):
         assert await getattr(api, method)("hub-1", "dev-1") == parsed
     _assert_stream_call(stub_cls, channel, request, 10)
+    parse.assert_called_once()
     (hub_device,) = parse.call_args.args
     assert hub_device == _hub_device_snapshot().success.snapshot.hub_device
+    assert hub_device.WhichOneof("device") == "motion_protect"
 
     # A failure answer, or a stream that ends without a snapshot, reads as nothing.
     for messages in ((_hub_device_failure(), _hub_device_snapshot()), ()):
