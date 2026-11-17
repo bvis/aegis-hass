@@ -1187,9 +1187,7 @@ class TestOptionsFlow:
         with pytest.raises(HomeAssistantError):
             validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "4321")
 
-    @pytest.mark.parametrize(
-        "pin_field", [{}, {"pin_code": ""}], ids=["omitted", "blank"]
-    )
+    @pytest.mark.parametrize("pin_field", [{}, {"pin_code": ""}], ids=["omitted", "blank"])
     async def test_options_flow_preserves_existing_pin_on_unrelated_edit(
         self, hass: HomeAssistant, pin_field: dict[str, str]
     ) -> None:
@@ -1200,9 +1198,7 @@ class TestOptionsFlow:
         )
         stored_hash = entry.options["pin_code_hash"]
 
-        await self._submit(
-            hass, entry, {"poll_interval": 90, "use_pin_code": True, **pin_field}
-        )
+        await self._submit(hass, entry, {"poll_interval": 90, "use_pin_code": True, **pin_field})
 
         assert entry.options["poll_interval"] == 90
         assert entry.options["pin_code_hash"] == stored_hash
