@@ -1187,6 +1187,42 @@ class TestOptionsFlow:
         with pytest.raises(HomeAssistantError):
             validate_pin({"use_pin_code": True, "pin_code_hash": stored}, "4321")
 
+    @pytest.mark.parametrize("pin_field", [{}, {"pin_code": ""}], ids=["omitted", "blank"])
+    async def test_options_flow_preserves_existing_pin_on_unrelated_edit(
+        self, hass: HomeAssistant, pin_field: dict[str, str]
+    ) -> None:
+        """Saving unrelated options must not delete a hidden password selector."""
+        entry = self._make_entry(hass)
+        await self._submit(
+            hass, entry, {"poll_interval": 60, "use_pin_code": True, "pin_code": "1234"}
+        )
+        stored_hash = entry.options["pin_code_hash"]
+
+        await self._submit(hass, entry, {"poll_interval": 90, "use_pin_code": True, **pin_field})
+
+        assert entry.options["poll_interval"] == 90
+        assert entry.options["pin_code_hash"] == stored_hash
+        assert "pin_code" not in entry.options
+        validate_pin(entry.options, "1234")
+
+    async def test_options_flow_new_pin_replaces_previous_pin(self, hass: HomeAssistant) -> None:
+        """A newly typed PIN must replace the saved hash."""
+        entry = self._make_entry(hass)
+        await self._submit(
+            hass, entry, {"poll_interval": 60, "use_pin_code": True, "pin_code": "1234"}
+        )
+        old_hash = entry.options["pin_code_hash"]
+
+        await self._submit(
+            hass, entry, {"poll_interval": 60, "use_pin_code": True, "pin_code": "5678"}
+        )
+
+        assert entry.options["pin_code_hash"] != old_hash
+        assert "pin_code" not in entry.options
+        validate_pin(entry.options, "5678")
+        with pytest.raises(HomeAssistantError):
+            validate_pin(entry.options, "1234")
+
     async def test_options_flow_without_pin_code_no_hash(self, hass: HomeAssistant) -> None:
         """Ensure no pin_code_hash is stored when pin_code is empty."""
         entry = self._make_entry(hass)
