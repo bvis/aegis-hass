@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1] - 2026-11-18
+
+### Fixed
+- **Saving the options no longer loses the alarm code (#675, thanks @yeyeric).** With a code set, saving the options without typing it again dropped the stored one, and after that every code was refused when arming or disarming from Home Assistant. A blank code field now keeps the code you had. If you saved the options on 1.27.0 or later and your code stopped working, type it once more in the options. **Requests to Ajax:** none.
+
 ## [1.31.0] - 2026-11-15
 
 ### Added
