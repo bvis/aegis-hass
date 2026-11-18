@@ -732,9 +732,11 @@ Once entered, the values are stored on the config entry and persist across resta
 >   Notification settings → View notifications). With no tab selected the account
 >   still registers for push and shows as connected, but Ajax sends it nothing; with
 >   all of them selected the pushes arrive. The admin role isn't needed for this: a
->   plain **User** receives pushes. The diagnostics file shows the current list as
->   `visible_tabs` under `member_push_preferences`. If yours has the tabs and still
->   gets nothing, open an issue and attach that file.
+>   plain **User** receives pushes. The diagnostics file shows the list as
+>   `visible_tabs` under `member_push_preferences`. It is read when Home Assistant
+>   starts, so restart after changing it in the app, and it is only there while the
+>   bypass switches option is on its default, automatic. If yours has the tabs and
+>   still gets nothing, open an issue and attach that file.
 >
 > Either way you'd still get changes on the next poll, just not instantly.
 
