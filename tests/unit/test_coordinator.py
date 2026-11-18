@@ -226,6 +226,34 @@ class TestRoomsRefresh:
         # Should not raise — failure is downgraded to debug log
         await coordinator._async_update_data()
         assert coordinator.rooms == {}
+        # ... and the next try comes in ten minutes, not in an hour
+        now = asyncio.get_running_loop().time()
+        assert coordinator._rooms_last_fetch == pytest.approx(now - 3000.0, abs=5)
+
+
+@pytest.mark.asyncio
+async def test_failed_snapshot_of_one_space_keeps_its_rooms_and_updates_the_other() -> None:
+    from custom_components.aegis_ajax.api.models import Room
+
+    coordinator = _make_coordinator(space_ids=["s1", "s2"])
+    coordinator.spaces = {"s1": _make_space("s1"), "s2": _make_space("s2")}
+    coordinator.rooms = {
+        "a-old": Room(id="a-old", name="Old", space_id="s1"),
+        "b1": Room(id="b1", name="Hall", space_id="s2"),
+    }
+
+    async def snapshot(space_id: str) -> SpaceSnapshot:
+        if space_id == "s2":
+            raise RuntimeError("oops")
+        return SpaceSnapshot(rooms=(Room(id="a-new", name="New", space_id="s1"),))
+
+    coordinator._spaces_api = MagicMock()
+    coordinator._spaces_api.get_space_snapshot = snapshot
+
+    await coordinator._maybe_refresh_rooms(10_000.0)
+
+    assert set(coordinator.rooms) == {"a-new", "b1"}
+    assert coordinator._rooms_last_fetch == 10_000.0 - 3000.0
 
 
 _CENTRAL_ONE = MonitoringCompany(
@@ -653,6 +681,53 @@ class TestAsyncUpdateData:
         coordinator._spaces_api.get_space_snapshot.assert_awaited_once()
         assert coordinator.spaces["s1"].groups[0].security_state == SecurityState.ARMED
         # Flag consumed so it doesn't snapshot on every subsequent poll.
+        assert coordinator._force_snapshot_refresh is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("polled_state", "snapshot_reads"),
+        [(SecurityState.DISARMED, 1), (SecurityState.ARMED, 0)],
+    )
+    async def test_polled_state_change_rereads_groups(
+        self, polled_state: SecurityState, snapshot_reads: int
+    ) -> None:
+        """A change no event announced (a security schedule, #678) reaches the
+        plain poll only: the groups are re-read in that same update. A poll
+        that shows the same state stays light.
+        """
+        from custom_components.aegis_ajax.api.models import Group
+
+        def group(state: SecurityState) -> Group:
+            return Group(
+                id="g1", space_id="s1", name="Garage", security_state=state, sorting_key="01"
+            )
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            security_state=SecurityState.ARMED,
+            groups=(group(SecurityState.ARMED),),
+            group_mode_enabled=True,
+        )
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(
+            return_value=[replace(_make_space("s1"), security_state=polled_state)]
+        )
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(
+            return_value=SpaceSnapshot(
+                groups=(group(SecurityState.DISARMED),), group_mode_enabled=True
+            )
+        )
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator._spaces_api.get_space_snapshot.await_count == snapshot_reads
+        assert coordinator.spaces["s1"].groups[0].security_state == polled_state
         assert coordinator._force_snapshot_refresh is False
 
     def test_security_event_uses_dedicated_short_cooldown_debouncer(self) -> None:

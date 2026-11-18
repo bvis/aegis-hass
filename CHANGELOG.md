@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.1] - unreleased
+
+### Fixed
+- **Group panels follow a disarm made by a security schedule (#678).** When a schedule disarmed the system, the main panel went to disarmed and the group panels stayed armed for up to an hour. The groups are now re-read as soon as the regular status refresh sees the main state change. **Requests to Ajax:** one extra read of the space when its state changed and no event had announced it; none otherwise.
+- A failed re-read of rooms and groups no longer waits an hour for the next try: it is retried after ten minutes, and the rooms and groups already known are kept meanwhile. **Requests to Ajax:** that read is repeated every ten minutes instead of every hour while it keeps failing.
+
 ## [1.32.0] - 2026-11-18
 
 ### Fixed

@@ -427,7 +427,7 @@ class TestListRooms:
         locator_pb2.SpaceLocator.assert_called_once_with(space_id="space-1")
 
     @pytest.mark.asyncio
-    async def test_list_rooms_returns_empty_on_failure(self) -> None:
+    async def test_list_rooms_raises_on_failure(self) -> None:
         mock_client = MagicMock()
         mock_client._get_channel.return_value = MagicMock()
         mock_client._session.get_call_metadata.return_value = []
@@ -445,17 +445,19 @@ class TestListRooms:
         grpc_module = MagicMock(SpaceServiceStub=MagicMock(return_value=stub_instance))
         locator_pb2 = MagicMock()
 
-        with patch.dict(
-            "sys.modules",
-            {
-                _STREAM_SPACE_REQUEST: request_pb2,
-                _SPACE_GRPC: grpc_module,
-                _SPACE_LOCATOR: locator_pb2,
-            },
+        # Raised so a failed read is never taken for "no rooms, no groups".
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    _STREAM_SPACE_REQUEST: request_pb2,
+                    _SPACE_GRPC: grpc_module,
+                    _SPACE_LOCATOR: locator_pb2,
+                },
+            ),
+            pytest.raises(RuntimeError),
         ):
-            rooms = await api.list_rooms("space-1")
-
-        assert rooms == []
+            await api.list_rooms("space-1")
 
 
 class TestGetSpaceSnapshot:

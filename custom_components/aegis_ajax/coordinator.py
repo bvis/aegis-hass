@@ -1494,6 +1494,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # it flips the panel from armed_night to armed_custom_bypass
                 # on every plain poll while night mode is on (#284).
                 if previous.groups or previous.group_mode_enabled:
+                    # A change nothing announced (a security schedule, #678)
+                    # shows up here first: re-read the groups in this same
+                    # update instead of leaving them as they were for an hour.
+                    if previous.groups and s.security_state != previous.security_state:
+                        self._force_snapshot_refresh = True
                     s = dc_replace(
                         s,
                         groups=previous.groups,
@@ -1612,11 +1617,17 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # every poll — the 300s poll and hourly gate remain the backstops.
         self._force_snapshot_refresh = False
         refreshed_rooms: dict[str, Room] = {}
+        failed = False
         for space_id in self.spaces:
             try:
                 snapshot = await self._spaces_api.get_space_snapshot(space_id)
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Failed to fetch rooms for space %s", space_id, exc_info=True)
+                failed = True
+                # This space keeps the rooms it had; the others still update.
+                refreshed_rooms.update(
+                    {rid: r for rid, r in self.rooms.items() if r.space_id == space_id}
+                )
                 continue
             for room in snapshot.rooms:
                 refreshed_rooms[room.id] = room
@@ -1630,7 +1641,8 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     chime_status=snapshot.chime_status,
                 )
         self.rooms = refreshed_rooms
-        self._rooms_last_fetch = now
+        # After a failure, try again in ten minutes, not in an hour.
+        self._rooms_last_fetch = now - (rooms_refresh_interval - 600.0 if failed else 0.0)
 
     def _schedule_hub_device_temperature_refresh(self) -> None:
         """Start the dedicated per-device-temperature refresh timer (#220, #229).
