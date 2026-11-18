@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.32.0] - unreleased
+## [1.32.0] - 2026-11-18
 
 ### Fixed
 - **The alarm panel goes to `triggered` when a detector sets off the alarm (#676).** A door opened with the system armed arrived as a plain `door_open` event and the panel stayed `armed_away` while the siren sounded. The panel now goes to `triggered` when a door opening, a motion detection or a glass break arrives in Ajax's alarm category while the space is armed, and stays there until it is disarmed. The event keeps its type (`door_open`, `motion`, `glass_break`), so existing automations see what they saw before. **Requests to Ajax:** none.
