@@ -4379,6 +4379,19 @@ class TestIntrusionAlarmOverlay:
         assert "s1" in coordinator.alarmed_space_ids
         coordinator.async_set_updated_data.assert_called_once()
 
+    def test_note_intrusion_alarm_ignores_a_disarmed_space(self) -> None:
+        # #676: kept from a disarmed moment, the entry would turn the panel
+        # `triggered` as soon as the space is armed.
+        from custom_components.aegis_ajax.const import SecurityState
+
+        coordinator = self._armed_coordinator()
+        coordinator.spaces = {"s1": self._make_space(SecurityState.DISARMED)}
+
+        coordinator.note_intrusion_alarm("s1")
+
+        assert "s1" not in coordinator.alarmed_space_ids
+        coordinator.async_set_updated_data.assert_not_called()
+
     def test_note_intrusion_alarm_ignores_unknown_space(self) -> None:
         coordinator = self._armed_coordinator()
 

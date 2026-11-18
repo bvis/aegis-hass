@@ -2359,6 +2359,34 @@ class TestApplySecurityStateFromEvent:
             coordinator.note_intrusion_alarm, "space-1"
         )
 
+    @pytest.mark.parametrize("tag", ["door_opened", "motion_detected", "glass_break_detected"])
+    def test_detector_tag_in_the_alarm_category_dispatches_alarm_overlay(self, tag: str) -> None:
+        # #676: an armed door opening arrives as `door_opened`, never as
+        # `intrusion_alarm`; the category is what says it is an alarm.
+        listener, hass, coordinator = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", {"raw_tag": tag, "category": "alarm"})
+
+        hass.loop.call_soon_threadsafe.assert_called_once_with(
+            coordinator.note_intrusion_alarm, "space-1"
+        )
+
+    @pytest.mark.parametrize(
+        "event_data",
+        [
+            {"raw_tag": "door_opened"},
+            {"raw_tag": "door_opened", "category": "system"},
+            {"raw_tag": "tamper_opened", "category": "alarm"},
+            {"raw_tag": "smoke_detected", "category": "alarm"},
+        ],
+    )
+    def test_other_detector_pushes_leave_the_panel_alone(self, event_data: dict[str, str]) -> None:
+        listener, hass, _ = self._make_listener()
+
+        listener._apply_security_state_from_event("space-1", event_data)
+
+        hass.loop.call_soon_threadsafe.assert_not_called()
+
     def test_missing_raw_tag_does_not_dispatch(self) -> None:
         listener, hass, _ = self._make_listener()
 
@@ -2984,6 +3012,31 @@ class TestSecurityEventSnapshotNudge:
         listener = self._make_listener()
         self._fire(listener, "doorbell_pressed", "doorbell_press")
         listener._coordinator.request_security_snapshot_refresh.assert_not_called()
+
+    @pytest.mark.parametrize(("folder", "alarmed"), [(1, True), (5, False)])
+    def test_door_opening_carries_its_category_and_only_an_alarm_marks_the_panel(
+        self, folder: int, alarmed: bool
+    ) -> None:
+        # #676, from the bytes: same `door_opened` tag, and only the alarm
+        # category turns the panel. The event stays `door_open` either way.
+        from systems.ajax.api.ecosystem.v2.communicationsvc.mobile.service.push_notification_dispatch import (  # noqa: E501
+            event_pb2,
+        )
+
+        listener = self._make_listener()
+        listener._coordinator._space_ids = ["space-1"]
+        dispatch = event_pb2.PushNotificationDispatchEvent()
+        dispatch.notification.id = "n1"
+        dispatch.notification.folder = folder
+        content = dispatch.notification.content.hub_notification_content
+        content.qualifier.tag.door_opened.SetInParent()
+
+        listener._parse_and_fire_event(base64.b64encode(dispatch.SerializeToString()).decode())
+
+        (space_id, event_type, data), _ = listener._coordinator.fire_push_event.call_args
+        assert (space_id, event_type) == ("space-1", "door_open")
+        assert data["category"] == ("alarm" if alarmed else "system")
+        assert listener._coordinator.note_intrusion_alarm.called is alarmed
 
     @pytest.mark.parametrize("tag", ["intrusion_alarm", "intrusion_alarm_confirmed"])
     def test_alarm_push_schedules_its_image_import(self, tag: str) -> None:
