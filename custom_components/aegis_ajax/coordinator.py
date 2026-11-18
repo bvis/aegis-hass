@@ -3298,9 +3298,14 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         from custom_components.aegis_ajax.const import SecurityState  # noqa: PLC0415
 
         space = self.spaces.get(space_id)
+        if space is None:
+            return
         # A disarmed space shows no alarm, and an entry kept from then would
-        # turn the panel `triggered` the moment it is armed (#676).
-        if space is None or space.security_state in (SecurityState.DISARMED, SecurityState.NONE):
+        # turn the panel `triggered` the moment it is armed (#676). Groups
+        # count: a group arm push updates the group at once, the space-level
+        # state only on the next re-read.
+        off = (SecurityState.DISARMED, SecurityState.NONE)
+        if space.security_state in off and all(g.security_state in off for g in space.groups):
             return
         self.alarmed_space_ids.add(space_id)
         # An alarm ends any running delay (#454): `triggered` wins, and the

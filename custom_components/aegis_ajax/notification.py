@@ -1602,6 +1602,8 @@ class AjaxNotificationListener:
         if raw_tag in INTRUSION_ALARM_RAW_TAGS or (
             event_data.get("category") == PUSH_CATEGORY_ALARM
             and raw_tag in ALARM_CATEGORY_INTRUSION_RAW_TAGS
+            # The detector going back to normal is filed with its alarm.
+            and event_data.get("transition") != "recovered"
         ):
             self._hass.loop.call_soon_threadsafe(
                 self._coordinator.note_intrusion_alarm,

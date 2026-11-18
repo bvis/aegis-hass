@@ -2376,6 +2376,7 @@ class TestApplySecurityStateFromEvent:
         [
             {"raw_tag": "door_opened"},
             {"raw_tag": "door_opened", "category": "system"},
+            {"raw_tag": "door_opened", "category": "alarm", "transition": "recovered"},
             {"raw_tag": "tamper_opened", "category": "alarm"},
             {"raw_tag": "smoke_detected", "category": "alarm"},
         ],

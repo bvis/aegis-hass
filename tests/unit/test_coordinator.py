@@ -4392,6 +4392,24 @@ class TestIntrusionAlarmOverlay:
         assert "s1" not in coordinator.alarmed_space_ids
         coordinator.async_set_updated_data.assert_not_called()
 
+    def test_note_intrusion_alarm_counts_an_armed_group(self) -> None:
+        # A group arm push updates the group at once; the space-level state
+        # follows on the next re-read and must not hide the alarm meanwhile.
+        from dataclasses import replace
+
+        from custom_components.aegis_ajax.api.models import Group
+        from custom_components.aegis_ajax.const import SecurityState
+
+        coordinator = self._armed_coordinator()
+        group = Group(id="g1", space_id="s1", name="Ground", security_state=SecurityState.ARMED)
+        coordinator.spaces = {
+            "s1": replace(self._make_space(SecurityState.DISARMED), groups=(group,))
+        }
+
+        coordinator.note_intrusion_alarm("s1")
+
+        assert "s1" in coordinator.alarmed_space_ids
+
     def test_note_intrusion_alarm_ignores_unknown_space(self) -> None:
         coordinator = self._armed_coordinator()
 
