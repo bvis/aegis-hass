@@ -435,7 +435,7 @@ class SpacesApi:
 
 
 def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
-    """Reduce a member's notification preferences to what gates video pushes.
+    """Reduce a member's notification preferences to what gates its pushes.
 
     `None` means Ajax did not send that part, which is not the same as off.
     """
@@ -444,7 +444,7 @@ def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
     )
 
     def name(enum: Any, value: int, prefix: str) -> str:  # noqa: ANN401
-        # Ajax adds values our proto doesn't have yet (14 = line crossing).
+        # Ajax adds values before our proto has them.
         known = enum.DESCRIPTOR.values_by_number.get(value)
         return known.name.removeprefix(prefix) if known else str(value)
 
@@ -465,4 +465,17 @@ def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
         video = {
             kind: getattr(v2.video, kind).enabled for kind in ("motion", "human", "pet", "vehicle")
         }
-    return {"legacy": legacy, "alarm_video": alarm_video, "video": video}
+    # The notification tabs the member may see ("View notifications" in the
+    # app). A tab that is not listed sends no pushes for its events, whatever
+    # the per-type switches say.
+    tabs = None
+    if prefs.HasField("folder_preferences"):
+        tabs = sorted(
+            name(
+                prefs_pb2.DisplayMemberFolderPreference,
+                f,
+                "DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_",
+            )
+            for f in prefs.folder_preferences.folder_preferences
+        )
+    return {"legacy": legacy, "alarm_video": alarm_video, "video": video, "visible_tabs": tabs}

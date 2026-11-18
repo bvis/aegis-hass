@@ -12,10 +12,10 @@ import builtins as _builtins
 import sys
 import typing as _typing
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias as _TypeAlias
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias as _TypeAlias, Never as _Never
 else:
-    from typing_extensions import TypeAlias as _TypeAlias
+    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
 if sys.version_info >= (3, 13):
     from warnings import deprecated as _deprecated
@@ -44,6 +44,8 @@ class _DisplayMemberPushPreferenceEnumTypeWrapper(_enum_type_wrapper._EnumTypeWr
     DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_VEHICLE: _DisplayMemberPushPreference.ValueType  # 11
     DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_SCENARIO_EXECUTED: _DisplayMemberPushPreference.ValueType  # 12
     DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_RING_BUTTON_PRESSED: _DisplayMemberPushPreference.ValueType  # 13
+    DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_LINE_CROSSING: _DisplayMemberPushPreference.ValueType  # 14
+    DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_PERIMETER_CROSSING: _DisplayMemberPushPreference.ValueType  # 15
 
 class DisplayMemberPushPreference(_DisplayMemberPushPreference, metaclass=_DisplayMemberPushPreferenceEnumTypeWrapper): ...
 
@@ -61,6 +63,8 @@ DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_PET: DisplayMemberPushPreference.Valu
 DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_VEHICLE: DisplayMemberPushPreference.ValueType  # 11
 DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_SCENARIO_EXECUTED: DisplayMemberPushPreference.ValueType  # 12
 DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_RING_BUTTON_PRESSED: DisplayMemberPushPreference.ValueType  # 13
+DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_LINE_CROSSING: DisplayMemberPushPreference.ValueType  # 14
+DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_PERIMETER_CROSSING: DisplayMemberPushPreference.ValueType  # 15
 Global___DisplayMemberPushPreference: _TypeAlias = DisplayMemberPushPreference  # noqa: Y015
 
 class _DisplayMemberSmsPreference:
@@ -103,6 +107,31 @@ DISPLAY_SPACE_MEMBER_CALL_PREFERENCE_UNSPECIFIED: DisplayMemberCallPreference.Va
 DISPLAY_SPACE_MEMBER_CALL_PREFERENCE_ALARM: DisplayMemberCallPreference.ValueType  # 1
 Global___DisplayMemberCallPreference: _TypeAlias = DisplayMemberCallPreference  # noqa: Y015
 
+class _DisplayMemberFolderPreference:
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
+
+class _DisplayMemberFolderPreferenceEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_DisplayMemberFolderPreference.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_UNSPECIFIED: _DisplayMemberFolderPreference.ValueType  # 0
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_ALARM: _DisplayMemberFolderPreference.ValueType  # 1
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_MALFUNCTION: _DisplayMemberFolderPreference.ValueType  # 2
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_USER_AUTOMATION: _DisplayMemberFolderPreference.ValueType  # 3
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_HOME_AUTOMATION: _DisplayMemberFolderPreference.ValueType  # 4
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_SYSTEM: _DisplayMemberFolderPreference.ValueType  # 5
+    DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_VIDEO: _DisplayMemberFolderPreference.ValueType  # 6
+
+class DisplayMemberFolderPreference(_DisplayMemberFolderPreference, metaclass=_DisplayMemberFolderPreferenceEnumTypeWrapper): ...
+
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_UNSPECIFIED: DisplayMemberFolderPreference.ValueType  # 0
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_ALARM: DisplayMemberFolderPreference.ValueType  # 1
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_MALFUNCTION: DisplayMemberFolderPreference.ValueType  # 2
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_USER_AUTOMATION: DisplayMemberFolderPreference.ValueType  # 3
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_HOME_AUTOMATION: DisplayMemberFolderPreference.ValueType  # 4
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_SYSTEM: DisplayMemberFolderPreference.ValueType  # 5
+DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_VIDEO: DisplayMemberFolderPreference.ValueType  # 6
+Global___DisplayMemberFolderPreference: _TypeAlias = DisplayMemberFolderPreference  # noqa: Y015
+
 @_typing.final
 class DisplayMemberNotificationPreferences(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
@@ -111,6 +140,7 @@ class DisplayMemberNotificationPreferences(_message.Message):
     MEMBER_SMS_PREFERENCES_FIELD_NUMBER: _builtins.int
     MEMBER_CALL_PREFERENCES_FIELD_NUMBER: _builtins.int
     MEMBER_PUSH_PREFERENCES_V2_FIELD_NUMBER: _builtins.int
+    FOLDER_PREFERENCES_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def member_push_preferences(self) -> Global___DisplayMemberPushPreferences: ...
     @_builtins.property
@@ -119,6 +149,8 @@ class DisplayMemberNotificationPreferences(_message.Message):
     def member_call_preferences(self) -> Global___DisplayMemberCallPreferences: ...
     @_builtins.property
     def member_push_preferences_v2(self) -> Global___DisplayMemberPushPreferencesV2: ...
+    @_builtins.property
+    def folder_preferences(self) -> Global___DisplayMemberFolderPreferences: ...
     def __init__(
         self,
         *,
@@ -126,11 +158,15 @@ class DisplayMemberNotificationPreferences(_message.Message):
         member_sms_preferences: Global___DisplayMemberSmsPreferences | None = ...,
         member_call_preferences: Global___DisplayMemberCallPreferences | None = ...,
         member_push_preferences_v2: Global___DisplayMemberPushPreferencesV2 | None = ...,
+        folder_preferences: Global___DisplayMemberFolderPreferences | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["member_call_preferences", b"member_call_preferences", "member_push_preferences", b"member_push_preferences", "member_push_preferences_v2", b"member_push_preferences_v2", "member_sms_preferences", b"member_sms_preferences"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_folder_preferences", b"_folder_preferences", "folder_preferences", b"folder_preferences", "member_call_preferences", b"member_call_preferences", "member_push_preferences", b"member_push_preferences", "member_push_preferences_v2", b"member_push_preferences_v2", "member_sms_preferences", b"member_sms_preferences"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["member_call_preferences", b"member_call_preferences", "member_push_preferences", b"member_push_preferences", "member_push_preferences_v2", b"member_push_preferences_v2", "member_sms_preferences", b"member_sms_preferences"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_folder_preferences", b"_folder_preferences", "folder_preferences", b"folder_preferences", "member_call_preferences", b"member_call_preferences", "member_push_preferences", b"member_push_preferences", "member_push_preferences_v2", b"member_push_preferences_v2", "member_sms_preferences", b"member_sms_preferences"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__folder_preferences: _TypeAlias = _typing.Literal["folder_preferences"]  # noqa: Y015
+    _WhichOneofArgType__folder_preferences: _TypeAlias = _typing.Literal["_folder_preferences", b"_folder_preferences"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__folder_preferences) -> _WhichOneofReturnType__folder_preferences | None: ...
 
 Global___DisplayMemberNotificationPreferences: _TypeAlias = DisplayMemberNotificationPreferences  # noqa: Y015
 
@@ -146,8 +182,11 @@ class DisplayMemberPushPreferences(_message.Message):
         *,
         push_preferences: _abc.Iterable[Global___DisplayMemberPushPreference.ValueType] | None = ...,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
     _ClearFieldArgType: _TypeAlias = _typing.Literal["push_preferences", b"push_preferences"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DisplayMemberPushPreferences: _TypeAlias = DisplayMemberPushPreferences  # noqa: Y015
 
@@ -206,8 +245,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 state: Global___DisplayMemberPushPreferencesV2.PushPreferenceState.ValueType = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Panic(_message.Message):
@@ -220,8 +262,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 state: Global___DisplayMemberPushPreferencesV2.PushPreferenceState.ValueType = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Fire(_message.Message):
@@ -234,8 +279,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 state: Global___DisplayMemberPushPreferencesV2.PushPreferenceState.ValueType = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Leakage(_message.Message):
@@ -248,8 +296,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 state: Global___DisplayMemberPushPreferencesV2.PushPreferenceState.ValueType = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Video(_message.Message):
@@ -262,8 +313,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 state: Global___DisplayMemberPushPreferencesV2.PushPreferenceState.ValueType = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["state", b"state"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         INTRUSION_FIELD_NUMBER: _builtins.int
         PANIC_FIELD_NUMBER: _builtins.int
@@ -293,6 +347,7 @@ class DisplayMemberPushPreferencesV2(_message.Message):
         def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["fire", b"fire", "intrusion", b"intrusion", "leakage", b"leakage", "panic", b"panic", "video", b"video"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Malfunction(_message.Message):
@@ -305,8 +360,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Security(_message.Message):
@@ -319,8 +377,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class SystemEvent(_message.Message):
@@ -333,8 +394,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class NonSecurityAlert(_message.Message):
@@ -347,8 +411,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Automation(_message.Message):
@@ -361,8 +428,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class SmartLock(_message.Message):
@@ -375,8 +445,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             *,
             enabled: _builtins.bool = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class DoorbellRinging(_message.Message):
@@ -397,8 +470,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             enabled: _builtins.bool = ...,
             state: Global___DisplayMemberPushPreferencesV2.DoorbellRingingPushPreferenceState.ValueType = ...,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
         _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled", "state", b"state"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Video(_message.Message):
@@ -415,8 +491,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 enabled: _builtins.bool = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Human(_message.Message):
@@ -429,8 +508,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 enabled: _builtins.bool = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Pet(_message.Message):
@@ -443,8 +525,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 enabled: _builtins.bool = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class Vehicle(_message.Message):
@@ -457,8 +542,11 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 enabled: _builtins.bool = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         @_typing.final
         class ScenarioExecuted(_message.Message):
@@ -471,14 +559,53 @@ class DisplayMemberPushPreferencesV2(_message.Message):
                 *,
                 enabled: _builtins.bool = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+        @_typing.final
+        class LineCrossing(_message.Message):
+            DESCRIPTOR: _descriptor.Descriptor
+
+            ENABLED_FIELD_NUMBER: _builtins.int
+            enabled: _builtins.bool
+            def __init__(
+                self,
+                *,
+                enabled: _builtins.bool = ...,
+            ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+            _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
+            def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+        @_typing.final
+        class PerimeterCrossing(_message.Message):
+            DESCRIPTOR: _descriptor.Descriptor
+
+            ENABLED_FIELD_NUMBER: _builtins.int
+            enabled: _builtins.bool
+            def __init__(
+                self,
+                *,
+                enabled: _builtins.bool = ...,
+            ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+            _ClearFieldArgType: _TypeAlias = _typing.Literal["enabled", b"enabled"]  # noqa: Y015
+            def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         MOTION_FIELD_NUMBER: _builtins.int
         HUMAN_FIELD_NUMBER: _builtins.int
         PET_FIELD_NUMBER: _builtins.int
         VEHICLE_FIELD_NUMBER: _builtins.int
         SCENARIO_EXECUTED_FIELD_NUMBER: _builtins.int
+        LINE_CROSSING_FIELD_NUMBER: _builtins.int
+        PERIMETER_CROSSING_FIELD_NUMBER: _builtins.int
         @_builtins.property
         def motion(self) -> Global___DisplayMemberPushPreferencesV2.Video.Motion: ...
         @_builtins.property
@@ -489,6 +616,10 @@ class DisplayMemberPushPreferencesV2(_message.Message):
         def vehicle(self) -> Global___DisplayMemberPushPreferencesV2.Video.Vehicle: ...
         @_builtins.property
         def scenario_executed(self) -> Global___DisplayMemberPushPreferencesV2.Video.ScenarioExecuted: ...
+        @_builtins.property
+        def line_crossing(self) -> Global___DisplayMemberPushPreferencesV2.Video.LineCrossing: ...
+        @_builtins.property
+        def perimeter_crossing(self) -> Global___DisplayMemberPushPreferencesV2.Video.PerimeterCrossing: ...
         def __init__(
             self,
             *,
@@ -497,11 +628,14 @@ class DisplayMemberPushPreferencesV2(_message.Message):
             pet: Global___DisplayMemberPushPreferencesV2.Video.Pet | None = ...,
             vehicle: Global___DisplayMemberPushPreferencesV2.Video.Vehicle | None = ...,
             scenario_executed: Global___DisplayMemberPushPreferencesV2.Video.ScenarioExecuted | None = ...,
+            line_crossing: Global___DisplayMemberPushPreferencesV2.Video.LineCrossing | None = ...,
+            perimeter_crossing: Global___DisplayMemberPushPreferencesV2.Video.PerimeterCrossing | None = ...,
         ) -> None: ...
-        _HasFieldArgType: _TypeAlias = _typing.Literal["human", b"human", "motion", b"motion", "pet", b"pet", "scenario_executed", b"scenario_executed", "vehicle", b"vehicle"]  # noqa: Y015
+        _HasFieldArgType: _TypeAlias = _typing.Literal["human", b"human", "line_crossing", b"line_crossing", "motion", b"motion", "perimeter_crossing", b"perimeter_crossing", "pet", b"pet", "scenario_executed", b"scenario_executed", "vehicle", b"vehicle"]  # noqa: Y015
         def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-        _ClearFieldArgType: _TypeAlias = _typing.Literal["human", b"human", "motion", b"motion", "pet", b"pet", "scenario_executed", b"scenario_executed", "vehicle", b"vehicle"]  # noqa: Y015
+        _ClearFieldArgType: _TypeAlias = _typing.Literal["human", b"human", "line_crossing", b"line_crossing", "motion", b"motion", "perimeter_crossing", b"perimeter_crossing", "pet", b"pet", "scenario_executed", b"scenario_executed", "vehicle", b"vehicle"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     ALARM_FIELD_NUMBER: _builtins.int
     MALFUNCTION_FIELD_NUMBER: _builtins.int
@@ -598,8 +732,11 @@ class DisplayMemberSmsPreferences(_message.Message):
         *,
         sms_preferences: _abc.Iterable[Global___DisplayMemberSmsPreference.ValueType] | None = ...,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
     _ClearFieldArgType: _TypeAlias = _typing.Literal["sms_preferences", b"sms_preferences"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DisplayMemberSmsPreferences: _TypeAlias = DisplayMemberSmsPreferences  # noqa: Y015
 
@@ -615,7 +752,30 @@ class DisplayMemberCallPreferences(_message.Message):
         *,
         call_preferences: _abc.Iterable[Global___DisplayMemberCallPreference.ValueType] | None = ...,
     ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
     _ClearFieldArgType: _TypeAlias = _typing.Literal["call_preferences", b"call_preferences"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DisplayMemberCallPreferences: _TypeAlias = DisplayMemberCallPreferences  # noqa: Y015
+
+@_typing.final
+class DisplayMemberFolderPreferences(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    FOLDER_PREFERENCES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def folder_preferences(self) -> _containers.RepeatedScalarFieldContainer[Global___DisplayMemberFolderPreference.ValueType]: ...
+    def __init__(
+        self,
+        *,
+        folder_preferences: _abc.Iterable[Global___DisplayMemberFolderPreference.ValueType] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["folder_preferences", b"folder_preferences"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___DisplayMemberFolderPreferences: _TypeAlias = DisplayMemberFolderPreferences  # noqa: Y015

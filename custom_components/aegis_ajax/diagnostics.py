@@ -351,6 +351,8 @@ async def async_get_config_entry_diagnostics(
         # else shows it. Kept from the bypass permission lookup, so it is empty
         # unless bypass switches are on `auto`, and the lookup entry says how it
         # ended when it is, or `not_run` for a space it never ran for.
+        # `visible_tabs` is the member's "View notifications" list: a tab left
+        # out sends no pushes for its events (None = Ajax did not send it).
         # Booleans and enum names only.
         "member_push_preferences": coordinator.spaces_api.member_push_preferences,
         "member_push_preferences_lookup": {

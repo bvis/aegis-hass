@@ -887,6 +887,7 @@ class TestGetMemberSpacePermissions:
                 "legacy": ["ALARM"],
                 "alarm_video": "NORMAL",
                 "video": {"motion": False, "human": True, "pet": False, "vehicle": False},
+                "visible_tabs": None,
             }
         }
 
@@ -917,21 +918,59 @@ class TestGetMemberSpacePermissions:
             return await api.get_member_space_permissions("space-1", "AAAA1111")
 
     @pytest.mark.asyncio
+    async def test_visible_tabs_are_reported(self) -> None:
+        """The tabs a member may see decide which pushes Ajax sends it."""
+        from systems.ajax.api.mobile.v2.common.space.member import (
+            display_member_notification_preferences_pb2 as prefs_pb2,
+        )
+
+        api = self._make_api()
+        full = self._full_response([])
+        prefs = full.success.snapshot.space_member.display_member_notification_preferences
+        prefs.folder_preferences.folder_preferences.extend(
+            [
+                prefs_pb2.DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_MALFUNCTION,
+                prefs_pb2.DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_ALARM,
+                99,
+            ]
+        )
+
+        await self._fetch(api, full)
+
+        assert api.member_push_preferences["space-1"]["visible_tabs"] == [
+            "99",
+            "ALARM",
+            "MALFUNCTION",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_no_visible_tabs_is_not_the_same_as_not_sent(self) -> None:
+        """ "None" chosen in the app arrives as an empty list; an old hub sends nothing."""
+        api = self._make_api()
+        full = self._full_response([])
+        prefs = full.success.snapshot.space_member.display_member_notification_preferences
+        prefs.folder_preferences.SetInParent()
+
+        await self._fetch(api, full)
+
+        assert api.member_push_preferences["space-1"]["visible_tabs"] == []
+
+    @pytest.mark.asyncio
     async def test_unknown_preference_value_is_kept_as_its_number(self) -> None:
-        """Ajax adds values our proto lacks (14 = line crossing, seen live on 1.23.0-beta.3)."""
+        """Ajax adds values before our proto has them."""
         from systems.ajax.api.mobile.v2.common.space.member import space_permission_pb2 as sp
 
         api = self._make_api()
         full = self._full_response([sp.SpacePermission.DEVICE_EDIT])
         prefs = full.success.snapshot.space_member.display_member_notification_preferences
-        prefs.member_push_preferences.push_preferences.extend([1, 14])
+        prefs.member_push_preferences.push_preferences.extend([1, 99])
         prefs.member_push_preferences_v2.alarm.video.state = 9
 
         perms = await self._fetch(api, full)
 
         assert perms == {"DEVICE_EDIT"}
         summary = api.member_push_preferences["space-1"]
-        assert summary["legacy"] == ["14", "ALARM"]
+        assert summary["legacy"] == ["99", "ALARM"]
         assert summary["alarm_video"] == "9"
 
     @pytest.mark.asyncio
@@ -983,7 +1022,7 @@ class TestGetMemberSpacePermissions:
             await api.get_member_space_permissions("space-1", "AAAA1111")
 
         assert api.member_push_preferences == {
-            "space-1": {"legacy": [], "alarm_video": None, "video": None}
+            "space-1": {"legacy": [], "alarm_video": None, "video": None, "visible_tabs": None}
         }
 
     @pytest.mark.asyncio
