@@ -226,6 +226,9 @@ class TestRoomsRefresh:
         # Should not raise — failure is downgraded to debug log
         await coordinator._async_update_data()
         assert coordinator.rooms == {}
+        # ... and the next try comes in ten minutes, not in an hour
+        now = asyncio.get_running_loop().time()
+        assert coordinator._rooms_last_fetch == pytest.approx(now - 3000.0, abs=5)
 
 
 _CENTRAL_ONE = MonitoringCompany(

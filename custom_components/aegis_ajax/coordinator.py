@@ -1617,11 +1617,13 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # every poll — the 300s poll and hourly gate remain the backstops.
         self._force_snapshot_refresh = False
         refreshed_rooms: dict[str, Room] = {}
+        failed = False
         for space_id in self.spaces:
             try:
                 snapshot = await self._spaces_api.get_space_snapshot(space_id)
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Failed to fetch rooms for space %s", space_id, exc_info=True)
+                failed = True
                 continue
             for room in snapshot.rooms:
                 refreshed_rooms[room.id] = room
@@ -1634,6 +1636,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     night_mode_enabled=snapshot.night_mode_enabled,
                     chime_status=snapshot.chime_status,
                 )
+        if failed:
+            # Keep the rooms we had and try again in ten minutes, not in an hour.
+            self._rooms_last_fetch = now - rooms_refresh_interval + 600.0
+            return
         self.rooms = refreshed_rooms
         self._rooms_last_fetch = now
 

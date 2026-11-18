@@ -247,8 +247,9 @@ class SpacesApi:
         try:
             async for msg in stream:
                 if msg.HasField("failure"):
-                    _LOGGER.debug("Failed to stream space %s for rooms snapshot", space_id)
-                    break
+                    # Raised, not returned empty: the caller keeps what it had
+                    # instead of taking "no groups" as the answer.
+                    raise RuntimeError(f"Space {space_id} snapshot read failed")
                 if not msg.HasField("success"):
                     continue
                 if msg.success.WhichOneof("success") != "snapshot":
