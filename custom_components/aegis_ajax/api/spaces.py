@@ -466,8 +466,8 @@ def _push_preferences_summary(prefs: Any) -> dict[str, Any]:  # noqa: ANN401
             kind: getattr(v2.video, kind).enabled for kind in ("motion", "human", "pet", "vehicle")
         }
     # The notification tabs the member may see ("View notifications" in the
-    # app). A tab that is not listed sends no pushes for its events, whatever
-    # the per-type switches say.
+    # app). With none listed Ajax sends the member no pushes at all, whatever
+    # the per-type switches say (measured 2026-11-18).
     tabs = None
     if prefs.HasField("folder_preferences"):
         tabs = sorted(

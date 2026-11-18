@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.32.2] - unreleased
 
 ### Added
-- **The diagnostics file lists the notification tabs the Home Assistant account may see.** In the Ajax app each user has a *View notifications* setting, and a tab left out of it sends that user no push notifications for its events, so an account with none receives no pushes at all while everything else looks connected. The list is in `member_push_preferences` as `visible_tabs`. **Requests to Ajax:** none.
+- **The diagnostics file lists the notification tabs the Home Assistant account may see.** In the Ajax app each user has a *View notifications* setting (Space settings > Users > the user > Notification settings). An account with no tab selected there receives no push notifications at all while everything else looks connected. The list is in `member_push_preferences` as `visible_tabs`. **Requests to Ajax:** none.
+
+### Fixed
+- The README no longer says the Home Assistant account needs the admin role to receive pushes. A plain user receives them; what it needs is its notification tabs enabled.
 
 ## [1.32.1] - 2026-11-18
 
