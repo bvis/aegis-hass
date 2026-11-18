@@ -1624,6 +1624,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Failed to fetch rooms for space %s", space_id, exc_info=True)
                 failed = True
+                # This space keeps the rooms it had; the others still update.
+                refreshed_rooms.update(
+                    {rid: r for rid, r in self.rooms.items() if r.space_id == space_id}
+                )
                 continue
             for room in snapshot.rooms:
                 refreshed_rooms[room.id] = room
@@ -1636,12 +1640,9 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     night_mode_enabled=snapshot.night_mode_enabled,
                     chime_status=snapshot.chime_status,
                 )
-        if failed:
-            # Keep the rooms we had and try again in ten minutes, not in an hour.
-            self._rooms_last_fetch = now - rooms_refresh_interval + 600.0
-            return
         self.rooms = refreshed_rooms
-        self._rooms_last_fetch = now
+        # After a failure, try again in ten minutes, not in an hour.
+        self._rooms_last_fetch = now - (rooms_refresh_interval - 600.0 if failed else 0.0)
 
     def _schedule_hub_device_temperature_refresh(self) -> None:
         """Start the dedicated per-device-temperature refresh timer (#220, #229).

@@ -231,6 +231,31 @@ class TestRoomsRefresh:
         assert coordinator._rooms_last_fetch == pytest.approx(now - 3000.0, abs=5)
 
 
+@pytest.mark.asyncio
+async def test_failed_snapshot_of_one_space_keeps_its_rooms_and_updates_the_other() -> None:
+    from custom_components.aegis_ajax.api.models import Room
+
+    coordinator = _make_coordinator(space_ids=["s1", "s2"])
+    coordinator.spaces = {"s1": _make_space("s1"), "s2": _make_space("s2")}
+    coordinator.rooms = {
+        "a-old": Room(id="a-old", name="Old", space_id="s1"),
+        "b1": Room(id="b1", name="Hall", space_id="s2"),
+    }
+
+    async def snapshot(space_id: str) -> SpaceSnapshot:
+        if space_id == "s2":
+            raise RuntimeError("oops")
+        return SpaceSnapshot(rooms=(Room(id="a-new", name="New", space_id="s1"),))
+
+    coordinator._spaces_api = MagicMock()
+    coordinator._spaces_api.get_space_snapshot = snapshot
+
+    await coordinator._maybe_refresh_rooms(10_000.0)
+
+    assert set(coordinator.rooms) == {"a-new", "b1"}
+    assert coordinator._rooms_last_fetch == 10_000.0 - 3000.0
+
+
 _CENTRAL_ONE = MonitoringCompany(
     name="Central One", status=MonitoringCompanyStatus.APPROVED, hex_id="0000016A"
 )
