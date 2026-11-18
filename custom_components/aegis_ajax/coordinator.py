@@ -1494,6 +1494,11 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # it flips the panel from armed_night to armed_custom_bypass
                 # on every plain poll while night mode is on (#284).
                 if previous.groups or previous.group_mode_enabled:
+                    # A change nothing announced (a security schedule, #678)
+                    # shows up here first: re-read the groups in this same
+                    # update instead of leaving them as they were for an hour.
+                    if previous.groups and s.security_state != previous.security_state:
+                        self._force_snapshot_refresh = True
                     s = dc_replace(
                         s,
                         groups=previous.groups,

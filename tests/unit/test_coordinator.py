@@ -655,6 +655,53 @@ class TestAsyncUpdateData:
         # Flag consumed so it doesn't snapshot on every subsequent poll.
         assert coordinator._force_snapshot_refresh is False
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("polled_state", "snapshot_reads"),
+        [(SecurityState.DISARMED, 1), (SecurityState.ARMED, 0)],
+    )
+    async def test_polled_state_change_rereads_groups(
+        self, polled_state: SecurityState, snapshot_reads: int
+    ) -> None:
+        """A change no event announced (a security schedule, #678) reaches the
+        plain poll only: the groups are re-read in that same update. A poll
+        that shows the same state stays light.
+        """
+        from custom_components.aegis_ajax.api.models import Group
+
+        def group(state: SecurityState) -> Group:
+            return Group(
+                id="g1", space_id="s1", name="Garage", security_state=state, sorting_key="01"
+            )
+
+        coordinator = _make_coordinator()
+        coordinator._client.session.is_authenticated = True
+        coordinator._streams_started = True
+        coordinator._rooms_last_fetch = asyncio.get_running_loop().time()
+        coordinator.spaces["s1"] = replace(
+            _make_space("s1"),
+            security_state=SecurityState.ARMED,
+            groups=(group(SecurityState.ARMED),),
+            group_mode_enabled=True,
+        )
+        coordinator._spaces_api = MagicMock()
+        coordinator._spaces_api.list_spaces = AsyncMock(
+            return_value=[replace(_make_space("s1"), security_state=polled_state)]
+        )
+        coordinator._spaces_api.get_space_snapshot = AsyncMock(
+            return_value=SpaceSnapshot(
+                groups=(group(SecurityState.DISARMED),), group_mode_enabled=True
+            )
+        )
+        coordinator._devices_api = MagicMock()
+        coordinator._devices_api.get_devices_snapshot = AsyncMock(return_value=[])
+
+        await coordinator._async_update_data()
+
+        assert coordinator._spaces_api.get_space_snapshot.await_count == snapshot_reads
+        assert coordinator.spaces["s1"].groups[0].security_state == polled_state
+        assert coordinator._force_snapshot_refresh is False
+
     def test_security_event_uses_dedicated_short_cooldown_debouncer(self) -> None:
         """A non-chime space event (#270) must re-read `security_state` through a
         dedicated short-cooldown debouncer, NOT the shared 10 s request-refresh
