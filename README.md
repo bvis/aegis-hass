@@ -116,12 +116,11 @@ Before 2026.11, Home Assistant had no Marketplace and community integrations wer
 > **Recommended: use a dedicated Ajax account, separate from the one on your phone.**
 > Instead of your primary admin login, create a separate Ajax account, invite it to
 > your space (Ajax app → space → Users → Invite) and grant it only what the
-> integration needs. A non-admin **User** role is enough to read device state and
-> arm / disarm — but to also receive **push events**, the role's notifications toggle
-> is **not** enough: Ajax filters event delivery server-side by permission level, and
-> a User role with notifications turned on still receives zero events (#234, #319);
-> in practice the account needs admin / full access (see the FCM troubleshooting
-> note below). You can also revoke its
+> integration needs. A non-admin **User** role is enough to read device state,
+> arm / disarm and receive **push events**. For the pushes, leave that user's
+> notification tabs enabled (Ajax app → Space settings → Users → the user →
+> Notification settings → View notifications): with none selected it receives no
+> pushes at all (see the FCM troubleshooting note below). You can also revoke its
 > **photo / video** access if you don't use
 > Photo on Demand or alarm photos, so Home Assistant never has access to camera images. This keeps
 > your main credentials out of HA and limits what a compromised HA host could reach
@@ -728,14 +727,16 @@ Once entered, the values are stored on the config entry and persist across resta
 >   push to two sessions at once, so an actively-used phone app can leave HA's push
 >   channel starved even though FCM reports connected. Give HA its own account (see
 >   [Configuration](#configuration)).
-> - **The HA account's role is below the level Ajax delivers events to.** Ajax gates
->   event delivery server-side by the account's permission level, not by the
->   notifications toggle — an invited **User** role with notifications turned **on**
->   still registers for push fine yet receives zero events (#234, #319). In practice,
->   switching the HA account to **admin / full access** is what unlocks delivery. The
->   exact minimum permission is unknown; if you find a narrower combination that still
->   receives events, please report it on the tracker so this can document a
->   least-privilege setup.
+> - **The HA account can't see the notification tabs.** Each user of a space has a
+>   *View notifications* setting (Ajax app → Space settings → Users → the user →
+>   Notification settings → View notifications). With no tab selected the account
+>   still registers for push and shows as connected, but Ajax sends it nothing; with
+>   all of them selected the pushes arrive. The admin role isn't needed for this: a
+>   plain **User** receives pushes. The diagnostics file shows the list as
+>   `visible_tabs` under `member_push_preferences`. It is read when Home Assistant
+>   starts, so restart after changing it in the app, and it is only there while the
+>   bypass switches option is on its default, automatic. If yours has the tabs and
+>   still gets nothing, open an issue and attach that file.
 >
 > Either way you'd still get changes on the next poll, just not instantly.
 

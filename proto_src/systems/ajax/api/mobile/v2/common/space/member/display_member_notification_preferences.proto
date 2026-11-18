@@ -10,6 +10,7 @@ message DisplayMemberNotificationPreferences {
   DisplayMemberSmsPreferences member_sms_preferences = 2;
   DisplayMemberCallPreferences member_call_preferences = 3;
   DisplayMemberPushPreferencesV2 member_push_preferences_v2 = 4;
+  optional DisplayMemberFolderPreferences folder_preferences = 5;
 }
 
 message DisplayMemberPushPreferences {
@@ -88,6 +89,8 @@ message DisplayMemberPushPreferencesV2 {
     Pet pet = 3;
     Vehicle vehicle = 4;
     ScenarioExecuted scenario_executed = 5;
+    LineCrossing line_crossing = 6;
+    PerimeterCrossing perimeter_crossing = 7;
 
     message Motion {
       bool enabled = 1;
@@ -102,6 +105,12 @@ message DisplayMemberPushPreferencesV2 {
       bool enabled = 1;
     }
     message ScenarioExecuted {
+      bool enabled = 1;
+    }
+    message LineCrossing {
+      bool enabled = 1;
+    }
+    message PerimeterCrossing {
       bool enabled = 1;
     }
   }
@@ -122,6 +131,10 @@ message DisplayMemberCallPreferences {
   repeated DisplayMemberCallPreference call_preferences = 1;
 }
 
+message DisplayMemberFolderPreferences {
+  repeated DisplayMemberFolderPreference folder_preferences = 1;
+}
+
 enum DisplayMemberPushPreference {
   DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_UNSPECIFIED = 0;
   DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_ALARM = 1;
@@ -137,6 +150,8 @@ enum DisplayMemberPushPreference {
   DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_VEHICLE = 11;
   DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_SCENARIO_EXECUTED = 12;
   DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_RING_BUTTON_PRESSED = 13;
+  DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_LINE_CROSSING = 14;
+  DISPLAY_SPACE_MEMBER_PUSH_PREFERENCE_VIDEO_PERIMETER_CROSSING = 15;
 }
 
 enum DisplayMemberSmsPreference {
@@ -152,4 +167,14 @@ enum DisplayMemberSmsPreference {
 enum DisplayMemberCallPreference {
   DISPLAY_SPACE_MEMBER_CALL_PREFERENCE_UNSPECIFIED = 0;
   DISPLAY_SPACE_MEMBER_CALL_PREFERENCE_ALARM = 1;
+}
+
+enum DisplayMemberFolderPreference {
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_UNSPECIFIED = 0;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_ALARM = 1;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_MALFUNCTION = 2;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_USER_AUTOMATION = 3;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_HOME_AUTOMATION = 4;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_SYSTEM = 5;
+  DISPLAY_SPACE_MEMBER_FOLDER_PREFERENCE_VIDEO = 6;
 }
