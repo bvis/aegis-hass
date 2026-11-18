@@ -514,6 +514,15 @@ INTRUSION_ALARM_RAW_TAGS: frozenset[str] = frozenset(
     {"intrusion_alarm", "intrusion_alarm_confirmed"}
 )
 
+# Detector tags that also mean an intrusion alarm, but only when Ajax files
+# the notification under its alarm category (#676): an armed door opening
+# arrives tagged `door_opened`, not `intrusion_alarm`. The same tag outside
+# that category (a chime, an activity notice) is not an alarm.
+ALARM_CATEGORY_INTRUSION_RAW_TAGS: frozenset[str] = frozenset(
+    {"door_opened", "motion_detected", "glass_break_detected"}
+)
+PUSH_CATEGORY_ALARM = "alarm"
+
 # HA event types that signal a security-state change. Used by the FCM event
 # path to nudge the snapshot-backed re-read (#284/#287): a push tells (at
 # most) one group's new state, while a scenario / keypad / fob action can

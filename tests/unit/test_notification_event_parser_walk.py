@@ -75,6 +75,7 @@ from custom_components.aegis_ajax.notification_event_parser import (
     _find_embedded_messages,
     _resolve_event_by_scanning,
     _resolve_event_from_dispatch,
+    extract_category,
 )
 
 # A 64-char hex notification id, the shape real pushes carry.
@@ -208,6 +209,30 @@ class TestRealPushPayloadsResolve:
         event_type, data = result
         assert event_type == "door_open"
         assert data["raw_tag"] == "door_opened"
+
+
+class TestPushCategory:
+    """#676: the category is what tells an alarm from a plain notice."""
+
+    @staticmethod
+    def _push(folder: int) -> bytes:
+        notification = notification_pb2.Notification(id=_NOTIFICATION_ID, folder=folder)
+        return event_pb2.PushNotificationDispatchEvent(
+            notification=notification
+        ).SerializeToString()
+
+    @pytest.mark.parametrize(
+        ("folder", "expected"),
+        [(1, "alarm"), (2, "malfunction"), (3, "user_automation"), (5, "system"), (0, None)],
+    )
+    def test_category_is_read_from_the_notification(self, folder: int, expected: str) -> None:
+        assert extract_category(self._push(folder)) == expected
+
+    def test_category_unknown_to_these_protos_is_none(self) -> None:
+        assert extract_category(self._push(99)) is None
+
+    def test_bytes_that_are_not_a_push_have_no_category(self) -> None:
+        assert extract_category(b"\xff\xff") is None
 
 
 class TestQualifierTypeIsTakenFromTheContent:

@@ -15,12 +15,14 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.aegis_ajax import notification_event_parser
 from custom_components.aegis_ajax.const import (
+    ALARM_CATEGORY_INTRUSION_RAW_TAGS,
     DOMAIN,
     DOORBELL_EVENT_TYPE,
     FCM_REJECTED_STORAGE_KEY,
     FCM_STORAGE_VERSION,
     INTRUSION_ALARM_RAW_TAGS,
     MOTION_EVENT_TYPE,
+    PUSH_CATEGORY_ALARM,
     RAW_TAG_TO_GROUP_SECURITY_STATE,
     RAW_TAG_TO_SECURITY_STATE,
     SECURITY_STATE_EVENT_TYPES,
@@ -1344,10 +1346,14 @@ class AjaxNotificationListener:
                             event_data.get("raw_tag"),
                             raw[:2048].hex(),
                         )
+                category = notification_event_parser.extract_category(raw)
+                if category:
+                    event_data["category"] = category
                 _LOGGER.debug(
-                    "Push event parsed: event_type=%s raw_tag=%s group_id=%s",
+                    "Push event parsed: event_type=%s raw_tag=%s category=%s group_id=%s",
                     event_type,
                     event_data.get("raw_tag"),
+                    category,
                     event_data.get("group_id"),
                 )
                 # Route to the space the push itself names (#358). This used to
@@ -1593,7 +1599,12 @@ class AjaxNotificationListener:
         # An intrusion alarm implies no arm-state transition — the space stays
         # armed while the siren fires — so it marks the space in-alarm (#426)
         # instead of writing a security_state.
-        if raw_tag in INTRUSION_ALARM_RAW_TAGS:
+        if raw_tag in INTRUSION_ALARM_RAW_TAGS or (
+            event_data.get("category") == PUSH_CATEGORY_ALARM
+            and raw_tag in ALARM_CATEGORY_INTRUSION_RAW_TAGS
+            # The detector going back to normal is filed with its alarm.
+            and event_data.get("transition") != "recovered"
+        ):
             self._hass.loop.call_soon_threadsafe(
                 self._coordinator.note_intrusion_alarm,
                 space_id,

@@ -205,6 +205,22 @@ def extract_space_id(raw: bytes) -> str | None:
     return notification.space.id or None
 
 
+def extract_category(raw: bytes) -> str | None:
+    """Return the category Ajax filed a push under, or None (#676).
+
+    One of `alarm`, `malfunction`, `user_automation`, `home_automation`,
+    `system`, `video`. It is what tells an armed door opening (an alarm)
+    from the same detector tag sent as a plain notice.
+    """
+    notification = _dispatch_notification(raw)
+    if notification is None or not notification.folder:
+        return None
+    value = notification.DESCRIPTOR.fields_by_name["folder"].enum_type.values_by_number.get(
+        notification.folder
+    )
+    return value.name.removeprefix("FOLDER_").lower() if value else None
+
+
 def _extract_event_with_compiled_protos(raw: bytes) -> tuple[str, dict[str, Any]] | None:
     """Resolve a push payload to an HA `(event_type, data)` pair.
 
