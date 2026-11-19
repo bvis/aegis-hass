@@ -72,21 +72,22 @@ class AegisActivityCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity) throw new Error("entity is required (the hub's Security event entity)");
     this._config = { days: 7, max: 30, ...config };
-    this._rows = undefined;
+    this._rows = [];
+    this._ready = false;
     this._loading = false;
     this._error = false;
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._rows === undefined) {
+    // New events come from the live state, also while the one history read is
+    // in flight: the recorder may not have written them yet.
+    const added = this._addLive();
+    if (!this._ready) {
       if (!this._loading) this._load();
       return;
     }
-    // After the one history read, new events come from the live state: the
-    // recorder may not have written them yet when the state changes.
-    const added = this._addLive();
-    if (added && this._error) this._load();
+    if (added && this._error && !this._loading) this._load();
     else if (added || this._dayKey.format(new Date()) !== this._day) this._render();
   }
 
@@ -107,6 +108,7 @@ class AegisActivityCard extends HTMLElement {
     this._loading = true;
     let rows = [];
     let error = false;
+    const seen = new Set();
     try {
       const res = await this._hass.callWS({
         type: "history/history_during_period",
@@ -120,7 +122,6 @@ class AegisActivityCard extends HTMLElement {
       });
       // Keyed on the state (the event's own time), not on when the row was
       // written: a restart writes the last event again under a new time.
-      const seen = new Set();
       rows = (res[entity] || [])
         .filter((r) => r.a && r.a.event_type && !Number.isNaN(Date.parse(r.s)) && !seen.has(r.s) && seen.add(r.s))
         .map((r) => ({ key: r.s, when: new Date(r.s), ...r.a }))
@@ -132,9 +133,9 @@ class AegisActivityCard extends HTMLElement {
     // The card was pointed at another entity while this was in flight.
     if (config !== this._config) return;
     this._loading = false;
-    this._rows = rows;
+    this._ready = true;
+    this._rows = [...this._rows.filter((r) => !seen.has(r.key)), ...rows];
     this._error = error;
-    this._addLive();
     this._render();
   }
 

@@ -28,6 +28,7 @@ const Card = window.customElements.card;
   const t1 = "2026-11-18T10:00:00.000+00:00";
   const t2 = "2026-11-19T09:00:00.000+00:00";
   const t3 = new Date().toISOString();
+  const during = "2026-11-19T09:30:00.000+00:00";
   let reads = 0;
   const hass = (state, eventType) => ({
     states: { [entity]: { state, attributes: { event_type: eventType, device_name: "<Ana>", device_type: "ACCESS_CARD" } } },
@@ -49,13 +50,18 @@ const Card = window.customElements.card;
   const card = new Card();
   card.setConfig({ entity });
   card.hass = hass(t2, "disarm");
+  card.hass = hass(during, "arm");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(card._rows.length, 2, "the restart duplicate and the unknown state are dropped");
+  assert.deepEqual(
+    card._rows.map((r) => r.key),
+    [during, t2, t1],
+    "restart duplicate and unknown state dropped, an event during the load kept",
+  );
 
   card.hass = hass(t3, "alarm");
   assert.equal(card._rows[0].event_type, "alarm", "a new event shows without waiting for the recorder");
   card.hass = hass(t3, "alarm");
-  assert.equal(card._rows.length, 3, "the same event is not added twice");
+  assert.equal(card._rows.length, 4, "the same event is not added twice");
   assert.equal(reads, 1, "history is read once");
 
   const html = card.shadowRoot.innerHTML;
