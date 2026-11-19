@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
+import subprocess
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,3 +44,10 @@ async def test_setup_registers_the_card_only_with_a_frontend(components: set[str
         assert await async_setup(hass, {}) is True
 
     assert register.await_count == len(components)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_card_logic_self_check() -> None:
+    script = Path(__file__).parents[1] / "js" / "activity_card_check.js"
+    result = subprocess.run(["node", str(script)], capture_output=True, text=True, check=False)  # noqa: S603, S607
+    assert result.returncode == 0, result.stderr

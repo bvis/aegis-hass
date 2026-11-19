@@ -1,6 +1,6 @@
 /* Aegis activity card.
  * Timeline of the hub's Security event entity, read from Home Assistant's own
- * recorder: it never asks Ajax for anything. */
+ * recorder, read once when the card opens: it never asks Ajax for anything. */
 
 const RED = "var(--error-color, #db4437)";
 const AMBER = "var(--warning-color, #ffa600)";
@@ -72,25 +72,41 @@ class AegisActivityCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity) throw new Error("entity is required (the hub's Security event entity)");
     this._config = { days: 7, max: 30, ...config };
-    this._loadedFor = undefined;
     this._rows = undefined;
+    this._loading = false;
+    this._error = false;
   }
 
   set hass(hass) {
     this._hass = hass;
-    const stateObj = hass.states[this._config.entity];
-    const stamp = stateObj ? stateObj.state : "missing";
-    // One history read per new event, none on a timer.
-    if (stamp !== this._loadedFor) {
-      this._loadedFor = stamp;
-      this._load();
+    if (this._rows === undefined) {
+      if (!this._loading) this._load();
+      return;
     }
+    // After the one history read, new events come from the live state: the
+    // recorder may not have written them yet when the state changes.
+    const added = this._addLive();
+    if (added && this._error) this._load();
+    else if (added || this._dayKey.format(new Date()) !== this._day) this._render();
+  }
+
+  // The entity's state is the time of its last event; attributes describe it.
+  _addLive() {
+    const stateObj = this._hass.states[this._config.entity];
+    if (!stateObj || !stateObj.attributes.event_type || Number.isNaN(Date.parse(stateObj.state))) return false;
+    if (this._rows.some((r) => r.key === stateObj.state)) return false;
+    this._rows.unshift({ key: stateObj.state, when: new Date(stateObj.state), ...stateObj.attributes });
+    return true;
   }
 
   async _load() {
-    const { entity, days } = this._config;
+    const config = this._config;
+    const { entity, days } = config;
     const end = new Date();
     const start = new Date(end - days * 86400000);
+    this._loading = true;
+    let rows = [];
+    let error = false;
     try {
       const res = await this._hass.callWS({
         type: "history/history_during_period",
@@ -102,15 +118,23 @@ class AegisActivityCard extends HTMLElement {
         minimal_response: false,
         no_attributes: false,
       });
-      this._rows = (res[entity] || [])
-        .filter((r) => r.a && r.a.event_type)
-        .map((r) => ({ when: new Date((r.lc ?? r.lu) * 1000), ...r.a }))
+      // Keyed on the state (the event's own time), not on when the row was
+      // written: a restart writes the last event again under a new time.
+      const seen = new Set();
+      rows = (res[entity] || [])
+        .filter((r) => r.a && r.a.event_type && !Number.isNaN(Date.parse(r.s)) && !seen.has(r.s) && seen.add(r.s))
+        .map((r) => ({ key: r.s, when: new Date(r.s), ...r.a }))
         .reverse();
-      this._error = false;
     } catch (err) {
       console.error("aegis-activity-card", err);
-      this._error = true;
+      error = true;
     }
+    // The card was pointed at another entity while this was in flight.
+    if (config !== this._config) return;
+    this._loading = false;
+    this._rows = rows;
+    this._error = error;
+    this._addLive();
     this._render();
   }
 
@@ -134,16 +158,22 @@ class AegisActivityCard extends HTMLElement {
     const cfg = this._config;
     const stateObj = hass.states[cfg.entity];
     const lang = hass.locale?.language || hass.language;
-    const dayFmt = new Intl.DateTimeFormat(lang, { weekday: "long", day: "numeric", month: "long" });
+    // Home Assistant lets the user choose between the browser's and the server's time zone.
+    const timeZone = hass.locale?.time_zone === "server" ? hass.config?.time_zone : undefined;
+    const dayFmt = new Intl.DateTimeFormat(lang, { weekday: "long", day: "numeric", month: "long", timeZone });
     const timeFmt = new Intl.DateTimeFormat(lang, {
       hour: "2-digit",
       minute: "2-digit",
       hour12: hass.locale?.time_format === "12" ? true : hass.locale?.time_format === "24" ? false : undefined,
+      timeZone,
     });
     const rel = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
-    const midnight = new Date().setHours(0, 0, 0, 0);
+    // en-CA prints YYYY-MM-DD, which parses as that calendar day at UTC midnight.
+    this._dayKey = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone });
+    this._day = this._dayKey.format(new Date());
+    const dayNumber = (d) => Date.parse(this._dayKey.format(d)) / 86400000;
     const dayLabel = (d) => {
-      const diff = Math.round((new Date(d).setHours(0, 0, 0, 0) - midnight) / 86400000);
+      const diff = dayNumber(d) - dayNumber(new Date());
       const label = diff >= -1 ? rel.format(diff, "day") : dayFmt.format(d);
       return label.charAt(0).toUpperCase() + label.slice(1);
     };

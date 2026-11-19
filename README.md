@@ -546,7 +546,7 @@ max: 30     # how many events to show (default 30)
 Things to know:
 
 - It shows what Home Assistant recorded for the [Security event entity](#security-event-entity), so it needs [push notifications](#push-notifications-fcm) and goes back only as far as your recorder keeps history (10 days by default). Events that happened while Home Assistant was off are not there.
-- **Requests to Ajax**: none. The card reads Home Assistant's own history, once when it opens and once per new event.
+- **Requests to Ajax**: none. The card reads Home Assistant's own history once when it opens, and new events come from the entity itself.
 - If the card does not show up in the picker right after updating, reload the browser page.
 
 ## Example Dashboard
