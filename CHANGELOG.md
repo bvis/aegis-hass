@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.32.2] - unreleased
+## [1.32.2] - 2026-11-19
 
 ### Added
 - **The diagnostics file lists the notification tabs the Home Assistant account may see.** In the Ajax app each user has a *View notifications* setting (Space settings > Users > the user > Notification settings). An account with no tab selected there receives no push notifications at all while everything else looks connected. The list is in `member_push_preferences` as `visible_tabs`. **Requests to Ajax:** none.
