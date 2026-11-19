@@ -1,7 +1,7 @@
 {
     "domain": "aegis_ajax",
     "name": "Aegis for Ajax",
-    "after_dependencies": ["web_rtc"],
+    "after_dependencies": ["frontend", "http", "web_rtc"],
     "codeowners": ["@bvis"],
     "config_flow": true,
     "dependencies": ["media_source"],
@@ -14,5 +14,5 @@
     "issue_tracker": "https://github.com/bvis/aegis-hass/issues",
     "loggers": ["firebase_messaging"],
     "requirements": ["grpcio>=1.75.1", "protobuf>=6.31.1", "firebase-messaging>=0.4.5"],
-    "version": "1.32.2"
+    "version": "1.33.0-beta.1"
 }

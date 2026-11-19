@@ -15,6 +15,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.service import async_register_admin_service
 
+from custom_components.aegis_ajax.card import async_register_card
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -653,6 +655,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the integration: services live here, not per entry (#603)."""
     _async_register_services(hass)
+    # Not a hard dependency: an install without the frontend has no dashboards
+    # to show the card in, and should not be made to load one.
+    if "frontend" in hass.config.components:
+        await async_register_card(hass)
     return True
 
 
