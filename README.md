@@ -731,7 +731,9 @@ Once entered, the values are stored on the config entry and persist across resta
 >   *View notifications* setting (Ajax app → Space settings → Users → the user →
 >   Notification settings → View notifications). With no tab selected the account
 >   still registers for push and shows as connected, but Ajax sends it nothing; with
->   all of them selected the pushes arrive. The admin role isn't needed for this: a
+>   all of them selected the pushes arrive. Leaving out one tab stops that tab's
+>   pushes: without the arming modes tab (`USER_AUTOMATION` in the diagnostics file)
+>   no arm or disarm push arrives. The admin role isn't needed for this: a
 >   plain **User** receives pushes. The diagnostics file shows the list as
 >   `visible_tabs` under `member_push_preferences`. It is read when Home Assistant
 >   starts, so restart after changing it in the app, and it is only there while the
