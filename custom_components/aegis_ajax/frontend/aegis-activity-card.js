@@ -7,6 +7,8 @@ const AMBER = "var(--warning-color, #ffa600)";
 const GREEN = "var(--success-color, #43a047)";
 const BLUE = "var(--info-color, #039be5)";
 const GREY = "var(--secondary-text-color)";
+// Wait between tries of a history read that failed.
+const RETRY_MS = 30000;
 
 // event_type -> [icon, colour]
 const STYLE = {
@@ -87,7 +89,10 @@ class AegisActivityCard extends HTMLElement {
       if (!this._loading) this._load();
       return;
     }
-    if (added && this._error && !this._loading) this._load();
+    // A failed read is tried again on the next event, or after RETRY_MS on
+    // any state update (the frontend sets hass on every one of them).
+    const retry = this._error && !this._loading && (added || Date.now() - this._failedAt >= RETRY_MS);
+    if (retry) this._load();
     else if (added || this._dayKey.format(new Date()) !== this._day) this._render();
   }
 
@@ -129,6 +134,7 @@ class AegisActivityCard extends HTMLElement {
     } catch (err) {
       console.error("aegis-activity-card", err);
       error = true;
+      this._failedAt = Date.now();
     }
     // The card was pointed at another entity while this was in flight.
     if (config !== this._config) return;
