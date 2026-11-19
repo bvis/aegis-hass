@@ -68,4 +68,32 @@ const Card = window.customElements.card;
   assert(html.includes("&lt;Ana&gt; (tarjeta o tag)"), "names are escaped and the method is translated");
   assert(!html.includes("<Ana>"));
   assert(html.includes("Hoy"));
+
+  // A failed history read: tried again after the wait, not on every state update.
+  let fail = true;
+  let tries = 0;
+  const flaky = () => ({
+    ...hass(t2, "disarm"),
+    callWS: async () => {
+      tries++;
+      if (fail) throw new Error("connection lost");
+      return { [entity]: [{ s: t1, a: { event_type: "arm" }, lc: 1 }] };
+    },
+  });
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const broken = new Card();
+  broken.setConfig({ entity });
+  broken.hass = flaky();
+  await settle();
+  assert(broken.shadowRoot.innerHTML.includes("No se pudo cargar el historial"));
+  broken.hass = flaky();
+  await settle();
+  assert.equal(tries, 1, "no retry on the next state update");
+  fail = false;
+  broken._failedAt -= 30000;
+  broken.hass = flaky();
+  await settle();
+  assert.equal(tries, 2, "retried once the wait is over");
+  assert(!broken.shadowRoot.innerHTML.includes("No se pudo cargar el historial"));
+  assert.deepEqual(broken._rows.map((r) => r.key), [t2, t1]);
 })();
