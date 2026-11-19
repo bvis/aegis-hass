@@ -527,6 +527,7 @@ class TestServiceRegistration:
         from custom_components.aegis_ajax import _CUSTOM_SERVICE_NAMES, async_setup
 
         hass = MagicMock()
+        hass.config.components = set()
         hass.services.async_register = MagicMock()
 
         assert await async_setup(hass, {}) is True

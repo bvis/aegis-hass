@@ -55,6 +55,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Lock LightSwitch buttons**: each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app, so the touch panel can be locked from a dashboard or an automation (for example, against children) while the light stays controllable remotely ([#641](https://github.com/bvis/aegis-hass/issues/641))
 - **Device removal follows the panel**: deleting a device in the Ajax app removes it from Home Assistant within seconds — entities, device card and cache. Deletions that happen while Home Assistant is offline are picked up on the next reconnect: the device stops claiming state and its leftover card can be removed from its device page (**Delete device** — offered for any device the hub no longer reports; live devices are refused and a mistaken deletion re-creates itself from the next snapshot) ([#422](https://github.com/bvis/aegis-hass/issues/422))
 - **Logbook**: Human-readable security event descriptions with icons
+- **Activity card**: a dashboard card with the timeline of security events, including who armed or disarmed and how. See [Activity card](#activity-card)
 - **Real-time updates**: Persistent gRPC stream for instant sensor state changes (< 1 second latency)
 - **Push notifications**: FCM integration for immediate event delivery
 - **2FA support** (TOTP)
@@ -525,6 +526,29 @@ automation:
 - **Permissions**: the Ajax account needs the device-edit permission (the same one the bypass switch uses). Without it, Ajax refuses the change and Home Assistant shows an error.
 - **Requests to Ajax**: reading the setting costs nothing, it arrives with the device data the integration already receives. Each change is one request, the same one the app sends.
 
+## Activity card
+
+A dashboard card that lists the hub's security events as a timeline: grouped by day, with an icon and colour per kind of event, and for an arm or disarm who did it and how.
+
+![Activity card](docs/images/activity-card.png)
+
+It comes with the integration. In a dashboard, **Add card**, search for **Aegis activity** and pick the hub's Security event entity. In YAML:
+
+```yaml
+type: custom:aegis-activity-card
+entity: event.my_hub_security_event
+days: 7     # how far back to look (default 7)
+max: 30     # how many events to show (default 30)
+# title: Activity
+# event_types: [alarm, arm, arm_night, disarm, disarm_night, tamper]   # show only these
+```
+
+Things to know:
+
+- It shows what Home Assistant recorded for the [Security event entity](#security-event-entity), so it needs [push notifications](#push-notifications-fcm) and goes back only as far as your recorder keeps history (10 days by default). Events that happened while Home Assistant was off are not there.
+- **Requests to Ajax**: none. The card reads Home Assistant's own history once when it opens, and new events come from the entity itself.
+- If the card does not show up in the picker right after updating, reload the browser page.
+
 ## Example Dashboard
 
 An example Lovelace dashboard is included in [`docs/dashboard.yaml`](docs/dashboard.yaml) with sections for:
@@ -535,7 +559,7 @@ An example Lovelace dashboard is included in [`docs/dashboard.yaml`](docs/dashbo
 - Cameras & motion detectors with photo capture buttons
 - Temperature overview with 24h history
 - Tamper, connectivity, and problem diagnostics
-- Alarm, door, window, motion, and hub connectivity history
+- Security events in the [activity card](#activity-card), plus alarm, door, window, motion, and hub connectivity history
 
 To use it, copy the YAML into a new dashboard view in **Settings → Dashboards → Edit → Add View → YAML mode**, and replace the example entity IDs with your own.
 

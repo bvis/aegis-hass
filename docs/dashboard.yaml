@@ -385,6 +385,11 @@ sections:
   # ═══════════════════════════════════════════════════════════════════════════
   - title: History
     cards:
+      # ─── Security events: who armed/disarmed, alarms, tamper… ───
+      - type: custom:aegis-activity-card
+        entity: event.my_hub_security_event
+        title: Activity
+
       # ─── Alarm State History ───
       - type: history-graph
         title: Alarm State (48h)
