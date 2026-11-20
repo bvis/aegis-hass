@@ -5,13 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.0] - unreleased
+## [1.33.0] - 2026-11-20
 
 ### Added
 - **Activity card.** A dashboard card that lists the hub's security events as a timeline: grouped by day, an icon and colour per kind of event, and for an arm or disarm who did it and how ("Ana (app)", "Ana (card or tag)", "Keypad (keypad)"). Add it from **Add card > Aegis activity** and pick the hub's Security event entity; nothing else to install. It shows what Home Assistant has recorded for that entity, so it goes back as far as your recorder keeps history and needs push notifications, like the entity itself. Times follow the time zone chosen in your Home Assistant profile. **Requests to Ajax: none**, the card only reads Home Assistant's own history.
 
 ### Fixed
 - Arming or disarming with an Ajax account that isn't allowed to do it now says "Your Ajax account does not have permission to perform this action" instead of "The hub returned: permission_denied".
+
+### Documentation
+- The README says how to make the alarm panel view-only: remove the arm and disarm permission from the Ajax user Home Assistant logs in with.
 
 ## [1.32.2] - 2026-11-19
 
