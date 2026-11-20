@@ -101,6 +101,7 @@ def _route(
     space: str | None,
     notification_id: str | None = None,
     photo_context: tuple[str, str, float] | None = None,
+    named: str | None = None,
 ) -> tuple[dict[str, Any], MagicMock, MagicMock, MagicMock]:
     data: dict[str, Any] = {"raw_tag": "not-a-group-tag"}
     with (
@@ -114,7 +115,7 @@ def _route(
             "extract_alarm_photo_context",
             return_value=photo_context,
         ) as photo,
-        patch.object(module.notification_event_parser, "extract_space_id", return_value=None),
+        patch.object(module.notification_event_parser, "extract_space_id", return_value=named),
     ):
         listener._parse_and_fire_event(_ENCODED, notification_id=notification_id)
     find.assert_called_once_with(_RAW)
@@ -141,6 +142,16 @@ def test_an_event_naming_no_space_goes_to_the_only_space() -> None:
     ]
     apply_state.assert_called_once_with("space-1", data)
     to_device.assert_called_once_with("tamper", data, _RAW, "space-1")
+
+
+@pytest.mark.parametrize("configured", [("space-1",), ("space-1", "space-2")])
+def test_an_event_of_a_space_that_is_not_set_up_is_ignored(configured: tuple[str, ...]) -> None:
+    # Also with a single space set up, where it used to land on that space (#687).
+    listener = _listener(*configured)
+    _, apply_state, to_device, _ = _route(listener, "arm", space=None, named="someone-elses")
+    assert _dispatched(listener) == []
+    apply_state.assert_not_called()
+    to_device.assert_not_called()
 
 
 def test_an_event_naming_no_space_is_not_guessed_among_several() -> None:

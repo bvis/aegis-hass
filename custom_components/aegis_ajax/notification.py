@@ -1362,6 +1362,21 @@ class AjaxNotificationListener:
                 # every event took the fallback below and was delivered to every
                 # space. Don't reintroduce a byte scan here.
                 target_space = self._find_space_for_event(raw)
+                if not target_space and (
+                    named_space := notification_event_parser.extract_space_id(raw)
+                ):
+                    # The push names a space this entry doesn't manage. The FCM
+                    # stream is per account, so a user who added 2 of their 5
+                    # systems keeps receiving the other 3: expected, not a
+                    # defect, and deliberately not a warning. Checked before the
+                    # single-space fallback, which used to claim these (#687).
+                    _LOGGER.debug(
+                        "Push event %s belongs to space %s, which is not configured "
+                        "in this entry; not delivered",
+                        event_type,
+                        named_space,
+                    )
+                    return
                 # The space this push was actually delivered to, or None when it
                 # could not be routed. Device attribution below is scoped to it
                 # so a ring can never surface on another space's doorbell (#494).
@@ -1400,17 +1415,6 @@ class AjaxNotificationListener:
                             *photo_context,
                         )
                     self._apply_security_state_from_event(only_space, event_data)
-                elif named_space := notification_event_parser.extract_space_id(raw):
-                    # The push names a space this entry doesn't manage. The FCM
-                    # stream is per account, so a user who added 2 of their 5
-                    # systems keeps receiving the other 3 — expected, not a
-                    # defect, and deliberately not a warning.
-                    _LOGGER.debug(
-                        "Push event %s belongs to space %s, which is not configured "
-                        "in this entry; not delivered",
-                        event_type,
-                        named_space,
-                    )
                 else:
                     # Several spaces and the payload named none of them:
                     # dropping the event beats the pre-#358 fan-out. Fanning out
