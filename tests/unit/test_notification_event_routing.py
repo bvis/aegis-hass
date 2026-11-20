@@ -258,3 +258,46 @@ def test_motion_marks_the_device_it_names_and_is_never_guessed() -> None:
 def test_other_events_are_not_mirrored_onto_a_device() -> None:
     listener, _, _ = _to_device("tamper", "D1")
     assert _dispatched(listener) == []
+
+
+def _named(space_id: str) -> str:
+    dispatch = event_pb2.PushNotificationDispatchEvent()
+    dispatch.notification.space.id = space_id
+    dispatch.notification.server_timestamp.seconds = int(_NOW)
+    return base64.b64encode(dispatch.SerializeToString()).decode()
+
+
+@pytest.mark.parametrize(
+    ("configured", "named", "ignored"),
+    [
+        # Also with a single space set up, where it used to land on that space (#687).
+        (("space-1",), "someone-elses", True),
+        (("space-1", "space-2"), "someone-elses", True),
+        (("space-1",), "space-1", False),
+        (("space-1", "space-2"), "space-2", False),
+    ],
+)
+def test_a_push_of_a_space_that_is_not_set_up_is_ignored_whole(
+    configured: tuple[str, ...], named: str, ignored: bool
+) -> None:
+    listener = _listener(*configured)
+    pending = MagicMock(done=MagicMock(return_value=False))
+    listener._photo_callbacks["D1"] = pending
+    with (
+        patch.object(module.time, "time", return_value=_NOW),
+        patch.object(listener, "_parse_and_fire_event") as parse,
+        patch.object(listener, "_resolve_future_on_loop") as resolve,
+    ):
+        listener._on_notification({"ENCODED_DATA": _named(named)}, "pid")
+    assert parse.called is not ignored
+    resolve.assert_not_called()
+    refreshed = listener._hass.loop.call_soon_threadsafe.called
+    assert refreshed is not ignored
+    # Either way it shows that pushes arrive.
+    assert listener._pushes_received == 1
+
+
+def test_a_push_that_names_no_space_is_not_taken_for_another_spaces() -> None:
+    listener = _listener("space-1")
+    assert listener._foreign_space(_push(age=0)) is None
+    assert listener._foreign_space("not-valid-base64!!!") is None

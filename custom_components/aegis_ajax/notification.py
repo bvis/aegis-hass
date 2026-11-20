@@ -992,6 +992,20 @@ class AjaxNotificationListener:
         if encoded_data and self._is_stale_push(encoded_data):
             return
 
+        # The FCM stream is per account, so it also carries the spaces this
+        # entry did not add. Those are dropped whole, before any side effect: no
+        # event, no photo future resolved, no refresh (#687). Still counted,
+        # because it shows push delivery is alive.
+        if encoded_data and (foreign := self._foreign_space(encoded_data)):
+            _LOGGER.debug(
+                "Push belongs to space %s, which is not configured in this entry; ignored",
+                foreign,
+            )
+            self._pushes_received += 1
+            self._last_push_at = time.monotonic()
+            self._note_push_delivered()
+            return
+
         if encoded_data:
             try:
                 raw = base64.b64decode(encoded_data)
@@ -1254,6 +1268,22 @@ class AjaxNotificationListener:
             )
             return True
         return False
+
+    def _foreign_space(self, encoded_data: str) -> str | None:
+        """The space a push names when it is not one of this entry's, else None.
+
+        Compared with the ids the user picked, not `coordinator.spaces`: that
+        map is rebuilt on every refresh and can briefly miss a space. A push
+        that names no space, or cannot be decoded, is not foreign.
+        """
+        configured = self._coordinator._space_ids
+        if not configured:
+            return None
+        try:
+            named = notification_event_parser.extract_space_id(base64.b64decode(encoded_data))
+        except Exception:  # noqa: BLE001
+            return None
+        return named if named and named not in configured else None
 
     def _is_duplicate_notification(self, notif_id: str) -> bool:
         """Return True if *notif_id* was seen within the dedupe window.
