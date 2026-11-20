@@ -18,6 +18,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.aegis_ajax.const import (
+    COMMAND_ERROR_TRANSLATION_KEYS,
     CONF_ARM_REQUIRES_PIN,
     CONF_EXPOSE_ARM_HOME,
     CONF_FORCE_ARM,
@@ -320,6 +321,10 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
         """Build a translated error, listing the blocking devices on malfunctions."""
         error_type = str(err)
         if error_type not in _SECURITY_ERROR_TYPES:
+            # Failures shared with device commands (no permission, hub offline)
+            # reuse their plain messages instead of echoing the raw reason
+            if key := COMMAND_ERROR_TRANSLATION_KEYS.get(error_type):
+                return HomeAssistantError(translation_domain=DOMAIN, translation_key=key)
             return HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="command_failed",

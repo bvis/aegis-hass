@@ -976,6 +976,14 @@ class TestTranslatedErrors:
         assert err.translation_key == "security_hub_detected_malfunctions"
         assert err.translation_placeholders == {"details": " — Door: open"}
 
+    def test_no_permission_gets_the_plain_message(self) -> None:
+        panel = AjaxAlarmControlPanel(coordinator=MagicMock(), space_id="s1")
+
+        err = panel._arm_error(Exception("permission_denied"))
+
+        assert err.translation_key == "command_permission_denied"
+        assert err.translation_placeholders is None
+
     def test_unknown_failure_falls_back_to_command_failed(self) -> None:
         panel = AjaxAlarmControlPanel(coordinator=MagicMock(), space_id="s1")
 

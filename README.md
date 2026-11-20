@@ -123,7 +123,9 @@ Before 2026.11, Home Assistant had no Marketplace and community integrations wer
 > Notification settings → View notifications): with none selected it receives no
 > pushes at all (see the FCM troubleshooting note below). You can also revoke its
 > **photo / video** access if you don't use
-> Photo on Demand or alarm photos, so Home Assistant never has access to camera images. This keeps
+> Photo on Demand or alarm photos, so Home Assistant never has access to camera images. To make
+> Home Assistant view-only, also remove that user's permission to arm and disarm: the panel keeps
+> showing the alarm state, and an arm or disarm from Home Assistant is refused by Ajax. This keeps
 > your main credentials out of HA and limits what a compromised HA host could reach
 > in your Ajax installation.
 >
