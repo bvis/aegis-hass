@@ -992,6 +992,20 @@ class AjaxNotificationListener:
         if encoded_data and self._is_stale_push(encoded_data):
             return
 
+        # The FCM stream is per account, so it also carries the spaces this
+        # entry did not add. Those are dropped whole, before any side effect: no
+        # event, no photo future resolved, no refresh (#687). Still counted,
+        # because it shows push delivery is alive.
+        if encoded_data and (foreign := self._foreign_space(encoded_data)):
+            _LOGGER.debug(
+                "Push belongs to space %s, which is not configured in this entry; ignored",
+                foreign,
+            )
+            self._pushes_received += 1
+            self._last_push_at = time.monotonic()
+            self._note_push_delivered()
+            return
+
         if encoded_data:
             try:
                 raw = base64.b64decode(encoded_data)
@@ -1072,9 +1086,8 @@ class AjaxNotificationListener:
         self._note_push_delivered()
 
         # Parse event from ENCODED_DATA using compiled protos
-        if encoded_data and not self._parse_and_fire_event(encoded_data, notification_id=notif_id):
-            # Another space's event: nothing here changed, so no refresh either.
-            return
+        if encoded_data:
+            self._parse_and_fire_event(encoded_data, notification_id=notif_id)
 
         # Always trigger refresh
         if self._hass.loop and self._hass.loop.is_running():
@@ -1256,6 +1269,22 @@ class AjaxNotificationListener:
             return True
         return False
 
+    def _foreign_space(self, encoded_data: str) -> str | None:
+        """The space a push names when it is not one of this entry's, else None.
+
+        Compared with the ids the user picked, not `coordinator.spaces`: that
+        map is rebuilt on every refresh and can briefly miss a space. A push
+        that names no space, or cannot be decoded, is not foreign.
+        """
+        configured = self._coordinator._space_ids
+        if not configured:
+            return None
+        try:
+            named = notification_event_parser.extract_space_id(base64.b64decode(encoded_data))
+        except Exception:  # noqa: BLE001
+            return None
+        return named if named and named not in configured else None
+
     def _is_duplicate_notification(self, notif_id: str) -> bool:
         """Return True if *notif_id* was seen within the dedupe window.
 
@@ -1306,11 +1335,8 @@ class AjaxNotificationListener:
 
     def _parse_and_fire_event(
         self, encoded_data: str, *, notification_id: str | None = None
-    ) -> bool:
-        """Parse event from base64-encoded push notification data.
-
-        False only when the event belongs to a space that is not set up here.
-        """
+    ) -> None:
+        """Parse event from base64-encoded push notification data."""
         try:
             raw = base64.b64decode(encoded_data)
             event_info = self._extract_event_from_proto(raw)
@@ -1366,26 +1392,6 @@ class AjaxNotificationListener:
                 # every event took the fallback below and was delivered to every
                 # space. Don't reintroduce a byte scan here.
                 target_space = self._find_space_for_event(raw)
-                named_space = notification_event_parser.extract_space_id(raw)
-                # Against the ids the user picked, not `spaces`: that map is
-                # rebuilt on every refresh and can briefly miss a space.
-                if (
-                    not target_space
-                    and named_space
-                    and named_space not in self._coordinator._space_ids
-                ):
-                    # The push names a space this entry doesn't manage. The FCM
-                    # stream is per account, so a user who added 2 of their 5
-                    # systems keeps receiving the other 3: expected, not a
-                    # defect, and deliberately not a warning. Checked before the
-                    # single-space fallback, which used to claim these (#687).
-                    _LOGGER.debug(
-                        "Push event %s belongs to space %s, which is not configured "
-                        "in this entry; not delivered",
-                        event_type,
-                        named_space,
-                    )
-                    return False
                 # The space this push was actually delivered to, or None when it
                 # could not be routed. Device attribution below is scoped to it
                 # so a ring can never surface on another space's doorbell (#494).
@@ -1424,6 +1430,17 @@ class AjaxNotificationListener:
                             *photo_context,
                         )
                     self._apply_security_state_from_event(only_space, event_data)
+                elif named_space := notification_event_parser.extract_space_id(raw):
+                    # The push names a space this entry doesn't manage. The FCM
+                    # stream is per account, so a user who added 2 of their 5
+                    # systems keeps receiving the other 3 — expected, not a
+                    # defect, and deliberately not a warning.
+                    _LOGGER.debug(
+                        "Push event %s belongs to space %s, which is not configured "
+                        "in this entry; not delivered",
+                        event_type,
+                        named_space,
+                    )
                 else:
                     # Several spaces and the payload named none of them:
                     # dropping the event beats the pre-#358 fan-out. Fanning out
@@ -1454,7 +1471,6 @@ class AjaxNotificationListener:
                 self._dispatch_event_to_device(event_type, event_data, raw, delivered_space)
         except Exception:
             _LOGGER.debug("Failed to parse event from push notification", exc_info=True)
-        return True
 
     def _doorbell_fallback_candidates(
         self, devices: dict[str, Any], space_id: str | None

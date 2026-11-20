@@ -101,7 +101,6 @@ def _route(
     space: str | None,
     notification_id: str | None = None,
     photo_context: tuple[str, str, float] | None = None,
-    named: str | None = None,
 ) -> tuple[dict[str, Any], MagicMock, MagicMock, MagicMock]:
     data: dict[str, Any] = {"raw_tag": "not-a-group-tag"}
     with (
@@ -115,12 +114,10 @@ def _route(
             "extract_alarm_photo_context",
             return_value=photo_context,
         ) as photo,
-        patch.object(module.notification_event_parser, "extract_space_id", return_value=named),
+        patch.object(module.notification_event_parser, "extract_space_id", return_value=None),
     ):
-        accepted = listener._parse_and_fire_event(_ENCODED, notification_id=notification_id)
+        listener._parse_and_fire_event(_ENCODED, notification_id=notification_id)
     find.assert_called_once_with(_RAW)
-    # Only another space's event is turned away; that is what skips the refresh.
-    assert accepted is (named is None or named in listener._coordinator._space_ids)
     return data, apply_state, to_device, photo
 
 
@@ -144,25 +141,6 @@ def test_an_event_naming_no_space_goes_to_the_only_space() -> None:
     ]
     apply_state.assert_called_once_with("space-1", data)
     to_device.assert_called_once_with("tamper", data, _RAW, "space-1")
-
-
-@pytest.mark.parametrize("configured", [("space-1",), ("space-1", "space-2")])
-def test_an_event_of_a_space_that_is_not_set_up_is_ignored(configured: tuple[str, ...]) -> None:
-    # Also with a single space set up, where it used to land on that space (#687).
-    listener = _listener(*configured)
-    _, apply_state, to_device, _ = _route(listener, "arm", space=None, named="someone-elses")
-    assert _dispatched(listener) == []
-    apply_state.assert_not_called()
-    to_device.assert_not_called()
-
-
-def test_an_event_naming_the_only_space_is_kept_while_its_details_are_missing() -> None:
-    # `_find_space_for_event` misses when a refresh left the space out for a moment.
-    listener = _listener("space-1")
-    data, apply_state, _, _ = _route(listener, "arm", space=None, named="space-1")
-    fire = listener._coordinator.fire_push_event
-    assert _dispatched(listener)[0] == (fire, "space-1", "arm", data)
-    apply_state.assert_called_once_with("space-1", data)
 
 
 def test_an_event_naming_no_space_is_not_guessed_among_several() -> None:
@@ -280,3 +258,46 @@ def test_motion_marks_the_device_it_names_and_is_never_guessed() -> None:
 def test_other_events_are_not_mirrored_onto_a_device() -> None:
     listener, _, _ = _to_device("tamper", "D1")
     assert _dispatched(listener) == []
+
+
+def _named(space_id: str) -> str:
+    dispatch = event_pb2.PushNotificationDispatchEvent()
+    dispatch.notification.space.id = space_id
+    dispatch.notification.server_timestamp.seconds = int(_NOW)
+    return base64.b64encode(dispatch.SerializeToString()).decode()
+
+
+@pytest.mark.parametrize(
+    ("configured", "named", "ignored"),
+    [
+        # Also with a single space set up, where it used to land on that space (#687).
+        (("space-1",), "someone-elses", True),
+        (("space-1", "space-2"), "someone-elses", True),
+        (("space-1",), "space-1", False),
+        (("space-1", "space-2"), "space-2", False),
+    ],
+)
+def test_a_push_of_a_space_that_is_not_set_up_is_ignored_whole(
+    configured: tuple[str, ...], named: str, ignored: bool
+) -> None:
+    listener = _listener(*configured)
+    pending = MagicMock(done=MagicMock(return_value=False))
+    listener._photo_callbacks["D1"] = pending
+    with (
+        patch.object(module.time, "time", return_value=_NOW),
+        patch.object(listener, "_parse_and_fire_event") as parse,
+        patch.object(listener, "_resolve_future_on_loop") as resolve,
+    ):
+        listener._on_notification({"ENCODED_DATA": _named(named)}, "pid")
+    assert parse.called is not ignored
+    resolve.assert_not_called()
+    refreshed = listener._hass.loop.call_soon_threadsafe.called
+    assert refreshed is not ignored
+    # Either way it shows that pushes arrive.
+    assert listener._pushes_received == 1
+
+
+def test_a_push_that_names_no_space_is_not_taken_for_another_spaces() -> None:
+    listener = _listener("space-1")
+    assert listener._foreign_space(_push(age=0)) is None
+    assert listener._foreign_space("not-valid-base64!!!") is None
