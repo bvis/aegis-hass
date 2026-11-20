@@ -117,8 +117,10 @@ def _route(
         ) as photo,
         patch.object(module.notification_event_parser, "extract_space_id", return_value=named),
     ):
-        listener._parse_and_fire_event(_ENCODED, notification_id=notification_id)
+        accepted = listener._parse_and_fire_event(_ENCODED, notification_id=notification_id)
     find.assert_called_once_with(_RAW)
+    # Only another space's event is turned away; that is what skips the refresh.
+    assert accepted is (named is None or named in listener._coordinator._space_ids)
     return data, apply_state, to_device, photo
 
 
@@ -152,6 +154,15 @@ def test_an_event_of_a_space_that_is_not_set_up_is_ignored(configured: tuple[str
     assert _dispatched(listener) == []
     apply_state.assert_not_called()
     to_device.assert_not_called()
+
+
+def test_an_event_naming_the_only_space_is_kept_while_its_details_are_missing() -> None:
+    # `_find_space_for_event` misses when a refresh left the space out for a moment.
+    listener = _listener("space-1")
+    data, apply_state, _, _ = _route(listener, "arm", space=None, named="space-1")
+    fire = listener._coordinator.fire_push_event
+    assert _dispatched(listener)[0] == (fire, "space-1", "arm", data)
+    apply_state.assert_called_once_with("space-1", data)
 
 
 def test_an_event_naming_no_space_is_not_guessed_among_several() -> None:

@@ -1072,8 +1072,9 @@ class AjaxNotificationListener:
         self._note_push_delivered()
 
         # Parse event from ENCODED_DATA using compiled protos
-        if encoded_data:
-            self._parse_and_fire_event(encoded_data, notification_id=notif_id)
+        if encoded_data and not self._parse_and_fire_event(encoded_data, notification_id=notif_id):
+            # Another space's event: nothing here changed, so no refresh either.
+            return
 
         # Always trigger refresh
         if self._hass.loop and self._hass.loop.is_running():
@@ -1305,8 +1306,11 @@ class AjaxNotificationListener:
 
     def _parse_and_fire_event(
         self, encoded_data: str, *, notification_id: str | None = None
-    ) -> None:
-        """Parse event from base64-encoded push notification data."""
+    ) -> bool:
+        """Parse event from base64-encoded push notification data.
+
+        False only when the event belongs to a space that is not set up here.
+        """
         try:
             raw = base64.b64decode(encoded_data)
             event_info = self._extract_event_from_proto(raw)
@@ -1362,8 +1366,13 @@ class AjaxNotificationListener:
                 # every event took the fallback below and was delivered to every
                 # space. Don't reintroduce a byte scan here.
                 target_space = self._find_space_for_event(raw)
-                if not target_space and (
-                    named_space := notification_event_parser.extract_space_id(raw)
+                named_space = notification_event_parser.extract_space_id(raw)
+                # Against the ids the user picked, not `spaces`: that map is
+                # rebuilt on every refresh and can briefly miss a space.
+                if (
+                    not target_space
+                    and named_space
+                    and named_space not in self._coordinator._space_ids
                 ):
                     # The push names a space this entry doesn't manage. The FCM
                     # stream is per account, so a user who added 2 of their 5
@@ -1376,7 +1385,7 @@ class AjaxNotificationListener:
                         event_type,
                         named_space,
                     )
-                    return
+                    return False
                 # The space this push was actually delivered to, or None when it
                 # could not be routed. Device attribution below is scoped to it
                 # so a ring can never surface on another space's doorbell (#494).
@@ -1445,6 +1454,7 @@ class AjaxNotificationListener:
                 self._dispatch_event_to_device(event_type, event_data, raw, delivered_space)
         except Exception:
             _LOGGER.debug("Failed to parse event from push notification", exc_info=True)
+        return True
 
     def _doorbell_fallback_candidates(
         self, devices: dict[str, Any], space_id: str | None

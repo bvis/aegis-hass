@@ -3479,6 +3479,12 @@ class TestUnresolvedPushStillQueriesTheApi:
         coordinator.fire_push_event.assert_not_called()
         assert hass.loop.call_soon_threadsafe.call_count == 1
 
+    def test_another_spaces_event_does_not_refresh(self) -> None:
+        listener, hass, _ = self._make_listener()
+        with patch.object(listener, "_parse_and_fire_event", return_value=False):
+            listener._on_notification({"ENCODED_DATA": _restamp_push(_REAL_PUSH_ENCODED_DATA)}, "p")
+        hass.loop.call_soon_threadsafe.assert_not_called()
+
     def test_undecodable_push_still_refreshes(self) -> None:
         listener, hass, coordinator = self._make_listener()
 
