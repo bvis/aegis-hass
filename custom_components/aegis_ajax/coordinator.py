@@ -77,6 +77,8 @@ from custom_components.aegis_ajax.const import (
     SIREN_ALARM_DURATION_KEY,
     SIREN_SETTINGS_CONFIRM_DELAY,
     SIREN_VOLUME_LEVEL_KEY,
+    WIRE_INPUT_MT_ALWAYS_ACTIVE_KEY,
+    WIRE_INPUT_MT_OBJECT_TYPE,
     ChimeStatus,
     ConnectionStatus,
 )
@@ -3463,6 +3465,49 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.light_switch_settings[device_id] = new
             self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
             return
+        self._raise_for_hub_answer(answer)
+
+    async def async_set_wire_input_always_active(self, device_id: str, *, enable: bool) -> None:
+        """Set "Always active" on a MultiTransmitter wired input, like the app (#689).
+
+        One HTS frame per call. The state is not touched here: the device
+        stream reports the change, as it does after a change made in the app.
+        """
+        device = self.devices.get(device_id)
+        hts_client = self._hts_client
+        if device is None or hts_client is None or not hts_client.is_connected:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": "hub connection (HTS) not active"},
+            )
+        try:
+            answer = await hts_client.write_device_parameter(
+                device.hub_id,
+                WIRE_INPUT_MT_OBJECT_TYPE,
+                device_id,
+                WIRE_INPUT_MT_ALWAYS_ACTIVE_KEY,
+                b"\x01" if enable else b"\x00",
+            )
+        except HtsConnectionError as exc:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": str(exc)},
+            ) from exc
+        _LOGGER.debug(
+            "Wired input %s always_active=%s: hub answered %s",
+            device_id,
+            enable,
+            COMMAND_ANSWERS.get(answer, f"0x{answer:02X}"),
+        )
+        if answer not in (0x01, 0x02, 0x09):
+            self._raise_for_hub_answer(answer)
+
+    @staticmethod
+    def _raise_for_hub_answer(answer: int) -> None:
+        """Turn a hub's refusal of an HTS write into the matching error."""
+        name = COMMAND_ANSWERS.get(answer, f"0x{answer:02X}")
         key = {
             0x03: "command_not_performed",
             0x05: "command_permission_denied",
