@@ -141,13 +141,16 @@ async def async_setup_entry(
                 AjaxLightSwitchButtonLockSwitch(coordinator=coordinator, device_id=device_id)
             )
         if capabilities_for(device).has_night_mode_arm:
-            entities.append(
-                AjaxNightModeArmSwitch(
+            # "Always active" (#689) sits in the same arming settings as
+            # "Arm in night mode", on the same detectors.
+            entities.extend(
+                switch_class(
                     coordinator=coordinator,
                     device_id=device_id,
                     hub_id=device.hub_id,
                     device_type=device.device_type,
                 )
+                for switch_class in (AjaxNightModeArmSwitch, AjaxAlwaysActiveSwitch)
             )
     # One hub-wide Chime switch per hub that exposes the feature (#239). Hubs
     # that don't report a Chime status (UNSPECIFIED) get none.
@@ -408,6 +411,10 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
     _attr_translation_key = "night_mode_arm"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = False
+    # What a subclass for another arming setting changes (#689).
+    _status_key = "armed_in_night_mode"
+    _command = staticmethod(DeviceCommand.set_night_mode_arm)
+    _armed_error_key: str | None = "night_mode_arm_while_armed"
 
     def __init__(
         self,
@@ -420,7 +427,7 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
         self._device_id = device_id
         self._hub_id = hub_id
         self._device_type = device_type
-        self._attr_unique_id = f"aegis_ajax_{device_id}_night_mode_arm"
+        self._attr_unique_id = f"aegis_ajax_{device_id}_{self._attr_translation_key}"
         device = coordinator.devices.get(device_id)
         if device:
             self._attr_device_info = build_device_info(
@@ -437,7 +444,7 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
         device = self.coordinator.devices.get(self._device_id)
         if device is None:
             return None
-        return bool(device.statuses.get("armed_in_night_mode"))
+        return bool(device.statuses.get(self._status_key))
 
     async def async_turn_on(self, **kwargs: object) -> None:
         await self._set(enable=True)
@@ -446,7 +453,7 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
         await self._set(enable=False)
 
     async def _set(self, *, enable: bool) -> None:
-        cmd = DeviceCommand.set_night_mode_arm(
+        cmd = self._command(
             hub_id=self._hub_id,
             device_id=self._device_id,
             device_type=self._device_type,
@@ -457,11 +464,29 @@ class AjaxNightModeArmSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], Switch
         except HomeAssistantError as err:
             # The hub refuses settings changes on an armed detector. Say so
             # plainly, and as a user error so HA doesn't log a traceback.
-            if err.translation_key == "command_hub_wrong_state":
+            if self._armed_error_key and err.translation_key == "command_hub_wrong_state":
                 raise ServiceValidationError(
-                    translation_domain=DOMAIN, translation_key="night_mode_arm_while_armed"
+                    translation_domain=DOMAIN, translation_key=self._armed_error_key
                 ) from err
             raise
+
+
+class AjaxAlwaysActiveSwitch(AjaxNightModeArmSwitch):
+    """A detector's "Always active" setting (#689).
+
+    `on` = the detector raises alarms at all times, also while the system is
+    disarmed. Same stored hub setting the Ajax app edits, same request and
+    permission as "Arm in Night Mode", and disabled by default for the same
+    reason reversed: turning it on makes a detector alarm in a disarmed home.
+
+    The state is the device stream's `always_active` status. Whether the hub
+    refuses the change while armed is not known, so its own message is shown.
+    """
+
+    _attr_translation_key = "always_active"
+    _status_key = "always_active"
+    _command = staticmethod(DeviceCommand.set_always_active)
+    _armed_error_key = None
 
 
 class AjaxLightSwitchButtonLockSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):

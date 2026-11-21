@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Armare în modul de noapte"
             },
+            "always_active": {
+                "name": "Întotdeauna activ"
+            },
             "chime": {
                 "name": "Sonerie"
             },

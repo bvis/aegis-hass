@@ -180,7 +180,7 @@ class TestSetup:
             ),
         ):
             await async_setup_entry(MagicMock(), entry, lambda e, *a, **k: added.extend(e))
-        ids = {e.unique_id for e in added if isinstance(e, AjaxNightModeArmSwitch)}
+        ids = {e.unique_id for e in added if type(e) is AjaxNightModeArmSwitch}
         assert ids == {"aegis_ajax_30EA219B_night_mode_arm"}
 
 

@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Im Nachtmodus scharf schalten"
             },
+            "always_active": {
+                "name": "Immer aktiv"
+            },
             "chime": {
                 "name": "Gong"
             },

@@ -88,6 +88,12 @@ _SPECS: dict[str, _Spec] = {
         ),
         "night_mode_arm",
     ),
+    "always_active": _Spec(
+        "update_hub_device",
+        "UpdateHubDevice",
+        lambda api: api.send_command(_command("always_active", "door_protect", always_active=True)),
+        "always_active",
+    ),
     "sound_test": _Spec(
         "device_command_stest_start",
         "DeviceCommandSoundTestStart",
@@ -283,6 +289,29 @@ async def test_night_mode_arm_without_a_value_is_refused_before_any_call() -> No
     harness = _Harness("night_mode_arm")
     with pytest.raises(DeviceCommandError, match="requires a value"):
         await harness.run(lambda api: api.send_command(_command("night_mode_arm", "door_protect")))
+    harness.rpc.assert_not_awaited()
+
+
+@pytest.mark.parametrize(("enable", "value"), [(True, 2), (False, 1)])
+async def test_always_active_request(enable: bool, value: int) -> None:
+    request = await _Harness("always_active").run(
+        lambda api: api.send_command(
+            _command("always_active", "door_protect", always_active=enable)
+        )
+    )
+    assert request.object_type.WhichOneof("type") == "door_protect"
+    (update,) = request.update
+    assert [field.name for field, _ in update.ListFields()] == ["common_arming_part_settings"]
+    settings = update.common_arming_part_settings
+    # Only this field goes out, so night mode, delays and arming mode stay as they are.
+    assert [field.name for field, _ in settings.ListFields()] == ["always_active"]
+    assert settings.always_active == value
+
+
+async def test_always_active_without_a_value_is_refused_before_any_call() -> None:
+    harness = _Harness("always_active")
+    with pytest.raises(DeviceCommandError, match="requires a value"):
+        await harness.run(lambda api: api.send_command(_command("always_active", "door_protect")))
     harness.rpc.assert_not_awaited()
 
 

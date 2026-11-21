@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Gece modunda kur"
             },
+            "always_active": {
+                "name": "Her zaman aktif"
+            },
             "chime": {
                 "name": "Zil sesi"
             },

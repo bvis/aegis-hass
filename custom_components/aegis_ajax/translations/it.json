@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Inserire in modalità notte"
             },
+            "always_active": {
+                "name": "Sempre attivo"
+            },
             "chime": {
                 "name": "Campanello"
             },

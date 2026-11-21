@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Uzbrajaj w trybie nocnym"
             },
+            "always_active": {
+                "name": "Zawsze aktywny"
+            },
             "chime": {
                 "name": "Gong"
             },
