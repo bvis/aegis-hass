@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Tilkobl i nattilstand"
             },
+            "always_active": {
+                "name": "Altid aktiv"
+            },
             "chime": {
                 "name": "Ringetone"
             },

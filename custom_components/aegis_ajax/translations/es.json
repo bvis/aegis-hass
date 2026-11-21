@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Armar en modo noche"
             },
+            "always_active": {
+                "name": "Siempre activo"
+            },
             "chime": {
                 "name": "Timbre"
             },

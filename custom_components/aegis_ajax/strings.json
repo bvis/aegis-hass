@@ -712,6 +712,9 @@
             "night_mode_arm": {
                 "name": "Arm in night mode"
             },
+            "always_active": {
+                "name": "Always active"
+            },
             "chime": {
                 "name": "Chime"
             },

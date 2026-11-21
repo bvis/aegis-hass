@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Zabezpečit v nočním režimu"
             },
+            "always_active": {
+                "name": "Vždy aktivní"
+            },
             "chime": {
                 "name": "Gong"
             },

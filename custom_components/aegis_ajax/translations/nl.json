@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Inschakelen in nachtmodus"
             },
+            "always_active": {
+                "name": "Altijd actief"
+            },
             "chime": {
                 "name": "Deurbel"
             },

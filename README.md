@@ -52,6 +52,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Button presses**: an Ajax Button in control mode gets a per-device `event` entity that fires `pressed` — no push (FCM) needed, and it works while the system is armed or disarmed
 - **Per-device bypass switches**: each non-hub device can get a `bypass` switch to deactivate / reactivate it; gated by the `bypass_switches` option (`auto` / `always` / `never`). The switch reads `on` for a device deactivated **anywhere** — from Home Assistant, the Ajax app, or by an installer — and its `deactivation_kinds` attribute names the mode in force. Mind Ajax's own wording: `temporary_deactivation_*` is the **permanent** deactivation (until you re-enable it), `one_time_deactivation_*` lasts a single arming cycle, and a `*_tamper` variant means only the device's tamper protection is off. Both directions work from Home Assistant: switch **on** applies the same permanent deactivation the Ajax app does, switch **off** puts the device back under protection — and the integration re-reads the device after every write, so the switch never shows a state the hardware isn't in ([#338](https://github.com/bvis/aegis-hass/issues/338))
 - **Arm in night mode, per detector**: each intrusion detector gets an *Arm in night mode* switch (disabled by default) that edits the same setting as the Ajax app, so automations can change what Night Mode protects. See [Night Mode per detector](#night-mode-per-detector) ([#579](https://github.com/bvis/aegis-hass/issues/579))
+- **Always active, per detector**: each intrusion detector gets an *Always active* switch (disabled by default) that edits the same setting as the Ajax app, to keep a room protected while the system is disarmed. See [Always active per detector](#always-active-per-detector) ([#689](https://github.com/bvis/aegis-hass/issues/689))
 - **Lock LightSwitch buttons**: each LightSwitch gets a *Lock switch buttons* switch, the same setting as in the Ajax app, so the touch panel can be locked from a dashboard or an automation (for example, against children) while the light stays controllable remotely ([#641](https://github.com/bvis/aegis-hass/issues/641))
 - **Device removal follows the panel**: deleting a device in the Ajax app removes it from Home Assistant within seconds — entities, device card and cache. Deletions that happen while Home Assistant is offline are picked up on the next reconnect: the device stops claiming state and its leftover card can be removed from its device page (**Delete device** — offered for any device the hub no longer reports; live devices are refused and a mistaken deletion re-creates itself from the next snapshot) ([#422](https://github.com/bvis/aegis-hass/issues/422))
 - **Logbook**: Human-readable security event descriptions with icons
@@ -528,6 +529,19 @@ automation:
 - **Change it before arming.** As in the Ajax app, a detector's settings can't be changed while it is armed; if the hub refuses, Home Assistant shows the error. Automations should adjust detectors before switching to Night Mode.
 - **Permissions**: the Ajax account needs the device-edit permission (the same one the bypass switch uses). Without it, Ajax refuses the change and Home Assistant shows an error.
 - **Requests to Ajax**: reading the setting costs nothing, it arrives with the device data the integration already receives. Each change is one request, the same one the app sends.
+
+## Always active per detector
+
+A detector with *Always active* turned on raises alarms at all times, also while the system is disarmed. In the Ajax app it is a setting of each intrusion detector. The integration exposes it as an *Always active* switch on the same detectors that get *Arm in night mode*, and changes it the same way the app does.
+
+It fits a room that must stay protected while the rest of the home is in use: an outbuilding or office when nobody is working there, a basement, a storage room. Turn it on when you leave the room and off before you go back in.
+
+The switch is **disabled by default**: enable it under the device page, *Configuration* section, for the detectors you want to control.
+
+- **It raises real alarms.** While the switch is on, opening that door or walking past that detector sets off the alarm, with sirens and a call from the monitoring company if you have one. Turn it off before entering, and be careful with automations that turn it on.
+- **It's a stored setting.** It stays as set until someone changes it, in Home Assistant or in the app.
+- **Permissions**: the Ajax account needs the device-edit permission, as for *Arm in night mode*. If the hub refuses a change, Home Assistant shows its error.
+- **Requests to Ajax**: reading the setting costs nothing. Each change is one request, the same one the app sends.
 
 ## Activity card
 

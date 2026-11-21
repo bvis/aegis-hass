@@ -216,6 +216,9 @@ class DeviceCommand:
     # The detector's "Arm in Night Mode" setting (#579). Only set for
     # action="night_mode_arm".
     night_mode_arm: bool | None = None
+    # The detector's "Always active" setting (#689). Only set for
+    # action="always_active".
+    always_active: bool | None = None
 
     @classmethod
     def on(
@@ -281,6 +284,19 @@ class DeviceCommand:
             device_id=device_id,
             device_type=device_type,
             night_mode_arm=enable,
+        )
+
+    @classmethod
+    def set_always_active(
+        cls, hub_id: str, device_id: str, device_type: str, *, enable: bool
+    ) -> DeviceCommand:
+        """Turn a detector's "Always active" setting on or off (#689)."""
+        return cls(
+            action="always_active",
+            hub_id=hub_id,
+            device_id=device_id,
+            device_type=device_type,
+            always_active=enable,
         )
 
     @classmethod

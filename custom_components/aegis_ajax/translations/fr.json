@@ -614,6 +614,9 @@
             "night_mode_arm": {
                 "name": "Armer en mode nuit"
             },
+            "always_active": {
+                "name": "Toujours actif"
+            },
             "chime": {
                 "name": "Carillon"
             },

@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.1] - unreleased
+## [1.34.0] - unreleased
+
+### Added
+- **Always active switch, per detector (#689).** Each intrusion detector gets an *Always active* switch next to *Arm in night mode*. It edits the same setting as the Ajax app: while on, the detector raises alarms at all times, also with the system disarmed. Useful for a room that must stay protected while the rest of the home is in use, such as an outbuilding or a basement. The switch is disabled by default and needs the device-edit permission. See [Always active per detector](README.md#always-active-per-detector). Requested by @hurinapakova. **Requests to Ajax:** none to read it; one per change, the same one the app sends.
 
 ### Fixed
 - **Events from Ajax spaces you did not add no longer show up (#687).** With an account that has access to several spaces and only one of them set up in Home Assistant, the Security event entity also fired for what happened in the others: another site's hub going offline, a leak, someone arming there. Those events are now ignored, as they already were when two or more spaces were set up. Reported by @Sven2410. **Requests to Ajax: fewer**, an event in a space that is not set up no longer triggers a state refresh.

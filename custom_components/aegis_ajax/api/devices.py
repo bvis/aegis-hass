@@ -978,8 +978,8 @@ class DevicesApi:
             await self._device_bypass(command)
         elif command.action == "siren_settings":
             await self._update_siren_settings(command)
-        elif command.action == "night_mode_arm":
-            await self._update_night_mode_arm(command)
+        elif command.action in ("night_mode_arm", "always_active"):
+            await self._update_arming_setting(command)
         else:
             raise DeviceCommandError(f"Unknown device command action: {command.action}")
 
@@ -1033,15 +1033,18 @@ class DevicesApi:
             command.siren_volume_level,
         )
 
-    async def _update_night_mode_arm(self, command: DeviceCommand) -> None:
-        """Change a detector's "Arm in Night Mode" setting via UpdateHubDevice (#579).
+    async def _update_arming_setting(self, command: DeviceCommand) -> None:
+        """Change one of a detector's arming settings via UpdateHubDevice.
 
-        Same request as the Ajax app's toggle: one `Update` carrying only
-        `CommonArmingPartSettings.night_mode_arm`. The field is `optional`, so
-        the detector's other arming settings (delays, arming mode) are left
-        alone. Needs device-edit permission, like the siren settings.
+        "Arm in Night Mode" (#579) or "Always active" (#689), named by the
+        command's action. Same request as the Ajax app's toggle: one `Update`
+        carrying only that field of `CommonArmingPartSettings`. Both fields
+        are `optional`, so the detector's other arming settings (delays,
+        arming mode) are left alone. Needs device-edit permission, like the
+        siren settings.
         """
         from systems.ajax.api.ecosystem.v2.commonmodels.device.common import (  # noqa: PLC0415
+            always_active_pb2,
             common_arming_part_pb2,
         )
         from systems.ajax.api.ecosystem.v2.hubsvc.commonmodels.device import (  # noqa: PLC0415
@@ -1052,16 +1055,20 @@ class DevicesApi:
             request_pb2,
         )
 
-        if command.night_mode_arm is None:
-            raise DeviceCommandError("night_mode_arm command requires a value")
+        setting = command.action
+        enable = getattr(command, setting)
+        if enable is None:
+            raise DeviceCommandError(f"{setting} command requires a value")
         part = common_arming_part_pb2.CommonArmingPart
-        settings = part.CommonArmingPartSettings(
-            night_mode_arm=(
-                part.NIGHT_MODE_ARM_ENABLED
-                if command.night_mode_arm
-                else part.NIGHT_MODE_ARM_DISABLED
+        if setting == "night_mode_arm":
+            value = part.NIGHT_MODE_ARM_ENABLED if enable else part.NIGHT_MODE_ARM_DISABLED
+        else:
+            value = (
+                always_active_pb2.ALWAYS_ACTIVE_ENABLED
+                if enable
+                else always_active_pb2.ALWAYS_ACTIVE_DISABLED
             )
-        )
+        settings = part.CommonArmingPartSettings(**{setting: value})
         channel = self._client._get_channel()
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.UpdateHubDeviceServiceStub(channel)
@@ -1074,8 +1081,26 @@ class DevicesApi:
         response = await stub.execute(request, metadata=metadata, timeout=15)
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
-            raise DeviceCommandError(f"night_mode_arm: {error}", reason=error)
-        _LOGGER.debug("Device %s night_mode_arm=%s OK", command.device_id, command.night_mode_arm)
+            # Logged as well as raised: the write of "Always active" is
+            # unverified on real hardware, so a report needs the sent bytes.
+            _LOGGER.debug(
+                "Device %s (%s) %s=%s refused: %s (settings %s)",
+                command.device_id,
+                command.device_type,
+                setting,
+                enable,
+                error,
+                settings.SerializeToString().hex(),
+            )
+            raise DeviceCommandError(f"{setting}: {error}", reason=error)
+        _LOGGER.debug(
+            "Device %s (%s) %s=%s OK (settings %s)",
+            command.device_id,
+            command.device_type,
+            setting,
+            enable,
+            settings.SerializeToString().hex(),
+        )
 
     async def _device_bypass(self, command: DeviceCommand) -> None:
         """Deactivate / reactivate a device via DeviceCommandDeviceBypass (#338).
