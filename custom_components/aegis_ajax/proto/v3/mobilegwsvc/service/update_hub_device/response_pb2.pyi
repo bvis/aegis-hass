@@ -12,10 +12,10 @@ import builtins as _builtins
 import sys
 import typing as _typing
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias as _TypeAlias
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias as _TypeAlias, Never as _Never
 else:
-    from typing_extensions import TypeAlias as _TypeAlias
+    from typing_extensions import TypeAlias as _TypeAlias, Never as _Never
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -30,6 +30,11 @@ class UpdateHubDeviceResponse(_message.Message):
         def __init__(
             self,
         ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+        _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+        def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+        def WhichOneof(self, oneof_group: _Never) -> None: ...
 
     @_typing.final
     class Failure(_message.Message):
@@ -47,14 +52,78 @@ class UpdateHubDeviceResponse(_message.Message):
                 *,
                 error_cause: _abc.Iterable[_response_pb2.ErrorCause] | None = ...,
             ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
             _ClearFieldArgType: _TypeAlias = _typing.Literal["error_cause", b"error_cause"]  # noqa: Y015
             def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+        @_typing.final
+        class ParamsApplicationFailure(_message.Message):
+            DESCRIPTOR: _descriptor.Descriptor
+
+            @_typing.final
+            class ParamsApplicationFailureDetails(_message.Message):
+                DESCRIPTOR: _descriptor.Descriptor
+
+                @_typing.final
+                class FailReason(_message.Message):
+                    DESCRIPTOR: _descriptor.Descriptor
+
+                    PARAM_NUMBER_FIELD_NUMBER: _builtins.int
+                    CAUSE_FIELD_NUMBER: _builtins.int
+                    param_number: _builtins.str
+                    @_builtins.property
+                    def cause(self) -> _response_pb2.ErrorCause: ...
+                    def __init__(
+                        self,
+                        *,
+                        param_number: _builtins.str = ...,
+                        cause: _response_pb2.ErrorCause | None = ...,
+                    ) -> None: ...
+                    _HasFieldArgType: _TypeAlias = _typing.Literal["cause", b"cause"]  # noqa: Y015
+                    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+                    _ClearFieldArgType: _TypeAlias = _typing.Literal["cause", b"cause", "param_number", b"param_number"]  # noqa: Y015
+                    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+                    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+                DEVICE_ID_FIELD_NUMBER: _builtins.int
+                FAIL_REASONS_FIELD_NUMBER: _builtins.int
+                device_id: _builtins.str
+                @_builtins.property
+                def fail_reasons(self) -> _containers.RepeatedCompositeFieldContainer[Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure.ParamsApplicationFailureDetails.FailReason]: ...
+                def __init__(
+                    self,
+                    *,
+                    device_id: _builtins.str = ...,
+                    fail_reasons: _abc.Iterable[Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure.ParamsApplicationFailureDetails.FailReason] | None = ...,
+                ) -> None: ...
+                _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+                def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+                _ClearFieldArgType: _TypeAlias = _typing.Literal["device_id", b"device_id", "fail_reasons", b"fail_reasons"]  # noqa: Y015
+                def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+                def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+            PARAMS_APPLICATION_FAILURE_FIELD_NUMBER: _builtins.int
+            @_builtins.property
+            def params_application_failure(self) -> _containers.RepeatedCompositeFieldContainer[Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure.ParamsApplicationFailureDetails]: ...
+            def __init__(
+                self,
+                *,
+                params_application_failure: _abc.Iterable[Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure.ParamsApplicationFailureDetails] | None = ...,
+            ) -> None: ...
+            _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+            def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+            _ClearFieldArgType: _TypeAlias = _typing.Literal["params_application_failure", b"params_application_failure"]  # noqa: Y015
+            def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+            def WhichOneof(self, oneof_group: _Never) -> None: ...
 
         BAD_REQUEST_FIELD_NUMBER: _builtins.int
         DEVICE_NO_FOUND_FIELD_NUMBER: _builtins.int
         PERMISSION_DENIED_FIELD_NUMBER: _builtins.int
         HUB_OFFLINE_FIELD_NUMBER: _builtins.int
         HUB_WRONG_STATE_FIELD_NUMBER: _builtins.int
+        PARAMS_APPLICATION_FAILURE_FIELD_NUMBER: _builtins.int
         @_builtins.property
         def bad_request(self) -> _response_pb2.Error: ...
         @_builtins.property
@@ -65,6 +134,8 @@ class UpdateHubDeviceResponse(_message.Message):
         def hub_offline(self) -> _response_pb2.Error: ...
         @_builtins.property
         def hub_wrong_state(self) -> Global___UpdateHubDeviceResponse.Failure.HubWrongStateError: ...
+        @_builtins.property
+        def params_application_failure(self) -> Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure: ...
         def __init__(
             self,
             *,
@@ -73,12 +144,13 @@ class UpdateHubDeviceResponse(_message.Message):
             permission_denied: _response_pb2.Error | None = ...,
             hub_offline: _response_pb2.Error | None = ...,
             hub_wrong_state: Global___UpdateHubDeviceResponse.Failure.HubWrongStateError | None = ...,
+            params_application_failure: Global___UpdateHubDeviceResponse.Failure.ParamsApplicationFailure | None = ...,
         ) -> None: ...
-        _HasFieldArgType: _TypeAlias = _typing.Literal["bad_request", b"bad_request", "device_no_found", b"device_no_found", "error", b"error", "hub_offline", b"hub_offline", "hub_wrong_state", b"hub_wrong_state", "permission_denied", b"permission_denied"]  # noqa: Y015
+        _HasFieldArgType: _TypeAlias = _typing.Literal["bad_request", b"bad_request", "device_no_found", b"device_no_found", "error", b"error", "hub_offline", b"hub_offline", "hub_wrong_state", b"hub_wrong_state", "params_application_failure", b"params_application_failure", "permission_denied", b"permission_denied"]  # noqa: Y015
         def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-        _ClearFieldArgType: _TypeAlias = _typing.Literal["bad_request", b"bad_request", "device_no_found", b"device_no_found", "error", b"error", "hub_offline", b"hub_offline", "hub_wrong_state", b"hub_wrong_state", "permission_denied", b"permission_denied"]  # noqa: Y015
+        _ClearFieldArgType: _TypeAlias = _typing.Literal["bad_request", b"bad_request", "device_no_found", b"device_no_found", "error", b"error", "hub_offline", b"hub_offline", "hub_wrong_state", b"hub_wrong_state", "params_application_failure", b"params_application_failure", "permission_denied", b"permission_denied"]  # noqa: Y015
         def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-        _WhichOneofReturnType_error: _TypeAlias = _typing.Literal["bad_request", "device_no_found", "permission_denied", "hub_offline", "hub_wrong_state"]  # noqa: Y015
+        _WhichOneofReturnType_error: _TypeAlias = _typing.Literal["bad_request", "device_no_found", "permission_denied", "hub_offline", "hub_wrong_state", "params_application_failure"]  # noqa: Y015
         _WhichOneofArgType_error: _TypeAlias = _typing.Literal["error", b"error"]  # noqa: Y015
         def WhichOneof(self, oneof_group: _WhichOneofArgType_error) -> _WhichOneofReturnType_error | None: ...
 

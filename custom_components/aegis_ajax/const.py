@@ -233,6 +233,12 @@ LIGHT_SWITCH_LEGACY_LOCK_KEY = 0x4B
 LIGHT_SWITCH_BUTTONS_LOCKED_BIT = 0x02
 LIGHT_SWITCH_OBJECT_TYPE = 0x44
 
+# A MultiTransmitter wired input keeps "Always active" as its own hub
+# parameter (#689): the settings request used for wireless detectors is
+# refused for it, so it is written over HTS like the app does.
+WIRE_INPUT_MT_OBJECT_TYPE = 0x1D
+WIRE_INPUT_MT_ALWAYS_ACTIVE_KEY = 0x40
+
 
 class SecurityState(IntEnum):
     """Maps DisplayedSpaceSecurityState proto enum."""

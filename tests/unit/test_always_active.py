@@ -26,6 +26,23 @@ def _switch(device: object | None = None) -> tuple[AjaxAlwaysActiveSwitch, Magic
     return sw, coordinator
 
 
+@pytest.mark.parametrize(("method", "enable"), [("async_turn_on", True), ("async_turn_off", False)])
+async def test_a_multitransmitter_input_is_written_over_the_hub_connection(
+    method: str, enable: bool
+) -> None:
+    sw, coordinator = _switch(_device())
+    sw._device_type = "wire_input_mt"
+    coordinator.async_set_wire_input_always_active = AsyncMock()
+
+    with patch("custom_components.aegis_ajax.switch.async_send_device_command") as send:
+        await getattr(sw, method)()
+
+    coordinator.async_set_wire_input_always_active.assert_awaited_once_with(
+        "30EA219B", enable=enable
+    )
+    send.assert_not_called()
+
+
 def test_disabled_by_default_with_its_own_id() -> None:
     sw, _ = _switch(_device())
     assert sw.unique_id == "aegis_ajax_30EA219B_always_active"

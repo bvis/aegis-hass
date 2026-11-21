@@ -488,6 +488,16 @@ class AjaxAlwaysActiveSwitch(AjaxNightModeArmSwitch):
     _command = staticmethod(DeviceCommand.set_always_active)
     _armed_error_key = None
 
+    async def _set(self, *, enable: bool) -> None:
+        # A MultiTransmitter wired input keeps this setting elsewhere and the
+        # hub refuses the request the other detectors take.
+        if self._device_type == "wire_input_mt":
+            await self.coordinator.async_set_wire_input_always_active(
+                self._device_id, enable=enable
+            )
+            return
+        await super()._set(enable=enable)
+
 
 class AjaxLightSwitchButtonLockSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity):
     """A LightSwitch's "Lock switch buttons" setting (#641).
