@@ -1084,13 +1084,14 @@ class DevicesApi:
             # Logged as well as raised: the write of "Always active" is
             # unverified on real hardware, so a report needs the sent bytes.
             _LOGGER.debug(
-                "Device %s (%s) %s=%s refused: %s (settings %s)",
+                "Device %s (%s) %s=%s refused: %s (settings %s, answer %s)",
                 command.device_id,
                 command.device_type,
                 setting,
                 enable,
                 error,
                 settings.SerializeToString().hex(),
+                response.failure.SerializeToString().hex(),
             )
             raise DeviceCommandError(f"{setting}: {error}", reason=error)
         _LOGGER.debug(

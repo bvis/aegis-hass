@@ -143,6 +143,37 @@ class TestWrite:
         assert coordinator.light_switch_settings[LS] == 0x05
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("enable", "value"), [(True, b"\x01"), (False, b"\x00")])
+    async def test_wired_input_always_active_is_one_write_of_its_own_key(
+        self, enable: bool, value: bytes
+    ) -> None:
+        coordinator = _coordinator()
+        coordinator.devices[LS] = _device("wire_input_mt")
+
+        await coordinator.async_set_wire_input_always_active(LS, enable=enable)
+
+        coordinator._hts_client.write_device_parameter.assert_awaited_once_with(
+            HUB, 0x1D, LS, 0x40, value
+        )
+        coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_wired_input_always_active_refusal_is_an_error(self) -> None:
+        coordinator = _coordinator(answer=0x05)
+        coordinator.devices[LS] = _device("wire_input_mt")
+        with pytest.raises(HomeAssistantError) as exc:
+            await coordinator.async_set_wire_input_always_active(LS, enable=True)
+        assert exc.value.translation_key == "command_permission_denied"
+
+    @pytest.mark.asyncio
+    async def test_wired_input_always_active_needs_the_hub_connection(self) -> None:
+        coordinator = _coordinator()
+        coordinator._hts_client.is_connected = False
+        with pytest.raises(HomeAssistantError):
+            await coordinator.async_set_wire_input_always_active(LS, enable=True)
+        coordinator._hts_client.write_device_parameter.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_hub_report_matching_the_write_is_confirmed(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

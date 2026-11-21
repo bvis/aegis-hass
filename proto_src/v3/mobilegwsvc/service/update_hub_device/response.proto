@@ -25,10 +25,25 @@ message UpdateHubDeviceResponse {
       commonmodels.Error permission_denied = 3;
       commonmodels.Error hub_offline = 4;
       HubWrongStateError hub_wrong_state = 5;
+      ParamsApplicationFailure params_application_failure = 6;
     }
 
     message HubWrongStateError {
       repeated commonmodels.ErrorCause error_cause = 1;
+    }
+
+    message ParamsApplicationFailure {
+      repeated ParamsApplicationFailureDetails params_application_failure = 1;
+
+      message ParamsApplicationFailureDetails {
+        string device_id = 1;
+        repeated FailReason fail_reasons = 2;
+
+        message FailReason {
+          string param_number = 1;
+          commonmodels.ErrorCause cause = 2;
+        }
+      }
     }
   }
 }
