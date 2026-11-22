@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import random
 import ssl
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -119,6 +121,9 @@ HUB_COMMAND_RESTORE_AFTER_ALARM = 0x16
 WRITE_PARAMETER_MSG_TYPE = 0x07
 WRITE_PARAMETER_TERMINATOR = b"\xfe\xfe"
 HUB_COMMAND_TIMEOUT = 15
+# How long after a hub command everything the hub sends is spelled out in the
+# debug log, so an answer that comes late, or in another shape, can be seen (#689).
+HUB_COMMAND_TRACE_SECONDS = 120
 COMMAND_ANSWERS = {
     0x01: "DELIVERED",
     0x02: "DELIVERED_COMMAND_PERFORMED",
@@ -361,6 +366,7 @@ class HtsClient:
         )
         self._hub_command_lock = asyncio.Lock()
         self._pending_hub_command: tuple[int | None, asyncio.Future[int]] | None = None
+        self._hub_command_trace_until = 0.0
 
     # ------------------------------------------------------------------
     # Properties
@@ -576,14 +582,19 @@ class HtsClient:
     # ------------------------------------------------------------------
 
     async def _send_message(
-        self, msg_type: MsgType | int, payload: bytes, *, receiver: int | None = None
+        self,
+        msg_type: MsgType | int,
+        payload: bytes,
+        *,
+        receiver: int | None = None,
+        link: int = 0,
     ) -> int:
         """Build, encrypt and send an HTS message; return its sequence number."""
         msg = HtsMessage(
             sender=self._sender_id,
             receiver=self._receiver_id if receiver is None else receiver,
             seq_num=self._next_seq(),
-            link=0,
+            link=link,
             flags=0,
             msg_type=msg_type,
             payload=payload,
@@ -593,9 +604,10 @@ class HtsClient:
         encrypted = encrypt(padded)
         frame = encode_frame(encrypted)
         _LOGGER.debug(
-            "SEND: type=0x%02X seq=%d raw=%db padded=%db enc=%db frame=%db",
+            "SEND: type=0x%02X seq=%d link=%d raw=%db padded=%db enc=%db frame=%db",
             int(msg_type),
             msg.seq_num,
+            link,
             len(raw),
             len(padded),
             len(encrypted),
@@ -819,12 +831,21 @@ class HtsClient:
             hub_id,
             tlv_encode(params).hex(),
         )
+        # The app stamps each settings write with a link byte of its own, 1 to 100.
         return await self._send_hub_command(
-            int(hub_id, 16), params, msg_type=WRITE_PARAMETER_MSG_TYPE
+            int(hub_id, 16),
+            params,
+            msg_type=WRITE_PARAMETER_MSG_TYPE,
+            link=random.randint(1, 100),  # noqa: S311
         )
 
     async def _send_hub_command(
-        self, hub: int, params: list[bytes], *, msg_type: int = HUB_COMMAND_MSG_TYPE
+        self,
+        hub: int,
+        params: list[bytes],
+        *,
+        msg_type: int = HUB_COMMAND_MSG_TYPE,
+        link: int = 0,
     ) -> int:
         """Send one hub command and wait for its answer code."""
         if not self._connected:
@@ -833,7 +854,10 @@ class HtsClient:
             future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
             self._pending_hub_command = (None, future)
             try:
-                seq = await self._send_message(msg_type, tlv_encode(params), receiver=hub)
+                self._hub_command_trace_until = time.monotonic() + HUB_COMMAND_TRACE_SECONDS
+                seq = await self._send_message(
+                    msg_type, tlv_encode(params), receiver=hub, link=link
+                )
                 self._pending_hub_command = (seq, future)
                 return await asyncio.wait_for(future, timeout=HUB_COMMAND_TIMEOUT)
             except TimeoutError as exc:
@@ -847,6 +871,8 @@ class HtsClient:
         """Hand a hub command's answer to the waiting request."""
         pending = self._pending_hub_command
         if pending is None:
+            if time.monotonic() < self._hub_command_trace_until:
+                _LOGGER.debug("  hub answered with no command waiting for it (late answer?)")
             return
         try:
             params = tlv_decode(msg.payload)
@@ -1093,6 +1119,12 @@ class HtsClient:
                     msg.link,
                     len(msg.payload),
                 )
+                if time.monotonic() < self._hub_command_trace_until:
+                    _LOGGER.debug(
+                        "  after a hub command: type=0x%02X payload hex: %s",
+                        int(msg.msg_type),
+                        _redact_payload_hex(msg.payload[:80]),
+                    )
                 if msg.msg_type == MsgType.UPDATES:
                     await self._handle_update(msg)
                 elif msg.msg_type == MsgType.USER_REGISTRATION:
