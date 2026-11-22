@@ -416,7 +416,7 @@ data:
   mode: once
 ```
 
-Target the device's Bypass switch. The switch reads `on` while the device is deactivated either way, its `deactivation_kinds` attribute tells which one is in force, and turning it off reactivates the device at any time. Not every Ajax device offers a one-time deactivation; if the hub refuses it, the action fails with the hub's answer. It needs the same Ajax permission as the Bypass switch. **Requests to Ajax:** one per call, the same one the app sends.
+Target the device's Bypass switch. The switch reads `on` while the device is deactivated either way, its `deactivation_kinds` attribute tells which one is in force, and turning it off reactivates the device at any time. Not every Ajax device offers a one-time deactivation; if the hub refuses it, the action fails with the hub's answer. It needs the same Ajax permission as the Bypass switch. **Requests to Ajax:** one command per call, the same one the app sends, plus the check the Bypass switch already makes a few seconds later to confirm the hub applied it.
 
 ### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
 
