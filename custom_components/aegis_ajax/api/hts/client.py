@@ -51,6 +51,7 @@ from custom_components.aegis_ajax.api.hts.protocol import (
     encode_frame,
     pad16,
 )
+from custom_components.aegis_ajax.redaction import is_text, mask_text_runs
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -205,9 +206,23 @@ _SPACE_EVENT_PREFIX: bytes = b"\x02"
 _SPACE_EVENT_FAMILIES: frozenset[int] = frozenset({0x0B, 0x22, 0x2E, 0x30, 0x43})
 
 
+def _is_receipt(msg: HtsMessage) -> bool:
+    """True for the bare "got your message" frame, which is never acknowledged.
+
+    Answers to hub commands share the ACK message type but carry a result
+    code as their key, and those do want an acknowledgement.
+    """
+    if msg.msg_type != MsgType.ACK:
+        return False
+    try:
+        params = tlv_decode(msg.payload)
+    except ValueError:
+        return True
+    return not params or params[0] == bytes([ACK_KEY_RECEIVED])
+
+
 def _redact_payload_hex(data: bytes) -> str:
-    """Hex-encode `data`, masking runs of >=3 printable-ASCII bytes as
-    `<text:Nb>`.
+    """Hex-encode `data`, masking runs of >=3 bytes of text as `<text:Nb>`.
 
     Mixed-content frame/UPDATES payload dumps can embed device names / user
     PII as text runs inside otherwise-binary bytes. Unlike `_redact_if_text`
@@ -215,23 +230,7 @@ def _redact_payload_hex(data: bytes) -> str:
     runs *within* a binary buffer so a publicly-pasted debug log keeps the
     byte shape without leaking PII. See [[feedback_pii_in_debug_logs]].
     """
-    out: list[str] = []
-    run: list[int] = []
-
-    def flush() -> None:
-        if not run:
-            return
-        out.append(f"<text:{len(run)}b>" if len(run) >= 3 else bytes(run).hex())
-        run.clear()
-
-    for byte in data:
-        if 0x20 <= byte <= 0x7E:
-            run.append(byte)
-        else:
-            flush()
-            out.append(f"{byte:02x}")
-    flush()
-    return "".join(out)
+    return mask_text_runs(data)
 
 
 def _redact_if_text(value: bytes) -> str:
@@ -251,7 +250,7 @@ def _redact_if_text(value: bytes) -> str:
     being the most common) so they keep their hex value — exactly what
     we need to map the unknown Outlet sub-keys.
     """
-    if len(value) >= 3 and all(0x20 <= b <= 0x7E for b in value):
+    if is_text(value):
         return f"<text:{len(value)}b>"
     return value.hex()
 
@@ -1104,7 +1103,10 @@ class HtsClient:
                     continue
                 self._consecutive_read_timeouts = 0
 
-                if not msg.is_no_ack and msg.msg_type != MsgType.ACK:
+                # Everything but a plain receipt gets one, a hub command's
+                # answer included: unacknowledged, the hub repeats the answer
+                # four times and then drops the connection (#689).
+                if not msg.is_no_ack and not _is_receipt(msg):
                     try:
                         await self._send_ack(msg)
                         _LOGGER.debug("  ACK sent for seq=%d", msg.seq_num)
