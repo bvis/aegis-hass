@@ -121,8 +121,8 @@ HUB_COMMAND_RESTORE_AFTER_ALARM = 0x16
 WRITE_PARAMETER_MSG_TYPE = 0x07
 WRITE_PARAMETER_TERMINATOR = b"\xfe\xfe"
 HUB_COMMAND_TIMEOUT = 15
-# How long after a hub command everything the hub sends is spelled out in the
-# debug log, so an answer that comes late, or in another shape, can be seen (#689).
+# How long after a hub command the hub's receipts and answers are spelled out in
+# the debug log, so an answer that comes late, or in another shape, can be seen (#689).
 HUB_COMMAND_TRACE_SECONDS = 120
 COMMAND_ANSWERS = {
     0x01: "DELIVERED",
@@ -1119,11 +1119,13 @@ class HtsClient:
                     msg.link,
                     len(msg.payload),
                 )
-                if time.monotonic() < self._hub_command_trace_until:
+                # Receipts and answers only: they carry a code and a sequence
+                # number. Settings and status rows can hold names, so those
+                # stay out of the trace.
+                if msg.msg_type == MsgType.ACK and time.monotonic() < self._hub_command_trace_until:
                     _LOGGER.debug(
-                        "  after a hub command: type=0x%02X payload hex: %s",
-                        int(msg.msg_type),
-                        _redact_payload_hex(msg.payload[:80]),
+                        "  after a hub command: receipt/answer payload hex: %s",
+                        msg.payload[:32].hex(),
                     )
                 if msg.msg_type == MsgType.UPDATES:
                     await self._handle_update(msg)
