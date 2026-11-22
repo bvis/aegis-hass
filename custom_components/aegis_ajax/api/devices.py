@@ -1130,11 +1130,15 @@ class DevicesApi:
             request_pb2,
         )
 
-        bypass_type = (
-            request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_ENGINEERING_SENSOR
-            if command.bypass_enable
-            else request_pb2.DeviceCommandDeviceBypassRequest.BYPASS_ENGINEERING_DISABLE
-        )
+        # The one-time family mirrors the permanent one, and the Ajax app
+        # clears each with its own value (#694).
+        bypass = request_pb2.DeviceCommandDeviceBypassRequest
+        bypass_type = {
+            (True, False): bypass.BYPASS_ENGINEERING_SENSOR,
+            (False, False): bypass.BYPASS_ENGINEERING_DISABLE,
+            (True, True): bypass.BYPASS_ONE_TIME_SENSOR,
+            (False, True): bypass.BYPASS_ONE_TIME_DISABLE,
+        }[bool(command.bypass_enable), command.bypass_once]
         channel = self._client._get_channel()
         metadata = self._client._session.get_call_metadata()
         stub = endpoint_pb2_grpc.DeviceCommandDeviceBypassServiceStub(channel)
@@ -1148,7 +1152,12 @@ class DevicesApi:
         if response.HasField("failure"):
             error = response.failure.WhichOneof("error") or "unknown"
             raise DeviceCommandError(f"bypass: {error}", reason=error)
-        _LOGGER.debug("Device %s bypass=%s OK", command.device_id, bool(command.bypass_enable))
+        _LOGGER.debug(
+            "Device %s bypass=%s once=%s OK",
+            command.device_id,
+            bool(command.bypass_enable),
+            command.bypass_once,
+        )
 
     async def _device_on(self, command: DeviceCommand) -> None:
         from v3.mobilegwsvc.service.device_command_device_on import (  # noqa: PLC0415

@@ -290,6 +290,16 @@
                     "description": "Necesar când este configurat mai mult de un cont Aegis."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Dezactivează dispozitivul",
+            "description": "Scoate un dispozitiv din alarmă, la fel ca întrerupătorul său „Excludere”, cu alegerea duratei: până îl reactivează cineva sau doar până la următoarea dezarmare.",
+            "fields": {
+                "mode": {
+                    "name": "Mod",
+                    "description": "„O dată” durează până la următoarea dezarmare, apoi dispozitivul revine singur. „Permanent” este ceea ce face întrerupătorul când este pornit."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Niciun cont Aegis for Ajax nu este încărcat. Verifică integrarea în pagina Dispozitive și servicii."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} nu este un întrerupător „Excludere”. Alege întrerupătorul „Excludere” al dispozitivului."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Miscare",
                 "panic": "Panica",
                 "tamper": "Sabotaj"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanent",
+                "once": "O dată, până la următoarea dezarmare"
             }
         }
     },

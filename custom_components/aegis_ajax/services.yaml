@@ -274,3 +274,27 @@ terminate_other_client_sessions:
       required: false
       selector:
         text:
+
+deactivate_device:
+  name: Deactivate device
+  description: >-
+    Take a device out of the alarm, like its Bypass switch, with a choice
+    of how long: until someone reactivates it, or only until the next disarm.
+  target:
+    entity:
+      domain: switch
+      integration: aegis_ajax
+  fields:
+    mode:
+      name: Mode
+      description: >-
+        "Once" lasts until the next disarm and then the device comes back by
+        itself. "Permanently" is what the switch does when turned on.
+      required: false
+      default: permanently
+      selector:
+        select:
+          translation_key: deactivate_mode
+          options:
+            - permanently
+            - once

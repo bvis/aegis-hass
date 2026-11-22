@@ -538,7 +538,8 @@ class TestServiceRegistration:
             or (call_args[0][4] if len(call_args[0]) > 4 else None)
             for call_args in hass.services.async_register.call_args_list
         }
-        assert set(register_calls) == set(_CUSTOM_SERVICE_NAMES)
+        # Plus the entity action Home Assistant's helper registers (#694).
+        assert set(register_calls) == {*_CUSTOM_SERVICE_NAMES, "deactivate_device"}
         assert register_calls["refresh_alarm_images"] == SupportsResponse.OPTIONAL
         assert register_calls["list_client_sessions"] == SupportsResponse.ONLY
         assert register_calls["terminate_other_client_sessions"] == SupportsResponse.OPTIONAL
@@ -576,3 +577,37 @@ class TestServiceRegistration:
         with pytest.raises(ServiceValidationError) as err:
             await _async_handle_force_arm(hass, call)
         assert err.value.translation_key == "not_loaded"
+
+
+class TestDeactivateDeviceAction:
+    """`aegis_ajax.deactivate_device` runs on a bypass switch only (#694)."""
+
+    @pytest.mark.asyncio
+    async def test_a_bypass_switch_gets_the_mode(self) -> None:
+        from custom_components.aegis_ajax import _async_deactivate_device
+        from custom_components.aegis_ajax.switch import AjaxBypassSwitch
+
+        entity = MagicMock(spec=AjaxBypassSwitch)
+        entity.async_deactivate = AsyncMock()
+        call = MagicMock()
+        call.data = {"mode": "once"}
+
+        await _async_deactivate_device(entity, call)
+
+        entity.async_deactivate.assert_awaited_once_with("once")
+
+    @pytest.mark.asyncio
+    async def test_any_other_switch_is_refused(self) -> None:
+        from homeassistant.exceptions import ServiceValidationError
+
+        from custom_components.aegis_ajax import _async_deactivate_device
+        from custom_components.aegis_ajax.switch import AjaxChimeSwitch
+
+        entity = MagicMock(spec=AjaxChimeSwitch)
+        entity.entity_id = "switch.hub_chime"
+        call = MagicMock()
+        call.data = {"mode": "once"}
+
+        with pytest.raises(ServiceValidationError) as err:
+            await _async_deactivate_device(entity, call)
+        assert err.value.translation_key == "deactivate_needs_bypass_switch"

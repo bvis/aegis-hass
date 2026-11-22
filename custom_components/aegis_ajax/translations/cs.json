@@ -290,6 +290,16 @@
                     "description": "Nutné, pokud je nakonfigurován více než jeden účet Aegis."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Deaktivovat zařízení",
+            "description": "Vyřadí zařízení z alarmu stejně jako jeho přepínač „Vyřazení“, s volbou doby: dokud ho někdo znovu neaktivuje, nebo jen do příštího odjištění.",
+            "fields": {
+                "mode": {
+                    "name": "Režim",
+                    "description": "„Jednorázově“ platí do příštího odjištění, potom se zařízení samo vrátí. „Trvale“ je to, co dělá přepínač při zapnutí."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Není načten žádný účet Aegis for Ajax. Zkontrolujte integraci na stránce Zařízení a služby."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} není přepínač „Vyřazení“. Vyberte přepínač „Vyřazení“ daného zařízení."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Pohyb",
                 "panic": "Panika",
                 "tamper": "Sabotáž"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Trvale",
+                "once": "Jednorázově, do příštího odjištění"
             }
         }
     },

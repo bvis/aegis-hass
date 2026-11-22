@@ -251,6 +251,42 @@ class TestAjaxBypassSwitch:
         coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("mode", "once"), [("once", True), ("permanently", False)])
+    async def test_deactivate_picks_the_mode(self, mode: str, once: bool) -> None:
+        sw, coordinator = self._make()
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_deactivate(mode)
+
+        cmd = coordinator.devices_api.send_command.call_args[0][0]
+        assert (cmd.action, cmd.bypass_enable, cmd.bypass_once) == ("bypass", True, once)
+        coordinator.schedule_bypass_confirm.assert_called_once_with("d1", expected=True)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("statuses", "once"),
+        [
+            ({"one_time_deactivation_whole": True}, True),
+            ({"temporary_deactivation_whole": True}, False),
+            # Both in force: the permanent clear is the one the switch always sent.
+            ({"one_time_deactivation_whole": True, "temporary_deactivation_whole": True}, False),
+            ({}, False),
+        ],
+    )
+    async def test_turn_off_clears_a_one_time_deactivation_with_its_own_value(
+        self, statuses: dict, once: bool
+    ) -> None:
+        sw, coordinator = self._make(statuses=statuses)
+        coordinator.devices_api.send_command = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+
+        await sw.async_turn_off()
+
+        cmd = coordinator.devices_api.send_command.call_args[0][0]
+        assert (cmd.bypass_enable, cmd.bypass_once) == (False, once)
+
+    @pytest.mark.asyncio
     async def test_permission_denied_surfaces_homeassistant_error(self) -> None:
         from homeassistant.exceptions import HomeAssistantError
 

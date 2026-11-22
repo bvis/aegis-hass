@@ -207,6 +207,9 @@ class DeviceCommand:
     # True = deactivate (bypass) the device, False = reactivate it. Only set
     # for action="bypass".
     bypass_enable: bool | None = None
+    # With `bypass_enable`, deactivate until the next disarm only; without it,
+    # clear such a one-time deactivation (#694).
+    bypass_once: bool = False
     # Writable siren settings (#310). Only set for action="siren_settings";
     # each is optional so a command can change one without touching the other.
     # `alarm_duration` is seconds; `siren_volume_level` is the
@@ -263,14 +266,21 @@ class DeviceCommand:
         )
 
     @classmethod
-    def bypass(cls, hub_id: str, device_id: str, device_type: str, enable: bool) -> DeviceCommand:
-        """Deactivate (`enable=True`) or reactivate (`enable=False`) a device."""
+    def bypass(
+        cls, hub_id: str, device_id: str, device_type: str, enable: bool, *, once: bool = False
+    ) -> DeviceCommand:
+        """Deactivate (`enable=True`) or reactivate (`enable=False`) a device.
+
+        `once` picks the one-time deactivation, which the hub lifts by itself
+        at the next disarm, over the permanent one (#694).
+        """
         return cls(
             action="bypass",
             hub_id=hub_id,
             device_id=device_id,
             device_type=device_type,
             bypass_enable=enable,
+            bypass_once=once,
         )
 
     @classmethod

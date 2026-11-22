@@ -13,7 +13,10 @@ from homeassistant.core import ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.service import async_register_admin_service
+from homeassistant.helpers.service import (
+    async_register_admin_service,
+    async_register_platform_entity_service,
+)
 
 from custom_components.aegis_ajax.card import async_register_card
 
@@ -83,6 +86,8 @@ from custom_components.aegis_ajax.const import (  # noqa: E402
     CONF_PERSISTENT_NOTIFICATION_EVENTS,
     CONF_PERSISTENT_NOTIFICATIONS,
     CONF_PRIMARY_ENTRY_ID,
+    DEACTIVATE_MODE_ONCE,
+    DEACTIVATE_MODE_PERMANENTLY,
     DEFAULT_AUTO_CREATE_LABELS,
     DEFAULT_DELAY_PANEL_STATES,
     DEFAULT_DISABLE_PUSH_WARNING,
@@ -106,6 +111,7 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant, ServiceCall
     from homeassistant.helpers.device_registry import DeviceEntry
+    from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.typing import ConfigType
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -133,6 +139,22 @@ PLATFORMS = [
 ]
 
 type AjaxCobrandedConfigEntry = ConfigEntry[AjaxCobrandedCoordinator]
+
+
+async def _async_deactivate_device(entity: Entity, call: ServiceCall) -> None:
+    """Deactivate the device behind a bypass switch, once or permanently (#694)."""
+    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+    from custom_components.aegis_ajax.switch import AjaxBypassSwitch  # noqa: PLC0415
+
+    if not isinstance(entity, AjaxBypassSwitch):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="deactivate_needs_bypass_switch",
+            translation_placeholders={"entity_id": entity.entity_id},
+        )
+    await entity.async_deactivate(call.data["mode"])
+
 
 # Domain-level custom services, registered once in async_setup (#603).
 _CUSTOM_SERVICE_NAMES = (
@@ -650,6 +672,21 @@ def _async_register_services(hass: HomeAssistant) -> None:
             hass.services.async_register(
                 DOMAIN, name, service_handlers[name], supports_response=supports_response
             )
+
+    # An entity action on the bypass switch, so targets, areas and labels are
+    # resolved by Home Assistant (#694).
+    async_register_platform_entity_service(
+        hass,
+        DOMAIN,
+        "deactivate_device",
+        entity_domain="switch",
+        schema={
+            vol.Optional("mode", default=DEACTIVATE_MODE_PERMANENTLY): vol.In(
+                [DEACTIVATE_MODE_PERMANENTLY, DEACTIVATE_MODE_ONCE]
+            )
+        },
+        func=_async_deactivate_device,
+    )
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

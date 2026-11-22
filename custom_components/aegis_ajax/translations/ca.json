@@ -290,6 +290,16 @@
                     "description": "Obligatori quan hi ha més d'un compte d'Aegis configurat."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Desactiva el dispositiu",
+            "description": "Treu un dispositiu de l'alarma, com el seu interruptor Bypass, triant quant dura: fins que algú el reactivi o només fins al pròxim desarmament.",
+            "fields": {
+                "mode": {
+                    "name": "Mode",
+                    "description": "«Una vegada» dura fins al pròxim desarmament i després el dispositiu torna sol. «Permanent» és el que fa l'interruptor en encendre'l."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "No hi ha cap compte d'Aegis for Ajax carregat. Revisa la integració a la pàgina Dispositius i serveis."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} no és un interruptor Bypass. Tria l'interruptor Bypass del dispositiu."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Moviment",
                 "panic": "Panic",
                 "tamper": "Manipulacio"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanent",
+                "once": "Una vegada, fins al pròxim desarmament"
             }
         }
     },
