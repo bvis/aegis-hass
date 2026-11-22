@@ -377,6 +377,10 @@ SIREN_SETTINGS_CONFIRM_DELAY = 5.0
 # the same oneof but have not been observed on hardware; they are folded the
 # same way because every one of them means "protection is off here", and
 # under-reporting that is the failure mode this fix exists to remove.
+# Modes of the `deactivate_device` action (#694).
+DEACTIVATE_MODE_PERMANENTLY = "permanently"
+DEACTIVATE_MODE_ONCE = "once"
+
 DEACTIVATION_STATUS_KEYS: tuple[str, ...] = (
     "temporary_deactivation_whole",
     "temporary_deactivation_tamper",

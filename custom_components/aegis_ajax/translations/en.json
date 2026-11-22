@@ -290,6 +290,16 @@
                     "description": "Required when more than one Aegis account is configured."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Deactivate device",
+            "description": "Take a device out of the alarm, like its Bypass switch, with a choice of how long: until someone reactivates it, or only until the next disarm.",
+            "fields": {
+                "mode": {
+                    "name": "Mode",
+                    "description": "\"Once\" lasts until the next disarm and then the device comes back by itself. \"Permanently\" is what the switch does when turned on."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "No Aegis for Ajax account is loaded. Check the integration on the Devices & services page."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} is not a Bypass switch. Pick the Bypass switch of the device."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Motion",
                 "panic": "Panic",
                 "tamper": "Tamper"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanently",
+                "once": "Once, until the next disarm"
             }
         }
     },

@@ -290,6 +290,16 @@
                     "description": "Requis lorsque plusieurs comptes Aegis sont configurés."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Désactiver l'appareil",
+            "description": "Retire un appareil de l'alarme, comme son interrupteur Contournement, en choisissant la durée : jusqu'à ce que quelqu'un le réactive, ou seulement jusqu'au prochain désarmement.",
+            "fields": {
+                "mode": {
+                    "name": "Mode",
+                    "description": "« Une fois » dure jusqu'au prochain désarmement, puis l'appareil revient de lui-même. « En permanence » est ce que fait l'interrupteur quand on l'allume."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Aucun compte Aegis for Ajax n'est chargé. Vérifiez l'intégration dans la page Appareils et services."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} n'est pas un interrupteur Contournement. Choisissez l'interrupteur Contournement de l'appareil."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Mouvement",
                 "panic": "Panique",
                 "tamper": "Sabotage"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "En permanence",
+                "once": "Une fois, jusqu'au prochain désarmement"
             }
         }
     },

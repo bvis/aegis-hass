@@ -290,6 +290,16 @@
                     "description": "Obrigatório quando há mais de uma conta Aegis configurada."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Desativar dispositivo",
+            "description": "Retira um dispositivo do alarme, como o interruptor Ignorar dele, escolhendo a duração: até alguém reativá-lo ou apenas até o próximo desarme.",
+            "fields": {
+                "mode": {
+                    "name": "Modo",
+                    "description": "\"Uma vez\" dura até o próximo desarme e depois o dispositivo volta sozinho. \"Permanente\" é o que o interruptor faz quando é ligado."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Nenhuma conta do Aegis for Ajax está carregada. Verifique a integração na página Dispositivos e serviços."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} não é um interruptor Ignorar. Escolha o interruptor Ignorar do dispositivo."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Movimento",
                 "panic": "Pânico",
                 "tamper": "Violação"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanente",
+                "once": "Uma vez, até o próximo desarme"
             }
         }
     },

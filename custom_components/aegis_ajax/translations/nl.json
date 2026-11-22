@@ -290,6 +290,16 @@
                     "description": "Vereist wanneer meer dan één Aegis-account is geconfigureerd."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Apparaat deactiveren",
+            "description": "Haalt een apparaat uit het alarm, net als de schakelaar Overbruggen, met een keuze voor hoe lang: tot iemand het weer activeert of alleen tot de volgende uitschakeling.",
+            "fields": {
+                "mode": {
+                    "name": "Modus",
+                    "description": "\"Eenmalig\" duurt tot de volgende uitschakeling, daarna doet het apparaat vanzelf weer mee. \"Permanent\" is wat de schakelaar doet als je hem aanzet."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Er is geen Aegis for Ajax-account geladen. Controleer de integratie op de pagina Apparaten en diensten."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} is geen schakelaar Overbruggen. Kies de schakelaar Overbruggen van het apparaat."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Beweging",
                 "panic": "Paniek",
                 "tamper": "Sabotage"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanent",
+                "once": "Eenmalig, tot de volgende uitschakeling"
             }
         }
     },

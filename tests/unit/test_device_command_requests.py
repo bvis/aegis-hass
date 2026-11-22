@@ -239,6 +239,18 @@ async def test_bypass_request(enable: bool, bypass: str) -> None:
     assert request.bypass_type == getattr(harness.request_cls, f"BYPASS_ENGINEERING_{bypass}")
 
 
+@pytest.mark.parametrize(("enable", "bypass"), [(True, "SENSOR"), (False, "DISABLE")])
+async def test_one_time_bypass_request(enable: bool, bypass: str) -> None:
+    """The one-time family has its own values, the clear included (#694)."""
+    harness = _Harness("bypass")
+    request = await harness.run(
+        lambda api: api.send_command(
+            _command("bypass", "wire_input_mt", bypass_enable=enable, bypass_once=True)
+        )
+    )
+    assert request.bypass_type == getattr(harness.request_cls, f"BYPASS_ONE_TIME_{bypass}")
+
+
 @pytest.mark.parametrize(
     ("values", "sent"),
     [

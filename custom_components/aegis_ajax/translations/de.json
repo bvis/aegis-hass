@@ -290,6 +290,16 @@
                     "description": "Erforderlich, wenn mehr als ein Aegis-Konto konfiguriert ist."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Gerät deaktivieren",
+            "description": "Nimmt ein Gerät aus der Alarmanlage, wie sein Schalter „Überbrückung“, mit wählbarer Dauer: bis es jemand wieder aktiviert oder nur bis zur nächsten Unscharfschaltung.",
+            "fields": {
+                "mode": {
+                    "name": "Modus",
+                    "description": "„Einmalig“ gilt bis zur nächsten Unscharfschaltung, danach ist das Gerät von selbst wieder aktiv. „Dauerhaft“ ist das, was der Schalter beim Einschalten tut."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Kein Aegis for Ajax-Konto ist geladen. Prüfe die Integration auf der Seite Geräte & Dienste."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} ist kein Schalter „Überbrückung“. Wähle den Schalter „Überbrückung“ des Geräts."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Bewegung",
                 "panic": "Panik",
                 "tamper": "Sabotage"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Dauerhaft",
+                "once": "Einmalig, bis zur nächsten Unscharfschaltung"
             }
         }
     },

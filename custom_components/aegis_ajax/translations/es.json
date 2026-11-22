@@ -290,6 +290,16 @@
                     "description": "Obligatorio cuando hay más de una cuenta de Aegis configurada."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Desactivar dispositivo",
+            "description": "Saca un dispositivo de la alarma, como su interruptor Bypass, eligiendo cuánto dura: hasta que alguien lo reactive o solo hasta el próximo desarmado.",
+            "fields": {
+                "mode": {
+                    "name": "Modo",
+                    "description": "«Una vez» dura hasta el próximo desarmado y después el dispositivo vuelve solo. «Permanente» es lo que hace el interruptor al encenderlo."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "No hay ninguna cuenta de Aegis for Ajax cargada. Revisa la integración en la página Dispositivos y servicios."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} no es un interruptor Bypass. Elige el interruptor Bypass del dispositivo."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Movimiento",
                 "panic": "Panico",
                 "tamper": "Manipulacion"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanente",
+                "once": "Una vez, hasta el próximo desarmado"
             }
         }
     },

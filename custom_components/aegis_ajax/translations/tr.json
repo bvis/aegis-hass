@@ -290,6 +290,16 @@
                     "description": "Birden fazla Aegis hesabı yapılandırıldığında gereklidir."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Cihazı devre dışı bırak",
+            "description": "Bir cihazı, \"Atlama\" anahtarı gibi alarmın dışına alır; süresini seçebilirsiniz: biri yeniden etkinleştirene kadar ya da yalnızca alarm bir sonraki kez kapatılana kadar.",
+            "fields": {
+                "mode": {
+                    "name": "Mod",
+                    "description": "\"Bir kez\" alarm bir sonraki kez kapatılana kadar sürer, sonra cihaz kendiliğinden geri döner. \"Kalıcı\" ise anahtar açıldığında yaptığı şeydir."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Yüklü bir Aegis for Ajax hesabı yok. Cihazlar ve hizmetler sayfasından entegrasyonu kontrol edin."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} bir \"Atlama\" anahtarı değil. Cihazın \"Atlama\" anahtarını seçin."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Hareket",
                 "panic": "Panik",
                 "tamper": "Müdahale"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Kalıcı",
+                "once": "Bir kez, alarm bir sonraki kez kapatılana kadar"
             }
         }
     },

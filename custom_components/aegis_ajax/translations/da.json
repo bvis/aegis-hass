@@ -290,6 +290,16 @@
                     "description": "Påkrævet når mere end én Aegis-konto er konfigureret."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Deaktiver enhed",
+            "description": "Tager en enhed ud af alarmen, ligesom dens kontakt Bypass, med valg af varighed: indtil nogen aktiverer den igen eller kun indtil næste frakobling.",
+            "fields": {
+                "mode": {
+                    "name": "Tilstand",
+                    "description": "\"Én gang\" varer indtil næste frakobling, og derefter er enheden selv med igen. \"Permanent\" er det, kontakten gør, når den tændes."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Ingen Aegis for Ajax-konto er indlæst. Tjek integrationen på siden Enheder og tjenester."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} er ikke en kontakt Bypass. Vælg enhedens kontakt Bypass."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Bevægelse",
                 "panic": "Panik",
                 "tamper": "Sabotage"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanent",
+                "once": "Én gang, indtil næste frakobling"
             }
         }
     },

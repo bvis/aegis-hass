@@ -401,6 +401,23 @@ after you ignore its warning, the Repair reappears. Read-only services such as
 `refresh_alarm_images` retain their existing all-spaces behavior.
 
 
+### Service: `aegis_ajax.deactivate_device`
+
+Turning a device's **Bypass** switch on deactivates it until someone turns the switch off again. This action does the same with a choice of how long, like the two deactivation menus in the Ajax app:
+
+- `mode: permanently` (default): the same as turning the switch on.
+- `mode: once`: the device is left out until the next disarm and then comes back by itself. Nothing has to remember to reactivate it.
+
+```yaml
+action: aegis_ajax.deactivate_device
+target:
+  entity_id: switch.garden_room_bypass
+data:
+  mode: once
+```
+
+Target the device's Bypass switch. The switch reads `on` while the device is deactivated either way, its `deactivation_kinds` attribute tells which one is in force, and turning it off reactivates the device at any time. Not every Ajax device offers a one-time deactivation; if the hub refuses it, the action fails with the hub's answer. It needs the same Ajax permission as the Bypass switch. **Requests to Ajax:** one per call, the same one the app sends.
+
 ### Arm modes & voice assistants (Alexa via Home Assistant Cloud)
 
 Ajax has a single partial-arm mode (the app calls it **Night mode**) plus full arm. The panel exposes **Arm Away** (full arm) and both **Arm Home** and **Arm Night** for that one partial mode — so "Arm Home" and "Arm Night" do the same thing and both settle the panel to `armed_night`. "Arm Home" is advertised mainly so the **Nabu Casa / Alexa** skill discovers the panel (it won't discover a panel that exposes Night without Home).

@@ -290,6 +290,16 @@
                     "description": "Wymagane, gdy skonfigurowano więcej niż jedno konto Aegis."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Dezaktywuj urządzenie",
+            "description": "Wyłącza urządzenie z alarmu, tak jak jego przełącznik „Pominięcie”, z wyborem czasu: do chwili, gdy ktoś je ponownie aktywuje, albo tylko do najbliższego rozbrojenia.",
+            "fields": {
+                "mode": {
+                    "name": "Tryb",
+                    "description": "„Jednorazowo” trwa do najbliższego rozbrojenia, po czym urządzenie samo wraca. „Na stałe” to to, co robi przełącznik po włączeniu."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Żadne konto Aegis for Ajax nie jest załadowane. Sprawdź integrację na stronie Urządzenia i usługi."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} nie jest przełącznikiem „Pominięcie”. Wybierz przełącznik „Pominięcie” tego urządzenia."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Ruch",
                 "panic": "Panika",
                 "tamper": "Sabotaż"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Na stałe",
+                "once": "Jednorazowo, do najbliższego rozbrojenia"
             }
         }
     },

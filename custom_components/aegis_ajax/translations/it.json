@@ -290,6 +290,16 @@
                     "description": "Necessario quando è configurato più di un account Aegis."
                 }
             }
+        },
+        "deactivate_device": {
+            "name": "Disattiva dispositivo",
+            "description": "Esclude un dispositivo dall'allarme, come il suo interruttore Esclusione, scegliendo per quanto: finché qualcuno lo riattiva o solo fino al prossimo disinserimento.",
+            "fields": {
+                "mode": {
+                    "name": "Modalità",
+                    "description": "«Una volta» dura fino al prossimo disinserimento, poi il dispositivo torna attivo da solo. «Permanente» è ciò che fa l'interruttore quando viene acceso."
+                }
+            }
         }
     },
     "issues": {
@@ -755,6 +765,9 @@
         },
         "not_loaded": {
             "message": "Nessun account Aegis for Ajax è caricato. Controlla l'integrazione nella pagina Dispositivi e servizi."
+        },
+        "deactivate_needs_bypass_switch": {
+            "message": "{entity_id} non è un interruttore Esclusione. Scegli l'interruttore Esclusione del dispositivo."
         }
     },
     "device_automation": {
@@ -805,6 +818,12 @@
                 "motion": "Movimento",
                 "panic": "Panico",
                 "tamper": "Manomissione"
+            }
+        },
+        "deactivate_mode": {
+            "options": {
+                "permanently": "Permanente",
+                "once": "Una volta, fino al prossimo disinserimento"
             }
         }
     },

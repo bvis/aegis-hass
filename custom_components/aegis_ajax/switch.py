@@ -21,6 +21,7 @@ from custom_components.aegis_ajax.const import (
     BYPASS_SWITCHES_ALWAYS,
     BYPASS_SWITCHES_NEVER,
     CONF_BYPASS_SWITCHES,
+    DEACTIVATE_MODE_ONCE,
     DEFAULT_BYPASS_SWITCHES,
     DOMAIN,
     LIGHT_SWITCH_BUTTON_LOCK_DEVICE_TYPES,
@@ -315,8 +316,9 @@ class AjaxBypassSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity
     the snapshot's `bypassed` flag False (#338). Reading only that flag showed
     a disabled sensor as live protection.
 
-    Writing goes out as the permanent ("engineering") deactivation; the
-    granular mode in force is exposed as the `deactivation_kinds` attribute.
+    Turning it on writes the permanent ("engineering") deactivation; the
+    `deactivate_device` action can ask for the one-time one instead (#694).
+    The mode in force is exposed as the `deactivation_kinds` attribute.
     **Both directions are honoured** — see `DevicesApi._device_bypass` for why
     the enum value that clears a deactivation is not the one its name suggests,
     and why sending the wrong one looked like the hub ignoring us (#338).
@@ -377,14 +379,24 @@ class AjaxBypassSwitch(CoordinatorEntity[AjaxCobrandedCoordinator], SwitchEntity
         await self._set_bypass(enable=True)
 
     async def async_turn_off(self, **kwargs: object) -> None:
-        await self._set_bypass(enable=False)
+        # A one-time deactivation is cleared with its own value, as in the
+        # Ajax app; everything else with the permanent one.
+        device = self._device
+        kinds = device_deactivation_kinds(device) if device is not None else []
+        once = bool(kinds) and all(kind.startswith("one_time") for kind in kinds)
+        await self._set_bypass(enable=False, once=once)
 
-    async def _set_bypass(self, *, enable: bool) -> None:
+    async def async_deactivate(self, mode: str) -> None:
+        """The `deactivate_device` action: like turning on, with a choice of mode (#694)."""
+        await self._set_bypass(enable=True, once=mode == DEACTIVATE_MODE_ONCE)
+
+    async def _set_bypass(self, *, enable: bool, once: bool = False) -> None:
         cmd = DeviceCommand.bypass(
             hub_id=self._hub_id,
             device_id=self._device_id,
             device_type=self._device_type,
             enable=enable,
+            once=once,
         )
         await async_send_device_command(self.coordinator, cmd)
         # The hub can accept this command and apply nothing (#338), so the
