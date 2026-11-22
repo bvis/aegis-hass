@@ -106,6 +106,27 @@ async def test_a_hub_command_answer_is_acknowledged_and_a_receipt_is_not() -> No
     assert _calls(client) == _none_but(_handle_answer=[receipt, answer, quiet, garbled])
 
 
+async def test_our_next_frame_is_numbered_after_the_last_one_received() -> None:
+    client = _listening(_message(MsgType.UPDATES, seq=500), _message(MsgType.UPDATES, seq=503))
+    client._seq_num = 498
+    await client.listen()
+    assert client._next_seq() == 504
+
+
+async def test_an_older_number_does_not_pull_the_counter_back() -> None:
+    client = _listening(_message(MsgType.UPDATES, seq=500))
+    client._seq_num = 510
+    await client.listen()
+    assert client._next_seq() == 510
+
+
+async def test_the_counter_follows_across_the_wrap() -> None:
+    client = _listening(_message(MsgType.UPDATES, seq=0xFFFFFF))
+    client._seq_num = 0xFFFFFE
+    await client.listen()
+    assert client._next_seq() == 0
+
+
 async def test_a_failed_acknowledgement_does_not_drop_the_message() -> None:
     update = _message(MsgType.UPDATES)
     client = _listening(update)

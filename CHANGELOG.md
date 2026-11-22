@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Deactivate a device once, until the next disarm (#694).** The new `aegis_ajax.deactivate_device` action takes a device's Bypass switch and a `mode`: `permanently` does what the switch does, `once` leaves the device out only until the next disarm, after which it protects again by itself. It is the "One-time deactivation" of the Ajax app, handy for a routine that arms the house while you stay in one room. Turning the Bypass switch off cancels either kind. See [`aegis_ajax.deactivate_device`](README.md#service-aegis_ajaxdeactivate_device). Requested by @hurinapakova. **Requests to Ajax:** one command per call, the same one the app sends, plus the check the Bypass switch already makes a few seconds later to confirm the hub applied it.
 
+### Fixed
+- **Messages to the hub are numbered the way the hub expects.** Home Assistant counted only its own messages, so after anything the hub sent it was one number behind, and the hub then gave two different messages the same number. Nothing visibly broke, but it is not how the Ajax app talks to the hub, and a mismatch like that can make the hub ignore an acknowledgement. The next message is now numbered after the last one received. **Requests to Ajax:** unchanged.
+
 ## [1.34.0] - 2026-11-22
 
 ### Added

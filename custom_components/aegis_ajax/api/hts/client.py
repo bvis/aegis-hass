@@ -409,6 +409,18 @@ class HtsClient:
         self._seq_num = (self._seq_num + 1) & 0xFFFFFF
         return seq
 
+    def _follow_seq(self, received: int) -> None:
+        """Number our next frame after the one just received.
+
+        Both ends share one counter: whoever sends next uses the last number
+        seen plus one, and the hub takes over ours the same way. Counting only
+        our own frames left us one behind after every frame the hub sent, and
+        the hub then gave two different frames the same number.
+        """
+        ahead = (received + 1 - self._seq_num) & 0xFFFFFF
+        if 0 < ahead < 0x800000:
+            self._seq_num = (received + 1) & 0xFFFFFF
+
     # ------------------------------------------------------------------
     # Connection
     # ------------------------------------------------------------------
@@ -1102,6 +1114,7 @@ class HtsClient:
                     self._consecutive_read_timeouts = 0
                     continue
                 self._consecutive_read_timeouts = 0
+                self._follow_seq(msg.seq_num)
 
                 # Everything but a plain receipt gets one, a hub command's
                 # answer included: unacknowledged, the hub repeats the answer
