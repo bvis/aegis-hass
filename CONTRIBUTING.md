@@ -128,6 +128,8 @@ git rebase --exec "git commit --amend --no-edit -S" HEAD~N
 git push --force-with-lease
 ```
 
+That recipe is for a branch with a straight line of commits. If yours has merge commits (for example, you merged `main` into it), say so in the pull request and we'll sort it out together.
+
 ## Credentials and secrets
 
 Do not commit FCM credentials (`fcm_project_id`, `fcm_app_id`, `fcm_api_key`, `fcm_sender_id`), Ajax session tokens, OAuth client secrets, or any other credential — in source, tests, fixtures, issues, PR descriptions, or commit messages. Each user supplies their own values through the integration's config flow (Settings → Devices & Services → Aegis for Ajax → Configure) or through the Repair card. See the README's [Where the values live](README.md#where-the-values-live) section for how a user extracts them from their own Ajax mobile app.
