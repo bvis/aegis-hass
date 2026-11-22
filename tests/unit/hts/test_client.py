@@ -213,7 +213,7 @@ class TestRestoreAfterAlarm:
         await asyncio.sleep(0)
         msg_type, payload = client._send_message.await_args.args
         assert msg_type == 0x06
-        assert client._send_message.await_args.kwargs == {"receiver": 0x0001A2B3}
+        assert client._send_message.await_args.kwargs == {"receiver": 0x0001A2B3, "link": 0}
         assert tlv_decode(payload) == [b"\x00", b"\x21", b"\x00\x01\xa2\xb3", b"\x16"]
 
         # The transport receipt and an answer to another frame are not the result.

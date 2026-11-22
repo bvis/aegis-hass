@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -57,7 +58,9 @@ class TestClientWrite:
         await asyncio.sleep(0)
         msg_type, payload = client._send_message.await_args.args
         assert msg_type == MsgType.WRITE_PARAMETER
-        assert client._send_message.await_args.kwargs == {"receiver": 0x0001A2B3}
+        kwargs = client._send_message.await_args.kwargs
+        assert kwargs["receiver"] == 0x0001A2B3
+        assert 1 <= kwargs["link"] <= 100  # a link of its own per write, like the app
         assert tlv_decode(payload) == [
             b"\x44",
             bytes.fromhex(LS),
@@ -70,6 +73,15 @@ class TestClientWrite:
         assert not task.done()
         client._handle_answer(_msg(MsgType.ACK, tlv_encode([b"\x02", b"\x00\x01\x02"])))
         assert await task == 0x02
+
+    def test_an_answer_after_the_wait_ended_is_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        client = _make_client()
+        client._hub_command_trace_until = time.monotonic() + 60
+        with caplog.at_level("DEBUG", logger="custom_components.aegis_ajax.api.hts.client"):
+            client._handle_answer(_msg(MsgType.ACK, tlv_encode([b"\x02", b"\x00\x01\x02"])))
+        assert "late answer" in caplog.text
 
 
 class TestTracking:
