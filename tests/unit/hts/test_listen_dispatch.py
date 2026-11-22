@@ -89,6 +89,23 @@ async def test_messages_are_acknowledged_unless_they_say_not_to() -> None:
     )
 
 
+async def test_a_hub_command_answer_is_acknowledged_and_a_receipt_is_not() -> None:
+    """Unacknowledged, the hub repeats its answer four times and hangs up (#689)."""
+    from dataclasses import replace
+
+    from custom_components.aegis_ajax.api.hts.messages import tlv_encode
+
+    seq = (7).to_bytes(3, "big")
+    receipt = replace(_message(MsgType.ACK, seq=1), payload=tlv_encode([b"\x00", seq]))
+    answer = replace(_message(MsgType.ACK, seq=2), payload=tlv_encode([b"\x02", seq]))
+    quiet = replace(answer, seq_num=3, flags=FLAG_NO_ACK)
+    garbled = replace(_message(MsgType.ACK, seq=4), payload=b"\x05")
+    client = _listening(receipt, answer, quiet, garbled)
+    await client.listen()
+    assert [call.args[0] for call in client._send_ack.await_args_list] == [answer]
+    assert _calls(client) == _none_but(_handle_answer=[receipt, answer, quiet, garbled])
+
+
 async def test_a_failed_acknowledgement_does_not_drop_the_message() -> None:
     update = _message(MsgType.UPDATES)
     client = _listening(update)

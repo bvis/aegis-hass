@@ -5242,6 +5242,19 @@ class TestOnHtsDeviceKvKeyfob:
             "2ACCB91C": {"missing": ["0x16"], "unexpected": ["0x17"]}
         }
 
+    def test_a_named_row_that_is_no_keyfob_is_recorded_without_a_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A detector row has a name and an index too; that is not firmware drift (#689)."""
+        coordinator = _make_coordinator()
+        row = {0x02: b"Basement", 0x0A: b"\x05", 0x08: b"\x01", 0x2E: b"\x02", 0xB0: b"\x06"}
+
+        with caplog.at_level(logging.WARNING, logger="custom_components.aegis_ajax.coordinator"):
+            coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", row)
+
+        assert [r for r in caplog.records if r.levelno == logging.WARNING] == []
+        assert "2ACCB91C" in coordinator.keyfob_unrecognised_rows
+
     def test_recognised_keyfob_records_nothing(self) -> None:
         coordinator = _make_coordinator()
         coordinator.async_set_updated_data = MagicMock()

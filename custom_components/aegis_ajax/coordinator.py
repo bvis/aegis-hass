@@ -2916,6 +2916,12 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             return
         self.keyfob_unrecognised_rows[device_id_hex] = record
+        if len(keys & KEYFOB_SHAPE) * 2 < len(KEYFOB_SHAPE):
+            # Under half the keyfob sub-keys: another kind of device that
+            # happens to have a name and an index (a detector the account
+            # list doesn't match, #689), not a keyfob a firmware changed.
+            # Diagnostics keep the row; the log stays quiet.
+            return
         _LOGGER.warning(
             "Row %s on hub %s looks like a SpaceControl keyfob but does not match the "
             "known shape, so no keyfob entity is provided for it: missing sub-keys %s, "

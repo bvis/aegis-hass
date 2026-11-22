@@ -33,6 +33,7 @@ from custom_components.aegis_ajax.notification_fcm_guard import (
     attach_fcm_log_guard,
     install_fcm_decrypt_guard,
 )
+from custom_components.aegis_ajax.redaction import mask_text_runs
 from custom_components.aegis_ajax.repairs import (
     async_clear_fcm_credentials_invalid,
     async_clear_fcm_credentials_malformed,
@@ -127,38 +128,14 @@ FCM_STUCK_TERMINATION_THRESHOLD = 3
 # days of ordinary use, and by then zero deliveries is not a quiet house.
 FCM_NEVER_DELIVERED_EVENT_THRESHOLD = 20
 
-# A run of this many consecutive printable-ASCII bytes in a redacted hex dump
-# is treated as text (likely a device name / label) and masked. Shorter runs
-# stay as hex — too short to leak meaningful PII, and often coincidental.
-_MIN_PRINTABLE_RUN = 3
-
 
 def _redact_printable(data: bytes) -> str:
-    """Hex-encode `data`, masking runs of >=3 printable-ASCII bytes as
-    `<text:Nb>` (#173). Debug payload dumps can carry user device labels;
-    this keeps the binary shape visible for diagnosis without leaking PII
-    when a user pastes the log publicly. See [[feedback_pii_in_debug_logs]].
+    """Hex-encode `data`, masking runs of >=3 bytes of text as `<text:Nb>`
+    (#173). Debug payload dumps can carry user device labels; this keeps the
+    binary shape visible for diagnosis without leaking PII when a user pastes
+    the log publicly. See [[feedback_pii_in_debug_logs]].
     """
-    out: list[str] = []
-    run: list[int] = []
-
-    def flush() -> None:
-        if not run:
-            return
-        if len(run) >= _MIN_PRINTABLE_RUN:
-            out.append(f"<text:{len(run)}b>")
-        else:
-            out.append(bytes(run).hex())
-        run.clear()
-
-    for byte in data:
-        if 0x20 <= byte <= 0x7E:
-            run.append(byte)
-        else:
-            flush()
-            out.append(f"{byte:02x}")
-    flush()
-    return "".join(out)
+    return mask_text_runs(data)
 
 
 # FCM credentials validation + library-error classifier extracted to
