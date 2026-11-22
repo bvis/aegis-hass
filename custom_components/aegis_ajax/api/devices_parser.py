@@ -24,6 +24,7 @@ from custom_components.aegis_ajax.const import (
     SIREN_VOLUME_LEVEL_KEY,
     DeviceState,
 )
+from custom_components.aegis_ajax.redaction import mask_text_runs
 
 # Logger name is pinned to the original `api.devices` module (not __name__) so
 # debug output keeps its existing namespace — callers and caplog-based tests
@@ -162,9 +163,9 @@ def _decode_varint(data: bytes, i: int) -> tuple[int, int]:
 
 
 def _redact_proto_bytes_to_hex(data: bytes) -> str:
-    """Render protobuf bytes as hex with printable-ASCII runs masked.
+    """Render protobuf bytes as hex with text runs masked.
 
-    Scans `data` for contiguous runs of printable ASCII bytes (length ≥ 3)
+    Scans `data` for contiguous runs of text (ASCII or UTF-8, length ≥ 3)
     and replaces each run with `<text:Nb>`; everything else renders as
     its two-character hex value. The chosen 3-byte threshold mirrors the
     HTS DEBUG probe (`_redact_if_text` in api/hts/client.py) — short
@@ -176,21 +177,7 @@ def _redact_proto_bytes_to_hex(data: bytes) -> str:
     lets an unknown LightDevice oneof case be mapped from a bug-report
     log without the log carrying anyone's device names.
     """
-    out: list[str] = []
-    i = 0
-    n = len(data)
-    while i < n:
-        j = i
-        while j < n and 0x20 <= data[j] <= 0x7E:
-            j += 1
-        run_len = j - i
-        if run_len >= 3:
-            out.append(f"<text:{run_len}b>")
-            i = j
-        else:
-            out.append(f"{data[i]:02x}")
-            i += 1
-    return "".join(out)
+    return mask_text_runs(data)
 
 
 # SmartLockStatus.LockStatus → human-readable state used by the lock entity.

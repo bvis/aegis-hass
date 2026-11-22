@@ -657,6 +657,10 @@ class TestRedactProtoBytesToHex:
     def test_empty(self) -> None:
         assert _redact_proto_bytes_to_hex(b"") == ""
 
+    def test_a_non_ascii_name_is_masked(self) -> None:
+        raw = "Кухня".encode()
+        assert _redact_proto_bytes_to_hex(b"\x0a" + raw + b"\x00") == f"0a<text:{len(raw)}b>00"
+
     def test_parse_video_edge_channel_doorbell(self) -> None:
         # @Permudious in #119: MotionCam Video Doorbell arrives as a
         # `video_edge_channel` LightDevice oneof case, not `hub_device`,

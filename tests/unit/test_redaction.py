@@ -7,7 +7,9 @@ import pytest
 from custom_components.aegis_ajax.redaction import is_text, mask_text_runs
 
 
-@pytest.mark.parametrize("name", ["João", "Salón", "Garça", "Кухня", "Kitchen"])
+@pytest.mark.parametrize(
+    "name", ["João", "Salón", "Garça", "Кухня", "Kitchen", "João\u00a0Silva", "Ana\u200bB"]
+)
 def test_a_name_inside_binary_is_masked_whole(name: str) -> None:
     raw = name.encode()
     out = mask_text_runs(b"\x00\x01" + raw + b"\x02")

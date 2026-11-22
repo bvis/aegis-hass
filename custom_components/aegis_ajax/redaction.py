@@ -7,10 +7,15 @@ ASCII *or* a well-formed multi-byte UTF-8 character.
 
 from __future__ import annotations
 
+import unicodedata
+
 # A run this long is treated as text (a name or label) and masked. Shorter
 # runs stay as hex: too short to carry a name, and often coincidental.
 MIN_TEXT_RUN = 3
 
+# Beyond ASCII only control, unassigned and private-use code points are left
+# out: a name may hold a non-breaking space or a zero-width joiner.
+_NOT_TEXT = frozenset({"Cc", "Cn", "Co"})
 _UTF8_LEADS = ((2, 0xC2, 0xDF), (3, 0xE0, 0xEF), (4, 0xF0, 0xF4))
 
 
@@ -25,7 +30,7 @@ def _text_char_len(data: bytes, i: int) -> int:
                 char = data[i : i + size].decode("utf-8")
             except UnicodeDecodeError:
                 return 0
-            return size if char.isprintable() else 0
+            return size if unicodedata.category(char) not in _NOT_TEXT else 0
     return 0
 
 
