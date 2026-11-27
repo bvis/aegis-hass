@@ -138,24 +138,15 @@ def _redact_printable(data: bytes) -> str:
     return mask_text_runs(data)
 
 
-# A hub or device id: eight hex digits, upper case. The letter is required so
-# an eight-digit number (a phone, a code) never passes for one; the few ids
-# without a letter are left out.
-_DEVICE_ID = re.compile(rb"(?=[0-9]*[A-F])[0-9A-F]{8}")
+def _device_ids_in(raw: bytes, known: set[str]) -> list[str]:
+    """Ids of this install's own devices in a push, in payload order (#686).
 
-
-def _device_ids_in(raw: bytes) -> list[str]:
-    """Device ids a push carries, in payload order, for the debug log (#686).
-
-    Only a whole string field counts, found by walking the message field by
-    field. Hex digits that are part of a longer text are never picked out of
-    it, so a name or a phone number next to them stays out of the log.
+    For the debug log. An id is only named when it is a whole string field and
+    one of the devices Home Assistant already has, so nothing that merely looks
+    like an id (a short label, a number) is ever taken out of the masked dump.
     """
-    return [
-        field.decode()
-        for field in notification_event_parser._find_embedded_messages(raw)
-        if _DEVICE_ID.fullmatch(field)
-    ]
+    fields = notification_event_parser._find_embedded_messages(raw)
+    return [text for field in fields if (text := field.decode("ascii", "ignore")) in known]
 
 
 # FCM credentials validation + library-error classifier extracted to
@@ -1339,12 +1330,12 @@ class AjaxNotificationListener:
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 # The whole push, so a field nothing reads yet (which keypad
                 # read a pass, #686) can be found in a reporter's log. Text is
-                # masked; the device ids are listed apart, in payload order.
+                # masked; the ids of known devices are listed apart, in payload order.
                 _LOGGER.debug(
                     "Push payload (%d bytes, hex, text masked): %s; device ids in it: %s",
                     len(raw),
                     _redact_printable(raw[:4096]),
-                    _device_ids_in(raw),
+                    _device_ids_in(raw, set(getattr(self._coordinator, "devices", None) or ())),
                 )
             event_info = self._extract_event_from_proto(raw)
             if event_info:
