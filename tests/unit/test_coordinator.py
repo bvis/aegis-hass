@@ -5162,6 +5162,20 @@ def _keyfob_kv(name: bytes = b"ALICE", index: bytes = b"\x02\xef", active: int =
 class TestOnHtsDeviceKvKeyfob:
     """Keyfobs are HTS-only — they reach _on_hts_device_kv with no gRPC device."""
 
+    def test_a_keyfob_of_a_hub_outside_the_entrys_spaces_is_ignored(self) -> None:
+        # #705: the hub connection covers every hub of a PRO account.
+        coordinator = _make_coordinator()
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.spaces = {"s1": MagicMock(hub_id="00AAAAAA")}
+
+        coordinator._on_hts_device_kv("002B1A51", "2ACCB91C", _keyfob_kv())
+        coordinator._on_hts_update("002B1A51", HubNetworkState())
+        assert coordinator.keyfobs == {}
+        assert coordinator.hub_network == {}
+
+        coordinator._on_hts_device_kv("00AAAAAA", "2ACCB91C", _keyfob_kv())
+        assert list(coordinator.keyfobs) == ["2ACCB91C"]
+
     def test_new_keyfob_is_stored_and_announced(self) -> None:
         from custom_components.aegis_ajax.api.hts.keyfobs import Keyfob
         from custom_components.aegis_ajax.const import SIGNAL_NEW_DEVICE

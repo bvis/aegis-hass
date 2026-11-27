@@ -1227,3 +1227,33 @@ class TestMigrateEntry:
         assert kwargs["minor_version"] == 0
         assert kwargs["data"] == entry.data
         assert kwargs["options"] == entry.options
+
+
+def test_keyfob_devices_of_hubs_outside_the_entrys_spaces_are_removed() -> None:
+    # #705: created before the hub connection was filtered by space.
+    from custom_components.aegis_ajax import _async_remove_foreign_keyfob_devices
+    from custom_components.aegis_ajax.const import DOMAIN
+
+    own = MagicMock(id="own", identifiers={(DOMAIN, "00AAAAAA_keyfobs")})
+    foreign = MagicMock(id="foreign", identifiers={(DOMAIN, "00BBBBBB_keyfobs")})
+    hub = MagicMock(id="hub", identifiers={(DOMAIN, "00BBBBBB")})
+    registry = MagicMock()
+    coordinator = MagicMock(spaces={"s1": MagicMock(hub_id="00AAAAAA")})
+    entry = MagicMock(entry_id="e1")
+
+    with (
+        patch("custom_components.aegis_ajax.dr.async_get", return_value=registry),
+        patch(
+            "custom_components.aegis_ajax.dr.async_entries_for_config_entry",
+            return_value=[own, foreign, hub],
+        ),
+    ):
+        _async_remove_foreign_keyfob_devices(MagicMock(), entry, coordinator)
+        # Detached, not deleted: another entry may hold that hub's keyfobs rightfully.
+        registry.async_update_device.assert_called_once_with("foreign", remove_config_entry_id="e1")
+        registry.async_remove_device.assert_not_called()
+
+        # Spaces not loaded yet: nothing is known to be foreign, nothing is removed.
+        registry.reset_mock()
+        _async_remove_foreign_keyfob_devices(MagicMock(), entry, MagicMock(spaces={}))
+        registry.async_update_device.assert_not_called()

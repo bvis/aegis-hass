@@ -398,6 +398,10 @@ HTS_TEMPERATURE_DEVICE_TYPES: frozenset[str] = frozenset(
         "home_siren_g3",
         "home_siren_s",
         "home_siren_fibra",
+        # Transmitter Jeweller (#704). Nothing on the light stream; a reporter's
+        # STATUS_BODY capture showed 0x02 on three of them with the values the
+        # Ajax app shows, next to a siren whose 0x02 matched its sensor.
+        "transmitter",
     }
 )
 
