@@ -23,7 +23,7 @@ blueprint:
       name: Event Type Filter (optional)
       description: >-
         Leave empty to receive all events. Set to a specific event type
-        (alarm, tamper, arm, disarm, arm_night, disarm_night, panic,
+        (alarm, tamper, arm, arm_failed, disarm, arm_night, disarm_night, panic,
         battery_low, connection_lost, malfunction, fire, co_alarm, flood,
         glass_break, motion, door_open) to filter.
       default: ""
@@ -46,6 +46,7 @@ blueprint:
       default:
         alarm: "🚨 Alarm"
         arm: "🔒 Armed"
+        arm_failed: "⛔ Arming failed"
         arm_night: "🌙 Night mode"
         disarm: "🔓 Disarmed"
         disarm_night: "🔓 Night mode off"

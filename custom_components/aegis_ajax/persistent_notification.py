@@ -49,6 +49,7 @@ _EVENT_HEADLINES: dict[str, str] = {
     "door_open": "Door opened",
     "doorbell_pressed": "Doorbell pressed",
     "arm": "Armed",
+    "arm_failed": "Arming failed",
     "disarm": "Disarmed",
     "arm_night": "Night mode armed",
     "disarm_night": "Night mode disarmed",

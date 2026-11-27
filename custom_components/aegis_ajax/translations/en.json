@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Armed",
+                            "arm_failed": "Arming failed",
                             "arm_night": "Armed night",
                             "battery_low": "Battery low",
                             "co_alarm": "CO alarm",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Armed",
+            "arm_failed": "Arming failed",
             "arm_night": "Armed night",
             "battery_low": "Battery low",
             "co_alarm": "CO alarm",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Armed",
+                "arm_failed": "Arming failed",
                 "arm_night": "Night mode armed",
                 "battery_low": "Battery low",
                 "co_alarm": "CO alarm",

@@ -470,7 +470,7 @@ EVENT_DOMAIN = f"{DOMAIN}_event"
 RAW_TAG_TO_SECURITY_STATE: dict[str, SecurityState] = {
     # HubEventTag tags (sub-incidents that imply a space-level transition)
     "arm": SecurityState.ARMED,
-    "arm_attempt": SecurityState.ARMED,
+    # `arm_attempt` is absent on purpose: the hub refused it, nothing changed (#702).
     "arm_with_malfunctions": SecurityState.ARMED,
     "disarm": SecurityState.DISARMED,
     "duress_disarm": SecurityState.DISARMED,
@@ -547,7 +547,7 @@ SECURITY_STATE_EVENT_TYPES: frozenset[str] = frozenset(
 HUB_EVENT_TAG_MAP: dict[str, str] = {
     # Arming
     "arm": "arm",
-    "arm_attempt": "arm",
+    "arm_attempt": "arm_failed",
     "arm_with_malfunctions": "arm",
     "group_arm": "arm",
     "group_arm_with_malfunctions": "arm",

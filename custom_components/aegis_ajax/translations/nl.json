@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Ingeschakeld",
+                            "arm_failed": "Inschakelen mislukt",
                             "arm_night": "Nachtmodus ingeschakeld",
                             "battery_low": "Batterij laag",
                             "co_alarm": "CO-alarm",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Ingeschakeld",
+            "arm_failed": "Inschakelen mislukt",
             "arm_night": "Nachtmodus ingeschakeld",
             "battery_low": "Batterij laag",
             "co_alarm": "CO-alarm",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Ingeschakeld",
+                "arm_failed": "Inschakelen mislukt",
                 "arm_night": "Nachtmodus ingeschakeld",
                 "battery_low": "Batterij laag",
                 "co_alarm": "CO-alarm",

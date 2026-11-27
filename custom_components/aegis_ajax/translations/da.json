@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Aktiveret",
+                            "arm_failed": "Aktivering mislykkedes",
                             "arm_night": "Aktiveret nat",
                             "battery_low": "Lavt batteriniveau",
                             "co_alarm": "CO-alarm",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Aktiveret",
+            "arm_failed": "Aktivering mislykkedes",
             "arm_night": "Aktiveret nat",
             "battery_low": "Lavt batteriniveau",
             "co_alarm": "CO-alarm",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Aktiveret",
+                "arm_failed": "Aktivering mislykkedes",
                 "arm_night": "Natfunktion aktiveret",
                 "battery_low": "Lavt batteriniveau",
                 "co_alarm": "CO-alarm",

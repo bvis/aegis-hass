@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Uzbrojony",
+                            "arm_failed": "Uzbrojenie nieudane",
                             "arm_night": "Tryb nocny włączony",
                             "battery_low": "Niski poziom baterii",
                             "co_alarm": "Alarm CO",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Uzbrojony",
+            "arm_failed": "Uzbrojenie nieudane",
             "arm_night": "Tryb nocny włączony",
             "battery_low": "Niski poziom baterii",
             "co_alarm": "Alarm CO",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Uzbrojony",
+                "arm_failed": "Uzbrojenie nieudane",
                 "arm_night": "Tryb nocny włączony",
                 "battery_low": "Niski poziom baterii",
                 "co_alarm": "Alarm CO",
