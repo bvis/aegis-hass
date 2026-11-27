@@ -607,7 +607,7 @@ type: custom:aegis-devices-card
 
 A whole view: the alarm panel with its arm buttons, the hub's status, the devices card, what needs attention, a temperature graph per sensor, the history of the alarm, doors and motion, the [activity card](#activity-card) and the logbook.
 
-- **As a new dashboard**: **Settings → Dashboards → Add dashboard** and pick **Aegis security**.
+- **As a new dashboard**: **Settings → Dashboards → Add dashboard** and pick **Aegis security**, under the community dashboards.
 - **As a view in a dashboard you already have**: edit the dashboard, add a view, open its YAML editor and paste:
 
   ```yaml

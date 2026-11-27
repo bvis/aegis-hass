@@ -125,12 +125,14 @@ class AegisDevicesCard extends HTMLElement {
         panel ||
         MAIN_CLASSES.map((c) => sensors.find((e) => cls(e) === c)).find(Boolean) ||
         MAIN_DOMAINS.map((d) => of(d).find(plain)).find(Boolean);
-      const row = { name, area, entity: (main || camera || entities[0]).id, iconEntity: "", icon: "", state: "", text: "", colour: GREY, chips: [], rank: 3 };
+      const row = { name, area, entity: (main || camera || entities[0]).id, iconEntity: "", icon: "", state: "", text: "", colour: GREY, chips: [], rank: 3, attention: false };
       if (main) {
         const state = main.stateObj.state;
         Object.assign(row, { iconEntity: main.id, state, text: fmt(main) });
-        if (panel) Object.assign(row, { colour: PANEL_COLOUR[state] || GREEN, rank: 0 });
-        else if (ACTIVE_STATES.includes(state)) Object.assign(row, { colour: DANGER_CLASSES.includes(cls(main)) ? RED : BLUE, rank: 2 });
+        // The panel always comes first, but only an alarm makes it something to attend to.
+        if (panel) Object.assign(row, { colour: PANEL_COLOUR[state] || GREEN, rank: 0, attention: state === "triggered" });
+        else if (ACTIVE_STATES.includes(state))
+          Object.assign(row, { colour: DANGER_CLASSES.includes(cls(main)) ? RED : BLUE, rank: 2, attention: true });
       } else {
         const byModel = MODEL_ICONS.find(([pattern]) => pattern.test(device.model || ""));
         row.icon = camera ? "mdi:cctv" : byModel ? byModel[1] : "mdi:shield-outline";
@@ -146,6 +148,7 @@ class AegisDevicesCard extends HTMLElement {
           title: e.stateObj.attributes.friendly_name || e.id,
         });
         row.rank = Math.min(row.rank, 1);
+        row.attention = true;
       }
       for (const e of of("sensor")) {
         const value = Number(e.stateObj.state);
@@ -154,7 +157,7 @@ class AegisDevicesCard extends HTMLElement {
         if (cls(e) === "battery")
           row.chips.push({ icon: batteryIcon(value), text: `${Math.round(value)}%`, colour: value < 20 ? AMBER : "", entity: e.id });
       }
-      if (!cfg.only_issues || row.rank < 3) devices.push(row);
+      if (!cfg.only_issues || row.attention) devices.push(row);
     }
     devices.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
     cameras.sort((a, b) => a.name.localeCompare(b.name));

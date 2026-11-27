@@ -79,7 +79,8 @@ assert.ok(!card.shadowRoot.innerHTML.includes("Cam <b>"));
 card.setConfig({ only_issues: true, cameras: false });
 card._hass = hass;
 model = card._model();
-assert.deepStrictEqual(model.devices.map((d) => d.name), ["Hub", "Front door"]);
+// A disarmed panel with nothing wrong is not something to attend to.
+assert.deepStrictEqual(model.devices.map((d) => d.name), ["Front door"]);
 assert.deepStrictEqual(model.cameras, []);
 
 card.setConfig({ hub: "nope" });
