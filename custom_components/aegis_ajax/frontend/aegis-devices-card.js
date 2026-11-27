@@ -65,7 +65,6 @@ const words = (hass) => {
     problem: own("component.binary_sensor.entity_component.problem.name", "Problem"),
     temperature: own("component.sensor.entity_component.temperature.name", "Temperature"),
     history: own("panel.history", "History"),
-    activity: own("panel.logbook", "Activity"),
     door: own("component.binary_sensor.entity_component.door.name", "Door"),
     window: own("component.binary_sensor.entity_component.window.name", "Window"),
     battery: own("component.sensor.entity_component.battery.name", "Battery"),
@@ -439,13 +438,14 @@ class AegisSecurityViewStrategy {
             : []),
         ]),
         ...section([heading(w.devices, "mdi:shield-outline"), ...(all.length ? [{ type: `custom:${CARD}`, hub: config.hub, cameras: false }] : [])]),
+        // Everything about what happened and when, the list of events first.
         ...section([
           heading(w.history, "mdi:chart-timeline"),
+          ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 })),
           ...(panels.length ? [{ type: "history-graph", title: w.alarm, hours_to_show: 48, entities: byDevice(panels) }] : []),
           ...(doors.length ? [{ type: "history-graph", title: w.door, hours_to_show: 24, entities: byDevice(doors) }] : []),
           ...(motion.length ? [{ type: "history-graph", title: w.motion, hours_to_show: 24, entities: byDevice(motion) }] : []),
         ]),
-        ...section([heading(w.activity, "mdi:history"), ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 }))]),
       ],
     };
   }

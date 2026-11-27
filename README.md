@@ -608,7 +608,7 @@ With `sensors` the card becomes a compact block: a pill per sensor of that kind 
 
 ### Security view
 
-A whole view, in this order: the alarm panel with its arm buttons, the cameras, doors and windows, lid (tamper) sensors, what needs attention and batteries as compact blocks, a temperature graph per sensor, the hub's status, the list of devices, the history of the alarm, doors and motion, and the [activity card](#activity-card).
+A whole view, in this order: the alarm panel with its arm buttons, the cameras, doors and windows, lid (tamper) sensors, what needs attention and batteries as compact blocks, a temperature graph per sensor, the hub's status, the list of devices, and a history block with the [activity card](#activity-card) followed by the graphs of the alarm, doors and motion.
 
 - **As a new dashboard**: **Settings → Dashboards → Add dashboard** and pick **Aegis security**, under the community dashboards.
 - **As a view in a dashboard you already have**: edit the dashboard, add a view, open its YAML editor and paste:

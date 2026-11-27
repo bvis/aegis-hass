@@ -129,6 +129,9 @@ assert.deepStrictEqual(card._model().devices, []);
     [[false, undefined, undefined], [undefined, false, true], [undefined, false, undefined]],
   );
   assert.ok(!cards.some((c) => c.type === "logbook"));
+  // The activity card opens the history block, before the graphs.
+  const history = view.sections[view.sections.length - 1].cards.map((c) => c.type);
+  assert.deepStrictEqual(history.slice(0, 3), ["heading", "custom:aegis-activity-card", "history-graph"]);
   assert.ok(cards.some((c) => c.type === "custom:aegis-activity-card" && c.entity === "event.hub_security"));
   assert.deepStrictEqual(cards.find((c) => c.type === "history-graph" && c.title === "Door").entities, [
     { entity: "binary_sensor.door", name: "Front door" },
