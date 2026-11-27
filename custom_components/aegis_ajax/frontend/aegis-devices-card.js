@@ -60,6 +60,8 @@ const words = (hass) => {
     history: own("panel.history", "History"),
     activity: own("panel.logbook", "Activity"),
     door: own("component.binary_sensor.entity_component.door.name", "Door"),
+    window: own("component.binary_sensor.entity_component.window.name", "Window"),
+    battery: own("component.sensor.entity_component.battery.name", "Battery"),
     motion: own("component.binary_sensor.entity_component.motion.name", "Motion"),
     title: own("ui.panel.lovelace.editor.card.generic.title", "Title"),
   };
@@ -309,6 +311,9 @@ class AegisSecurityViewStrategy {
     const doors = cls("door", "window", "garage_door", "opening");
     const motion = cls("motion", "occupancy");
     const temps = cls("temperature");
+    // Batteries are diagnostic entities; one that reports nothing is left out.
+    const batteries = all.filter((e) => e.stateObj.attributes.device_class === "battery" && !Number.isNaN(Number(e.stateObj.state)));
+    const glance = (list, title) => ({ type: "glance", title, show_state: true, columns: 3, entities: byDevice(list) });
     const hubIds = new Set(panels.map((p) => p.reg.device_id));
     const hub = all.filter((e) => hubIds.has(e.reg.device_id) && /^(binary_sensor|sensor)\./.test(e.id));
     const attribute = (panel, name, extra) => ({
@@ -346,6 +351,12 @@ class AegisSecurityViewStrategy {
           ...(hub.length ? [{ type: "entities", entities: hub.map((e) => ({ entity: e.id, name: entityName(e.stateObj, e.device) })) }] : []),
         ]),
         ...section([heading(`${w.camera} · ${w.devices}`, "mdi:cctv"), { type: `custom:${CARD}`, hub: config.hub }]),
+        // Every door and window at a glance, and every battery next to them.
+        ...section([
+          heading(`${w.door} · ${w.window}`, "mdi:door"),
+          ...(doors.length ? [glance(doors)] : []),
+          ...(doors.length && batteries.length ? [glance(batteries, w.battery)] : []),
+        ]),
         ...section([
           heading(w.problem, "mdi:alert"),
           { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true },
