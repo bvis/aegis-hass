@@ -665,6 +665,19 @@
             }
         },
         "alarm_control_panel": {
+            "space": {
+                "state_attributes": {
+                    "hub_state": {
+                        "name": "Hub'a göre durum"
+                    },
+                    "exit_delay_seconds": {
+                        "name": "Çıkış gecikmesi"
+                    },
+                    "delay_ends_at": {
+                        "name": "Devam eden gecikmenin bitişi"
+                    }
+                }
+            },
             "group": {
                 "name": "Grup {group_id}"
             }

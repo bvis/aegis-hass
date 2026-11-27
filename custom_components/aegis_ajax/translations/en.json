@@ -665,6 +665,19 @@
             }
         },
         "alarm_control_panel": {
+            "space": {
+                "state_attributes": {
+                    "hub_state": {
+                        "name": "Hub state"
+                    },
+                    "exit_delay_seconds": {
+                        "name": "Exit delay"
+                    },
+                    "delay_ends_at": {
+                        "name": "Running delay ends"
+                    }
+                }
+            },
             "group": {
                 "name": "Group {group_id}"
             }

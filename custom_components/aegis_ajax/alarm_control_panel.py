@@ -343,6 +343,8 @@ class _AjaxAlarmPanelBase(CoordinatorEntity[AjaxCobrandedCoordinator], AlarmCont
 
 class AjaxAlarmControlPanel(_AjaxAlarmPanelBase):
     _attr_name = None
+    # Only for the translated names of its attributes; the entity keeps the device's name.
+    _attr_translation_key = "space"
     # ARM_HOME is advertised mainly for the Nabu Casa / Alexa skill, which
     # otherwise won't discover a panel exposing ARM_AWAY|ARM_NIGHT (#221).
     # Ajax has a single partial mode ("Night mode"), so ARM_HOME and ARM_NIGHT
