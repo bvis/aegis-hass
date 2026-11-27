@@ -1316,6 +1316,15 @@ class AjaxNotificationListener:
         """Parse event from base64-encoded push notification data."""
         try:
             raw = base64.b64decode(encoded_data)
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                # The whole push, so a field nothing reads yet (which keypad
+                # read a pass, #686) can be found in a reporter's log. Names
+                # are masked; ids stay, they are what tells devices apart.
+                _LOGGER.debug(
+                    "Push payload (%d bytes, hex, names masked): %s",
+                    len(raw),
+                    mask_text_runs(raw[:4096], keep_ids=True),
+                )
             event_info = self._extract_event_from_proto(raw)
             if event_info:
                 event_type, event_data = event_info
