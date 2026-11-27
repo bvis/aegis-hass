@@ -57,6 +57,7 @@ Ajax Systems provides co-branded versions of their mobile app to security compan
 - **Device removal follows the panel**: deleting a device in the Ajax app removes it from Home Assistant within seconds — entities, device card and cache. Deletions that happen while Home Assistant is offline are picked up on the next reconnect: the device stops claiming state and its leftover card can be removed from its device page (**Delete device** — offered for any device the hub no longer reports; live devices are refused and a mistaken deletion re-creates itself from the next snapshot) ([#422](https://github.com/bvis/aegis-hass/issues/422))
 - **Logbook**: Human-readable security event descriptions with icons
 - **Activity card**: a dashboard card with the timeline of security events, including who armed or disarmed and how. See [Activity card](#activity-card)
+- **Devices card and security view**: a card with your cameras and one row per Ajax device, and a whole security dashboard, both built from your devices without naming any entity. See [Devices card and security view](#devices-card-and-security-view)
 - **Real-time updates**: Persistent gRPC stream for instant sensor state changes (< 1 second latency)
 - **Push notifications**: FCM integration for immediate event delivery
 - **2FA support** (TOTP)
@@ -583,9 +584,50 @@ Things to know:
 - **Requests to Ajax**: none. The card reads Home Assistant's own history once when it opens, and new events come from the entity itself.
 - If the card does not show up in the picker right after updating, reload the browser page.
 
+## Devices card and security view
+
+Both come with the integration and find your devices by themselves. Add a detector or a camera in the Ajax app and it shows up here without editing anything.
+
+### Devices card
+
+One tile per camera with its **Capture photo** button, and one row per Ajax device: what it is doing (open, motion detected, armed…), its room, temperature and battery, and a warning for an open lid, a problem or a lost connection. Devices that need attention come first. Tap a row or a picture for the details.
+
+In a dashboard, **Add card** and search for **Aegis devices**. It needs no settings. In YAML:
+
+```yaml
+type: custom:aegis-devices-card
+# title: Alarm
+# hub: 0123456789abcdef   # device id of a hub, to show only its devices (pick it in the card editor)
+# cameras: false          # hide the camera tiles
+# devices: false          # hide the device rows
+# only_issues: true       # only the devices that need attention or are open
+```
+
+### Security view
+
+A whole view: the alarm panel with its arm buttons, the hub's status, the devices card, what needs attention, a temperature graph per sensor, the history of the alarm, doors and motion, the [activity card](#activity-card) and the logbook.
+
+- **As a new dashboard**: **Settings → Dashboards → Add dashboard** and pick **Aegis security**, under the community dashboards.
+- **As a view in a dashboard you already have**: edit the dashboard, add a view, open its YAML editor and paste:
+
+  ```yaml
+  strategy:
+    type: custom:aegis-security
+    # hub: 0123456789abcdef   # only this hub's devices
+    # max_columns: 3
+  title: Security
+  icon: mdi:shield-home
+  ```
+
+Things to know:
+
+- A generated view is not edited card by card. To change it, use the options above or build your own view with the cards. Home Assistant also offers **Take control**, which turns it into a normal view that no longer follows your devices.
+- **Requests to Ajax**: none. Card and view read what Home Assistant already has.
+- If they do not show up right after updating, reload the browser page.
+
 ## Example Dashboard
 
-An example Lovelace dashboard is included in [`docs/dashboard.yaml`](docs/dashboard.yaml) with sections for:
+If you prefer to write every card yourself, an example Lovelace dashboard is included in [`docs/dashboard.yaml`](docs/dashboard.yaml) with sections for:
 
 - Alarm control panel + system status, with the exit / entry delay card (hub state, exit delay, countdown to the end of a running delay — needs the option described in [Exit and entry delays](#exit-and-entry-delays))
 - Hub network (Ethernet, Wi-Fi, cellular, power)

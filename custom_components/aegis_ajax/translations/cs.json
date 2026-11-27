@@ -665,6 +665,19 @@
             }
         },
         "alarm_control_panel": {
+            "space": {
+                "state_attributes": {
+                    "hub_state": {
+                        "name": "Stav podle hubu"
+                    },
+                    "exit_delay_seconds": {
+                        "name": "Zpoždění při odchodu"
+                    },
+                    "delay_ends_at": {
+                        "name": "Konec běžícího zpoždění"
+                    }
+                }
+            },
             "group": {
                 "name": "Skupina {group_id}"
             }

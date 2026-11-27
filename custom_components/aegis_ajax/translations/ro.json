@@ -665,6 +665,19 @@
             }
         },
         "alarm_control_panel": {
+            "space": {
+                "state_attributes": {
+                    "hub_state": {
+                        "name": "Stare conform hubului"
+                    },
+                    "exit_delay_seconds": {
+                        "name": "Întârziere la ieșire"
+                    },
+                    "delay_ends_at": {
+                        "name": "Sfârșitul întârzierii în curs"
+                    }
+                }
+            },
             "group": {
                 "name": "Grupul {group_id}"
             }

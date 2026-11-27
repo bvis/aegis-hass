@@ -665,6 +665,19 @@
             }
         },
         "alarm_control_panel": {
+            "space": {
+                "state_attributes": {
+                    "hub_state": {
+                        "name": "Tilstand ifølge hubben"
+                    },
+                    "exit_delay_seconds": {
+                        "name": "Udgangsforsinkelse"
+                    },
+                    "delay_ends_at": {
+                        "name": "Igangværende forsinkelse slutter"
+                    }
+                }
+            },
             "group": {
                 "name": "Gruppe {group_id}"
             }
