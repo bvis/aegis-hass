@@ -42,10 +42,9 @@ def test_keep_ids_leaves_hex_ids_readable_and_masks_the_rest() -> None:
     assert out == "0a08<id:0012ABCD>1207<text:7b>1a0b<text:11b>"
     # Off by default: nothing readable.
     assert "0012ABCD" not in mask_text_runs(data)
-    # A 32-character id: its length byte is a space, so it joins the run.
-    long_id = b"0123456789abcdef0123456789abcdef"
-    assert mask_text_runs(b"\x0a " + long_id + b"\x00", keep_ids=True) == (
-        f"0a<text:1b><id:{long_id.decode()}>00"
+    # The field after the id is text that starts right behind it.
+    assert mask_text_runs(b"\x0a\x080012ABCDB\x03abc", keep_ids=True) == (
+        "0a08<id:0012ABCD><text:1b>03<text:3b>"
     )
 
 
@@ -56,3 +55,8 @@ def test_keep_ids_only_trusts_a_whole_string_field() -> None:
     assert mask_text_runs(b"\x0a\x0fSal\xc3\xb3n 00ab12cd", keep_ids=True) == "0a0f<text:15b>"
     # A short name glued to hex digits: nothing of it comes out, not even as hex.
     assert mask_text_runs(b"\x00Jo0012ABCD\x00", keep_ids=True) == "00<text:10b>00"
+    # A digit of a phone number is never read as the length of an id behind it.
+    data = b"\x1a\x0b34600112233\x42\x30" + b"a" * 48
+    assert "<id:" not in mask_text_runs(data, keep_ids=True)
+    # Nor is a printable length byte: a 32-character id stays masked.
+    assert mask_text_runs(b"\x0a " + b"0123456789abcdef" * 2, keep_ids=True) == "0a<text:33b>"

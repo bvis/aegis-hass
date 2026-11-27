@@ -55,31 +55,24 @@ _MIN_ID_LEN = 8
 
 
 def _mask_run(data: bytes, start: int, end: int, keep_ids: bool) -> str:
-    """Mask the text run `data[start:end]`, leaving whole-field hex ids readable.
+    """Mask the text run `data[start:end]`, leaving a leading hex id readable.
 
-    A stretch of hex digits is only an id when it is a whole string field: the
-    byte before it is its length. Going by the look of the text alone would
-    show a phone number that happens to sit next to a printable field tag.
+    Hex digits are only an id when they are a string field that opens the run:
+    the byte right before the run is their length. That byte is never text
+    itself (it would be part of the run), so a digit in a phone number cannot
+    pass for a length. Going by the look of the text alone would show a phone
+    number that sits next to a printable field tag. Ids of 32 characters or
+    more have a printable length byte and stay masked.
     """
     if end - start < MIN_TEXT_RUN:
         return data[start:end].hex()
-    if not keep_ids:
-        return f"<text:{end - start}b>"
-    out: list[str] = []
-    last = pos = start
-    while pos < end:
-        size = data[pos - 1] if pos else 0
-        value = data[pos : pos + size]
-        if size >= _MIN_ID_LEN and pos + size <= end and _HEX_ID.fullmatch(value):
-            if pos > last:
-                out.append(f"<text:{pos - last}b>")
-            out.append(f"<id:{value.decode()}>")
-            last = pos = pos + size
-        else:
-            pos += 1
-    if end > last:
-        out.append(f"<text:{end - last}b>")
-    return "".join(out)
+    if keep_ids and start:
+        size = data[start - 1]
+        value = data[start : start + size]
+        if _MIN_ID_LEN <= size <= end - start and _HEX_ID.fullmatch(value):
+            rest = end - start - size
+            return f"<id:{value.decode()}>" + (f"<text:{rest}b>" if rest else "")
+    return f"<text:{end - start}b>"
 
 
 def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
@@ -87,7 +80,7 @@ def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
 
     With `keep_ids`, a string field that is a hex id (device, hub, user) stays
     readable as `<id:...>`: it says which device a payload is about, and it is
-    not a name.
+    not a name. Anything less certain than that is masked.
     """
     out: list[str] = []
     run = 0  # bytes of text collected so far, ending at `i`
