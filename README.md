@@ -604,7 +604,7 @@ type: custom:aegis-devices-card
 # sensors: door           # instead of all that: one small pill per door/window, or `tamper`, or `battery`
 ```
 
-With `sensors` the card becomes a compact block: a pill per sensor of that kind with the device's name, highlighted when it is open, when the lid is off or when the battery is under 20 %. Three of them cover doors, lids and batteries in the space of one list.
+With `sensors` the card becomes a compact block: a pill per sensor of that kind with the device's name, highlighted when it is open, when the lid is off or when the battery is under 20 %. Doors and windows are all listed; lids and batteries show only the ones that need a look and count the rest ("11 OK"). Three of them cover doors, lids and batteries in the space of one list.
 
 ### Security view
 

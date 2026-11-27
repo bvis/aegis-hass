@@ -105,8 +105,12 @@ const pillsOf = (sensors) => {
   return card._model().pills.map((p) => [p.name, p.active, p.text]);
 };
 assert.deepStrictEqual(pillsOf("door"), [["Front door", true, ""], ["Gone", false, ""]]);
-assert.deepStrictEqual(pillsOf("tamper"), [["Front door · Lid", true, ""], ["Front door · Tilt", false, ""]]);
+// Lids and batteries list only what is wrong and count the rest.
+assert.deepStrictEqual(pillsOf("tamper"), [["Front door · Lid", true, ""], [undefined, undefined, "1 OK"]]);
 assert.deepStrictEqual(pillsOf("battery"), [["Front door", true, "12%"]]);
+hass.states["sensor.door_battery"].state = "80";
+assert.deepStrictEqual(pillsOf("battery"), [[undefined, undefined, "1 OK"]]);
+hass.states["sensor.door_battery"].state = "12";
 assert.throws(() => card.setConfig({ sensors: "nope" }));
 card.hass = hass;
 assert.ok(card.shadowRoot.innerHTML.includes('<button type="button" class="pill active"'));

@@ -27,8 +27,9 @@ const MODEL_ICONS = [
 // `sensors: door | tamper | battery` turns the card into one small pill per sensor of that kind.
 const PILL_KINDS = {
   door: { classes: ["door", "window", "garage_door", "opening"], colour: BLUE },
-  tamper: { classes: ["tamper"], colour: AMBER },
-  battery: { classes: ["battery"], colour: AMBER },
+  // Lids and batteries only matter when something is wrong: the ones that are fine are counted, not listed.
+  tamper: { classes: ["tamper"], colour: AMBER, quiet: true },
+  battery: { classes: ["battery"], colour: AMBER, quiet: true },
 };
 const CARD = "aegis-devices-card";
 const STRATEGY = "aegis-security";
@@ -191,7 +192,7 @@ class AegisDevicesCard extends HTMLElement {
       .filter((e) => !battery || (e.stateObj.state !== "" && !Number.isNaN(Number(e.stateObj.state))));
     const perDevice = {};
     for (const e of list) perDevice[e.reg.device_id] = (perDevice[e.reg.device_id] || 0) + 1;
-    return list
+    const pills = list
       .map((e) => {
         const state = e.stateObj.state;
         const active = battery ? Number(state) < 20 : state === "on";
@@ -207,13 +208,19 @@ class AegisDevicesCard extends HTMLElement {
         };
       })
       .sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
+    if (!kind.quiet) return pills;
+    const shown = pills.filter((p) => p.active || p.state === "unavailable");
+    const fine = pills.length - shown.length;
+    return fine ? [...shown, { summary: true, text: `${fine} OK` }] : shown;
   }
 
   _render({ cameras, devices, pills = [] }) {
     const cfg = this._config;
     const pillHtml = pills
-      .map(
-        (p) => `
+      .map((p) =>
+        p.summary
+          ? `<div class="pill fine" style="--c:${GREEN}"><ha-icon icon="mdi:check-circle"></ha-icon><span class="pname">${esc(p.text)}</span></div>`
+          : `
         <button type="button" class="pill${p.active ? " active" : ""}" data-entity="${esc(p.entity)}" title="${esc(p.title)}" style="--c:${p.colour}">
           <ha-state-icon data-icon-entity="${esc(p.entity)}"></ha-state-icon>
           <span class="pname">${esc(p.name)}</span>${p.text ? `<span class="pval">${esc(p.text)}</span>` : ""}
@@ -282,6 +289,7 @@ class AegisDevicesCard extends HTMLElement {
         .pill { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 16px;
                 min-width: 0; text-align: left; cursor: pointer; font: inherit; font-size: 13px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
                 --mdc-icon-size: 16px; }
+        .pill.fine { cursor: default; }
         .pill.active { background: color-mix(in srgb, var(--c) 24%, transparent); font-weight: 500; }
         .pname { flex: 1; min-width: 0; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pval { flex: none; color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
