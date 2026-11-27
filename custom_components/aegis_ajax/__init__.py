@@ -1091,7 +1091,9 @@ def _async_remove_foreign_keyfob_devices(
     Before the hub connection was filtered by space, a PRO account got one for
     every hub it can see, each with an entity per access card named after its
     holder. Home Assistant never removes a device an integration stops
-    providing, so they are removed here, with their entities.
+    providing, so this entry lets go of them here. Home Assistant then drops
+    this entry's entities on the device, and the device itself once no entry
+    is left on it: another entry set up for that hub's space keeps its own.
     """
     own_hubs = {space.hub_id for space in coordinator.spaces.values()}
     if not own_hubs:
@@ -1102,7 +1104,7 @@ def _async_remove_foreign_keyfob_devices(
             if domain != DOMAIN or not identifier.endswith("_keyfobs"):
                 continue
             if identifier.removesuffix("_keyfobs") not in own_hubs:
-                registry.async_remove_device(device.id)
+                registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
 
 
 async def _async_apply_labels(hass: HomeAssistant, entry: ConfigEntry) -> None:

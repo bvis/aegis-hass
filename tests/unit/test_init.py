@@ -1249,9 +1249,11 @@ def test_keyfob_devices_of_hubs_outside_the_entrys_spaces_are_removed() -> None:
         ),
     ):
         _async_remove_foreign_keyfob_devices(MagicMock(), entry, coordinator)
-        registry.async_remove_device.assert_called_once_with("foreign")
+        # Detached, not deleted: another entry may hold that hub's keyfobs rightfully.
+        registry.async_update_device.assert_called_once_with("foreign", remove_config_entry_id="e1")
+        registry.async_remove_device.assert_not_called()
 
         # Spaces not loaded yet: nothing is known to be foreign, nothing is removed.
         registry.reset_mock()
         _async_remove_foreign_keyfob_devices(MagicMock(), entry, MagicMock(spaces={}))
-        registry.async_remove_device.assert_not_called()
+        registry.async_update_device.assert_not_called()
