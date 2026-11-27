@@ -30,6 +30,9 @@ const hass = {
       reg("camera.cam", "c1"),
       reg("button.cam_shot", "c1", { translation_key: "capture_photo" }),
       reg("sensor.pad_battery", "k1", { entity_category: "diagnostic" }),
+      reg("binary_sensor.fire_smoke", "f1"),
+      reg("binary_sensor.fire_co", "f1"),
+      reg("binary_sensor.gone", "g1"),
       { entity_id: "binary_sensor.other", device_id: "x", platform: "zha" },
     ].map((r) => [r.entity_id, r]),
   ),
@@ -45,6 +48,9 @@ const hass = {
       st("camera.cam", "idle", { entity_picture: "/api/camera_proxy/camera.cam?token=x" }),
       st("button.cam_shot", "unknown", { friendly_name: "Cam <b> Capture photo" }),
       st("sensor.pad_battery", "unknown", { device_class: "battery" }),
+      st("binary_sensor.fire_smoke", "off", { device_class: "smoke" }),
+      st("binary_sensor.fire_co", "on", { device_class: "carbon_monoxide" }),
+      st("binary_sensor.gone", "unavailable", { device_class: "door" }),
       st("binary_sensor.other", "on", { device_class: "door" }),
     ].map((s) => [s.entity_id, s]),
   ),
@@ -53,6 +59,8 @@ const hass = {
     d1: { name: "Front door", area_id: "a", via_device_id: "hub" },
     c1: { name: "Cam <b>", via_device_id: "hub" },
     k1: { name: "Pad", model: "Keypad Combi", via_device_id: "hub" },
+    f1: { name: "Fire", via_device_id: "hub" },
+    g1: { name: "Gone", via_device_id: "hub" },
   },
   areas: { a: { name: "Hall" } },
 };
@@ -62,14 +70,16 @@ card.setConfig({});
 card._hass = hass;
 let model = card._model();
 // The panel first, then what needs attention, then the rest by name; other integrations are left out.
-assert.deepStrictEqual(model.devices.map((d) => d.name), ["Hub", "Front door", "Cam <b>", "Pad"]);
+assert.deepStrictEqual(model.devices.map((d) => d.name), ["Hub", "Front door", "Gone", "Fire", "Cam <b>", "Pad"]);
+// A detector with smoke off and CO on shows the CO, not the quiet smoke sensor.
+assert.strictEqual(model.devices[3].iconEntity, "binary_sensor.fire_co");
 assert.deepStrictEqual(model.cameras.map((c) => [c.capture, c.captureLabel]), [["button.cam_shot", "Capture photo"]]);
 const door = model.devices[1];
 assert.strictEqual(door.iconEntity, "binary_sensor.door");
 assert.strictEqual(door.area, "Hall");
 // A battery that reports nothing shows no chip instead of 0 %.
 assert.deepStrictEqual(door.chips.map((c) => c.icon || c.text), ["mdi:shield-off", "mdi:battery-10", "21.5"]);
-assert.deepStrictEqual([model.devices[3].icon, model.devices[3].chips.length], ["mdi:dialpad", 0]);
+assert.deepStrictEqual([model.devices[5].icon, model.devices[5].chips.length], ["mdi:dialpad", 0]);
 
 // Names reach the page escaped.
 card.hass = hass;
@@ -80,7 +90,7 @@ card.setConfig({ only_issues: true, cameras: false });
 card._hass = hass;
 model = card._model();
 // A disarmed panel with nothing wrong is not something to attend to.
-assert.deepStrictEqual(model.devices.map((d) => d.name), ["Front door"]);
+assert.deepStrictEqual(model.devices.map((d) => d.name), ["Front door", "Gone", "Fire"]);
 assert.deepStrictEqual(model.cameras, []);
 
 card.setConfig({ hub: "nope" });
@@ -95,6 +105,7 @@ assert.deepStrictEqual(card._model().devices, []);
   assert.ok(cards.some((c) => c.type === "custom:aegis-activity-card" && c.entity === "event.hub_security"));
   assert.deepStrictEqual(cards.find((c) => c.type === "history-graph" && c.title === "Door").entities, [
     { entity: "binary_sensor.door", name: "Front door" },
+    { entity: "binary_sensor.gone", name: "Gone" },
   ]);
   // The delays rows come only with the attribute; hub entities lose the device name in front.
   const lists = cards.filter((c) => c.type === "entities");

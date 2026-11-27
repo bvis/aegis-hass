@@ -121,9 +121,14 @@ class AegisDevicesCard extends HTMLElement {
 
       const panel = of("alarm_control_panel")[0];
       const sensors = of("binary_sensor").filter(plain);
+      // A detector can have several of these (smoke, CO, heat): one that is on wins, a dangerous one first.
+      const mains = MAIN_CLASSES.flatMap((c) => sensors.filter((e) => cls(e) === c));
+      const on = mains.filter((e) => e.stateObj.state === "on");
       const main =
         panel ||
-        MAIN_CLASSES.map((c) => sensors.find((e) => cls(e) === c)).find(Boolean) ||
+        on.find((e) => DANGER_CLASSES.includes(cls(e))) ||
+        on[0] ||
+        mains[0] ||
         MAIN_DOMAINS.map((d) => of(d).find(plain)).find(Boolean);
       const row = { name, area, entity: (main || camera || entities[0]).id, iconEntity: "", icon: "", state: "", text: "", colour: GREY, chips: [], rank: 3, attention: false };
       if (main) {
@@ -131,6 +136,8 @@ class AegisDevicesCard extends HTMLElement {
         Object.assign(row, { iconEntity: main.id, state, text: fmt(main) });
         // The panel always comes first, but only an alarm makes it something to attend to.
         if (panel) Object.assign(row, { colour: PANEL_COLOUR[state] || GREEN, rank: 0, attention: state === "triggered" });
+        // Not reporting at all is worth a look too, whether or not the device has a connectivity entity.
+        else if (state === "unavailable") Object.assign(row, { rank: 1, attention: true });
         else if (ACTIVE_STATES.includes(state))
           Object.assign(row, { colour: DANGER_CLASSES.includes(cls(main)) ? RED : BLUE, rank: 2, attention: true });
       } else {
