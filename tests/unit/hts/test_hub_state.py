@@ -848,6 +848,9 @@ _CONFIRMED_HTS_TEMPERATURE_SAMPLES: dict[str, tuple[bytes, float]] = {
     # this dict records that the family reports 0x02, and the byte-to-degrees
     # conversion is family-agnostic and covered once below.
     "motion_cam_outdoor_phod": (b"\x1d", 29.0),
+    # #704: three Transmitter Jeweller on one hub, 0x04, 0x08 and 0x06, matching
+    # the app in late November.
+    "transmitter": (b"\x08", 8.0),
 }
 
 # Families in the production gate with no recorded byte-level sample. They are

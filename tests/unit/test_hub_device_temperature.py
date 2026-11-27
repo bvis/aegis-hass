@@ -160,3 +160,13 @@ class TestGetHubDeviceTemperature:
             result = await api.get_hub_device_temperature("hub-1", "dev-1")
 
         assert result is None
+
+
+def test_transmitter_temperature_comes_from_the_hub_connection() -> None:
+    # #704: the app shows it, the light stream does not carry it, 0x02 does.
+    from custom_components.aegis_ajax.api.hts.hub_state import parse_device_temperature_c
+    from custom_components.aegis_ajax.device_handlers import capabilities_for
+
+    assert parse_device_temperature_c("transmitter", {0x02: b"\x04"}) == 4.0
+    device = MagicMock(device_type="transmitter")
+    assert capabilities_for(device).has_hts_temperature is True

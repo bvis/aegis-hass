@@ -2176,8 +2176,21 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self._hts_client = None
 
+    def _is_foreign_hub(self, hub_id: str) -> bool:
+        """True for a hub of the account that is in none of this entry's spaces (#705).
+
+        The hub connection covers every hub the account can see. On a PRO
+        account that is every customer's hub, while the entry was set up for
+        some spaces only. Unknown until the spaces are loaded, and then it
+        says no: dropping our own hub's rows would be worse than a late filter.
+        """
+        own = {space.hub_id for space in self.spaces.values()}
+        return bool(own) and hub_id not in own
+
     def _on_hts_update(self, hub_id: str, state: HubNetworkState) -> None:
         """Handle hub network state update from HTS."""
+        if self._is_foreign_hub(hub_id):
+            return
         self.hub_network[hub_id] = state
         self.async_set_updated_data({"spaces": self.spaces, "devices": self.devices})
 
@@ -2206,6 +2219,10 @@ class AjaxCobrandedCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         `coordinator.device_readings` and fires `async_set_updated_data`
         so the sensor entities pick the change up immediately.
         """
+        # Rows of another space's hub: its access cards and keyfobs, with the
+        # holders' names, do not belong in this entry (#705).
+        if self._is_foreign_hub(hub_id):
+            return
         from custom_components.aegis_ajax.api.hts.hub_state import (  # noqa: PLC0415
             parse_device_readings,
         )
