@@ -4163,3 +4163,23 @@ class TestFcmStoresPerEntry:
         assert data == {"fcm": "creds"}
         own.async_save.assert_awaited_once_with({"fcm": "creds"})
         legacy.async_remove.assert_awaited_once()
+
+
+def test_device_ids_in_push_are_whole_fields_only() -> None:
+    """The debug dump lists ids, never hex digits cut out of other text (#686)."""
+    from custom_components.aegis_ajax.notification import _device_ids_in
+
+    def field(number: int, value: bytes) -> bytes:
+        return bytes([number << 3 | 2, len(value)]) + value
+
+    raw = (
+        field(1, b"0012ABCD")
+        + field(2, field(2, b"00FF00AA") + field(3, b"Keypad 0012ABCD"))
+        + field(3, b"34600112233")  # a phone number, then a tag that reads "B"
+        + field(8, b"X")
+        + field(3, b"\n123456789")  # a newline that could pass for a length
+        + field(8, b"X")
+        + field(4, b"12345678")  # eight digits, no letter
+        + field(5, b"0012abcd")  # not how Ajax writes an id
+    )
+    assert _device_ids_in(raw) == ["0012ABCD", "00FF00AA"]

@@ -7,7 +7,6 @@ ASCII *or* a well-formed multi-byte UTF-8 character.
 
 from __future__ import annotations
 
-import re
 import unicodedata
 
 # A run this long is treated as text (a name or label) and masked. Shorter
@@ -48,43 +47,15 @@ def is_text(value: bytes) -> bool:
     return True
 
 
-# A hardware or account id as Ajax writes it in a payload: hex digits as
-# text. One letter is required so a number never passes for an id.
-_HEX_ID = re.compile(rb"(?=[0-9]*[A-Fa-f])[0-9A-Fa-f]+")
-_MIN_ID_LEN = 8
-
-
-def _mask_run(data: bytes, start: int, end: int, keep_ids: bool) -> str:
-    """Mask the text run `data[start:end]`, leaving a leading hex id readable.
-
-    Hex digits are only an id when they are a string field that opens the run:
-    the byte right before the run is their length. That byte is never text
-    itself (it would be part of the run), so a digit in a phone number cannot
-    pass for a length. Going by the look of the text alone would show a phone
-    number that sits next to a printable field tag. Ids of 32 characters or
-    more have a printable length byte and stay masked.
-    """
-    if end - start < MIN_TEXT_RUN:
-        return data[start:end].hex()
-    if keep_ids and start:
-        size = data[start - 1]
-        value = data[start : start + size]
-        if _MIN_ID_LEN <= size <= end - start and _HEX_ID.fullmatch(value):
-            rest = end - start - size
-            return f"<id:{value.decode()}>" + (f"<text:{rest}b>" if rest else "")
-    return f"<text:{end - start}b>"
-
-
-def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
-    """Hex-encode `data`, replacing each text run with `<text:Nb>`.
-
-    With `keep_ids`, a string field that is a hex id (device, hub, user) stays
-    readable as `<id:...>`: it says which device a payload is about, and it is
-    not a name. Anything less certain than that is masked.
-    """
+def mask_text_runs(data: bytes) -> str:
+    """Hex-encode `data`, replacing each text run with `<text:Nb>`."""
     out: list[str] = []
     run = 0  # bytes of text collected so far, ending at `i`
     i = 0
+
+    def flush() -> None:
+        if run:
+            out.append(f"<text:{run}b>" if run >= MIN_TEXT_RUN else data[i - run : i].hex())
 
     while i < len(data):
         size = _text_char_len(data, i)
@@ -92,11 +63,9 @@ def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
             run += size
             i += size
             continue
-        if run:
-            out.append(_mask_run(data, i - run, i, keep_ids))
+        flush()
         run = 0
         out.append(f"{data[i]:02x}")
         i += 1
-    if run:
-        out.append(_mask_run(data, i - run, i, keep_ids))
+    flush()
     return "".join(out)

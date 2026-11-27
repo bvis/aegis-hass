@@ -138,6 +138,26 @@ def _redact_printable(data: bytes) -> str:
     return mask_text_runs(data)
 
 
+# A hub or device id: eight hex digits, upper case. The letter is required so
+# an eight-digit number (a phone, a code) never passes for one; the few ids
+# without a letter are left out.
+_DEVICE_ID = re.compile(rb"(?=[0-9]*[A-F])[0-9A-F]{8}")
+
+
+def _device_ids_in(raw: bytes) -> list[str]:
+    """Device ids a push carries, in payload order, for the debug log (#686).
+
+    Only a whole string field counts, found by walking the message field by
+    field. Hex digits that are part of a longer text are never picked out of
+    it, so a name or a phone number next to them stays out of the log.
+    """
+    return [
+        field.decode()
+        for field in notification_event_parser._find_embedded_messages(raw)
+        if _DEVICE_ID.fullmatch(field)
+    ]
+
+
 # FCM credentials validation + library-error classifier extracted to
 # `notification_fcm_creds.py`. Re-exported here so callers (tests + the
 # listener inside this module) keep working unchanged.
@@ -1318,12 +1338,13 @@ class AjaxNotificationListener:
             raw = base64.b64decode(encoded_data)
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 # The whole push, so a field nothing reads yet (which keypad
-                # read a pass, #686) can be found in a reporter's log. Names
-                # are masked; ids stay, they are what tells devices apart.
+                # read a pass, #686) can be found in a reporter's log. Text is
+                # masked; the device ids are listed apart, in payload order.
                 _LOGGER.debug(
-                    "Push payload (%d bytes, hex, names masked): %s",
+                    "Push payload (%d bytes, hex, text masked): %s; device ids in it: %s",
                     len(raw),
-                    mask_text_runs(raw[:4096], keep_ids=True),
+                    _redact_printable(raw[:4096]),
+                    _device_ids_in(raw),
                 )
             event_info = self._extract_event_from_proto(raw)
             if event_info:
