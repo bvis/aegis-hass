@@ -214,10 +214,10 @@ class AegisDevicesCard extends HTMLElement {
     const pillHtml = pills
       .map(
         (p) => `
-        <div class="pill${p.active ? " active" : ""}" data-entity="${esc(p.entity)}" title="${esc(p.title)}" style="--c:${p.colour}">
+        <button type="button" class="pill${p.active ? " active" : ""}" data-entity="${esc(p.entity)}" title="${esc(p.title)}" style="--c:${p.colour}">
           <ha-state-icon data-icon-entity="${esc(p.entity)}"></ha-state-icon>
           <span class="pname">${esc(p.name)}</span>${p.text ? `<span class="pval">${esc(p.text)}</span>` : ""}
-        </div>`,
+        </button>`,
       )
       .join("");
     const chip = (c) =>
@@ -279,8 +279,8 @@ class AegisDevicesCard extends HTMLElement {
                  font-variant-numeric: tabular-nums; }
         .chip { display: inline-flex; align-items: center; gap: 2px; --mdc-icon-size: 16px; }
         .pills { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; padding: 10px 12px 2px; }
-        .pill { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 16px; min-width: 0;
-                cursor: pointer; font-size: 13px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
+        .pill { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 16px;
+                min-width: 0; text-align: left; cursor: pointer; font: inherit; font-size: 13px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
                 --mdc-icon-size: 16px; }
         .pill.active { background: color-mix(in srgb, var(--c) 24%, transparent); font-weight: 500; }
         .pname { flex: 1; min-width: 0; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -371,7 +371,13 @@ class AegisSecurityViewStrategy {
     const hub = all.filter((e) => hubIds.has(e.reg.device_id) && /^(binary_sensor|sensor)\./.test(e.id));
     // The names of the panel's attributes are among the integration's entity translations, which the
     // frontend loads on demand: ask for them, or the names depend on what happened to be loaded.
-    const localize = hass.loadBackendTranslation ? await hass.loadBackendTranslation("entity", PLATFORM) : hass.localize;
+    // A failed request must not cost the whole view: the names fall back to what is already loaded.
+    let localize = hass.localize;
+    try {
+      if (hass.loadBackendTranslation) localize = await hass.loadBackendTranslation("entity", PLATFORM);
+    } catch (err) {
+      console.warn("aegis-security: could not load the attribute names", err);
+    }
     const attribute = (panel, name, extra) => ({
       type: "attribute",
       entity: panel.id,

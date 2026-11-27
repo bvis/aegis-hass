@@ -109,7 +109,7 @@ assert.deepStrictEqual(pillsOf("tamper"), [["Front door · Lid", true, ""], ["Fr
 assert.deepStrictEqual(pillsOf("battery"), [["Front door", true, "12%"]]);
 assert.throws(() => card.setConfig({ sensors: "nope" }));
 card.hass = hass;
-assert.ok(card.shadowRoot.innerHTML.includes('class="pill active"'));
+assert.ok(card.shadowRoot.innerHTML.includes('<button type="button" class="pill active"'));
 
 card.setConfig({ hub: "nope" });
 assert.deepStrictEqual(card._model().devices, []);
@@ -136,6 +136,13 @@ assert.deepStrictEqual(card._model().devices, []);
   // A house with nothing of ours gets an empty view, not empty sections.
   const empty = await defs["ll-strategy-view-aegis-security"].generate({}, { ...hass, entities: {} });
   assert.deepStrictEqual(empty.sections.flatMap((s) => s.cards.map((c) => c.type)), ["heading", "custom:aegis-devices-card", "heading", "custom:aegis-devices-card"]);
+
+  // A failed translation request still gives the whole view.
+  const offline = await defs["ll-strategy-view-aegis-security"].generate(
+    {},
+    { ...hass, loadBackendTranslation: async () => Promise.reject(new Error("offline")) },
+  );
+  assert.strictEqual(offline.sections.length, view.sections.length);
 
   const dashboard = await defs["ll-strategy-dashboard-aegis-security"].generate({ type: "custom:aegis-security", hub: "hub" }, hass);
   assert.deepStrictEqual(dashboard.views[0].strategy, { type: "custom:aegis-security", hub: "hub" });
