@@ -601,11 +601,14 @@ type: custom:aegis-devices-card
 # cameras: false          # hide the camera tiles
 # devices: false          # hide the device rows
 # only_issues: true       # only the devices that need attention or are open
+# sensors: door           # instead of all that: one small pill per door/window, or `tamper`, or `battery`
 ```
+
+With `sensors` the card becomes a compact block: a pill per sensor of that kind with the device's name, highlighted when it is open, when the lid is off or when the battery is under 20 %. Three of them cover doors, lids and batteries in the space of one list.
 
 ### Security view
 
-A whole view: the alarm panel with its arm buttons, the hub's status, the devices card, every door and window at a glance with the batteries, every lid (tamper) sensor, what needs attention, a temperature graph per sensor, the history of the alarm, doors and motion, the [activity card](#activity-card) and the logbook.
+A whole view: the alarm panel with its arm buttons, the hub's status, the devices card, doors and windows, lid (tamper) sensors and batteries as compact pills, what needs attention, a temperature graph per sensor, the history of the alarm, doors and motion, the [activity card](#activity-card) and the logbook.
 
 - **As a new dashboard**: **Settings → Dashboards → Add dashboard** and pick **Aegis security**, under the community dashboards.
 - **As a view in a dashboard you already have**: edit the dashboard, add a view, open its YAML editor and paste:
