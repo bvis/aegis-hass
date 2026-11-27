@@ -138,6 +138,17 @@ def _redact_printable(data: bytes) -> str:
     return mask_text_runs(data)
 
 
+def _device_ids_in(raw: bytes, known: set[str]) -> list[str]:
+    """Ids of this install's own devices in a push, in payload order (#686).
+
+    For the debug log. An id is only named when it is a whole string field and
+    one of the devices Home Assistant already has, so nothing that merely looks
+    like an id (a short label, a number) is ever taken out of the masked dump.
+    """
+    fields = notification_event_parser._find_embedded_messages(raw)
+    return [text for field in fields if (text := field.decode("ascii", "ignore")) in known]
+
+
 # FCM credentials validation + library-error classifier extracted to
 # `notification_fcm_creds.py`. Re-exported here so callers (tests + the
 # listener inside this module) keep working unchanged.
@@ -1316,6 +1327,16 @@ class AjaxNotificationListener:
         """Parse event from base64-encoded push notification data."""
         try:
             raw = base64.b64decode(encoded_data)
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                # The whole push, so a field nothing reads yet (which keypad
+                # read a pass, #686) can be found in a reporter's log. Text is
+                # masked; the ids of known devices are listed apart, in payload order.
+                _LOGGER.debug(
+                    "Push payload (%d bytes, hex, text masked): %s; device ids in it: %s",
+                    len(raw),
+                    _redact_printable(raw[:4096]),
+                    _device_ids_in(raw, set(getattr(self._coordinator, "devices", None) or ())),
+                )
             event_info = self._extract_event_from_proto(raw)
             if event_info:
                 event_type, event_data = event_info
