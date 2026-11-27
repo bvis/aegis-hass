@@ -123,7 +123,12 @@ assert.deepStrictEqual(card._model().devices, []);
   const cards = view.sections.flatMap((s) => s.cards);
   assert.strictEqual(view.type, "sections");
   assert.ok(cards.some((c) => c.type === "alarm-panel" && c.entity === "alarm_control_panel.hub"));
-  assert.strictEqual(cards.filter((c) => c.type === "custom:aegis-devices-card" && !c.sensors).length, 2);
+  // Cameras, the list of what is wrong and the list of devices are three separate cards.
+  assert.deepStrictEqual(
+    cards.filter((c) => c.type === "custom:aegis-devices-card" && !c.sensors).map((c) => [c.devices, c.cameras, c.only_issues]),
+    [[false, undefined, undefined], [undefined, false, true], [undefined, false, undefined]],
+  );
+  assert.ok(!cards.some((c) => c.type === "logbook"));
   assert.ok(cards.some((c) => c.type === "custom:aegis-activity-card" && c.entity === "event.hub_security"));
   assert.deepStrictEqual(cards.find((c) => c.type === "history-graph" && c.title === "Door").entities, [
     { entity: "binary_sensor.door", name: "Front door" },
@@ -139,7 +144,7 @@ assert.deepStrictEqual(card._model().devices, []);
 
   // A house with nothing of ours gets an empty view, not empty sections.
   const empty = await defs["ll-strategy-view-aegis-security"].generate({}, { ...hass, entities: {} });
-  assert.deepStrictEqual(empty.sections.flatMap((s) => s.cards.map((c) => c.type)), ["heading", "custom:aegis-devices-card", "heading", "custom:aegis-devices-card"]);
+  assert.deepStrictEqual(empty.sections, []);
 
   // A failed translation request still gives the whole view.
   const offline = await defs["ll-strategy-view-aegis-security"].generate(

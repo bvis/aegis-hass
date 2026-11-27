@@ -371,6 +371,7 @@ class AegisSecurityViewStrategy {
     const events = domain("event").filter((e) => e.reg.translation_key === "security_event");
     const doors = cls("door", "window", "garage_door", "opening");
     const motion = cls("motion", "occupancy");
+    const cameras = domain("camera");
     const temps = cls("temperature");
     const tampers = cls("tamper");
     const pills = (sensors) => ({ type: `custom:${CARD}`, hub: config.hub, sensors });
@@ -415,37 +416,36 @@ class AegisSecurityViewStrategy {
     return {
       type: "sections",
       max_columns: config.max_columns || 3,
+      // Reading order: what to act on first (alarm, cameras, what is open or wrong), then the detail.
       sections: [
         ...section([
           heading(w.alarm, "mdi:shield-home"),
           ...panels.map((p) => ({ type: "alarm-panel", entity: p.id, states: ["arm_away", "arm_night"] })),
           ...delays,
-          ...(hub.length ? [{ type: "entities", entities: hub.map((e) => ({ entity: e.id, name: entityName(e.stateObj, e.device) })) }] : []),
         ]),
-        ...section([heading(`${w.camera} · ${w.devices}`, "mdi:cctv"), { type: `custom:${CARD}`, hub: config.hub }]),
-        // Every door, lid sensor and battery at a glance, one small pill each.
+        ...section([heading(w.camera, "mdi:cctv"), ...(cameras.length ? [{ type: `custom:${CARD}`, hub: config.hub, devices: false }] : [])]),
+        // Doors, lid sensors, anything else that is wrong, and batteries: one small block each.
         ...section([
           ...(doors.length ? [heading(`${w.door} · ${w.window}`, "mdi:door"), pills("door")] : []),
           ...(tampers.length ? [heading(w.tamper, "mdi:shield-off"), pills("tamper")] : []),
+          ...(all.length ? [heading(w.problem, "mdi:alert"), { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true }] : []),
           ...(batteries.length ? [heading(w.battery, "mdi:battery"), pills("battery")] : []),
         ]),
         ...section([
-          heading(w.problem, "mdi:alert"),
-          { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true },
           ...(temps.length ? [heading(w.temperature, "mdi:thermometer")] : []),
           ...byDevice(temps).map((t) => ({ type: "sensor", ...t, graph: "line", hours_to_show: 24, grid_options: { columns: 6 } })),
+          ...(hub.length
+            ? [heading("Hub", "mdi:router-wireless"), { type: "entities", entities: hub.map((e) => ({ entity: e.id, name: entityName(e.stateObj, e.device) })) }]
+            : []),
         ]),
+        ...section([heading(w.devices, "mdi:shield-outline"), ...(all.length ? [{ type: `custom:${CARD}`, hub: config.hub, cameras: false }] : [])]),
         ...section([
           heading(w.history, "mdi:chart-timeline"),
           ...(panels.length ? [{ type: "history-graph", title: w.alarm, hours_to_show: 48, entities: byDevice(panels) }] : []),
           ...(doors.length ? [{ type: "history-graph", title: w.door, hours_to_show: 24, entities: byDevice(doors) }] : []),
           ...(motion.length ? [{ type: "history-graph", title: w.motion, hours_to_show: 24, entities: byDevice(motion) }] : []),
         ]),
-        ...section([
-          heading(w.activity, "mdi:history"),
-          ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 })),
-          ...(doors.length + motion.length ? [{ type: "logbook", hours_to_show: 24, entities: [...doors, ...motion].map((e) => e.id) }] : []),
-        ]),
+        ...section([heading(w.activity, "mdi:history"), ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 }))]),
       ],
     };
   }
