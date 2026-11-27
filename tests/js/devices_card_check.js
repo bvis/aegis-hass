@@ -107,9 +107,10 @@ assert.deepStrictEqual(card._model().devices, []);
     { entity: "binary_sensor.door", name: "Front door" },
     { entity: "binary_sensor.gone", name: "Gone" },
   ]);
-  // Doors at a glance with the batteries that report a value (the keypad's reports none).
+  // Doors at a glance with the batteries that report a value (the keypad's reports none), then the lid sensors.
   const glances = cards.filter((c) => c.type === "glance");
-  assert.deepStrictEqual(glances.map((g) => g.entities.map((e) => e.name)), [["Front door", "Gone"], ["Front door"]]);
+  assert.deepStrictEqual(glances.map((g) => g.entities.map((e) => e.name)), [["Front door", "Gone"], ["Front door"], ["Front door"]]);
+  assert.deepStrictEqual(glances[2].entities, [{ entity: "binary_sensor.door_tamper", name: "Front door" }]);
   // The delays rows come only with the attribute; hub entities lose the device name in front.
   const lists = cards.filter((c) => c.type === "entities");
   assert.strictEqual(lists[0].entities[1].attribute, "exit_delay_seconds");

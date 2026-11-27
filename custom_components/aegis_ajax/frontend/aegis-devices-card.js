@@ -62,6 +62,7 @@ const words = (hass) => {
     door: own("component.binary_sensor.entity_component.door.name", "Door"),
     window: own("component.binary_sensor.entity_component.window.name", "Window"),
     battery: own("component.sensor.entity_component.battery.name", "Battery"),
+    tamper: own("component.binary_sensor.entity_component.tamper.name", "Tamper"),
     motion: own("component.binary_sensor.entity_component.motion.name", "Motion"),
     title: own("ui.panel.lovelace.editor.card.generic.title", "Title"),
   };
@@ -311,6 +312,7 @@ class AegisSecurityViewStrategy {
     const doors = cls("door", "window", "garage_door", "opening");
     const motion = cls("motion", "occupancy");
     const temps = cls("temperature");
+    const tampers = cls("tamper");
     // Batteries are diagnostic entities; one that reports nothing is left out.
     const batteries = all.filter((e) => e.stateObj.attributes.device_class === "battery" && !Number.isNaN(Number(e.stateObj.state)));
     const glance = (list, title) => ({ type: "glance", title, show_state: true, columns: 3, entities: byDevice(list) });
@@ -357,6 +359,8 @@ class AegisSecurityViewStrategy {
           ...(doors.length ? [glance(doors)] : []),
           ...(doors.length && batteries.length ? [glance(batteries, w.battery)] : []),
         ]),
+        // Every lid sensor in one place: an opened device shows here before anything else says so.
+        ...section([heading(w.tamper, "mdi:shield-off"), ...(tampers.length ? [glance(tampers)] : [])]),
         ...section([
           heading(w.problem, "mdi:alert"),
           { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true },
