@@ -18,6 +18,9 @@ const st = (id, state, attributes = {}) => ({ entity_id: id, state, attributes, 
 const reg = (id, device_id, extra = {}) => ({ entity_id: id, device_id, platform: "aegis_ajax", ...extra });
 const hass = {
   language: "en",
+  // The attribute names come from translations the view has to ask for.
+  loadBackendTranslation: async (category, integration) => (key) =>
+    category === "entity" && integration === "aegis_ajax" && key.endsWith("space.state_attributes.exit_delay_seconds.name") ? "Exit delay (loaded)" : "",
   entities: Object.fromEntries(
     [
       reg("alarm_control_panel.hub", "hub"),
@@ -25,6 +28,7 @@ const hass = {
       reg("binary_sensor.hub_ethernet", "hub", { entity_category: "diagnostic" }),
       reg("binary_sensor.door", "d1"),
       reg("binary_sensor.door_tamper", "d1"),
+      reg("binary_sensor.door_tilt", "d1"),
       reg("sensor.door_battery", "d1", { entity_category: "diagnostic" }),
       reg("sensor.door_temperature", "d1"),
       reg("camera.cam", "c1"),
@@ -42,7 +46,8 @@ const hass = {
       st("event.hub_security", "2026-11-27T08:00:00+00:00"),
       st("binary_sensor.hub_ethernet", "on", { device_class: "connectivity", friendly_name: "Hub Ethernet" }),
       st("binary_sensor.door", "on", { device_class: "door" }),
-      st("binary_sensor.door_tamper", "on", { device_class: "tamper" }),
+      st("binary_sensor.door_tamper", "on", { device_class: "tamper", friendly_name: "Front door Lid" }),
+      st("binary_sensor.door_tilt", "off", { device_class: "tamper", friendly_name: "Front door Tilt" }),
       st("sensor.door_battery", "12", { device_class: "battery" }),
       st("sensor.door_temperature", "21.5", { device_class: "temperature" }),
       st("camera.cam", "idle", { entity_picture: "/api/camera_proxy/camera.cam?token=x" }),
@@ -93,6 +98,23 @@ model = card._model();
 assert.deepStrictEqual(model.devices.map((d) => d.name), ["Front door", "Gone", "Fire"]);
 assert.deepStrictEqual(model.cameras, []);
 
+// Pills: one per sensor of the kind, the ones to look at first; a battery that reports nothing is left out.
+const pillsOf = (sensors) => {
+  card.setConfig({ sensors });
+  card._hass = hass;
+  return card._model().pills.map((p) => [p.name, p.active, p.text]);
+};
+assert.deepStrictEqual(pillsOf("door"), [["Front door", true, ""], ["Gone", false, ""]]);
+// Lids and batteries list only what is wrong and count the rest.
+assert.deepStrictEqual(pillsOf("tamper"), [["Front door · Lid", true, ""], [undefined, undefined, "1 OK"]]);
+assert.deepStrictEqual(pillsOf("battery"), [["Front door", true, "12%"]]);
+hass.states["sensor.door_battery"].state = "80";
+assert.deepStrictEqual(pillsOf("battery"), [[undefined, undefined, "1 OK"]]);
+hass.states["sensor.door_battery"].state = "12";
+assert.throws(() => card.setConfig({ sensors: "nope" }));
+card.hass = hass;
+assert.ok(card.shadowRoot.innerHTML.includes('<button type="button" class="pill active"'));
+
 card.setConfig({ hub: "nope" });
 assert.deepStrictEqual(card._model().devices, []);
 
@@ -101,20 +123,38 @@ assert.deepStrictEqual(card._model().devices, []);
   const cards = view.sections.flatMap((s) => s.cards);
   assert.strictEqual(view.type, "sections");
   assert.ok(cards.some((c) => c.type === "alarm-panel" && c.entity === "alarm_control_panel.hub"));
-  assert.strictEqual(cards.filter((c) => c.type === "custom:aegis-devices-card").length, 2);
+  // Cameras, the list of what is wrong and the list of devices are three separate cards.
+  assert.deepStrictEqual(
+    cards.filter((c) => c.type === "custom:aegis-devices-card" && !c.sensors).map((c) => [c.devices, c.cameras, c.only_issues]),
+    [[false, undefined, undefined], [undefined, false, true], [undefined, false, undefined]],
+  );
+  assert.ok(!cards.some((c) => c.type === "logbook"));
+  // The activity card opens the history block, before the graphs.
+  const history = view.sections[view.sections.length - 1].cards.map((c) => c.type);
+  assert.deepStrictEqual(history.slice(0, 3), ["heading", "custom:aegis-activity-card", "history-graph"]);
   assert.ok(cards.some((c) => c.type === "custom:aegis-activity-card" && c.entity === "event.hub_security"));
   assert.deepStrictEqual(cards.find((c) => c.type === "history-graph" && c.title === "Door").entities, [
     { entity: "binary_sensor.door", name: "Front door" },
     { entity: "binary_sensor.gone", name: "Gone" },
   ]);
+  // Doors, lid sensors and batteries each get a block of pills.
+  assert.deepStrictEqual(cards.filter((c) => c.sensors).map((c) => c.sensors), ["door", "tamper", "battery"]);
   // The delays rows come only with the attribute; hub entities lose the device name in front.
   const lists = cards.filter((c) => c.type === "entities");
   assert.strictEqual(lists[0].entities[1].attribute, "exit_delay_seconds");
+  assert.strictEqual(lists[0].entities[1].name, "Exit delay (loaded)");
   assert.deepStrictEqual(lists[1].entities, [{ entity: "binary_sensor.hub_ethernet", name: "Ethernet" }]);
 
   // A house with nothing of ours gets an empty view, not empty sections.
   const empty = await defs["ll-strategy-view-aegis-security"].generate({}, { ...hass, entities: {} });
-  assert.deepStrictEqual(empty.sections.flatMap((s) => s.cards.map((c) => c.type)), ["heading", "custom:aegis-devices-card", "heading", "custom:aegis-devices-card"]);
+  assert.deepStrictEqual(empty.sections, []);
+
+  // A failed translation request still gives the whole view.
+  const offline = await defs["ll-strategy-view-aegis-security"].generate(
+    {},
+    { ...hass, loadBackendTranslation: async () => Promise.reject(new Error("offline")) },
+  );
+  assert.strictEqual(offline.sections.length, view.sections.length);
 
   const dashboard = await defs["ll-strategy-dashboard-aegis-security"].generate({ type: "custom:aegis-security", hub: "hub" }, hass);
   assert.deepStrictEqual(dashboard.views[0].strategy, { type: "custom:aegis-security", hub: "hub" });

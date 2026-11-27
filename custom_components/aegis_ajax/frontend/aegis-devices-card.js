@@ -24,6 +24,13 @@ const MODEL_ICONS = [
   [/key ?pad|keyboard/i, "mdi:dialpad"],
   [/spacecontrol|keyfob|button/i, "mdi:remote"],
 ];
+// `sensors: door | tamper | battery` turns the card into one small pill per sensor of that kind.
+const PILL_KINDS = {
+  door: { classes: ["door", "window", "garage_door", "opening"], colour: BLUE },
+  // Lids and batteries only matter when something is wrong: the ones that are fine are counted, not listed.
+  tamper: { classes: ["tamper"], colour: AMBER, quiet: true },
+  battery: { classes: ["battery"], colour: AMBER, quiet: true },
+};
 const CARD = "aegis-devices-card";
 const STRATEGY = "aegis-security";
 
@@ -58,8 +65,10 @@ const words = (hass) => {
     problem: own("component.binary_sensor.entity_component.problem.name", "Problem"),
     temperature: own("component.sensor.entity_component.temperature.name", "Temperature"),
     history: own("panel.history", "History"),
-    activity: own("panel.logbook", "Activity"),
     door: own("component.binary_sensor.entity_component.door.name", "Door"),
+    window: own("component.binary_sensor.entity_component.window.name", "Window"),
+    battery: own("component.sensor.entity_component.battery.name", "Battery"),
+    tamper: own("component.binary_sensor.entity_component.tamper.name", "Tamper"),
     motion: own("component.binary_sensor.entity_component.motion.name", "Motion"),
     title: own("ui.panel.lovelace.editor.card.generic.title", "Title"),
   };
@@ -74,6 +83,7 @@ const aegisEntities = (hass, hub) =>
 
 class AegisDevicesCard extends HTMLElement {
   setConfig(config) {
+    if (config.sensors && !PILL_KINDS[config.sensors]) throw new Error(`sensors must be one of: ${Object.keys(PILL_KINDS).join(", ")}`);
     this._config = { cameras: true, devices: true, only_issues: false, ...config };
     this._sig = undefined;
   }
@@ -92,6 +102,7 @@ class AegisDevicesCard extends HTMLElement {
   _model() {
     const hass = this._hass;
     const cfg = this._config;
+    if (cfg.sensors) return { cameras: [], devices: [], pills: this._pills(PILL_KINDS[cfg.sensors]) };
     const byDevice = {};
     for (const e of aegisEntities(hass, cfg.hub)) (byDevice[e.reg.device_id] = byDevice[e.reg.device_id] || []).push(e);
     const cameras = [];
@@ -171,8 +182,50 @@ class AegisDevicesCard extends HTMLElement {
     return { cameras: cfg.cameras ? cameras : [], devices: cfg.devices ? devices : [] };
   }
 
-  _render({ cameras, devices }) {
+  // One entry per sensor of a kind, across every device: the ones to look at first.
+  _pills(kind) {
+    const hass = this._hass;
+    const battery = kind === PILL_KINDS.battery;
+    const list = aegisEntities(hass, this._config.hub)
+      .filter((e) => kind.classes.includes(e.stateObj.attributes.device_class) && (battery || !e.reg.entity_category))
+      .filter((e) => !battery || (e.stateObj.state !== "" && !Number.isNaN(Number(e.stateObj.state))));
+    const perDevice = {};
+    for (const e of list) perDevice[e.reg.device_id] = (perDevice[e.reg.device_id] || 0) + 1;
+    const pills = list
+      .map((e) => {
+        const state = e.stateObj.state;
+        const active = battery ? Number(state) < 20 : state === "on";
+        return {
+          entity: e.id,
+          // A device with two of the kind (lid and tilt) says which one each pill is.
+          name: perDevice[e.reg.device_id] > 1 ? `${deviceName(e.device, e.id)} · ${entityName(e.stateObj, e.device)}` : deviceName(e.device, e.id),
+          text: battery ? `${Math.round(Number(state))}%` : "",
+          title: hass.formatEntityState ? hass.formatEntityState(e.stateObj) : state,
+          state,
+          colour: active ? kind.colour : GREY,
+          active,
+        };
+      })
+      .sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
+    if (!kind.quiet) return pills;
+    const shown = pills.filter((p) => p.active || p.state === "unavailable");
+    const fine = pills.length - shown.length;
+    return fine ? [...shown, { summary: true, text: `${fine} OK` }] : shown;
+  }
+
+  _render({ cameras, devices, pills = [] }) {
     const cfg = this._config;
+    const pillHtml = pills
+      .map((p) =>
+        p.summary
+          ? `<div class="pill fine" style="--c:${GREEN}"><ha-icon icon="mdi:check-circle"></ha-icon><span class="pname">${esc(p.text)}</span></div>`
+          : `
+        <button type="button" class="pill${p.active ? " active" : ""}" data-entity="${esc(p.entity)}" title="${esc(p.title)}" style="--c:${p.colour}">
+          <ha-state-icon data-icon-entity="${esc(p.entity)}"></ha-state-icon>
+          <span class="pname">${esc(p.name)}</span>${p.text ? `<span class="pval">${esc(p.text)}</span>` : ""}
+        </button>`,
+      )
+      .join("");
     const chip = (c) =>
       `<span class="chip" data-entity="${esc(c.entity)}" title="${esc(c.title || "")}" style="${c.colour ? `color:${c.colour}` : ""}">
          ${c.icon ? `<ha-icon icon="${c.icon}"></ha-icon>` : ""}${c.text ? esc(c.text) : ""}</span>`;
@@ -231,12 +284,21 @@ class AegisDevicesCard extends HTMLElement {
         .chips { flex: none; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--secondary-text-color);
                  font-variant-numeric: tabular-nums; }
         .chip { display: inline-flex; align-items: center; gap: 2px; --mdc-icon-size: 16px; }
+        .pills { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; padding: 10px 12px 2px; }
+        .pill { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 16px;
+                min-width: 0; text-align: left; cursor: pointer; font: inherit; font-size: 13px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
+                --mdc-icon-size: 16px; }
+        .pill.fine { cursor: default; }
+        .pill.active { background: color-mix(in srgb, var(--c) 24%, transparent); font-weight: 500; }
+        .pname { flex: 1; min-width: 0; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pval { flex: none; color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
         .empty { padding: 16px; display: grid; place-items: center; color: var(--success-color, #43a047); }
       </style>
       <ha-card ${cfg.title ? `header="${esc(cfg.title)}"` : ""}>
         ${camHtml ? `<div class="cams">${camHtml}</div>` : ""}
         ${devHtml}
-        ${camHtml || devHtml ? "" : `<div class="empty"><ha-icon icon="mdi:shield-check"></ha-icon></div>`}
+        ${pillHtml ? `<div class="pills">${pillHtml}</div>` : ""}
+        ${camHtml || devHtml || pillHtml ? "" : `<div class="empty"><ha-icon icon="mdi:shield-check"></ha-icon></div>`}
       </ha-card>`;
     // Home Assistant picks the icon of an entity from its state; that element takes objects, not attributes.
     for (const el of this.shadowRoot.querySelectorAll("[data-icon-entity]")) {
@@ -267,7 +329,7 @@ class AegisDevicesCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 6;
+    return this._config.sensors ? 2 : 6;
   }
 
   // The switches of the editor read the config as it is, so the picker writes the defaults out.
@@ -308,14 +370,29 @@ class AegisSecurityViewStrategy {
     const events = domain("event").filter((e) => e.reg.translation_key === "security_event");
     const doors = cls("door", "window", "garage_door", "opening");
     const motion = cls("motion", "occupancy");
+    const cameras = domain("camera");
     const temps = cls("temperature");
+    const tampers = cls("tamper");
+    const pills = (sensors) => ({ type: `custom:${CARD}`, hub: config.hub, sensors });
+    const batteries = all.filter((e) => e.stateObj.attributes.device_class === "battery");
     const hubIds = new Set(panels.map((p) => p.reg.device_id));
     const hub = all.filter((e) => hubIds.has(e.reg.device_id) && /^(binary_sensor|sensor)\./.test(e.id));
+    // The names of the panel's attributes are among the integration's entity translations, which the
+    // frontend loads on demand: ask for them, or the names depend on what happened to be loaded.
+    // A failed request must not cost the whole view: the names fall back to what is already loaded.
+    let localize = hass.localize;
+    try {
+      if (hass.loadBackendTranslation) localize = await hass.loadBackendTranslation("entity", PLATFORM);
+    } catch (err) {
+      console.warn("aegis-security: could not load the attribute names", err);
+    }
     const attribute = (panel, name, extra) => ({
       type: "attribute",
       entity: panel.id,
       attribute: name,
-      name: hass.formatEntityAttributeName ? hass.formatEntityAttributeName(panel.stateObj, name) : name,
+      name:
+        (localize && localize(`component.${PLATFORM}.entity.alarm_control_panel.space.state_attributes.${name}.name`)) ||
+        (hass.formatEntityAttributeName ? hass.formatEntityAttributeName(panel.stateObj, name) : name),
       ...extra,
     });
     // Present only with the option that shows exit and entry delays on the panel.
@@ -338,30 +415,36 @@ class AegisSecurityViewStrategy {
     return {
       type: "sections",
       max_columns: config.max_columns || 3,
+      // Reading order: what to act on first (alarm, cameras, what is open or wrong), then the detail.
       sections: [
         ...section([
           heading(w.alarm, "mdi:shield-home"),
           ...panels.map((p) => ({ type: "alarm-panel", entity: p.id, states: ["arm_away", "arm_night"] })),
           ...delays,
-          ...(hub.length ? [{ type: "entities", entities: hub.map((e) => ({ entity: e.id, name: entityName(e.stateObj, e.device) })) }] : []),
         ]),
-        ...section([heading(`${w.camera} · ${w.devices}`, "mdi:cctv"), { type: `custom:${CARD}`, hub: config.hub }]),
+        ...section([heading(w.camera, "mdi:cctv"), ...(cameras.length ? [{ type: `custom:${CARD}`, hub: config.hub, devices: false }] : [])]),
+        // Doors, lid sensors, anything else that is wrong, and batteries: one small block each.
         ...section([
-          heading(w.problem, "mdi:alert"),
-          { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true },
+          ...(doors.length ? [heading(`${w.door} · ${w.window}`, "mdi:door"), pills("door")] : []),
+          ...(tampers.length ? [heading(w.tamper, "mdi:shield-off"), pills("tamper")] : []),
+          ...(all.length ? [heading(w.problem, "mdi:alert"), { type: `custom:${CARD}`, hub: config.hub, cameras: false, only_issues: true }] : []),
+          ...(batteries.length ? [heading(w.battery, "mdi:battery"), pills("battery")] : []),
+        ]),
+        ...section([
           ...(temps.length ? [heading(w.temperature, "mdi:thermometer")] : []),
           ...byDevice(temps).map((t) => ({ type: "sensor", ...t, graph: "line", hours_to_show: 24, grid_options: { columns: 6 } })),
+          ...(hub.length
+            ? [heading("Hub", "mdi:router-wireless"), { type: "entities", entities: hub.map((e) => ({ entity: e.id, name: entityName(e.stateObj, e.device) })) }]
+            : []),
         ]),
+        ...section([heading(w.devices, "mdi:shield-outline"), ...(all.length ? [{ type: `custom:${CARD}`, hub: config.hub, cameras: false }] : [])]),
+        // Everything about what happened and when, the list of events first.
         ...section([
           heading(w.history, "mdi:chart-timeline"),
+          ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 })),
           ...(panels.length ? [{ type: "history-graph", title: w.alarm, hours_to_show: 48, entities: byDevice(panels) }] : []),
           ...(doors.length ? [{ type: "history-graph", title: w.door, hours_to_show: 24, entities: byDevice(doors) }] : []),
           ...(motion.length ? [{ type: "history-graph", title: w.motion, hours_to_show: 24, entities: byDevice(motion) }] : []),
-        ]),
-        ...section([
-          heading(w.activity, "mdi:history"),
-          ...events.map((e) => ({ type: "custom:aegis-activity-card", entity: e.id, days: 7, max: 15 })),
-          ...(doors.length + motion.length ? [{ type: "logbook", hours_to_show: 24, entities: [...doors, ...motion].map((e) => e.id) }] : []),
         ]),
       ],
     };
