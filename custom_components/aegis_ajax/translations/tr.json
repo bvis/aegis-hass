@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Kuruldu",
+                            "arm_failed": "Kurma başarısız",
                             "arm_night": "Gece modu etkin",
                             "battery_low": "Düşük pil",
                             "co_alarm": "CO alarmı",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Kuruldu",
+            "arm_failed": "Kurma başarısız",
             "arm_night": "Gece modu etkin",
             "battery_low": "Düşük pil",
             "co_alarm": "CO alarmı",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Kuruldu",
+                "arm_failed": "Kurma başarısız",
                 "arm_night": "Gece modu etkin",
                 "battery_low": "Düşük pil",
                 "co_alarm": "CO alarmı",

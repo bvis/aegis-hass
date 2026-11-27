@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarma",
                             "arm": "Armado",
+                            "arm_failed": "Armado fallido",
                             "arm_night": "Armado nocturno",
                             "battery_low": "Bateria baja",
                             "co_alarm": "Alarma CO",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarma",
             "arm": "Armado",
+            "arm_failed": "Armado fallido",
             "arm_night": "Armado nocturno",
             "battery_low": "Bateria baja",
             "co_alarm": "Alarma CO",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarma",
                 "arm": "Armado",
+                "arm_failed": "Armado fallido",
                 "arm_night": "Armado nocturno",
                 "battery_low": "Bateria baja",
                 "co_alarm": "Alarma CO",

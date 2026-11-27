@@ -5,7 +5,12 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from custom_components.aegis_ajax.api.models import Device
-from custom_components.aegis_ajax.const import ALL_EVENT_TYPES, HUB_EVENT_TAG_MAP, DeviceState
+from custom_components.aegis_ajax.const import (
+    ALL_EVENT_TYPES,
+    HUB_EVENT_TAG_MAP,
+    RAW_TAG_TO_SECURITY_STATE,
+    DeviceState,
+)
 from custom_components.aegis_ajax.event import (
     AjaxButtonPressEvent,
     AjaxDoorbellEvent,
@@ -273,6 +278,11 @@ class TestEventConstants:
 
     def test_hub_event_tag_map_has_intrusion_alarm(self) -> None:
         assert "intrusion_alarm" in HUB_EVENT_TAG_MAP
+
+    def test_refused_arming_is_not_an_arm(self) -> None:
+        # #702: the hub refused the attempt, so nothing was armed.
+        assert HUB_EVENT_TAG_MAP["arm_attempt"] == "arm_failed"
+        assert "arm_attempt" not in RAW_TAG_TO_SECURITY_STATE
 
     def test_all_event_types_are_sorted(self) -> None:
         assert sorted(ALL_EVENT_TYPES) == ALL_EVENT_TYPES

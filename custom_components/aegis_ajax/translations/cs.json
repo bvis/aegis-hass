@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Zastřeženo",
+                            "arm_failed": "Zastřežení se nezdařilo",
                             "arm_night": "Noční režim zapnut",
                             "battery_low": "Nízká baterie",
                             "co_alarm": "Alarm CO",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Zastřeženo",
+            "arm_failed": "Zastřežení se nezdařilo",
             "arm_night": "Noční režim zapnut",
             "battery_low": "Nízká baterie",
             "co_alarm": "Alarm CO",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Zastřeženo",
+                "arm_failed": "Zastřežení se nezdařilo",
                 "arm_night": "Noční režim zapnut",
                 "battery_low": "Nízká baterie",
                 "co_alarm": "Alarm CO",

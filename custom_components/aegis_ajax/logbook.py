@@ -19,6 +19,7 @@ LOGBOOK_ENTRY_MESSAGE = "message"
 _EVENT_DESCRIPTIONS: dict[str, str] = {
     "alarm": "Alarm triggered (via {device_name})",
     "arm": "Armed (via {device_name})",
+    "arm_failed": "Arming failed (via {device_name})",
     "arm_night": "Night mode armed (via {device_name})",
     "battery_low": "Battery low ({device_name})",
     "co_alarm": "CO alarm ({device_name})",

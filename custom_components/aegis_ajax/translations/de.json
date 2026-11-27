@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Alarm",
                             "arm": "Scharfgeschaltet",
+                            "arm_failed": "Scharfschaltung fehlgeschlagen",
                             "arm_night": "Nachtmodus aktiviert",
                             "battery_low": "Batterie schwach",
                             "co_alarm": "CO-Alarm",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Alarm",
             "arm": "Scharfgeschaltet",
+            "arm_failed": "Scharfschaltung fehlgeschlagen",
             "arm_night": "Nachtmodus aktiviert",
             "battery_low": "Batterie schwach",
             "co_alarm": "CO-Alarm",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Alarm",
                 "arm": "Scharfgeschaltet",
+                "arm_failed": "Scharfschaltung fehlgeschlagen",
                 "arm_night": "Nachtmodus aktiviert",
                 "battery_low": "Batterie schwach",
                 "co_alarm": "CO-Alarm",

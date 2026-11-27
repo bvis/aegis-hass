@@ -423,6 +423,7 @@
                         "state": {
                             "alarm": "Allarme",
                             "arm": "Inserito",
+                            "arm_failed": "Inserimento non riuscito",
                             "arm_night": "Modo notte attivato",
                             "battery_low": "Batteria scarica",
                             "co_alarm": "Allarme CO",
@@ -774,6 +775,7 @@
         "trigger_type": {
             "alarm": "Allarme",
             "arm": "Inserito",
+            "arm_failed": "Inserimento non riuscito",
             "arm_night": "Modo notte attivato",
             "battery_low": "Batteria scarica",
             "co_alarm": "Allarme CO",
@@ -803,6 +805,7 @@
             "options": {
                 "alarm": "Allarme",
                 "arm": "Inserito",
+                "arm_failed": "Inserimento non riuscito",
                 "arm_night": "Modo notte attivato",
                 "battery_low": "Batteria scarica",
                 "co_alarm": "Allarme CO",

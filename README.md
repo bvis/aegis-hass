@@ -645,6 +645,8 @@ Use these in automation templates, e.g. `{{ trigger.event.data.device_name }}`.
 
 **A detector that sets off the alarm keeps its own event type.** A door opened while the system is armed arrives as `door_open`, the same as any other opening; what marks it as an alarm is `category: alarm`. The alarm panel goes to `triggered` on a door opening, a motion detection or a glass break in that category while the space is armed, and stays there until it is disarmed. So for "the alarm went off, whatever caused it", trigger on the panel changing to `triggered`; for "this door set it off", trigger on the event and check `{{ trigger.event.data.category == 'alarm' }}`.
 
+**A refused arming is `arm_failed`, not `arm`.** When someone tries to arm with a door open and the hub refuses, the event type is `arm_failed` and the alarm panel stays disarmed. If they arm anyway, that one arrives as a normal `arm`.
+
 The alarm panel shows the same name as **changed by** after an arm or disarm (the person, keyfob or keypad), readable as `{{ state_attr('alarm_control_panel.my_hub', 'changed_by') }}`, and the panel's activity details name the arm or disarm event as the cause. It needs push notifications, covers the main panel (not per-group panels), is empty when a change arrives with no push, and is not kept across a restart.
 
 ### Security sensors
