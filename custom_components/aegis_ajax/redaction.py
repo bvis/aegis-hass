@@ -49,33 +49,45 @@ def is_text(value: bytes) -> bool:
 
 
 # A hardware or account id as Ajax writes it in a payload: hex digits as
-# text. One letter is required so a phone number never passes for an id.
-_HEX_ID = re.compile(rb"(?=[0-9]*[A-Fa-f])[0-9A-Fa-f]{8,}")
+# text. One letter is required so a number never passes for an id.
+_HEX_ID = re.compile(rb"(?=[0-9]*[A-Fa-f])[0-9A-Fa-f]+")
+_MIN_ID_LEN = 8
 
 
-def _mask_run(chunk: bytes, keep_ids: bool) -> str:
-    """Mask one text run, leaving the hex ids inside it readable if asked."""
-    if len(chunk) < MIN_TEXT_RUN:
-        return chunk.hex()
+def _mask_run(data: bytes, start: int, end: int, keep_ids: bool) -> str:
+    """Mask the text run `data[start:end]`, leaving whole-field hex ids readable.
+
+    A stretch of hex digits is only an id when it is a whole string field: the
+    byte before it is its length. Going by the look of the text alone would
+    show a phone number that happens to sit next to a printable field tag.
+    """
+    if end - start < MIN_TEXT_RUN:
+        return data[start:end].hex()
     if not keep_ids:
-        return f"<text:{len(chunk)}b>"
+        return f"<text:{end - start}b>"
     out: list[str] = []
-    last = 0
-    for match in _HEX_ID.finditer(chunk):
-        if match.start() > last:
-            out.append(_mask_run(chunk[last : match.start()], False))
-        out.append(f"<id:{match.group().decode()}>")
-        last = match.end()
-    if last < len(chunk):
-        out.append(_mask_run(chunk[last:], False))
+    last = pos = start
+    while pos < end:
+        size = data[pos - 1] if pos else 0
+        value = data[pos : pos + size]
+        if size >= _MIN_ID_LEN and pos + size <= end and _HEX_ID.fullmatch(value):
+            if pos > last:
+                out.append(f"<text:{pos - last}b>")
+            out.append(f"<id:{value.decode()}>")
+            last = pos = pos + size
+        else:
+            pos += 1
+    if end > last:
+        out.append(f"<text:{end - last}b>")
     return "".join(out)
 
 
 def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
     """Hex-encode `data`, replacing each text run with `<text:Nb>`.
 
-    With `keep_ids`, device, hub and user ids stay readable as `<id:...>`:
-    they say which device a payload is about, and they are not names.
+    With `keep_ids`, a string field that is a hex id (device, hub, user) stays
+    readable as `<id:...>`: it says which device a payload is about, and it is
+    not a name.
     """
     out: list[str] = []
     run = 0  # bytes of text collected so far, ending at `i`
@@ -88,10 +100,10 @@ def mask_text_runs(data: bytes, *, keep_ids: bool = False) -> str:
             i += size
             continue
         if run:
-            out.append(_mask_run(data[i - run : i], keep_ids))
+            out.append(_mask_run(data, i - run, i, keep_ids))
         run = 0
         out.append(f"{data[i]:02x}")
         i += 1
     if run:
-        out.append(_mask_run(data[i - run : i], keep_ids))
+        out.append(_mask_run(data, i - run, i, keep_ids))
     return "".join(out)
