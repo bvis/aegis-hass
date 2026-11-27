@@ -1231,12 +1231,34 @@ class TestMigrateEntry:
 
 def test_keyfob_devices_of_hubs_outside_the_entrys_spaces_are_removed() -> None:
     # #705: created before the hub connection was filtered by space.
+    from types import SimpleNamespace
+
     from custom_components.aegis_ajax import _async_remove_foreign_keyfob_devices
     from custom_components.aegis_ajax.const import DOMAIN
 
-    own = MagicMock(id="own", identifiers={(DOMAIN, "00AAAAAA_keyfobs")})
-    foreign = MagicMock(id="foreign", identifiers={(DOMAIN, "00BBBBBB_keyfobs")})
-    hub = MagicMock(id="hub", identifiers={(DOMAIN, "00BBBBBB")})
+    def new(dev_id: str, hub: str, *, composite: bool = False) -> SimpleNamespace:
+        # Home Assistant 2026.11+: one config entry per device.
+        return SimpleNamespace(
+            id=dev_id,
+            identifiers={(DOMAIN, f"{hub}_keyfobs")},
+            config_entry_id="e1",
+            is_composite_device=composite,
+        )
+
+    def old(dev_id: str, hub: str, entries: set[str]) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=dev_id, identifiers={(DOMAIN, f"{hub}_keyfobs")}, config_entries=entries
+        )
+
+    hub = SimpleNamespace(id="hub", identifiers={(DOMAIN, "00BBBBBB")}, config_entry_id="e1")
+    devices = [
+        new("own", "00AAAAAA"),
+        new("foreign", "00BBBBBB"),
+        new("composite", "00CCCCCC", composite=True),
+        old("old-foreign", "00DDDDDD", {"e1"}),
+        old("old-shared", "00EEEEEE", {"e1", "e2"}),
+        hub,
+    ]
     registry = MagicMock()
     coordinator = MagicMock(spaces={"s1": MagicMock(hub_id="00AAAAAA")})
     entry = MagicMock(entry_id="e1")
@@ -1245,15 +1267,22 @@ def test_keyfob_devices_of_hubs_outside_the_entrys_spaces_are_removed() -> None:
         patch("custom_components.aegis_ajax.dr.async_get", return_value=registry),
         patch(
             "custom_components.aegis_ajax.dr.async_entries_for_config_entry",
-            return_value=[own, foreign, hub],
+            return_value=devices,
         ),
     ):
         _async_remove_foreign_keyfob_devices(MagicMock(), entry, coordinator)
-        # Detached, not deleted: another entry may hold that hub's keyfobs rightfully.
-        registry.async_update_device.assert_called_once_with("foreign", remove_config_entry_id="e1")
-        registry.async_remove_device.assert_not_called()
+        # Ours alone: removed. Held by another entry too: left to it, and on an
+        # older Home Assistant this entry lets go of it.
+        assert [c.args for c in registry.async_remove_device.call_args_list] == [
+            ("foreign",),
+            ("old-foreign",),
+        ]
+        registry.async_update_device.assert_called_once_with(
+            "old-shared", remove_config_entry_id="e1"
+        )
 
         # Spaces not loaded yet: nothing is known to be foreign, nothing is removed.
         registry.reset_mock()
         _async_remove_foreign_keyfob_devices(MagicMock(), entry, MagicMock(spaces={}))
+        registry.async_remove_device.assert_not_called()
         registry.async_update_device.assert_not_called()
